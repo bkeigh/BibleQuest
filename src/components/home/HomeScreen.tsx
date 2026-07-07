@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuestOS, selectDaysAway } from "@/lib/questos/store";
 import { calculateTreeState } from "@/lib/questos/growth-engine";
 import { getDailyVerse } from "@/lib/questos/verse-engine";
@@ -23,7 +23,10 @@ import { questBySlug } from "@/data/seed/quests";
 
 function HomeInner() {
   const profile = useQuestOS((s) => s.profile);
-  const daysAway = useQuestOS(selectDaysAway);
+  // Snapshot how long they've been away ONCE, at mount — before AppShell's
+  // recordVisit() overwrites lastVisitDateKey to today. A reactive read would
+  // flip the warm "welcome back" line to same-day copy ~400ms in.
+  const [daysAway] = useState(() => selectDaysAway(useQuestOS.getState()));
   const growthEvents = useQuestOS((s) => s.growthEvents);
   const readingPosition = useQuestOS((s) => s.readingPosition);
   const getTodayAssignment = useQuestOS((s) => s.getTodayAssignment);

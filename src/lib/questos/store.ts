@@ -561,14 +561,16 @@ export const useQuestOS = create<QuestOSState>()(
           const already = s.chaptersRead.some(
             (c) => c.bookSlug === bookSlug && c.chapter === chapter
           );
-          set({
-            chaptersRead: [...s.chaptersRead, { bookSlug, chapter, dateKey }],
-          });
+          // Only record a chapter once — re-opening it must not grow the
+          // persisted array or re-fire growth for the same reading.
           if (!already) {
+            set({
+              chaptersRead: [...s.chaptersRead, { bookSlug, chapter, dateKey }],
+            });
             recordAction("chapter_read", `${bookName} ${chapter}`, "branches");
           }
           track("bible_chapter_opened");
-          return { newMilestones: runMilestoneCheck() };
+          return { newMilestones: already ? [] : runMilestoneCheck() };
         },
 
         setReadingPosition: (position) => {
