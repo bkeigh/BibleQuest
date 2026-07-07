@@ -1,11 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import {
-  useQuestOS,
-  selectTreeState,
-  selectTimeline,
-} from "@/lib/questos/store";
+import { useQuestOS } from "@/lib/questos/store";
+import { calculateTreeState } from "@/lib/questos/growth-engine";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
@@ -38,10 +35,16 @@ const EVENT_SPRITE: Record<JourneyEventType, PixelSpriteName> = {
 };
 
 function JourneyScreenInner() {
-  const tree = useQuestOS(selectTreeState);
-  const timeline = useQuestOS(selectTimeline);
+  const growthEvents = useQuestOS((s) => s.growthEvents);
+  const journeyEvents = useQuestOS((s) => s.journeyEvents);
   const earned = useQuestOS((s) => s.earnedMilestones);
   const lastVisit = useQuestOS((s) => s.lastVisitDateKey);
+
+  const tree = useMemo(() => calculateTreeState(growthEvents), [growthEvents]);
+  const timeline = useMemo(
+    () => [...journeyEvents].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)),
+    [journeyEvents]
+  );
 
   const earnedKeys = useMemo(() => new Set(earned.map((e) => e.key)), [earned]);
   const nextMilestones = useMemo(

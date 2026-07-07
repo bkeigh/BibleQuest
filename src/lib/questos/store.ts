@@ -17,7 +17,6 @@ import { seedQuests, questBySlug } from "@/data/seed/quests";
 import { seedMilestones } from "@/data/seed/milestones";
 import { getDailyVerse } from "./verse-engine";
 import { selectDailyQuest } from "./quest-engine";
-import { calculateTreeState } from "./growth-engine";
 import { computeMetrics, checkMilestones } from "./milestone-engine";
 import { getCurrentSeason } from "./seasonal-engine";
 import { toDateKey, daysBetween } from "@/lib/utils/dates";
@@ -76,7 +75,10 @@ interface QuestOSState {
   clearAllData: () => void;
 
   // -- daily loop
+  /** Pure read — safe during render. Does NOT persist. */
   getTodayAssignment: () => { assignment: DailyQuestAssignment; quest: QuestTemplate } | null;
+  /** Persists today's assignment if missing. Call from an effect, never render. */
+  ensureDailyQuest: () => void;
   rerollTodayQuest: () => void;
   startTodayQuest: () => void;
   completeTodayQuest: (reflection?: { body: string; mood?: ReflectionMood }) => { newMilestones: MilestoneSeed[] };
@@ -317,6 +319,8 @@ export const useQuestOS = create<QuestOSState>()(
             const quest = questBySlug.get(existing.questSlug);
             if (quest) return { assignment: existing, quest };
           }
+          // Compute today's quest deterministically WITHOUT persisting, so this
+          // is safe to call during render. ensureDailyQuest() persists it.
           const quest = selectDailyQuest({
             quests: seedQuests,
             dateKey,
@@ -326,14 +330,41 @@ export const useQuestOS = create<QuestOSState>()(
             recentSlugs: s.completions.map((c) => c.questSlug),
           });
           if (!quest) return null;
-          const assignment: DailyQuestAssignment = {
-            dateKey,
-            questSlug: quest.slug,
-            status: "assigned",
-            rerolls: 0,
+          return {
+            assignment: {
+              dateKey,
+              questSlug: quest.slug,
+              status: "assigned",
+              rerolls: 0,
+            },
+            quest,
           };
-          set({ assignments: { ...s.assignments, [dateKey]: assignment } });
-          return { assignment, quest };
+        },
+
+        ensureDailyQuest: () => {
+          const s = get();
+          const dateKey = toDateKey();
+          if (s.assignments[dateKey]) return;
+          const quest = selectDailyQuest({
+            quests: seedQuests,
+            dateKey,
+            profile: s.profile,
+            settings: s.settings,
+            season: getCurrentSeason().key,
+            recentSlugs: s.completions.map((c) => c.questSlug),
+          });
+          if (!quest) return;
+          set({
+            assignments: {
+              ...s.assignments,
+              [dateKey]: {
+                dateKey,
+                questSlug: quest.slug,
+                status: "assigned",
+                rerolls: 0,
+              },
+            },
+          });
         },
 
         rerollTodayQuest: () => {
@@ -567,22 +598,19 @@ export const useQuestOS = create<QuestOSState>()(
 );
 
 // ---------------------------------------------------------------------------
-// Derived selectors (pure reads — keep components declarative)
+// Derived selectors
+//
+// IMPORTANT: selectors passed to useQuestOS(...) must return a STABLE reference
+// (primitive or an unchanged object). Anything that builds a new object/array
+// each call (e.g. calculateTreeState, sorted timelines) must be derived with
+// useMemo in the component over the raw state slice — never inside a selector,
+// or zustand's getSnapshot loops. selectDaysAway is safe because it returns a
+// primitive.
 // ---------------------------------------------------------------------------
-
-export function selectTreeState(s: QuestOSState) {
-  return calculateTreeState(s.growthEvents);
-}
 
 export function selectDaysAway(s: QuestOSState): number | null {
   if (!s.lastVisitDateKey) return null;
   return daysBetween(s.lastVisitDateKey, toDateKey());
-}
-
-export function selectTimeline(s: QuestOSState): JourneyEvent[] {
-  return [...s.journeyEvents].sort((a, b) =>
-    b.occurredAt.localeCompare(a.occurredAt)
-  );
 }
 
 export { getDailyVerse };

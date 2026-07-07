@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
-import { useQuestOS, selectTreeState, selectDaysAway } from "@/lib/questos/store";
+import { useEffect, useMemo } from "react";
+import { useQuestOS, selectDaysAway } from "@/lib/questos/store";
+import { calculateTreeState } from "@/lib/questos/growth-engine";
 import { getDailyVerse } from "@/lib/questos/verse-engine";
 import { timeOfDay, toDateKey, formatFriendlyDate } from "@/lib/utils/dates";
 import { greeting, returnLine, dayCompleteLines } from "@/lib/questos/copy";
@@ -18,19 +19,37 @@ import { SeasonalAtmosphere } from "@/components/design-system/SeasonalAtmospher
 import { PixelIcon, CATEGORY_SPRITE } from "@/components/design-system/PixelIcon";
 import { IconArrowRight, IconChevronRight } from "@/components/design-system/icons";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
+import { questBySlug } from "@/data/seed/quests";
 
 function HomeInner() {
   const profile = useQuestOS((s) => s.profile);
   const daysAway = useQuestOS(selectDaysAway);
-  const tree = useQuestOS(selectTreeState);
+  const growthEvents = useQuestOS((s) => s.growthEvents);
   const readingPosition = useQuestOS((s) => s.readingPosition);
   const getTodayAssignment = useQuestOS((s) => s.getTodayAssignment);
+  const ensureDailyQuest = useQuestOS((s) => s.ensureDailyQuest);
   const rerollTodayQuest = useQuestOS((s) => s.rerollTodayQuest);
   const journeyEvents = useQuestOS((s) => s.journeyEvents);
+  // Subscribe to today's assignment slice so reroll/completion re-renders Home.
+  const todayAssignment = useQuestOS((s) => s.assignments[toDateKey()]);
 
+  // Persist today's quest once (never during render).
+  useEffect(() => {
+    ensureDailyQuest();
+  }, [ensureDailyQuest]);
+
+  const tree = useMemo(() => calculateTreeState(growthEvents), [growthEvents]);
   const verse = useMemo(() => getDailyVerse(), []);
   const season = useMemo(() => getCurrentSeason(), []);
-  const today = getTodayAssignment();
+  // Prefer the persisted assignment; fall back to a deterministic preview on the
+  // very first render before ensureDailyQuest() has run.
+  const today = useMemo(() => {
+    if (todayAssignment) {
+      const quest = questBySlug.get(todayAssignment.questSlug);
+      if (quest) return { assignment: todayAssignment, quest };
+    }
+    return getTodayAssignment();
+  }, [todayAssignment, getTodayAssignment]);
   const name = firstName(profile?.displayName);
   const time = timeOfDay();
 
