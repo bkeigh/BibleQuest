@@ -1,0 +1,159 @@
+/**
+ * Line icons — quiet, hairline UI glyphs (not the pixel sprites).
+ * 1.5px strokes, rounded, inheriting currentColor. Kept minimal per the Codex.
+ */
+import { cn } from "@/lib/utils/cn";
+
+interface IconProps {
+  className?: string;
+  size?: number;
+  strokeWidth?: number;
+}
+
+function Svg({
+  className,
+  size = 22,
+  strokeWidth = 1.6,
+  children,
+}: IconProps & { children: React.ReactNode }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={cn("shrink-0", className)}
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  );
+}
+
+export const IconHome = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 11.5 12 5l8 6.5" />
+    <path d="M6 10.5V19h12v-8.5" />
+    <path d="M10.5 19v-4.5h3V19" />
+  </Svg>
+);
+
+export const IconQuest = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M6 20V5a1 1 0 0 1 1-1h8l-1.5 3L15 10H7" />
+    <circle cx="6" cy="20" r="1.1" />
+  </Svg>
+);
+
+export const IconBible = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H18a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6.5A1.5 1.5 0 0 0 5 20.5z" />
+    <path d="M5 17.5A1.5 1.5 0 0 1 6.5 16H19" />
+    <path d="M12 7v5M9.5 9.5h5" />
+  </Svg>
+);
+
+export const IconPrayer = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 4c-1.2 2.2-2 3.4-2 5.2 0 1.4.9 2.3 2 2.3s2-.9 2-2.3C14 7.4 13.2 6.2 12 4Z" />
+    <path d="M8 20c0-3 1.5-5 4-5s4 2 4 5" />
+    <path d="M6.5 20h11" />
+  </Svg>
+);
+
+export const IconJourney = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 21c4-3 6-6.2 6-10a6 6 0 0 0-12 0c0 3.8 2 7 6 10Z" />
+    <path d="M12 21V9M12 12l2.5-2M12 14l-2.5-2" />
+  </Svg>
+);
+
+export const IconArrowRight = (p: IconProps) => (
+  <Svg {...p} size={p.size ?? 18}>
+    <path d="M5 12h13M13 6l6 6-6 6" />
+  </Svg>
+);
+
+export const IconArrowLeft = (p: IconProps) => (
+  <Svg {...p} size={p.size ?? 18}>
+    <path d="M19 12H6M11 6l-6 6 6 6" />
+  </Svg>
+);
+
+export const IconCheck = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5 12.5 10 17 19 7" />
+  </Svg>
+);
+
+export const IconBookmark = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1Z" />
+  </Svg>
+);
+
+export const IconBookmarkFilled = (p: IconProps) => (
+  <Svg {...p}>
+    <path
+      d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1Z"
+      fill="currentColor"
+      stroke="none"
+    />
+  </Svg>
+);
+
+export const IconPlus = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 5v14M5 12h14" />
+  </Svg>
+);
+
+export const IconSettings = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 3v2.5M12 18.5V21M4.2 7l2.1 1.2M17.7 15.8l2.1 1.2M4.2 17l2.1-1.2M17.7 8.2l2.1-1.2" />
+  </Svg>
+);
+
+export const IconClose = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M6 6l12 12M18 6 6 18" />
+  </Svg>
+);
+
+export const IconClock = (p: IconProps) => (
+  <Svg {...p} size={p.size ?? 16}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3 1.8" />
+  </Svg>
+);
+
+export const IconChevronRight = (p: IconProps) => (
+  <Svg {...p} size={p.size ?? 18}>
+    <path d="M9 6l6 6-6 6" />
+  </Svg>
+);
+
+export const IconSparkle = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 4c.5 3.5 1.5 4.5 5 5-3.5.5-4.5 1.5-5 5-.5-3.5-1.5-4.5-5-5 3.5-.5 4.5-1.5 5-5Z" />
+  </Svg>
+);
+
+export const IconShare = (p: IconProps) => (
+  <Svg {...p} size={p.size ?? 18}>
+    <path d="M12 3v12M8 6l4-3 4 3" />
+    <path d="M7 11H6a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1" />
+  </Svg>
+);
+
+export const IconLeaf = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5 19c0-8 6-13 14-13 0 8-5 14-13 14-.5 0-1 0-1-1Z" />
+    <path d="M5 19C8 14 12 11 16 9.5" />
+  </Svg>
+);

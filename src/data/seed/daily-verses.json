@@ -1,0 +1,602 @@
+[
+ {
+  "id": "dv01",
+  "reference": "John 3:16",
+  "bookSlug": "john",
+  "chapter": 3,
+  "verseStart": 16,
+  "verseEnd": 16,
+  "text": "For God so loved the world, that he gave his one and only Son, that whoever believes in him should not perish, but have eternal life.",
+  "theme": "love"
+ },
+ {
+  "id": "dv02",
+  "reference": "Psalm 23:1-3",
+  "bookSlug": "psalms",
+  "chapter": 23,
+  "verseStart": 1,
+  "verseEnd": 3,
+  "text": "Yahweh is my shepherd: I shall lack nothing. He makes me lie down in green pastures. He leads me beside still waters. He restores my soul. He guides me in the paths of righteousness for his name’s sake.",
+  "theme": "rest"
+ },
+ {
+  "id": "dv03",
+  "reference": "Psalm 46:10",
+  "bookSlug": "psalms",
+  "chapter": 46,
+  "verseStart": 10,
+  "verseEnd": 10,
+  "text": "“Be still, and know that I am God. I will be exalted among the nations. I will be exalted in the earth.”",
+  "theme": "stillness"
+ },
+ {
+  "id": "dv04",
+  "reference": "Isaiah 40:31",
+  "bookSlug": "isaiah",
+  "chapter": 40,
+  "verseStart": 31,
+  "verseEnd": 31,
+  "text": "but those who wait for Yahweh will renew their strength. They will mount up with wings like eagles. They will run, and not be weary. They will walk, and not faint.",
+  "theme": "renewal"
+ },
+ {
+  "id": "dv05",
+  "reference": "Isaiah 41:10",
+  "bookSlug": "isaiah",
+  "chapter": 41,
+  "verseStart": 10,
+  "verseEnd": 10,
+  "text": "Don’t you be afraid, for I am with you. Don’t be dismayed, for I am your God. I will strengthen you. Yes, I will help you. Yes, I will uphold you with the right hand of my righteousness.",
+  "theme": "courage"
+ },
+ {
+  "id": "dv06",
+  "reference": "Isaiah 26:3",
+  "bookSlug": "isaiah",
+  "chapter": 26,
+  "verseStart": 3,
+  "verseEnd": 3,
+  "text": "You will keep whoever’s mind is steadfast in perfect peace, because he trusts in you.",
+  "theme": "peace"
+ },
+ {
+  "id": "dv07",
+  "reference": "Jeremiah 29:11",
+  "bookSlug": "jeremiah",
+  "chapter": 29,
+  "verseStart": 11,
+  "verseEnd": 11,
+  "text": "For I know the thoughts that I think toward you,” says Yahweh, “thoughts of peace, and not of evil, to give you hope and a future.",
+  "theme": "hope"
+ },
+ {
+  "id": "dv08",
+  "reference": "Matthew 5:14-16",
+  "bookSlug": "matthew",
+  "chapter": 5,
+  "verseStart": 14,
+  "verseEnd": 16,
+  "text": "You are the light of the world. A city located on a hill can’t be hidden. Neither do you light a lamp, and put it under a measuring basket, but on a stand; and it shines to all who are in the house. Even so, let your light shine before men; that they may see your good works, and glorify your Father who is in heaven.",
+  "theme": "kindness"
+ },
+ {
+  "id": "dv09",
+  "reference": "Matthew 6:33-34",
+  "bookSlug": "matthew",
+  "chapter": 6,
+  "verseStart": 33,
+  "verseEnd": 34,
+  "text": "But seek first God’s Kingdom, and his righteousness; and all these things will be given to you as well. Therefore don’t be anxious for tomorrow, for tomorrow will be anxious for itself. Each day’s own evil is sufficient.",
+  "theme": "trust"
+ },
+ {
+  "id": "dv10",
+  "reference": "Matthew 11:28-30",
+  "bookSlug": "matthew",
+  "chapter": 11,
+  "verseStart": 28,
+  "verseEnd": 30,
+  "text": "“Come to me, all you who labor and are heavily burdened, and I will give you rest. Take my yoke upon you, and learn from me, for I am gentle and humble in heart; and you will find rest for your souls. For my yoke is easy, and my burden is light.”",
+  "theme": "rest"
+ },
+ {
+  "id": "dv11",
+  "reference": "Matthew 22:37-39",
+  "bookSlug": "matthew",
+  "chapter": 22,
+  "verseStart": 37,
+  "verseEnd": 39,
+  "text": "Jesus said to him, “ ‘You shall love the Lord your God with all your heart, with all your soul, and with all your mind.’ This is the first and great commandment. A second likewise is this, ‘You shall love your neighbor as yourself.’",
+  "theme": "love"
+ },
+ {
+  "id": "dv12",
+  "reference": "Matthew 7:7-8",
+  "bookSlug": "matthew",
+  "chapter": 7,
+  "verseStart": 7,
+  "verseEnd": 8,
+  "text": "“Ask, and it will be given you. Seek, and you will find. Knock, and it will be opened for you. For everyone who asks receives. He who seeks finds. To him who knocks it will be opened.",
+  "theme": "prayer"
+ },
+ {
+  "id": "dv13",
+  "reference": "Philippians 4:6-7",
+  "bookSlug": "philippians",
+  "chapter": 4,
+  "verseStart": 6,
+  "verseEnd": 7,
+  "text": "In nothing be anxious, but in everything, by prayer and petition with thanksgiving, let your requests be made known to God. And the peace of God, which surpasses all understanding, will guard your hearts and your thoughts in Christ Jesus.",
+  "theme": "peace"
+ },
+ {
+  "id": "dv14",
+  "reference": "Philippians 4:13",
+  "bookSlug": "philippians",
+  "chapter": 4,
+  "verseStart": 13,
+  "verseEnd": 13,
+  "text": "I can do all things through Christ, who strengthens me.",
+  "theme": "courage"
+ },
+ {
+  "id": "dv15",
+  "reference": "Romans 8:28",
+  "bookSlug": "romans",
+  "chapter": 8,
+  "verseStart": 28,
+  "verseEnd": 28,
+  "text": "We know that all things work together for good for those who love God, for those who are called according to his purpose.",
+  "theme": "trust"
+ },
+ {
+  "id": "dv16",
+  "reference": "Romans 8:38-39",
+  "bookSlug": "romans",
+  "chapter": 8,
+  "verseStart": 38,
+  "verseEnd": 39,
+  "text": "For I am persuaded that neither death, nor life, nor angels, nor principalities, nor things present, nor things to come, nor powers, nor height, nor depth, nor any other created thing will be able to separate us from God’s love which is in Christ Jesus our Lord.",
+  "theme": "love"
+ },
+ {
+  "id": "dv17",
+  "reference": "Romans 12:12",
+  "bookSlug": "romans",
+  "chapter": 12,
+  "verseStart": 12,
+  "verseEnd": 12,
+  "text": "rejoicing in hope; enduring in troubles; continuing steadfastly in prayer;",
+  "theme": "hope"
+ },
+ {
+  "id": "dv18",
+  "reference": "Romans 15:13",
+  "bookSlug": "romans",
+  "chapter": 15,
+  "verseStart": 13,
+  "verseEnd": 13,
+  "text": "Now may the God of hope fill you with all joy and peace in believing, that you may abound in hope, in the power of the Holy Spirit.",
+  "theme": "hope"
+ },
+ {
+  "id": "dv19",
+  "reference": "Joshua 1:9",
+  "bookSlug": "joshua",
+  "chapter": 1,
+  "verseStart": 9,
+  "verseEnd": 9,
+  "text": "Haven’t I commanded you? Be strong and courageous. Don’t be afraid. Don’t be dismayed, for Yahweh your God is with you wherever you go.”",
+  "theme": "courage"
+ },
+ {
+  "id": "dv20",
+  "reference": "Proverbs 3:5-6",
+  "bookSlug": "proverbs",
+  "chapter": 3,
+  "verseStart": 5,
+  "verseEnd": 6,
+  "text": "Trust in Yahweh with all your heart, and don’t lean on your own understanding. In all your ways acknowledge him, and he will make your paths straight.",
+  "theme": "trust"
+ },
+ {
+  "id": "dv21",
+  "reference": "Proverbs 16:3",
+  "bookSlug": "proverbs",
+  "chapter": 16,
+  "verseStart": 3,
+  "verseEnd": 3,
+  "text": "Commit your deeds to Yahweh, and your plans shall succeed.",
+  "theme": "work"
+ },
+ {
+  "id": "dv22",
+  "reference": "Psalm 118:24",
+  "bookSlug": "psalms",
+  "chapter": 118,
+  "verseStart": 24,
+  "verseEnd": 24,
+  "text": "This is the day that Yahweh has made. We will rejoice and be glad in it!",
+  "theme": "gratitude"
+ },
+ {
+  "id": "dv23",
+  "reference": "Psalm 121:1-2",
+  "bookSlug": "psalms",
+  "chapter": 121,
+  "verseStart": 1,
+  "verseEnd": 2,
+  "text": "I will lift up my eyes to the hills. Where does my help come from? My help comes from Yahweh, who made heaven and earth.",
+  "theme": "trust"
+ },
+ {
+  "id": "dv24",
+  "reference": "Psalm 139:23-24",
+  "bookSlug": "psalms",
+  "chapter": 139,
+  "verseStart": 23,
+  "verseEnd": 24,
+  "text": "Search me, God, and know my heart. Try me, and know my thoughts. See if there is any wicked way in me, and lead me in the everlasting way.",
+  "theme": "honesty"
+ },
+ {
+  "id": "dv25",
+  "reference": "Lamentations 3:22-23",
+  "bookSlug": "lamentations",
+  "chapter": 3,
+  "verseStart": 22,
+  "verseEnd": 23,
+  "text": "It is because of Yahweh’s loving kindnesses that we are not consumed, because his compassion doesn’t fail. They are new every morning. Great is your faithfulness.",
+  "theme": "renewal"
+ },
+ {
+  "id": "dv26",
+  "reference": "Micah 6:8",
+  "bookSlug": "micah",
+  "chapter": 6,
+  "verseStart": 8,
+  "verseEnd": 8,
+  "text": "He has shown you, O man, what is good. What does Yahweh require of you, but to act justly, to love mercy, and to walk humbly with your God?",
+  "theme": "justice"
+ },
+ {
+  "id": "dv27",
+  "reference": "Zephaniah 3:17",
+  "bookSlug": "zephaniah",
+  "chapter": 3,
+  "verseStart": 17,
+  "verseEnd": 17,
+  "text": "Yahweh, your God, is among you, a mighty one who will save. He will rejoice over you with joy. He will calm you in his love. He will rejoice over you with singing.",
+  "theme": "love"
+ },
+ {
+  "id": "dv28",
+  "reference": "Galatians 5:22-23",
+  "bookSlug": "galatians",
+  "chapter": 5,
+  "verseStart": 22,
+  "verseEnd": 23,
+  "text": "But the fruit of the Spirit is love, joy, peace, patience, kindness, goodness, faith, gentleness, and self-control. Against such things there is no law.",
+  "theme": "growth"
+ },
+ {
+  "id": "dv29",
+  "reference": "Galatians 6:9",
+  "bookSlug": "galatians",
+  "chapter": 6,
+  "verseStart": 9,
+  "verseEnd": 9,
+  "text": "Let’s not be weary in doing good, for we will reap in due season, if we don’t give up.",
+  "theme": "perseverance"
+ },
+ {
+  "id": "dv30",
+  "reference": "Ephesians 2:8-10",
+  "bookSlug": "ephesians",
+  "chapter": 2,
+  "verseStart": 8,
+  "verseEnd": 10,
+  "text": "for by grace you have been saved through faith, and that not of yourselves; it is the gift of God, not of works, that no one would boast. For we are his workmanship, created in Christ Jesus for good works, which God prepared before that we would walk in them.",
+  "theme": "grace"
+ },
+ {
+  "id": "dv31",
+  "reference": "Ephesians 4:32",
+  "bookSlug": "ephesians",
+  "chapter": 4,
+  "verseStart": 32,
+  "verseEnd": 32,
+  "text": "And be kind to one another, tender hearted, forgiving each other, just as God also in Christ forgave you.",
+  "theme": "forgiveness"
+ },
+ {
+  "id": "dv32",
+  "reference": "Colossians 3:12",
+  "bookSlug": "colossians",
+  "chapter": 3,
+  "verseStart": 12,
+  "verseEnd": 12,
+  "text": "Put on therefore, as God’s chosen ones, holy and beloved, a heart of compassion, kindness, lowliness, humility, and perseverance;",
+  "theme": "kindness"
+ },
+ {
+  "id": "dv33",
+  "reference": "Colossians 3:23",
+  "bookSlug": "colossians",
+  "chapter": 3,
+  "verseStart": 23,
+  "verseEnd": 23,
+  "text": "And whatever you do, work heartily, as for the Lord, and not for men,",
+  "theme": "work"
+ },
+ {
+  "id": "dv34",
+  "reference": "1 Thessalonians 5:11",
+  "bookSlug": "1-thessalonians",
+  "chapter": 5,
+  "verseStart": 11,
+  "verseEnd": 11,
+  "text": "Therefore exhort one another, and build each other up, even as you also do.",
+  "theme": "encouragement"
+ },
+ {
+  "id": "dv35",
+  "reference": "1 Thessalonians 5:16-18",
+  "bookSlug": "1-thessalonians",
+  "chapter": 5,
+  "verseStart": 16,
+  "verseEnd": 18,
+  "text": "Always rejoice. Pray without ceasing. In everything give thanks, for this is the will of God in Christ Jesus toward you.",
+  "theme": "gratitude"
+ },
+ {
+  "id": "dv36",
+  "reference": "Hebrews 10:24-25",
+  "bookSlug": "hebrews",
+  "chapter": 10,
+  "verseStart": 24,
+  "verseEnd": 25,
+  "text": "Let’s consider how to provoke one another to love and good works, not forsaking our own assembling together, as the custom of some is, but exhorting one another, and so much the more as you see the Day approaching.",
+  "theme": "community"
+ },
+ {
+  "id": "dv37",
+  "reference": "Hebrews 11:1",
+  "bookSlug": "hebrews",
+  "chapter": 11,
+  "verseStart": 1,
+  "verseEnd": 1,
+  "text": "Now faith is assurance of things hoped for, proof of things not seen.",
+  "theme": "faith"
+ },
+ {
+  "id": "dv38",
+  "reference": "James 1:19",
+  "bookSlug": "james",
+  "chapter": 1,
+  "verseStart": 19,
+  "verseEnd": 19,
+  "text": "So, then, my beloved brothers, let every man be swift to hear, slow to speak, and slow to anger;",
+  "theme": "patience"
+ },
+ {
+  "id": "dv39",
+  "reference": "James 1:22",
+  "bookSlug": "james",
+  "chapter": 1,
+  "verseStart": 22,
+  "verseEnd": 22,
+  "text": "But be doers of the word, and not only hearers, deluding your own selves.",
+  "theme": "action"
+ },
+ {
+  "id": "dv40",
+  "reference": "James 4:8",
+  "bookSlug": "james",
+  "chapter": 4,
+  "verseStart": 8,
+  "verseEnd": 8,
+  "text": "Draw near to God, and he will draw near to you. Cleanse your hands, you sinners. Purify your hearts, you double-minded.",
+  "theme": "prayer"
+ },
+ {
+  "id": "dv41",
+  "reference": "1 Peter 5:7",
+  "bookSlug": "1-peter",
+  "chapter": 5,
+  "verseStart": 7,
+  "verseEnd": 7,
+  "text": "casting all your worries on him, because he cares for you.",
+  "theme": "rest"
+ },
+ {
+  "id": "dv42",
+  "reference": "1 John 4:7",
+  "bookSlug": "1-john",
+  "chapter": 4,
+  "verseStart": 7,
+  "verseEnd": 7,
+  "text": "Beloved, let’s love one another, for love is of God; and everyone who loves has been born of God, and knows God.",
+  "theme": "love"
+ },
+ {
+  "id": "dv43",
+  "reference": "1 John 4:19",
+  "bookSlug": "1-john",
+  "chapter": 4,
+  "verseStart": 19,
+  "verseEnd": 19,
+  "text": "We love him, because he first loved us.",
+  "theme": "love"
+ },
+ {
+  "id": "dv44",
+  "reference": "Psalm 27:1",
+  "bookSlug": "psalms",
+  "chapter": 27,
+  "verseStart": 1,
+  "verseEnd": 1,
+  "text": "Yahweh is my light and my salvation. Whom shall I fear? Yahweh is the strength of my life. Of whom shall I be afraid?",
+  "theme": "courage"
+ },
+ {
+  "id": "dv45",
+  "reference": "Psalm 34:8",
+  "bookSlug": "psalms",
+  "chapter": 34,
+  "verseStart": 8,
+  "verseEnd": 8,
+  "text": "Oh taste and see that Yahweh is good. Blessed is the man who takes refuge in him.",
+  "theme": "gratitude"
+ },
+ {
+  "id": "dv46",
+  "reference": "Psalm 51:10",
+  "bookSlug": "psalms",
+  "chapter": 51,
+  "verseStart": 10,
+  "verseEnd": 10,
+  "text": "Create in me a clean heart, O God. Renew a right spirit within me.",
+  "theme": "renewal"
+ },
+ {
+  "id": "dv47",
+  "reference": "Psalm 90:12",
+  "bookSlug": "psalms",
+  "chapter": 90,
+  "verseStart": 12,
+  "verseEnd": 12,
+  "text": "So teach us to count our days, that we may gain a heart of wisdom.",
+  "theme": "wisdom"
+ },
+ {
+  "id": "dv48",
+  "reference": "Psalm 103:2-4",
+  "bookSlug": "psalms",
+  "chapter": 103,
+  "verseStart": 2,
+  "verseEnd": 4,
+  "text": "Praise Yahweh, my soul, and don’t forget all his benefits, who forgives all your sins, who heals all your diseases, who redeems your life from destruction, who crowns you with loving kindness and tender mercies,",
+  "theme": "gratitude"
+ },
+ {
+  "id": "dv49",
+  "reference": "Psalm 19:14",
+  "bookSlug": "psalms",
+  "chapter": 19,
+  "verseStart": 14,
+  "verseEnd": 14,
+  "text": "Let the words of my mouth and the meditation of my heart be acceptable in your sight, Yahweh, my rock, and my redeemer.",
+  "theme": "prayer"
+ },
+ {
+  "id": "dv50",
+  "reference": "Mark 12:30-31",
+  "bookSlug": "mark",
+  "chapter": 12,
+  "verseStart": 30,
+  "verseEnd": 31,
+  "text": "you shall love the Lord your God with all your heart, and with all your soul, and with all your mind, and with all your strength.’ This is the first commandment. The second is like this, ‘You shall love your neighbor as yourself.’ There is no other commandment greater than these.”",
+  "theme": "love"
+ },
+ {
+  "id": "dv51",
+  "reference": "Luke 6:31",
+  "bookSlug": "luke",
+  "chapter": 6,
+  "verseStart": 31,
+  "verseEnd": 31,
+  "text": "“As you would like people to do to you, do exactly so to them.",
+  "theme": "kindness"
+ },
+ {
+  "id": "dv52",
+  "reference": "Luke 12:34",
+  "bookSlug": "luke",
+  "chapter": 12,
+  "verseStart": 34,
+  "verseEnd": 34,
+  "text": "For where your treasure is, there will your heart be also.",
+  "theme": "treasure"
+ },
+ {
+  "id": "dv53",
+  "reference": "John 1:5",
+  "bookSlug": "john",
+  "chapter": 1,
+  "verseStart": 5,
+  "verseEnd": 5,
+  "text": "The light shines in the darkness, and the darkness hasn’t overcome it.",
+  "theme": "hope"
+ },
+ {
+  "id": "dv54",
+  "reference": "John 13:34-35",
+  "bookSlug": "john",
+  "chapter": 13,
+  "verseStart": 34,
+  "verseEnd": 35,
+  "text": "A new commandment I give to you, that you love one another. Just as I have loved you, you also love one another. By this everyone will know that you are my disciples, if you have love for one another.”",
+  "theme": "love"
+ },
+ {
+  "id": "dv55",
+  "reference": "John 14:27",
+  "bookSlug": "john",
+  "chapter": 14,
+  "verseStart": 27,
+  "verseEnd": 27,
+  "text": "Peace I leave with you. My peace I give to you; not as the world gives, I give to you. Don’t let your heart be troubled, neither let it be fearful.",
+  "theme": "peace"
+ },
+ {
+  "id": "dv56",
+  "reference": "John 15:5",
+  "bookSlug": "john",
+  "chapter": 15,
+  "verseStart": 5,
+  "verseEnd": 5,
+  "text": "I am the vine. You are the branches. He who remains in me and I in him bears much fruit, for apart from me you can do nothing.",
+  "theme": "growth"
+ },
+ {
+  "id": "dv57",
+  "reference": "1 Corinthians 13:4-7",
+  "bookSlug": "1-corinthians",
+  "chapter": 13,
+  "verseStart": 4,
+  "verseEnd": 7,
+  "text": "Love is patient and is kind. Love doesn’t envy. Love doesn’t brag, is not proud, doesn’t behave itself inappropriately, doesn’t seek its own way, is not provoked, takes no account of evil; doesn’t rejoice in unrighteousness, but rejoices with the truth; bears all things, believes all things, hopes all things, and endures all things.",
+  "theme": "love"
+ },
+ {
+  "id": "dv58",
+  "reference": "1 Corinthians 16:14",
+  "bookSlug": "1-corinthians",
+  "chapter": 16,
+  "verseStart": 14,
+  "verseEnd": 14,
+  "text": "Let all that you do be done in love.",
+  "theme": "love"
+ },
+ {
+  "id": "dv59",
+  "reference": "2 Corinthians 5:17",
+  "bookSlug": "2-corinthians",
+  "chapter": 5,
+  "verseStart": 17,
+  "verseEnd": 17,
+  "text": "Therefore if anyone is in Christ, he is a new creation. The old things have passed away. Behold, all things have become new.",
+  "theme": "renewal"
+ },
+ {
+  "id": "dv60",
+  "reference": "Deuteronomy 31:8",
+  "bookSlug": "deuteronomy",
+  "chapter": 31,
+  "verseStart": 8,
+  "verseEnd": 8,
+  "text": "Yahweh himself is who goes before you. He will be with you. He will not fail you nor forsake you. Don’t be afraid. Don’t be discouraged.”",
+  "theme": "courage"
+ }
+]

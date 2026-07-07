@@ -1,0 +1,44 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="34%" r="62%">
+      <stop offset="0%" stop-color="#fff9ec"/>
+      <stop offset="100%" stop-color="#fefffc"/>
+    </radialGradient>
+    <linearGradient id="canopy" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a8b98c"/>
+      <stop offset="100%" stop-color="#6f8155"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Parchment tile -->
+  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
+  <rect x="4" y="4" width="504" height="504" rx="108" fill="none" stroke="#dee2de" stroke-width="6"/>
+
+  <!-- Open book / page base -->
+  <path d="M120 372 Q256 340 392 372 L392 400 Q256 368 120 400 Z" fill="#e7eddd"/>
+  <path d="M256 356 L256 404" stroke="#a8b98c" stroke-width="5" stroke-linecap="round"/>
+  <path d="M120 372 Q256 340 392 372" fill="none" stroke="#a8b98c" stroke-width="5"/>
+
+  <!-- Trunk -->
+  <path d="M244 356 C 240 300, 240 250, 256 214 C 272 250, 272 300, 268 356 Z" fill="#3f4d31"/>
+
+  <!-- Canopy -->
+  <circle cx="256" cy="180" r="78" fill="url(#canopy)"/>
+  <circle cx="196" cy="212" r="52" fill="url(#canopy)"/>
+  <circle cx="316" cy="212" r="52" fill="url(#canopy)"/>
+
+  <!-- Leaf dots -->
+  <g fill="#6f8155">
+    <circle cx="228" cy="150" r="8"/>
+    <circle cx="286" cy="160" r="8"/>
+    <circle cx="256" cy="128" r="8"/>
+    <circle cx="200" cy="200" r="7"/>
+    <circle cx="312" cy="198" r="7"/>
+  </g>
+
+  <!-- A small gold flame/star above — light -->
+  <g transform="translate(256 92)">
+    <circle r="16" fill="#e5c36d"/>
+    <circle r="7" fill="#f2b24a"/>
+  </g>
+</svg>
