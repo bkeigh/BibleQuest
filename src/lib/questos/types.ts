@@ -415,6 +415,20 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 /**
+ * Local deletions the sync engine still needs to propagate to the account.
+ * Prayers/reflections are tracked by id; bookmarks by their natural key.
+ */
+export interface SyncTombstones {
+  prayers: string[];
+  reflections: string[];
+  bookmarks: Array<{ bookSlug: string; chapter: number; verse: number }>;
+}
+
+export function emptyTombstones(): SyncTombstones {
+  return { prayers: [], reflections: [], bookmarks: [] };
+}
+
+/**
  * The persisted data fields — the exact shape of an exported journey. Mirrors
  * the store's initial-state block; a restore round-trips through this.
  */

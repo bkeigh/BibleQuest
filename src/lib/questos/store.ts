@@ -42,13 +42,19 @@ import {
   type VerseBookmark,
   type GrowthType,
   type QuestOSSnapshot,
+  type SyncTombstones,
+  emptyTombstones,
 } from "./types";
 
 function id(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
   }
-  return `id-${Math.random().toString(36).slice(2)}${Date.now()}`;
+  // RFC4122-shaped fallback so ids stay valid uuid columns for account sync.
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
 }
 
 interface QuestOSState {
@@ -67,6 +73,8 @@ interface QuestOSState {
   /** Milestones earned but not yet gently shown to the user. */
   pendingMilestones: string[];
   lastVisitDateKey: string | null;
+  /** Local deletions the sync engine still needs to propagate remotely. */
+  tombstones: SyncTombstones;
 
   // -- lifecycle
   completeOnboarding: (profile: Omit<Profile, "onboardingCompleted" | "createdAt">, settings?: Partial<Settings>) => void;
@@ -107,6 +115,10 @@ interface QuestOSState {
 
   // -- milestones
   dismissPendingMilestone: (key: string) => void;
+
+  // -- sync bookkeeping
+  /** Remove tombstone entries the sync engine has propagated remotely. */
+  clearSyncTombstones: (cleared: SyncTombstones) => void;
 }
 
 function journeyTitle(type: JourneyEventType, detail?: string): string {
@@ -279,6 +291,7 @@ export const useQuestOS = create<QuestOSState>()(
         chaptersRead: [],
         pendingMilestones: [],
         lastVisitDateKey: null,
+        tombstones: emptyTombstones(),
 
         completeOnboarding: (profileData, settingsPatch) => {
           const now = new Date().toISOString();
@@ -323,6 +336,7 @@ export const useQuestOS = create<QuestOSState>()(
             chaptersRead: [],
             pendingMilestones: [],
             lastVisitDateKey: null,
+            tombstones: emptyTombstones(),
           });
         },
 
@@ -525,7 +539,14 @@ export const useQuestOS = create<QuestOSState>()(
         },
 
         deletePrayer: (prayerId) => {
-          set({ prayers: get().prayers.filter((p) => p.id !== prayerId) });
+          const s = get();
+          set({
+            prayers: s.prayers.filter((p) => p.id !== prayerId),
+            tombstones: {
+              ...s.tombstones,
+              prayers: [...s.tombstones.prayers, prayerId],
+            },
+          });
         },
 
         markPrayerAnswered: (prayerId, answerReflection) => {
@@ -583,8 +604,13 @@ export const useQuestOS = create<QuestOSState>()(
         },
 
         deleteReflection: (reflectionId) => {
+          const s = get();
           set({
-            reflections: get().reflections.filter((r) => r.id !== reflectionId),
+            reflections: s.reflections.filter((r) => r.id !== reflectionId),
+            tombstones: {
+              ...s.tombstones,
+              reflections: [...s.tombstones.reflections, reflectionId],
+            },
           });
         },
 
@@ -599,6 +625,17 @@ export const useQuestOS = create<QuestOSState>()(
           if (existing) {
             set({
               bookmarks: s.bookmarks.filter((b) => b.id !== existing.id),
+              tombstones: {
+                ...s.tombstones,
+                bookmarks: [
+                  ...s.tombstones.bookmarks,
+                  {
+                    bookSlug: existing.bookSlug,
+                    chapter: existing.chapter,
+                    verse: existing.verse,
+                  },
+                ],
+              },
             });
             return false;
           }
@@ -652,12 +689,41 @@ export const useQuestOS = create<QuestOSState>()(
             ),
           });
         },
+
+        clearSyncTombstones: (cleared) => {
+          const t = get().tombstones;
+          set({
+            tombstones: {
+              prayers: t.prayers.filter((id) => !cleared.prayers.includes(id)),
+              reflections: t.reflections.filter(
+                (id) => !cleared.reflections.includes(id)
+              ),
+              bookmarks: t.bookmarks.filter(
+                (b) =>
+                  !cleared.bookmarks.some(
+                    (c) =>
+                      c.bookSlug === b.bookSlug &&
+                      c.chapter === b.chapter &&
+                      c.verse === b.verse
+                  )
+              ),
+            },
+          });
+        },
       };
     },
     {
       name: "biblequest:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 1,
+      version: 2,
+      migrate: (persisted, version) => {
+        const state = persisted as Record<string, unknown>;
+        if (version < 2) {
+          // v2 adds sync tombstones.
+          state.tombstones = emptyTombstones();
+        }
+        return state as unknown as QuestOSState;
+      },
     }
   )
 );

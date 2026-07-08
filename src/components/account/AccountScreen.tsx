@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/supabase/useSession";
 import { createClient } from "@/lib/supabase/client";
+import { useSyncStatus } from "@/lib/sync/status";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
@@ -16,6 +17,7 @@ function AccountInner() {
   const router = useRouter();
   const { toast } = useToast();
   const { user, loading, configured } = useSession();
+  const sync = useSyncStatus();
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +87,15 @@ function AccountInner() {
             Signed in
           </p>
           <p className="mt-1 text-[1.0625rem] text-graphite">{user.email}</p>
+          <p className="mt-1.5 text-[0.875rem] text-ash">
+            {sync.state === "syncing"
+              ? "Syncing quietly…"
+              : sync.state === "error"
+                ? "Sync will retry soon — your journey is safe on this device."
+                : sync.lastSyncedAt
+                  ? "Your journey is synced across your devices."
+                  : "Sync starts shortly."}
+          </p>
           <p className="mt-3 text-[0.9375rem] leading-relaxed text-ash">
             Your prayers and reflections stay private — kept only for you, never
             shared.
