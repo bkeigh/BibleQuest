@@ -157,6 +157,17 @@ function SettingsInner() {
     <>
       <PageHeader title="Settings" subtitle={profile ? `Signed in as ${profile.displayName}` : undefined} />
       <PageContainer className="pb-8">
+        <SectionTitle>Account</SectionTitle>
+        <PaperCard variant="paper" padding="none" className="overflow-hidden">
+          <Link
+            href="/app/account"
+            className="flex items-center justify-between px-4 py-3.5 text-charcoal hover:bg-linen"
+          >
+            <span className="text-[0.9375rem]">Sync across devices</span>
+            <span className="text-[0.8125rem] text-ash">Optional</span>
+          </Link>
+        </PaperCard>
+
         <SectionTitle>Appearance</SectionTitle>
         <PaperCard variant="paper" padding="md">
           <div className="divide-y divide-mist/70">
