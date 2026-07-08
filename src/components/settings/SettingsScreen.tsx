@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuestOS } from "@/lib/questos/store";
@@ -10,6 +10,8 @@ import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
 import { applyAppearance } from "@/lib/theme";
+import { parseSnapshot } from "@/lib/questos/import-schema";
+import type { QuestOSSnapshot } from "@/lib/questos/types";
 import { cn } from "@/lib/utils/cn";
 
 function Row({
@@ -92,9 +94,14 @@ function SettingsInner() {
   const settings = useQuestOS((s) => s.settings);
   const updateSettings = useQuestOS((s) => s.updateSettings);
   const clearAllData = useQuestOS((s) => s.clearAllData);
+  const importData = useQuestOS((s) => s.importData);
   const store = useQuestOS;
 
   const [confirmClear, setConfirmClear] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [pendingImport, setPendingImport] =
+    useState<Partial<QuestOSSnapshot> | null>(null);
 
   const appearance = settings.appearance;
 
@@ -116,6 +123,34 @@ function SettingsInner() {
     a.click();
     URL.revokeObjectURL(url);
     toast("Your journey was exported.");
+  }
+
+  async function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
+    setImportError(null);
+    const file = e.target.files?.[0];
+    e.target.value = ""; // reset so re-picking the same file still fires onChange
+    if (!file) return;
+    let text: string;
+    try {
+      text = await file.text();
+    } catch {
+      setImportError("That file couldn’t be read.");
+      return;
+    }
+    const result = parseSnapshot(text);
+    if (!result.ok) {
+      setImportError(result.error);
+      return;
+    }
+    setPendingImport(result.data); // arm the confirm step
+  }
+
+  function confirmImport() {
+    if (!pendingImport) return;
+    importData(pendingImport);
+    setPendingImport(null);
+    applyAppearance(store.getState().settings.appearance);
+    toast("Your journey was restored.");
   }
 
   return (
@@ -171,9 +206,26 @@ function SettingsInner() {
             they’re stored only for you. We never sell your data, and analytics
             never include prayer or journal text.
           </p>
-          <div className="mt-4 flex flex-wrap gap-3">
+          <div className="mt-4 flex flex-wrap items-center gap-3">
             <GentleButton variant="outline" size="sm" onClick={exportData}>
               Export my journey
+            </GentleButton>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="sr-only"
+              onChange={onFilePicked}
+            />
+            <GentleButton
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setImportError(null);
+                fileInputRef.current?.click();
+              }}
+            >
+              Restore a journey
             </GentleButton>
             <Link
               href="/privacy"
@@ -182,6 +234,31 @@ function SettingsInner() {
               Privacy policy
             </Link>
           </div>
+          {importError && (
+            <p role="alert" className="mt-2 text-[0.875rem] text-rose-700">
+              {importError}
+            </p>
+          )}
+          {pendingImport && (
+            <div className="mt-3 rounded-[var(--radius-card)] border border-mist bg-linen p-3.5">
+              <p className="text-[0.9375rem] leading-relaxed text-charcoal">
+                This replaces everything currently on this device with the journey
+                in that file. Consider exporting first — this cannot be undone.
+              </p>
+              <div className="mt-3 flex gap-2.5">
+                <GentleButton variant="danger" size="sm" onClick={confirmImport}>
+                  Replace and restore
+                </GentleButton>
+                <GentleButton
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPendingImport(null)}
+                >
+                  Keep what I have
+                </GentleButton>
+              </div>
+            </div>
+          )}
         </PaperCard>
 
         <SectionTitle>Plus</SectionTitle>

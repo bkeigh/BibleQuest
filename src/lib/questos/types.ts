@@ -414,6 +414,27 @@ export const DEFAULT_SETTINGS: Settings = {
   questCategoryPreference: [],
 };
 
+/**
+ * The persisted data fields — the exact shape of an exported journey. Mirrors
+ * the store's initial-state block; a restore round-trips through this.
+ */
+export interface QuestOSSnapshot {
+  profile: Profile | null;
+  settings: Settings;
+  assignments: Record<string, DailyQuestAssignment>;
+  completions: QuestCompletion[];
+  prayers: Prayer[];
+  reflections: Reflection[];
+  journeyEvents: JourneyEvent[];
+  growthEvents: GrowthEvent[];
+  earnedMilestones: EarnedMilestone[];
+  bookmarks: VerseBookmark[];
+  readingPosition: ReadingPosition | null;
+  chaptersRead: ChapterRead[];
+  pendingMilestones: string[];
+  lastVisitDateKey: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // Subscription (scaffold — V1 gates nothing spiritual)
 // ---------------------------------------------------------------------------

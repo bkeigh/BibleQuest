@@ -41,6 +41,7 @@ import {
   type ChapterRead,
   type VerseBookmark,
   type GrowthType,
+  type QuestOSSnapshot,
 } from "./types";
 
 function id(): string {
@@ -73,6 +74,8 @@ interface QuestOSState {
   updateSettings: (patch: Partial<Settings>) => void;
   recordVisit: () => void;
   clearAllData: () => void;
+  /** Replace all local data with a validated, previously-exported snapshot. */
+  importData: (snapshot: Partial<QuestOSSnapshot>) => void;
 
   // -- daily loop
   /** Pure read — safe during render. Does NOT persist. */
@@ -320,6 +323,38 @@ export const useQuestOS = create<QuestOSState>()(
             chaptersRead: [],
             pendingMilestones: [],
             lastVisitDateKey: null,
+          });
+        },
+
+        importData: (snapshot) => {
+          // REPLACE (a restore, not a merge): start from clean defaults so
+          // nothing from the current journey bleeds through, then overlay the
+          // validated snapshot. Any omitted field keeps its default. Emits no
+          // analytics — imported prayer/reflection text stays on-device.
+          set({
+            profile: snapshot.profile ?? null,
+            settings: snapshot.settings
+              ? {
+                  ...DEFAULT_SETTINGS,
+                  ...snapshot.settings,
+                  appearance: {
+                    ...DEFAULT_SETTINGS.appearance,
+                    ...(snapshot.settings.appearance ?? {}),
+                  },
+                }
+              : DEFAULT_SETTINGS,
+            assignments: snapshot.assignments ?? {},
+            completions: snapshot.completions ?? [],
+            prayers: snapshot.prayers ?? [],
+            reflections: snapshot.reflections ?? [],
+            journeyEvents: snapshot.journeyEvents ?? [],
+            growthEvents: snapshot.growthEvents ?? [],
+            earnedMilestones: snapshot.earnedMilestones ?? [],
+            bookmarks: snapshot.bookmarks ?? [],
+            readingPosition: snapshot.readingPosition ?? null,
+            chaptersRead: snapshot.chaptersRead ?? [],
+            pendingMilestones: snapshot.pendingMilestones ?? [],
+            lastVisitDateKey: snapshot.lastVisitDateKey ?? null,
           });
         },
 
