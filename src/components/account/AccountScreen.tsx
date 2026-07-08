@@ -11,15 +11,23 @@ import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { useToast } from "@/components/design-system/Toast";
 
-type Status = "idle" | "sending" | "sent";
+type EmailStatus = "idle" | "sending" | "sent";
+type PhoneStatus = "idle" | "sending" | "code-sent" | "verifying";
+
+// E.164: a leading + and 7–15 digits (first digit non-zero).
+const E164 = /^\+[1-9]\d{6,14}$/;
 
 function AccountInner() {
   const router = useRouter();
   const { toast } = useToast();
   const { user, loading, configured } = useSession();
   const sync = useSyncStatus();
+
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<Status>("idle");
+  const [emailStatus, setEmailStatus] = useState<EmailStatus>("idle");
+  const [phone, setPhone] = useState("");
+  const [code, setCode] = useState("");
+  const [phoneStatus, setPhoneStatus] = useState<PhoneStatus>("idle");
   const [error, setError] = useState<string | null>(null);
 
   if (!configured) {
@@ -48,20 +56,55 @@ function AccountInner() {
   async function sendLink() {
     if (!email.trim()) return;
     setError(null);
-    setStatus("sending");
+    setEmailStatus("sending");
     const { error } = await createClient().auth.signInWithOtp({
       email: email.trim(),
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
     if (error) {
       setError("We couldn’t send the link. Please try again in a moment.");
-      setStatus("idle");
+      setEmailStatus("idle");
     } else {
-      setStatus("sent");
+      setEmailStatus("sent");
     }
   }
 
-  async function oauth(provider: "google" | "apple") {
+  async function sendCode() {
+    const p = phone.trim();
+    if (!E164.test(p)) {
+      setError("Enter your number with country code, like +15551234567.");
+      return;
+    }
+    setError(null);
+    setPhoneStatus("sending");
+    const { error } = await createClient().auth.signInWithOtp({ phone: p });
+    if (error) {
+      setError("We couldn’t send the code. Please check the number and retry.");
+      setPhoneStatus("idle");
+    } else {
+      setPhoneStatus("code-sent");
+    }
+  }
+
+  async function verifyCode() {
+    const token = code.trim();
+    if (token.length < 4) return;
+    setError(null);
+    setPhoneStatus("verifying");
+    const { error } = await createClient().auth.verifyOtp({
+      phone: phone.trim(),
+      token,
+      type: "sms",
+    });
+    if (error) {
+      setError("That code didn’t match. Please try again.");
+      setPhoneStatus("code-sent");
+    }
+    // On success, onAuthStateChange updates the session and this view swaps to
+    // the signed-in state automatically.
+  }
+
+  async function oauth(provider: "google") {
     setError(null);
     const { error } = await createClient().auth.signInWithOAuth({
       provider,
@@ -86,7 +129,9 @@ function AccountInner() {
           <p className="text-[0.8125rem] uppercase tracking-[0.16em] text-olive-500">
             Signed in
           </p>
-          <p className="mt-1 text-[1.0625rem] text-graphite">{user.email}</p>
+          <p className="mt-1 text-[1.0625rem] text-graphite">
+            {user.email ?? user.phone ?? "your account"}
+          </p>
           <p className="mt-1.5 text-[0.875rem] text-ash">
             {sync.state === "syncing"
               ? "Syncing quietly…"
@@ -125,14 +170,66 @@ function AccountInner() {
           reflections are never shared.
         </p>
 
-        {status === "sent" ? (
-          <div className="mt-5 rounded-[var(--radius-card)] bg-olive-50 p-4 text-center">
-            <p className="text-[0.9375rem] leading-relaxed text-charcoal">
-              Check your email for a sign-in link. You can close this page.
-            </p>
+        {emailStatus === "sent" ? (
+          <div className="mt-5">
+            <div className="rounded-[var(--radius-card)] bg-olive-50 p-4 text-center">
+              <p className="text-[0.9375rem] leading-relaxed text-charcoal">
+                Check your email for a sign-in link. You can close this page.
+              </p>
+            </div>
+            <GentleButton
+              variant="ghost"
+              size="sm"
+              className="mt-3"
+              onClick={() => setEmailStatus("idle")}
+            >
+              Use a different method
+            </GentleButton>
+          </div>
+        ) : phoneStatus === "code-sent" || phoneStatus === "verifying" ? (
+          <div className="mt-5">
+            <label
+              htmlFor="account-code"
+              className="mb-1.5 block text-[0.8125rem] text-ash"
+            >
+              Enter the code sent to {phone.trim()}
+            </label>
+            <input
+              id="account-code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={8}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+              placeholder="123456"
+              className="w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-center text-[1.25rem] tracking-[0.3em] text-graphite outline-none focus:border-olive-300"
+            />
+            <GentleButton
+              variant="dark"
+              size="md"
+              fullWidth
+              className="mt-3"
+              onClick={verifyCode}
+              disabled={code.trim().length < 4 || phoneStatus === "verifying"}
+            >
+              {phoneStatus === "verifying" ? "Verifying…" : "Verify & sign in"}
+            </GentleButton>
+            <GentleButton
+              variant="ghost"
+              size="sm"
+              className="mt-2"
+              onClick={() => {
+                setPhoneStatus("idle");
+                setCode("");
+                setError(null);
+              }}
+            >
+              Use a different number
+            </GentleButton>
           </div>
         ) : (
           <>
+            {/* Email magic link */}
             <div className="mt-5">
               <label
                 htmlFor="account-email"
@@ -155,36 +252,53 @@ function AccountInner() {
                 fullWidth
                 className="mt-3"
                 onClick={sendLink}
-                disabled={!email.trim() || status === "sending"}
+                disabled={!email.trim() || emailStatus === "sending"}
               >
-                {status === "sending" ? "Sending…" : "Send a sign-in link"}
+                {emailStatus === "sending" ? "Sending…" : "Send a sign-in link"}
               </GentleButton>
             </div>
 
-            <div className="my-5 flex items-center gap-3 text-[0.8125rem] text-fog">
-              <span className="h-px flex-1 bg-mist" />
-              or
-              <span className="h-px flex-1 bg-mist" />
-            </div>
+            <Divider />
 
-            <div className="flex flex-col gap-2.5">
+            {/* Phone OTP */}
+            <div>
+              <label
+                htmlFor="account-phone"
+                className="mb-1.5 block text-[0.8125rem] text-ash"
+              >
+                Phone
+              </label>
+              <input
+                id="account-phone"
+                type="tel"
+                autoComplete="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+15551234567"
+                className="w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-[1rem] text-graphite outline-none focus:border-olive-300"
+              />
               <GentleButton
                 variant="outline"
                 size="md"
                 fullWidth
-                onClick={() => oauth("google")}
+                className="mt-3"
+                onClick={sendCode}
+                disabled={!phone.trim() || phoneStatus === "sending"}
               >
-                Continue with Google
-              </GentleButton>
-              <GentleButton
-                variant="outline"
-                size="md"
-                fullWidth
-                onClick={() => oauth("apple")}
-              >
-                Continue with Apple
+                {phoneStatus === "sending" ? "Sending…" : "Text me a code"}
               </GentleButton>
             </div>
+
+            <Divider />
+
+            <GentleButton
+              variant="outline"
+              size="md"
+              fullWidth
+              onClick={() => oauth("google")}
+            >
+              Continue with Google
+            </GentleButton>
           </>
         )}
 
@@ -195,6 +309,16 @@ function AccountInner() {
         )}
       </PaperCard>
     </Frame>
+  );
+}
+
+function Divider() {
+  return (
+    <div className="my-5 flex items-center gap-3 text-[0.8125rem] text-fog">
+      <span className="h-px flex-1 bg-mist" />
+      or
+      <span className="h-px flex-1 bg-mist" />
+    </div>
   );
 }
 
