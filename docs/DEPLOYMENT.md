@@ -8,7 +8,7 @@ BibleQuest deploys to **Vercel** and installs as a PWA at BibleQuest.us.
 2. Framework preset: **Next.js** (auto-detected). Build command `pnpm build`,
    install command `pnpm install`.
 3. Add environment variables (all optional for a guest-mode launch) — see
-   [`ENV.md`](ENV.md). Add `NEXT_PUBLIC_APP_URL=https://biblequest.us`.
+   [`ENV.md`](ENV.md). Add `NEXT_PUBLIC_APP_URL=https://biblequest.co`.
 4. Deploy.
 
 > The repo pins native-build approval and disables pnpm's pre-run deps check in
@@ -17,7 +17,7 @@ BibleQuest deploys to **Vercel** and installs as a PWA at BibleQuest.us.
 
 ## Domain
 
-1. Add `biblequest.us` (and `www`) in Vercel → Domains.
+1. Add `biblequest.co` (and `www`) in Vercel → Domains.
 2. Point DNS to Vercel per their instructions (A / CNAME).
 3. Confirm HTTPS is issued before sharing links.
 
@@ -40,7 +40,7 @@ The chapter reader loads book JSON server-side. `next.config.ts` includes
 
 ## Manual founder checklist (before public launch)
 
-- [ ] Confirm the `biblequest.us` domain and DNS.
+- [ ] Confirm the `biblequest.co` domain and DNS.
 - [ ] Create the Supabase project + run migrations/policies/seed (if enabling sync).
 - [ ] Configure analytics (privacy-first) and Sentry, if desired.
 - [ ] Configure Stripe products/prices (only when Plus is ready).

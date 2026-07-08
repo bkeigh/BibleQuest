@@ -16,7 +16,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL ?? "https://biblequest.us"
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://biblequest.co"
   ),
   title: {
     default: "BibleQuest — One Meaningful Step with God Today",
