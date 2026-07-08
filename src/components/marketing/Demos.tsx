@@ -16,7 +16,7 @@ export function VerseDemo({ verse }: { verse: DailyVerse }) {
       <p className="text-[0.75rem] uppercase tracking-[0.18em] text-olive-500">
         Today’s Verse
       </p>
-      <blockquote className="verse-text mt-3 text-[1.25rem] leading-relaxed">
+      <blockquote className="verse-text verse-text-lead mt-3">
         “{cleanVerseText(verse.text)}”
       </blockquote>
       <cite className="mt-4 block text-[0.9375rem] not-italic text-ash">

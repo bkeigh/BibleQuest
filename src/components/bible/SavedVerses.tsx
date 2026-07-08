@@ -45,7 +45,7 @@ function SavedVersesInner() {
           {sorted.map((b) => (
             <PaperCard key={b.id} variant="paper" padding="md">
               <Link href={`/app/bible/${b.bookSlug}/${b.chapter}`} className="block">
-                <blockquote className="verse-text text-[1.0625rem]">
+                <blockquote className="verse-text">
                   “{cleanVerseText(b.text)}”
                 </blockquote>
                 <cite className="mt-2 block text-[0.875rem] not-italic text-olive-700">

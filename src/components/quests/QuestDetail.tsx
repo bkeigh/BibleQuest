@@ -114,7 +114,7 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
             {/* Scripture */}
             <PaperCard variant="atmospheric" padding="md" className="mt-4">
               {quest.scriptureText && (
-                <blockquote className="verse-text text-[1.0625rem]">
+                <blockquote className="verse-text">
                   “{cleanVerseText(quest.scriptureText)}”
                 </blockquote>
               )}

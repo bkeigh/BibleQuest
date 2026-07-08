@@ -166,13 +166,22 @@ html.text-large .verse-text {
   font-size: 1.1875rem;
   line-height: 1.85;
 }
+html.text-large .verse-text-lead {
+  font-size: 1.45rem;
+  line-height: 1.8;
+}
 
 /* ---- App-level reduced-motion toggle (mirrors the OS media query) ---- */
 html.force-reduce-motion .ambient,
 html.force-reduce-motion .ambient * {
   animation: none !important;
 }
-html.force-reduce-motion * {
+html.force-reduce-motion *,
+html.force-reduce-motion *::before,
+html.force-reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
 
@@ -273,6 +282,14 @@ body {
   font-size: 1.0625rem;
   line-height: 1.75;
   color: var(--color-graphite);
+}
+
+/* The lead verse (today's verse, marketing hero) sits a step larger. Kept in
+   CSS so the "Large text" setting can scale it — inline text-[…] utilities
+   would override the html.text-large rule and defeat the setting. */
+.verse-text-lead {
+  font-size: 1.25rem;
+  line-height: 1.7;
 }
 
 .verse-number {
