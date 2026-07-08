@@ -204,6 +204,17 @@ export const useQuestOS = create<QuestOSState>()(
         const now = new Date();
         const dateKey = toDateKey(now);
 
+        // Idempotency: a fast double-tap (or re-entry) must never double-count
+        // growth. Growth only ever appends, so guard on an existing completion
+        // for this quest today.
+        if (
+          s.completions.some(
+            (c) => c.dateKey === dateKey && c.questSlug === quest.slug
+          )
+        ) {
+          return { newMilestones: [] };
+        }
+
         let reflectionId: string | undefined;
         if (reflection?.body.trim()) {
           const r: Reflection = {
@@ -472,6 +483,12 @@ export const useQuestOS = create<QuestOSState>()(
         },
 
         markPrayerAnswered: (prayerId, answerReflection) => {
+          const target = get().prayers.find((p) => p.id === prayerId);
+          // Guard double-taps: answering an already-answered prayer must not
+          // append a second growth/journey event.
+          if (!target || target.status === "answered") {
+            return { newMilestones: [] };
+          }
           const now = new Date().toISOString();
           set({
             prayers: get().prayers.map((p) =>

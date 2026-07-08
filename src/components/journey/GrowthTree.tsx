@@ -6,10 +6,18 @@
  * The tree grows through six stages and never decays. Prayer feeds roots,
  * Scripture the branches, kindness the leaves, service the fruit, reflection
  * the light, gratitude the flowers. It is an illustration, not a chart.
+ *
+ * Positions are deterministic PER element index (seeded on species + index),
+ * so growth is stable and additive: a new leaf appears in its own slot and
+ * never disturbs the ones already there. New elements gently grow in and a
+ * stage change eases the canopy outward — never a reshuffle, never a pop. All
+ * motion honors stillness (the OS reduced-motion query OR the in-app setting).
  */
 import { useMemo } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import type { GrowthTreeState, TreeStage } from "@/lib/questos/types";
 import { hashString, seededRandom } from "@/lib/utils/dates";
+import { useQuestOS } from "@/lib/questos/store";
 
 const STAGE_INDEX: Record<TreeStage, number> = {
   seed: 0,
@@ -19,6 +27,27 @@ const STAGE_INDEX: Record<TreeStage, number> = {
   "fruit-bearing": 4,
   sheltering: 5,
 };
+
+// Golden angle — an even, organic spread across the canopy disk.
+const GOLDEN = 2.399963229728653;
+
+/**
+ * Deterministic canopy placement for element `i` of a species. Depends only on
+ * (species, i) — never on the total count or stage — so a placed element is
+ * frozen and adding elements only appends. The radius is a fixed fraction of
+ * the (stage-growing) canopy radius, so points drift gently OUTWARD as the tree
+ * matures rather than teleporting.
+ */
+function placeInCanopy(species: string, i: number, r: number, cy: number) {
+  const rand = seededRandom(hashString(`${species}:${i}`));
+  const frac = Math.sqrt((i + 0.5) / (i + 4));
+  const angle = i * GOLDEN + (rand() - 0.5) * 0.6;
+  const rr = frac * r * (0.85 + rand() * 0.15);
+  return {
+    x: 110 + Math.cos(angle) * rr + (rand() - 0.5) * 4,
+    y: cy + Math.sin(angle) * rr * 0.9 + (rand() - 0.5) * 4,
+  };
+}
 
 interface GrowthTreeProps {
   state: GrowthTreeState;
@@ -35,11 +64,12 @@ export function GrowthTree({
 }: GrowthTreeProps) {
   const stage = STAGE_INDEX[state.stage];
 
-  // Deterministic layout keyed to the tree's shape so it's stable per user.
-  const rand = useMemo(
-    () => seededRandom(hashString(`tree:${state.totalActions}`)),
-    [state.totalActions]
-  );
+  // Stillness: honor both the OS query and the in-app "Reduce motion" setting.
+  const osReduced = useReducedMotion();
+  const appReduced = useQuestOS((s) => s.settings.appearance.reducedMotion);
+  const still = Boolean(osReduced) || appReduced;
+  const grow = { type: "spring", stiffness: 120, damping: 14, mass: 0.6 } as const;
+  const canopyEase = { duration: 1.1, ease: [0.22, 0.61, 0.36, 1] } as const;
 
   const { canopy, leaves, flowers, fruit, branches } = useMemo(() => {
     // Canopy radius grows with stage.
@@ -50,18 +80,20 @@ export function GrowthTree({
     const flowerCount = Math.min(state.byType.flowers, stage >= 2 ? 10 : 0);
     const fruitCount = Math.min(state.byType.fruit, stage >= 4 ? 8 : 0);
 
-    const inCanopy = (r: number) => {
-      // random point within canopy circle
-      const a = rand() * Math.PI * 2;
-      const rr = Math.sqrt(rand()) * r;
-      return { x: 110 + Math.cos(a) * rr, y: canopyY + Math.sin(a) * rr * 0.9 };
-    };
-
     return {
       canopy: { r: canopyR, y: canopyY },
-      leaves: Array.from({ length: leafCount }, () => inCanopy(canopyR)),
-      flowers: Array.from({ length: flowerCount }, () => inCanopy(canopyR * 0.9)),
-      fruit: Array.from({ length: fruitCount }, () => inCanopy(canopyR * 0.8)),
+      leaves: Array.from({ length: leafCount }, (_, i) => ({
+        i,
+        ...placeInCanopy("leaves", i, canopyR, canopyY),
+      })),
+      flowers: Array.from({ length: flowerCount }, (_, i) => ({
+        i,
+        ...placeInCanopy("flowers", i, canopyR * 0.9, canopyY),
+      })),
+      fruit: Array.from({ length: fruitCount }, (_, i) => ({
+        i,
+        ...placeInCanopy("fruit", i, canopyR * 0.8, canopyY),
+      })),
       branches:
         stage >= 2
           ? [
@@ -71,7 +103,7 @@ export function GrowthTree({
             ].slice(0, stage - 1)
           : [],
     };
-  }, [stage, state.byType, rand]);
+  }, [stage, state.byType.leaves, state.byType.flowers, state.byType.fruit]);
 
   return (
     <svg
@@ -151,56 +183,73 @@ export function GrowthTree({
           {stage >= 1 && canopy.r > 0 && (
             <g className="ambient">
               <g className="origin-bottom [animation:var(--animate-sway)]">
-                <circle
+                {/* The three canopy blobs ease outward on a stage-up (a breath,
+                    not a pop). */}
+                <motion.circle
                   cx="110"
-                  cy={canopy.y}
-                  r={canopy.r}
                   fill="var(--color-olive-300)"
                   opacity="0.55"
+                  animate={{ cy: canopy.y, r: canopy.r }}
+                  transition={still ? { duration: 0 } : canopyEase}
                 />
-                <circle
-                  cx={110 - canopy.r * 0.5}
-                  cy={canopy.y + canopy.r * 0.3}
-                  r={canopy.r * 0.7}
+                <motion.circle
                   fill="var(--color-olive-300)"
                   opacity="0.45"
+                  animate={{
+                    cx: 110 - canopy.r * 0.5,
+                    cy: canopy.y + canopy.r * 0.3,
+                    r: canopy.r * 0.7,
+                  }}
+                  transition={still ? { duration: 0 } : canopyEase}
                 />
-                <circle
-                  cx={110 + canopy.r * 0.5}
-                  cy={canopy.y + canopy.r * 0.25}
-                  r={canopy.r * 0.7}
+                <motion.circle
                   fill="var(--color-olive-300)"
                   opacity="0.45"
+                  animate={{
+                    cx: 110 + canopy.r * 0.5,
+                    cy: canopy.y + canopy.r * 0.25,
+                    r: canopy.r * 0.7,
+                  }}
+                  transition={still ? { duration: 0 } : canopyEase}
                 />
 
-                {/* Individual leaves */}
-                {leaves.map((l, i) => (
-                  <circle
-                    key={`leaf-${i}`}
+                {/* Individual leaves — each grows in once, in its own stable slot */}
+                {leaves.map((l) => (
+                  <motion.circle
+                    key={`leaf-${l.i}`}
                     cx={l.x}
                     cy={l.y}
-                    r={2.1}
                     fill="var(--color-olive-500)"
-                    opacity="0.85"
+                    initial={still ? false : { r: 0, opacity: 0 }}
+                    animate={{ r: 2.1, opacity: 0.85 }}
+                    transition={still ? { duration: 0 } : grow}
                   />
                 ))}
 
                 {/* Flowers — gratitude */}
-                {flowers.map((f, i) => (
-                  <g key={`flower-${i}`}>
+                {flowers.map((f) => (
+                  <motion.g
+                    key={`flower-${f.i}`}
+                    style={{ transformBox: "fill-box", transformOrigin: "center" }}
+                    initial={still ? false : { scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={still ? { duration: 0 } : grow}
+                  >
                     <circle cx={f.x} cy={f.y} r={2.6} fill="var(--color-rose-300)" />
                     <circle cx={f.x} cy={f.y} r={1} fill="var(--color-gold-300)" />
-                  </g>
+                  </motion.g>
                 ))}
 
                 {/* Fruit — service */}
-                {fruit.map((f, i) => (
-                  <circle
-                    key={`fruit-${i}`}
+                {fruit.map((f) => (
+                  <motion.circle
+                    key={`fruit-${f.i}`}
                     cx={f.x}
                     cy={f.y}
-                    r={3}
                     fill="var(--color-gold-500)"
+                    initial={still ? false : { r: 0, opacity: 0 }}
+                    animate={{ r: 3, opacity: 1 }}
+                    transition={still ? { duration: 0 } : grow}
                   />
                 ))}
               </g>

@@ -33,16 +33,40 @@ function HomeInner() {
   const ensureDailyQuest = useQuestOS((s) => s.ensureDailyQuest);
   const rerollTodayQuest = useQuestOS((s) => s.rerollTodayQuest);
   const journeyEvents = useQuestOS((s) => s.journeyEvents);
+  // Keep day-scoped content fresh when the local day rolls over while the app
+  // is left open (or the tab regains focus) — otherwise the verse and date
+  // silently show "yesterday".
+  const [dayKey, setDayKey] = useState(() => toDateKey());
   // Subscribe to today's assignment slice so reroll/completion re-renders Home.
-  const todayAssignment = useQuestOS((s) => s.assignments[toDateKey()]);
+  const todayAssignment = useQuestOS((s) => s.assignments[dayKey]);
 
-  // Persist today's quest once (never during render).
+  // Watch for a local day rollover: re-check on an interval, on focus, and on
+  // visibility change. setDayKey is a no-op when the day hasn't changed.
+  useEffect(() => {
+    function check() {
+      const k = toDateKey();
+      setDayKey((prev) => (prev === k ? prev : k));
+    }
+    const onVisible = () => {
+      if (document.visibilityState === "visible") check();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", check);
+    const interval = window.setInterval(check, 60_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", check);
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  // Persist today's quest once per day (never during render).
   useEffect(() => {
     ensureDailyQuest();
-  }, [ensureDailyQuest]);
+  }, [dayKey, ensureDailyQuest]);
 
   const tree = useMemo(() => calculateTreeState(growthEvents), [growthEvents]);
-  const verse = useMemo(() => getDailyVerse(), []);
+  const verse = useMemo(() => getDailyVerse(dayKey), [dayKey]);
   const season = useMemo(() => getCurrentSeason(), []);
   // Prefer the persisted assignment; fall back to a deterministic preview on the
   // very first render before ensureDailyQuest() has run.
@@ -52,12 +76,12 @@ function HomeInner() {
       if (quest) return { assignment: todayAssignment, quest };
     }
     return getTodayAssignment();
-  }, [todayAssignment, getTodayAssignment]);
+  }, [todayAssignment, getTodayAssignment, dayKey]);
   const name = firstName(profile?.displayName);
   const time = timeOfDay();
 
   const completedToday = today?.assignment.status === "completed";
-  const todayKey = toDateKey();
+  const todayKey = dayKey;
   const recent = [...journeyEvents]
     .filter((e) => e.type !== "milestone_reached")
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
