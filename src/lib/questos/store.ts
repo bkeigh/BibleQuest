@@ -88,6 +88,7 @@ interface QuestOSState {
   addPrayer: (data: { title?: string; body: string; category: PrayerCategory }) => Prayer;
   updatePrayer: (prayerId: string, patch: Partial<Pick<Prayer, "title" | "body" | "category">>) => void;
   archivePrayer: (prayerId: string) => void;
+  unarchivePrayer: (prayerId: string) => void;
   deletePrayer: (prayerId: string) => void;
   markPrayerAnswered: (prayerId: string, answerReflection?: string) => { newMilestones: MilestoneSeed[] };
 
@@ -473,6 +474,16 @@ export const useQuestOS = create<QuestOSState>()(
             prayers: get().prayers.map((p) =>
               p.id === prayerId
                 ? { ...p, status: "archived" as const, updatedAt: new Date().toISOString() }
+                : p
+            ),
+          });
+        },
+
+        unarchivePrayer: (prayerId) => {
+          set({
+            prayers: get().prayers.map((p) =>
+              p.id === prayerId
+                ? { ...p, status: "active" as const, updatedAt: new Date().toISOString() }
                 : p
             ),
           });

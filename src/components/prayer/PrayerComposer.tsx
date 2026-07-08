@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuestOS } from "@/lib/questos/store";
 import { useToast } from "@/components/design-system/Toast";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { GentleButton } from "@/components/design-system/GentleButton";
+import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
 import { IconArrowLeft } from "@/components/design-system/icons";
 import Link from "next/link";
 import { prayerPrompts } from "@/data/seed/prayer-prompts";
@@ -31,12 +31,30 @@ const CATEGORY_LABEL: Record<PrayerCategory, string> = {
 
 function PrayerComposerInner() {
   const router = useRouter();
+  const params = useSearchParams();
   const { toast } = useToast();
   const addPrayer = useQuestOS((s) => s.addPrayer);
+  const updatePrayer = useQuestOS((s) => s.updatePrayer);
+
+  const editId = params.get("edit");
+  const existing = useQuestOS((s) =>
+    editId ? s.prayers.find((p) => p.id === editId) : undefined
+  );
+  const isEdit = Boolean(existing);
 
   const [body, setBody] = useState("");
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<PrayerCategory>("general");
+
+  // Seed the fields once the record resolves (state hydrates after mount).
+  useEffect(() => {
+    if (existing) {
+      setBody(existing.body);
+      setTitle(existing.title ?? "");
+      setCategory(existing.category);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existing?.id]);
 
   // A gentle rotating starter, in case the page is blank.
   const starter = useMemo(() => {
@@ -46,9 +64,36 @@ function PrayerComposerInner() {
 
   function save() {
     if (!body.trim()) return;
-    addPrayer({ title, body, category });
-    toast("Saved. This is held privately.");
+    if (isEdit && existing) {
+      updatePrayer(existing.id, { title, body, category });
+      toast("Changes held privately.");
+    } else {
+      addPrayer({ title, body, category });
+      toast("Saved. This is held privately.");
+    }
     router.replace("/app/prayer");
+  }
+
+  // An edit link that points at a prayer that no longer exists.
+  if (editId && !existing) {
+    return (
+      <PageContainer className="pt-safe">
+        <div className="pt-6">
+          <Link
+            href="/app/prayer"
+            className="inline-flex items-center gap-1.5 text-[0.875rem] text-ash transition-colors hover:text-charcoal"
+          >
+            <IconArrowLeft size={16} /> Prayer
+          </Link>
+        </div>
+        <PaperCard variant="quiet" padding="lg" className="mt-6 text-center">
+          <p className="text-[0.9375rem] text-ash">This prayer is no longer here.</p>
+          <GentleLink variant="dark" size="md" href="/app/prayer" className="mt-4">
+            Back to prayer
+          </GentleLink>
+        </PaperCard>
+      </PageContainer>
+    );
   }
 
   return (
@@ -63,7 +108,7 @@ function PrayerComposerInner() {
       </div>
 
       <h1 className="mt-5 font-display text-[1.75rem] leading-tight text-graphite">
-        A prayer
+        {isEdit ? "Editing a prayer" : "A prayer"}
       </h1>
       <p className="mt-1 text-[0.9375rem] text-ash">
         Speak honestly. This stays private to you.
@@ -112,7 +157,7 @@ function PrayerComposerInner() {
           onClick={save}
           disabled={!body.trim()}
         >
-          Save prayer
+          {isEdit ? "Save changes" : "Save prayer"}
         </GentleButton>
         <Link
           href="/app/prayer"

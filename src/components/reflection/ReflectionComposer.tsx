@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useQuestOS } from "@/lib/questos/store";
@@ -8,7 +8,7 @@ import { useToast } from "@/components/design-system/Toast";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { GentleButton } from "@/components/design-system/GentleButton";
+import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
 import { MoodPicker } from "@/components/reflection/MoodPicker";
 import { IconArrowLeft } from "@/components/design-system/icons";
 import { reflectionPrompts } from "@/data/seed/reflection-prompts";
@@ -20,6 +20,13 @@ function ReflectionComposerInner() {
   const params = useSearchParams();
   const { toast } = useToast();
   const addReflection = useQuestOS((s) => s.addReflection);
+  const updateReflection = useQuestOS((s) => s.updateReflection);
+
+  const editId = params.get("edit");
+  const existing = useQuestOS((s) =>
+    editId ? s.reflections.find((r) => r.id === editId) : undefined
+  );
+  const isEdit = Boolean(existing);
 
   const verseRef = params.get("verse") ?? undefined;
 
@@ -34,16 +41,55 @@ function ReflectionComposerInner() {
   const [body, setBody] = useState("");
   const [mood, setMood] = useState<ReflectionMood | undefined>();
 
+  // Seed the fields once the record resolves (state hydrates after mount).
+  useEffect(() => {
+    if (existing) {
+      setBody(existing.body);
+      setMood(existing.mood);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existing?.id]);
+
+  // Editing preserves the reflection's original prompt and its quest/verse links.
+  const displayPrompt = isEdit && existing?.prompt ? existing.prompt : prompt.text;
+
   function save() {
     if (!body.trim()) return;
-    addReflection({
-      body,
-      mood,
-      prompt: prompt.text,
-      relatedVerseReference: verseRef,
-    });
-    toast("Saved to your journey.");
+    if (isEdit && existing) {
+      updateReflection(existing.id, { body, mood });
+      toast("Changes saved.");
+    } else {
+      addReflection({
+        body,
+        mood,
+        prompt: prompt.text,
+        relatedVerseReference: verseRef,
+      });
+      toast("Saved to your journey.");
+    }
     router.replace("/app/reflection");
+  }
+
+  // An edit link that points at a reflection that no longer exists.
+  if (editId && !existing) {
+    return (
+      <PageContainer className="pt-safe">
+        <div className="pt-6">
+          <Link
+            href="/app/reflection"
+            className="inline-flex items-center gap-1.5 text-[0.875rem] text-ash transition-colors hover:text-charcoal"
+          >
+            <IconArrowLeft size={16} /> Reflections
+          </Link>
+        </div>
+        <PaperCard variant="quiet" padding="lg" className="mt-6 text-center">
+          <p className="text-[0.9375rem] text-ash">This reflection is no longer here.</p>
+          <GentleLink variant="dark" size="md" href="/app/reflection" className="mt-4">
+            Back to reflections
+          </GentleLink>
+        </PaperCard>
+      </PageContainer>
+    );
   }
 
   return (
@@ -58,14 +104,14 @@ function ReflectionComposerInner() {
       </div>
 
       <h1 className="mt-5 font-display text-[1.75rem] leading-tight text-graphite">
-        A reflection
+        {isEdit ? "Editing a reflection" : "A reflection"}
       </h1>
       {verseRef && (
         <p className="mt-1 text-[0.9375rem] text-ash">On {verseRef}</p>
       )}
 
       <PaperCard variant="paper" padding="md" className="mt-5">
-        <p className="text-[0.9375rem] font-medium text-graphite">{prompt.text}</p>
+        <p className="text-[0.9375rem] font-medium text-graphite">{displayPrompt}</p>
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
@@ -87,7 +133,7 @@ function ReflectionComposerInner() {
           onClick={save}
           disabled={!body.trim()}
         >
-          Save reflection
+          {isEdit ? "Save changes" : "Save reflection"}
         </GentleButton>
         <Link
           href="/app/reflection"

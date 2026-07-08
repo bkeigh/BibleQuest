@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useQuestOS } from "@/lib/questos/store";
 import { useToast } from "@/components/design-system/Toast";
@@ -15,14 +16,15 @@ import { formatShortDate } from "@/lib/utils/dates";
 import type { Prayer, PrayerStatus } from "@/lib/questos/types";
 import { cn } from "@/lib/utils/cn";
 
-type Tab = "active" | "answered";
+type Tab = "active" | "answered" | "archived";
+const TABS: Tab[] = ["active", "answered", "archived"];
 
 function PrayerScreenInner() {
   const prayers = useQuestOS((s) => s.prayers);
   const [tab, setTab] = useState<Tab>("active");
 
   const visible = prayers
-    .filter((p) => (tab === "active" ? p.status === "active" : p.status === "answered"))
+    .filter((p) => p.status === tab)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
   return (
@@ -38,7 +40,7 @@ function PrayerScreenInner() {
       />
       <PageContainer>
         <div className="mb-4 flex gap-1 rounded-full border border-mist bg-linen p-1">
-          {(["active", "answered"] as Tab[]).map((t) => (
+          {TABS.map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -81,6 +83,18 @@ function EmptyPrayer({ tab }: { tab: Tab }) {
       </PaperCard>
     );
   }
+  if (tab === "archived") {
+    return (
+      <PaperCard variant="quiet" padding="lg" className="text-center">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-linen ring-1 ring-mist">
+          <PixelIcon name="leaf" size={5} />
+        </div>
+        <p className="text-[0.9375rem] text-ash">
+          Prayers you set aside rest here. You can bring any of them back.
+        </p>
+      </PaperCard>
+    );
+  }
   return (
     <PaperCard variant="atmospheric" padding="lg" className="text-center">
       <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-gold-50 ring-1 ring-gold-100">
@@ -102,12 +116,43 @@ const STATUS_ICON: Record<PrayerStatus, "candle" | "flower" | "leaf"> = {
   archived: "leaf",
 };
 
+/** A quiet text button for the inline card actions. */
+function CardAction({
+  onClick,
+  tone = "olive",
+  children,
+}: {
+  onClick: () => void;
+  tone?: "olive" | "ash" | "rose";
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "text-[0.875rem] transition-colors",
+        tone === "olive" && "text-olive-700 hover:text-olive-500",
+        tone === "ash" && "text-ash hover:text-charcoal",
+        tone === "rose" && "text-ash hover:text-rose-700"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 function PrayerCard({ prayer }: { prayer: Prayer }) {
   const { toast } = useToast();
   const markAnswered = useQuestOS((s) => s.markPrayerAnswered);
   const archivePrayer = useQuestOS((s) => s.archivePrayer);
+  const unarchivePrayer = useQuestOS((s) => s.unarchivePrayer);
+  const deletePrayer = useQuestOS((s) => s.deletePrayer);
   const [answering, setAnswering] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [note, setNote] = useState("");
+
+  // The expanders are mutually exclusive; hide the action row while either is open.
+  const showActions = !answering && !confirmingDelete;
 
   return (
     <PaperCard variant="paper" padding="md">
@@ -140,23 +185,44 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
               : formatShortDate(prayer.createdAt)}
           </p>
 
-          {prayer.status === "active" && !answering && (
-            <div className="mt-3 flex items-center gap-4">
-              <button
-                onClick={() => setAnswering(true)}
-                className="text-[0.875rem] text-olive-700 transition-colors hover:text-olive-500"
-              >
-                Mark as answered
-              </button>
-              <button
-                onClick={() => {
-                  archivePrayer(prayer.id);
-                  toast("Archived, gently.");
-                }}
-                className="text-[0.875rem] text-ash transition-colors hover:text-charcoal"
-              >
-                Archive
-              </button>
+          {showActions && (
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+              {prayer.status === "active" && (
+                <CardAction onClick={() => setAnswering(true)}>
+                  Mark as answered
+                </CardAction>
+              )}
+              {prayer.status !== "archived" && (
+                <Link
+                  href={`/app/prayer/new?edit=${prayer.id}`}
+                  className="text-[0.875rem] text-olive-700 transition-colors hover:text-olive-500"
+                >
+                  Edit
+                </Link>
+              )}
+              {prayer.status === "archived" ? (
+                <CardAction
+                  onClick={() => {
+                    unarchivePrayer(prayer.id);
+                    toast("Welcomed back.");
+                  }}
+                >
+                  Bring back
+                </CardAction>
+              ) : (
+                <CardAction
+                  tone="ash"
+                  onClick={() => {
+                    archivePrayer(prayer.id);
+                    toast("Archived, gently.");
+                  }}
+                >
+                  Archive
+                </CardAction>
+              )}
+              <CardAction tone="rose" onClick={() => setConfirmingDelete(true)}>
+                Delete
+              </CardAction>
             </div>
           )}
 
@@ -197,6 +263,42 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
                       onClick={() => setAnswering(false)}
                     >
                       Cancel
+                    </GentleButton>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {confirmingDelete && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-3 rounded-[var(--radius-button)] bg-linen px-3.5 py-3">
+                  <p className="text-[0.875rem] text-charcoal">
+                    Let this prayer go? This can’t be undone.
+                  </p>
+                  <div className="mt-2.5 flex gap-2">
+                    <GentleButton
+                      variant="danger"
+                      size="sm"
+                      onClick={() => {
+                        deletePrayer(prayer.id);
+                        toast("Released.");
+                      }}
+                    >
+                      Delete
+                    </GentleButton>
+                    <GentleButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setConfirmingDelete(false)}
+                    >
+                      Keep it
                     </GentleButton>
                   </div>
                 </div>
