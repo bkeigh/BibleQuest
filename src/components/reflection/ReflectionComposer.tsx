@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useQuestOS } from "@/lib/questos/store";
@@ -38,17 +38,12 @@ function ReflectionComposerInner() {
     return list[hashString(toDateKey() + (verseRef ?? "")) % list.length];
   }, [verseRef]);
 
-  const [body, setBody] = useState("");
-  const [mood, setMood] = useState<ReflectionMood | undefined>();
-
-  // Seed the fields once the record resolves (state hydrates after mount).
-  useEffect(() => {
-    if (existing) {
-      setBody(existing.body);
-      setMood(existing.mood);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [existing?.id]);
+  // Under ClientOnly the store is already hydrated, so an edit target resolves
+  // on the first render — seed the fields lazily from it.
+  const [body, setBody] = useState(() => existing?.body ?? "");
+  const [mood, setMood] = useState<ReflectionMood | undefined>(
+    () => existing?.mood
+  );
 
   // Editing preserves the reflection's original prompt and its quest/verse links.
   const displayPrompt = isEdit && existing?.prompt ? existing.prompt : prompt.text;

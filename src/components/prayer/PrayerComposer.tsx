@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuestOS } from "@/lib/questos/store";
 import { useToast } from "@/components/design-system/Toast";
@@ -42,19 +42,13 @@ function PrayerComposerInner() {
   );
   const isEdit = Boolean(existing);
 
-  const [body, setBody] = useState("");
-  const [title, setTitle] = useState("");
-  const [category, setCategory] = useState<PrayerCategory>("general");
-
-  // Seed the fields once the record resolves (state hydrates after mount).
-  useEffect(() => {
-    if (existing) {
-      setBody(existing.body);
-      setTitle(existing.title ?? "");
-      setCategory(existing.category);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [existing?.id]);
+  // Under ClientOnly the store is already hydrated, so an edit target resolves
+  // on the first render — seed the fields lazily from it.
+  const [body, setBody] = useState(() => existing?.body ?? "");
+  const [title, setTitle] = useState(() => existing?.title ?? "");
+  const [category, setCategory] = useState<PrayerCategory>(
+    () => existing?.category ?? "general"
+  );
 
   // A gentle rotating starter, in case the page is blank.
   const starter = useMemo(() => {

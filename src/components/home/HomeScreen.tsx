@@ -76,7 +76,7 @@ function HomeInner() {
       if (quest) return { assignment: todayAssignment, quest };
     }
     return getTodayAssignment();
-  }, [todayAssignment, getTodayAssignment, dayKey]);
+  }, [todayAssignment, getTodayAssignment]);
   const name = firstName(profile?.displayName);
   const time = timeOfDay();
 
