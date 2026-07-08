@@ -59,7 +59,7 @@ function PrayerComposerInner() {
   function save() {
     if (!body.trim()) return;
     if (isEdit && existing) {
-      updatePrayer(existing.id, { title, body, category });
+      updatePrayer(existing.id, { title: title.trim() || undefined, body: body.trim(), category });
       toast("Changes held privately.");
     } else {
       addPrayer({ title, body, category });

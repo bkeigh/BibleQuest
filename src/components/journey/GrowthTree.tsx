@@ -213,15 +213,15 @@ export function GrowthTree({
                   transition={still ? { duration: 0 } : canopyEase}
                 />
 
-                {/* Individual leaves — each grows in once, in its own stable slot */}
+                {/* Individual leaves — each grows in once in its own stable
+                    slot; cx/cy are animated so a stage-up eases the whole
+                    canopy outward instead of teleporting. */}
                 {leaves.map((l) => (
                   <motion.circle
                     key={`leaf-${l.i}`}
-                    cx={l.x}
-                    cy={l.y}
                     fill="var(--color-olive-500)"
                     initial={still ? false : { r: 0, opacity: 0 }}
-                    animate={{ r: 2.1, opacity: 0.85 }}
+                    animate={{ cx: l.x, cy: l.y, r: 2.1, opacity: 0.85 }}
                     transition={still ? { duration: 0 } : grow}
                   />
                 ))}
@@ -235,8 +235,20 @@ export function GrowthTree({
                     animate={{ scale: 1, opacity: 1 }}
                     transition={still ? { duration: 0 } : grow}
                   >
-                    <circle cx={f.x} cy={f.y} r={2.6} fill="var(--color-rose-300)" />
-                    <circle cx={f.x} cy={f.y} r={1} fill="var(--color-gold-300)" />
+                    <motion.circle
+                      r={2.6}
+                      fill="var(--color-rose-300)"
+                      initial={false}
+                      animate={{ cx: f.x, cy: f.y }}
+                      transition={still ? { duration: 0 } : grow}
+                    />
+                    <motion.circle
+                      r={1}
+                      fill="var(--color-gold-300)"
+                      initial={false}
+                      animate={{ cx: f.x, cy: f.y }}
+                      transition={still ? { duration: 0 } : grow}
+                    />
                   </motion.g>
                 ))}
 
@@ -244,11 +256,9 @@ export function GrowthTree({
                 {fruit.map((f) => (
                   <motion.circle
                     key={`fruit-${f.i}`}
-                    cx={f.x}
-                    cy={f.y}
                     fill="var(--color-gold-500)"
                     initial={still ? false : { r: 0, opacity: 0 }}
-                    animate={{ r: 3, opacity: 1 }}
+                    animate={{ cx: f.x, cy: f.y, r: 3, opacity: 1 }}
                     transition={still ? { duration: 0 } : grow}
                   />
                 ))}

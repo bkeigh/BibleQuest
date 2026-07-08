@@ -51,7 +51,7 @@ function ReflectionComposerInner() {
   function save() {
     if (!body.trim()) return;
     if (isEdit && existing) {
-      updateReflection(existing.id, { body, mood });
+      updateReflection(existing.id, { body: body.trim(), mood });
       toast("Changes saved.");
     } else {
       addReflection({

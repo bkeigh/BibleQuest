@@ -45,6 +45,7 @@ function MilestoneDialog({
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  const descId = useId();
 
   // Keep the latest onDismiss without re-running the focus effect on re-render.
   const onDismissRef = useRef(onDismiss);
@@ -88,7 +89,12 @@ function MilestoneDialog({
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      previouslyFocused?.focus?.();
+      // Only restore focus if it's still inside THIS dialog. When a second
+      // milestone is queued, this dialog exits AFTER the next one has mounted
+      // and taken focus — restoring here would yank focus out of the open one.
+      if (node && node.contains(document.activeElement)) {
+        previouslyFocused?.focus?.();
+      }
     };
   }, []);
 
@@ -105,6 +111,7 @@ function MilestoneDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={descId}
         initial={{ opacity: 0, y: 14, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 8 }}
@@ -125,7 +132,7 @@ function MilestoneDialog({
         <h2 id={titleId} className="mt-2 font-display text-[1.5rem] text-graphite">
           {milestone.title}
         </h2>
-        <p className="mt-2 text-[0.9375rem] leading-relaxed text-charcoal">
+        <p id={descId} className="mt-2 text-[0.9375rem] leading-relaxed text-charcoal">
           {milestone.description}
         </p>
         <GentleButton
