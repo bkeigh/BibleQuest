@@ -15,6 +15,7 @@ import { IconArrowLeft, IconClock, IconCheck } from "@/components/design-system/
 import { MoodPicker } from "@/components/reflection/MoodPicker";
 import { formatDuration } from "@/components/quests/QuestSlip";
 import { completionLine } from "@/lib/questos/copy";
+import { cleanVerseText } from "@/lib/utils/scripture";
 import { toDateKey, hashString } from "@/lib/utils/dates";
 
 type Phase = "detail" | "reflect" | "done";
@@ -114,7 +115,7 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
             <PaperCard variant="atmospheric" padding="md" className="mt-4">
               {quest.scriptureText && (
                 <blockquote className="verse-text text-[1.0625rem]">
-                  “{quest.scriptureText}”
+                  “{cleanVerseText(quest.scriptureText)}”
                 </blockquote>
               )}
               <cite className="mt-2 block text-[0.875rem] not-italic text-ash">

@@ -3,6 +3,7 @@ import { PixelIcon, CATEGORY_SPRITE } from "@/components/design-system/PixelIcon
 import { IconClock, IconBookmark, IconLeaf } from "@/components/design-system/icons";
 import { formatDuration } from "@/components/quests/QuestSlip";
 import type { QuestTemplate, DailyVerse } from "@/lib/questos/types";
+import { cleanVerseText } from "@/lib/utils/scripture";
 
 /** Presentational (non-interactive) versions of the app cards for marketing. */
 
@@ -16,7 +17,7 @@ export function VerseDemo({ verse }: { verse: DailyVerse }) {
         Today’s Verse
       </p>
       <blockquote className="verse-text mt-3 text-[1.25rem] leading-relaxed">
-        “{verse.text}”
+        “{cleanVerseText(verse.text)}”
       </blockquote>
       <cite className="mt-4 block text-[0.9375rem] not-italic text-ash">
         — {verse.reference}

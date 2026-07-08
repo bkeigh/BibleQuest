@@ -183,13 +183,27 @@ async function main() {
   meta.sort((a, b) => a.order - b.order)
   await writeFile(path.join(OUT_BIBLE, 'books.json'), JSON.stringify(meta, null, 1))
 
+  // A few WEB verses are fragments of longer speech and carry internal
+  // narrative-quote punctuation ("...," says Yahweh, "...") that reads as
+  // malformed inside a devotional card. Override with clean, faithful excerpts
+  // keyed by "bookSlug chapter:start". Keep in sync with the daily verse pool.
+  const DAILY_VERSE_OVERRIDES = {
+    'jeremiah 29:11':
+      'For I know the thoughts that I think toward you, thoughts of peace, and not of evil, to give you hope and a future.',
+    'matthew 22:37':
+      'You shall love the Lord your God with all your heart, with all your soul, and with all your mind. This is the first and great commandment. A second likewise is this: You shall love your neighbor as yourself.',
+    'mark 12:30':
+      'You shall love the Lord your God with all your heart, and with all your soul, and with all your mind, and with all your strength. This is the first commandment. The second is like this: You shall love your neighbor as yourself. There is no other commandment greater than these.',
+  }
+
   // Daily verse pool with exact WEB text pulled from the imported data
   const pool = DAILY_VERSES.map(([slug, chapter, start, end, theme], i) => {
     const book = bySlug.get(slug)
     if (!book) throw new Error(`Unknown book slug in DAILY_VERSES: ${slug}`)
     const ch = book.chapters[chapter - 1]
     if (!ch) throw new Error(`Missing ${slug} ${chapter}`)
-    const text = ch.slice(start - 1, end).join(' ')
+    const override = DAILY_VERSE_OVERRIDES[`${slug} ${chapter}:${start}`]
+    const text = override ?? ch.slice(start - 1, end).join(' ')
     if (!text) throw new Error(`Empty text for ${slug} ${chapter}:${start}-${end}`)
     const refBook = book.name === 'Psalms' ? 'Psalm' : book.name
     const reference = start === end ? `${refBook} ${chapter}:${start}` : `${refBook} ${chapter}:${start}-${end}`

@@ -9,6 +9,7 @@ import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleLink } from "@/components/design-system/GentleButton";
 import { IconArrowLeft, IconBookmarkFilled } from "@/components/design-system/icons";
 import { emptyStates } from "@/lib/questos/copy";
+import { cleanVerseText } from "@/lib/utils/scripture";
 
 function SavedVersesInner() {
   const { toast } = useToast();
@@ -45,7 +46,7 @@ function SavedVersesInner() {
             <PaperCard key={b.id} variant="paper" padding="md">
               <Link href={`/app/bible/${b.bookSlug}/${b.chapter}`} className="block">
                 <blockquote className="verse-text text-[1.0625rem]">
-                  “{b.text}”
+                  “{cleanVerseText(b.text)}”
                 </blockquote>
                 <cite className="mt-2 block text-[0.875rem] not-italic text-olive-700">
                   {b.bookName} {b.chapter}:{b.verse}

@@ -76,7 +76,17 @@ function hydrate(ref) {
     return null;
   }
   const text = ch.slice(parsed.start - 1, parsed.end).join(" ").trim();
-  return text || null;
+  if (!text) return null;
+  // Reject snapshots that still carry paired double-quote or nested
+  // single-quote speech artifacts after trimming a wrapping quote — those read
+  // as malformed inside our own quote marks, so the card shows the reference
+  // only. (’ apostrophes in contractions are fine.)
+  const trimmed = text
+    .replace(/^[“”‘’"']+\s*/, "")
+    .replace(/\s*[“”‘’"']+$/, "")
+    .trim();
+  if (/[“”"‘]/.test(trimmed)) return null;
+  return text;
 }
 
 const banner = (title) =>
