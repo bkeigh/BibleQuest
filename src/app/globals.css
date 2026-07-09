@@ -181,6 +181,12 @@ html.theme-dark {
   --color-accent-ink: #d8e9df;
   --color-accent-surface: #16241d;
   --color-gilt: #e7c563;
+  /* Danger reds flip light so destructive actions stay readable. */
+  --color-rose-50: #2c211f;
+  --color-rose-100: #3a2a27;
+  --color-rose-300: #8a544e;
+  --color-rose-500: #d99e97;
+  --color-rose-700: #e8beb8;
   color-scheme: dark;
 }
 html.theme-dark ::selection {
@@ -217,6 +223,17 @@ html.force-reduce-motion *::after {
 
 html {
   scroll-behavior: smooth;
+}
+
+/* RTL (Arabic): letter-spacing breaks cursive joining, and the pixel
+   accent font has no Arabic glyphs — fall back to clean sans, untracked. */
+[dir="rtl"] [class*="tracking-"] {
+  letter-spacing: 0 !important;
+}
+[dir="rtl"] .font-pixel {
+  font-family: var(--font-sans);
+  letter-spacing: 0 !important;
+  -webkit-font-smoothing: antialiased;
 }
 
 body {

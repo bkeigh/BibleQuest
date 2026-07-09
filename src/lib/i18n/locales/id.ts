@@ -59,7 +59,7 @@ export const id: UIStrings = {
     today: "Hari ini",
     suggested: "Saran untuk hari ini",
     picked: "{n} dari 3 dipilih",
-    capReached: "Sudah tiga untuk hari ini. Selesaikan satu dulu.",
+    capReached: "Sudah tiga untuk hari ini. Besok ada awal yang baru.",
     added: "Ditambahkan ke hari ini.",
     removed: "Dikeluarkan dari hari ini.",
     addToToday: "Tambahkan ke hari ini",

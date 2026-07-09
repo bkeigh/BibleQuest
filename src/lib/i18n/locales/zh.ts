@@ -59,7 +59,7 @@ export const zh: UIStrings = {
     today: "今天",
     suggested: "今日推荐",
     picked: "已选 {n}/3",
-    capReached: "今天的三项已经选满了。先完成一项吧。",
+    capReached: "今天的三项已经选满了。明天又是新的开始。",
     added: "已加入今天。",
     removed: "已从今天移除。",
     addToToday: "加入今天",

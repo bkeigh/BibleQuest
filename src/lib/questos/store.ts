@@ -256,13 +256,22 @@ export const useQuestOS = create<QuestOSState>()(
         };
         set({ completions: [...get().completions, completion] });
 
-        const dayPicks = s.assignments[dateKey] ?? [];
-        if (dayPicks.some((a) => a.questSlug === quest.slug)) {
+        // Mark the matching pick completed. Check today first; if the quest
+        // was picked before midnight and finished after, complete it under
+        // its own day so yesterday's pick isn't stranded as "started".
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const pickDayKey = [dateKey, toDateKey(yesterday)].find((key) =>
+          s.assignments[key]?.some(
+            (a) => a.questSlug === quest.slug && a.status !== "completed"
+          )
+        );
+        if (pickDayKey) {
           set({
             assignments: {
               ...get().assignments,
-              [dateKey]: dayPicks.map((a) =>
-                a.questSlug === quest.slug
+              [pickDayKey]: (get().assignments[pickDayKey] ?? []).map((a) =>
+                a.questSlug === quest.slug && a.status !== "completed"
                   ? {
                       ...a,
                       status: "completed" as const,
@@ -654,6 +663,15 @@ export const useQuestOS = create<QuestOSState>()(
         },
 
         clearSyncTombstones: (cleared) => {
+          // No-op when nothing can change — writing a fresh tombstones
+          // object would wake the sync subscriber for no reason.
+          if (
+            !cleared.prayers.length &&
+            !cleared.reflections.length &&
+            !cleared.bookmarks.length
+          ) {
+            return;
+          }
           const t = get().tombstones;
           set({
             tombstones: {

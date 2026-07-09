@@ -106,9 +106,13 @@ function OnboardingInner() {
   const [draft, setDraft] = useState<Draft>({ displayName: "" });
   // Only move focus after the user navigates — never on first paint.
   const hasNavigated = useRef(false);
+  // Set inside finish(): completing onboarding flips `alreadyDone`, and
+  // without this guard the redirect effect below would race finish()'s own
+  // router.replace and send "Or browse all quests" users to /app instead.
+  const finishing = useRef(false);
 
   useEffect(() => {
-    if (alreadyDone) router.replace("/app");
+    if (alreadyDone && !finishing.current) router.replace("/app");
   }, [alreadyDone, router]);
 
   useEffect(() => {
@@ -150,6 +154,7 @@ function OnboardingInner() {
    * failed pick never blocks entry) and can land somewhere other than Home.
    */
   function finish(opts?: { pickSlug?: string; destination?: string }) {
+    finishing.current = true;
     const rhythm = draft.dailyRhythm ?? "flexible";
     completeOnboarding(
       {

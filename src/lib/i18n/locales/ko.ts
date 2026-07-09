@@ -59,7 +59,7 @@ export const ko: UIStrings = {
     today: "오늘",
     suggested: "오늘의 추천",
     picked: "3개 중 {n}개 선택",
-    capReached: "오늘의 세 가지를 다 골랐어요. 먼저 하나를 마쳐 보세요.",
+    capReached: "오늘의 세 가지를 다 골랐어요. 내일은 새로운 하루가 기다리고 있어요.",
     added: "오늘의 실천에 추가했어요.",
     removed: "오늘의 실천에서 뺐어요.",
     addToToday: "오늘에 추가",

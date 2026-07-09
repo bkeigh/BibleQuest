@@ -137,7 +137,7 @@ function HomeInner() {
                 ? t.quests.emptyTitle
                 : allDone
                   ? t.dayComplete.title
-                  : `${completedCount} of ${pickCount} quests completed.`}
+                  : `${t.quests.completedToday}: ${completedCount}/${pickCount}`}
             </p>
 
             {pickCount === 0 && (

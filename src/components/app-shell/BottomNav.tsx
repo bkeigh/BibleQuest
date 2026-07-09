@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils/cn";
 import { useStrings } from "@/lib/i18n";
+import { en } from "@/lib/i18n/en";
 import {
   IconHome,
   IconQuest,
@@ -29,7 +31,16 @@ const ITEMS: NavItem[] = [
 
 export function BottomNav() {
   const pathname = usePathname();
-  const t = useStrings();
+  const strings = useStrings();
+  // The server renders English (no persisted language on the server), so
+  // first client paint must match it — swap to the chosen language only
+  // after hydration to avoid a text mismatch on every load.
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+  const t = hydrated ? strings : en;
 
   return (
     <nav

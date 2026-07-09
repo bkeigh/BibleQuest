@@ -59,7 +59,7 @@ export const sw: UIStrings = {
     today: "Ya leo",
     suggested: "Yanayopendekezwa kwa leo",
     picked: "Umechagua {n} kati ya 3",
-    capReached: "Hayo ndiyo mazoezi yako matatu ya leo. Kamilisha moja kwanza.",
+    capReached: "Hayo ndiyo mazoezi yako matatu ya leo. Kesho ni mwanzo mpya.",
     added: "Limeongezwa kwa leo.",
     removed: "Limeondolewa kwa leo.",
     addToToday: "Ongeza kwa leo",

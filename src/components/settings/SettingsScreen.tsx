@@ -90,9 +90,11 @@ function Toggle({
         on ? "bg-evergreen-600" : "bg-mist"
       )}
     >
+      {/* moon-paper doesn't flip in Candle mode, so the knob stays visible
+          against both the mist off-track and the evergreen on-track. */}
       <span
         className={cn(
-          "absolute top-0.5 h-5 w-5 rounded-full bg-paper transition-all duration-300",
+          "absolute top-0.5 h-5 w-5 rounded-full bg-moon-paper paper-shadow transition-all duration-300",
           on ? "left-[1.375rem]" : "left-0.5"
         )}
       />
@@ -115,17 +117,47 @@ function LanguagePicker({
   value: string;
   onChange: (code: string) => void;
 }) {
+  // Proper ARIA radio pattern: one Tab stop, arrows move + select.
+  const refs = useRef<Array<HTMLButtonElement | null>>([]);
+  const selectedIndex = Math.max(
+    0,
+    LANGUAGES.findIndex((l) => l.code === value)
+  );
+
+  function onKeyDown(e: React.KeyboardEvent, index: number) {
+    let next: number | null = null;
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+      next = (index + 1) % LANGUAGES.length;
+    } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+      next = (index - 1 + LANGUAGES.length) % LANGUAGES.length;
+    } else if (e.key === "Home") {
+      next = 0;
+    } else if (e.key === "End") {
+      next = LANGUAGES.length - 1;
+    }
+    if (next !== null) {
+      e.preventDefault();
+      onChange(LANGUAGES[next].code);
+      refs.current[next]?.focus();
+    }
+  }
+
   return (
     <div role="radiogroup" aria-label="App language" className="divide-y divide-mist/60">
-      {LANGUAGES.map((l) => {
+      {LANGUAGES.map((l, i) => {
         const selected = l.code === value;
         return (
           <button
             key={l.code}
+            ref={(el) => {
+              refs.current[i] = el;
+            }}
             role="radio"
             aria-checked={selected}
+            tabIndex={i === selectedIndex ? 0 : -1}
             lang={l.code}
             onClick={() => onChange(l.code)}
+            onKeyDown={(e) => onKeyDown(e, i)}
             className={cn(
               "flex w-full items-center justify-between gap-3 px-1 py-3 text-left transition-colors duration-200",
               selected ? "text-graphite" : "text-charcoal hover:text-graphite"
@@ -288,7 +320,7 @@ function SettingsInner() {
             </div>
           </Disclosure>
 
-          <Disclosure variant="card" label="Reminders">
+          <Disclosure variant="card" label={t.settings.reminders}>
             <p className="text-[0.875rem] leading-relaxed text-ash">
               Reminders are coming soon. When they arrive, they’ll be
               invitations — never pressure, never streak warnings. You’ll choose
@@ -304,7 +336,7 @@ function SettingsInner() {
             </p>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <GentleButton variant="outline" size="sm" onClick={exportData}>
-                Export my data
+                {t.settings.exportData}
               </GentleButton>
               <input
                 ref={fileInputRef}
@@ -322,7 +354,7 @@ function SettingsInner() {
                   fileInputRef.current?.click();
                 }}
               >
-                Restore from a file
+                {t.settings.importData}
               </GentleButton>
               <Link
                 href="/privacy"

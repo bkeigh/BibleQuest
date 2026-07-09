@@ -59,7 +59,7 @@ export const ar: UIStrings = {
     today: "اليوم",
     suggested: "مقترحات اليوم",
     picked: "اخترت {n} من 3",
-    capReached: "هذه مهامك الثلاث لهذا اليوم. أتمم إحداها أولًا.",
+    capReached: "هذه مهامك الثلاث لهذا اليوم. وغدًا بداية جديدة.",
     added: "أُضيفت إلى يومك.",
     removed: "أُزيلت من يومك.",
     addToToday: "أضِف إلى اليوم",

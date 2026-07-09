@@ -155,8 +155,8 @@ function QuestBrowseInner() {
           !isPicked && !done ? (
             <button
               type="button"
-              aria-label="Add to today"
-              title="Add to today"
+              aria-label={t.quests.addToToday}
+              title={t.quests.addToToday}
               onClick={() => handleAdd(quest)}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-accent/50 bg-paper text-accent transition-colors duration-300 hover:bg-accent-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
@@ -173,7 +173,7 @@ function QuestBrowseInner() {
   return (
     <>
       <PageHeader
-        title="Quests"
+        title={t.nav.quests}
         subtitle="Small acts of faith. Pick up to three a day."
       />
       <PageContainer>
@@ -241,7 +241,7 @@ function QuestBrowseInner() {
                 htmlFor="quest-search"
                 className="text-caption font-medium text-ash"
               >
-                Search
+                {t.quests.search}
               </label>
               <input
                 id="quest-search"
@@ -253,7 +253,7 @@ function QuestBrowseInner() {
               />
             </div>
 
-            <FilterGroup label="Time">
+            <FilterGroup label={t.quests.duration}>
               <Chip active={duration === null} onClick={() => setDuration(null)} small>
                 Any time
               </Chip>
@@ -269,7 +269,7 @@ function QuestBrowseInner() {
               ))}
             </FilterGroup>
 
-            <FilterGroup label="Category">
+            <FilterGroup label={t.quests.category}>
               <Chip active={category === null} onClick={() => setCategory(null)} small>
                 All
               </Chip>
@@ -285,7 +285,7 @@ function QuestBrowseInner() {
               ))}
             </FilterGroup>
 
-            <FilterGroup label="Energy">
+            <FilterGroup label={t.quests.energy}>
               <Chip active={energy === null} onClick={() => setEnergy(null)} small>
                 Any
               </Chip>
@@ -301,7 +301,7 @@ function QuestBrowseInner() {
               ))}
             </FilterGroup>
 
-            <FilterGroup label="Company">
+            <FilterGroup label={t.quests.soloOrSocial}>
               <Chip active={company === null} onClick={() => setCompany(null)} small>
                 Either
               </Chip>
@@ -321,7 +321,7 @@ function QuestBrowseInner() {
               </Chip>
             </FilterGroup>
 
-            <FilterGroup label="Setting">
+            <FilterGroup label={t.quests.indoorOrOutdoor}>
               <Chip active={setting === null} onClick={() => setSetting(null)} small>
                 Anywhere
               </Chip>

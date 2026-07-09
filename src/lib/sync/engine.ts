@@ -134,7 +134,16 @@ export async function startSync(userId: string) {
   } catch {
     if (!isCurrent()) return;
     setStatus("error");
-    scheduleRetry();
+    // NEVER fall through to write-through pushes before a successful pull —
+    // a blind push would upsert this device's (possibly default/stale) data
+    // over the account. Retry the full pull→merge instead, and install no
+    // subscriber until it succeeds.
+    retryTimer = setTimeout(() => {
+      if (!isCurrent()) return;
+      currentUserId = null; // release the same-user guard for re-entry
+      void startSync(userId);
+    }, RETRY_MS);
+    return;
   }
 
   if (!isCurrent()) return;
@@ -184,7 +193,16 @@ async function runPush() {
     dirty.clear();
 
     await propagateTombstones(supabase, tombstones);
-    useQuestOS.getState().clearSyncTombstones(tombstones);
+    // Only clear when there was something to propagate — an unconditional
+    // clear writes a fresh tombstones object every push, which the
+    // subscriber sees as a change and turns into an endless push loop.
+    if (
+      tombstones.prayers.length ||
+      tombstones.reflections.length ||
+      tombstones.bookmarks.length
+    ) {
+      useQuestOS.getState().clearSyncTombstones(tombstones);
+    }
     await pushFields(supabase, userId, snapshotFromStore(), fields);
     if (currentUserId === userId) setStatus("idle", true);
   } catch {
@@ -394,10 +412,30 @@ export function mergeSnapshots(
     : local.profile ?? remote.profile ?? null;
   const settings = adoptRemote && remote.settings ? remote.settings : local.settings;
 
-  // Assignments: per-day pick lists; this device wins conflicts (it's the
-  // one in use). A locally-present day — even an emptied one — replaces the
-  // remote day wholesale, so unpicks propagate instead of resurrecting.
-  const assignments = { ...(remote.assignments ?? {}), ...local.assignments };
+  // Assignments: per-day pick lists, unioned by questSlug so one device's
+  // sync can never destroy another device's picks. Completed always wins
+  // (a completed pick is history); otherwise the local entry wins. Known
+  // tradeoff: an unpick may resurface if another device still holds the
+  // pick — benign (unpick again) vs. losing a completed pick (data loss).
+  const assignments: QuestOSSnapshot["assignments"] = {
+    ...(remote.assignments ?? {}),
+  };
+  for (const [day, localList] of Object.entries(local.assignments)) {
+    const remoteList = assignments[day];
+    if (!remoteList?.length) {
+      assignments[day] = localList;
+      continue;
+    }
+    const bySlug = new Map(remoteList.map((a) => [a.questSlug, a]));
+    for (const l of localList) {
+      const r = bySlug.get(l.questSlug);
+      bySlug.set(
+        l.questSlug,
+        r && r.status === "completed" && l.status !== "completed" ? r : l
+      );
+    }
+    assignments[day] = [...bySlug.values()];
+  }
 
   // Bookmarks: union by natural key, local wins duplicates.
   const bookmarks = [...local.bookmarks];

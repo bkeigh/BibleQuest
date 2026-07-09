@@ -59,7 +59,7 @@ export const es: UIStrings = {
     today: "Para hoy",
     suggested: "Sugeridas para hoy",
     picked: "{n} de 3 elegidas",
-    capReached: "Ya tienes tus tres de hoy. Termina una primero.",
+    capReached: "Ya tienes tus tres de hoy. Mañana trae un nuevo comienzo.",
     added: "Agregada para hoy.",
     removed: "Quitada de hoy.",
     addToToday: "Agregar para hoy",

@@ -59,7 +59,7 @@ export const vi: UIStrings = {
     today: "Hôm nay",
     suggested: "Gợi ý cho hôm nay",
     picked: "Đã chọn {n} trong 3",
-    capReached: "Ba việc cho hôm nay đủ rồi. Hãy hoàn thành một việc trước đã.",
+    capReached: "Ba việc cho hôm nay đủ rồi. Ngày mai lại là một khởi đầu mới.",
     added: "Đã thêm vào hôm nay.",
     removed: "Đã bỏ khỏi hôm nay.",
     addToToday: "Thêm vào hôm nay",

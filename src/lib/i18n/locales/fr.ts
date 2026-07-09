@@ -59,7 +59,7 @@ export const fr: UIStrings = {
     today: "Aujourd’hui",
     suggested: "Suggestions du jour",
     picked: "{n} sur 3 choisies",
-    capReached: "Voilà vos trois quêtes du jour. Terminez-en une d’abord.",
+    capReached: "Voilà vos trois quêtes du jour. Demain, un nouveau départ vous attend.",
     added: "Ajoutée pour aujourd’hui.",
     removed: "Retirée d’aujourd’hui.",
     addToToday: "Ajouter pour aujourd’hui",

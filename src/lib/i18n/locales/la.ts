@@ -59,7 +59,7 @@ export const la: UIStrings = {
     today: "Hodierna",
     suggested: "Hodie proposita",
     picked: "{n} e tribus electa",
-    capReached: "Tria hodierna iam habes. Unum prius perfice.",
+    capReached: "Tria hodierna iam habes. Cras novum initium dabitur.",
     added: "In hodiernum additum.",
     removed: "Ex hodierno sublatum.",
     addToToday: "In hodiernum adde",

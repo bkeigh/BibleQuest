@@ -59,7 +59,7 @@ export const fil: UIStrings = {
     today: "Ngayong araw",
     suggested: "Mga mungkahi para ngayon",
     picked: "{n} sa 3 ang napili",
-    capReached: "Tatlo na ang napili mo ngayong araw. Tapusin muna ang isa.",
+    capReached: "Tatlo na ang napili mo ngayong araw. Bukas, may panibagong simula.",
     added: "Naidagdag sa araw na ito.",
     removed: "Inalis sa araw na ito.",
     addToToday: "Idagdag sa araw na ito",

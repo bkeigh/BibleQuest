@@ -59,7 +59,7 @@ export const ro: UIStrings = {
     today: "Astăzi",
     suggested: "Sugestii pentru azi",
     picked: "{n} din 3 alese",
-    capReached: "Ai deja trei misiuni pentru azi. Încheie una mai întâi.",
+    capReached: "Ai deja trei misiuni pentru azi. Mâine e un nou început.",
     added: "Adăugată la ziua de azi.",
     removed: "Scoasă din ziua de azi.",
     addToToday: "Adaugă pentru azi",

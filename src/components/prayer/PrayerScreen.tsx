@@ -19,6 +19,7 @@ import { emptyStates } from "@/lib/questos/copy";
 import { formatShortDate } from "@/lib/utils/dates";
 import type { Prayer, PrayerCategory, PrayerStatus } from "@/lib/questos/types";
 import { cn } from "@/lib/utils/cn";
+import { useStrings } from "@/lib/i18n";
 
 type Tab = "active" | "answered" | "archived";
 const TABS: Tab[] = ["active", "answered", "archived"];
@@ -29,6 +30,7 @@ const TAB_LABEL: Record<Tab, string> = {
 };
 
 function PrayerScreenInner() {
+  const t = useStrings();
   const prayers = useQuestOS((s) => s.prayers);
   const [tab, setTab] = useState<Tab>("active");
   const [category, setCategory] = useState<PrayerCategory | null>(null);
@@ -72,7 +74,7 @@ function PrayerScreenInner() {
   return (
     <>
       <PageHeader
-        title="Prayer"
+        title={t.nav.prayer}
         subtitle="What you’re praying for, in one place."
         action={
           <GentleLink variant="outline" size="sm" href="/app/prayer/new">

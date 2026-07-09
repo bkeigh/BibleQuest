@@ -70,7 +70,7 @@ export const questPicks = {
   cta: "Pick today’s quests",
   browseMore: "Add another quest",
   counter: (n: number) => `${n} of 3 picked`,
-  capReached: "That’s your three for today. Finish one first.",
+  capReached: "That’s your three for today. Tomorrow brings a fresh start.",
   added: "Added to today.",
   removed: "Removed from today.",
   pinnedTitle: "Today",
