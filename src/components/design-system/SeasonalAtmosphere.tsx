@@ -25,7 +25,9 @@ const COLORS: Record<ParticleKind, string> = {
   leaf: "var(--color-olive-300)",
   star: "var(--color-gold-300)",
   petal: "var(--color-rose-300)",
-  snow: "#ffffff",
+  /* moon-paper stays warm-white in both themes — paper flips dark in candle
+     mode and would make snow vanish. */
+  snow: "var(--color-moon-paper)",
   ember: "var(--color-gold-300)",
   dust: "var(--color-fog)",
 };

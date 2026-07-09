@@ -30,7 +30,7 @@ export function EditorialSection({
 /** A quiet, centered eyebrow label above editorial headings. */
 export function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mb-4 text-[0.8125rem] font-medium uppercase tracking-[0.18em] text-olive-500">
+    <p className="mb-4 text-[0.8125rem] font-medium uppercase tracking-[0.18em] text-accent">
       {children}
     </p>
   );
