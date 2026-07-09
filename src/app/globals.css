@@ -148,6 +148,14 @@
   0% { transform: translateY(-4%) translateX(0); }
   100% { transform: translateY(104%) translateX(6px); }
 }
+/* Seasonal particles: a slow breath around a fixed point. Particles are
+   statically scattered (inline top/left), so with animation removed —
+   reduced motion — they simply rest in place instead of collapsing into
+   a row of dots along the container's top edge. */
+@keyframes ambient-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(var(--drift, 6px), 12px, 0); }
+}
 @keyframes rise {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -205,6 +213,24 @@ html.text-large .verse-text {
 html.text-large .verse-text-lead {
   font-size: 1.45rem;
   line-height: 1.8;
+}
+
+/* ---- Bold text (accessibility): a gentle weight lift, not a shout.
+   Inter and Fraunces are variable fonts, so intermediate weights render
+   true. Ithaca (font-pixel) is a single 500 weight and opts out via
+   font-synthesis in its utility — synthesized bold smears pixel glyphs. ---- */
+html.text-bold body {
+  font-weight: 500;
+}
+html.text-bold .font-medium {
+  font-weight: 600;
+}
+html.text-bold .font-display {
+  font-weight: 560;
+}
+html.text-bold .verse-text,
+html.text-bold .verse-text-lead {
+  font-weight: 540;
 }
 
 /* ---- App-level reduced-motion toggle (mirrors the OS media query) ---- */
@@ -324,6 +350,10 @@ body {
   letter-spacing: 0.03em;
   -webkit-font-smoothing: none;
   font-smooth: never;
+  /* Ithaca ships one 500 weight; never let the browser fake a bold —
+     synthesized bold blurs pixel glyphs (incl. under html.text-bold). */
+  font-weight: 500;
+  font-synthesis-weight: none;
 }
 
 /* Chunky stepped edge for achievement cards + unlocked states.

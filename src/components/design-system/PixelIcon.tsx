@@ -1,299 +1,18 @@
 /**
  * PixelIcon — tiny hand-placed pixel sprites.
  *
- * Each sprite is a small grid of characters mapped to a warm, limited palette.
- * Rendered as crisp SVG <rect>s so they scale without blur. These are one of
- * BibleQuest's signatures: a modern spiritual storybook, never retro-arcade.
+ * A thin resolver over the pixel-asset registry (pixel-assets.ts).
+ * Grid assets render as crisp SVG <rect>s so they scale without blur;
+ * png assets render as a plain pixelated <img> (drop a file in
+ * public/pixel/ and flip the registry entry — no call site changes).
+ * These are one of BibleQuest's signatures: a modern spiritual
+ * storybook, never retro-arcade.
  */
 import { cn } from "@/lib/utils/cn";
+import { PIXEL_SPRITES, type PixelSpriteName } from "./pixel-assets";
 
-type Palette = Record<string, string>;
-
-interface Sprite {
-  rows: string[];
-  palette: Palette;
-  /** Optional per-cell animation class for living details. */
-  ambient?: { chars: string; className: string };
-}
-
-const T = "transparent";
-
-// Shared warm tones (tokens mirrored so sprites read against parchment).
-const INK = "#3f4d31";
-const OLIVE = "#6f8155";
-const OLIVE_L = "#a8b98c";
-const GOLD = "#e7c563";
-const GOLD_B = "#d3a336"; // brand gold — solid sacred objects
-const GOLD_D = "#b68b2f";
-const EVERGREEN = "#0e533c"; // brand green — doors, banners, ink
-const EVERGREEN_L = "#2f7c58";
-const FLAME = "#f2b24a";
-const WHITE = "#fffaf0";
-const ROSE = "#e5a8a1";
-const ROSE_D = "#b9645d";
-const BLUE = "#8fb9d4";
-const BROWN = "#7a5a3a";
-const BARK = "#6b4f34";
-const STONE = "#c9c3b4";
-
-const SPRITES: Record<string, Sprite> = {
-  candle: {
-    palette: { f: FLAME, w: GOLD, c: WHITE, b: GOLD_D, ".": T },
-    rows: [
-      "..f..",
-      "..f..",
-      "..w..",
-      ".ccc.",
-      ".ccc.",
-      ".ccc.",
-      ".bbb.",
-    ],
-    ambient: { chars: "f", className: "origin-bottom [animation:var(--animate-flicker)]" },
-  },
-  leaf: {
-    palette: { g: OLIVE, l: OLIVE_L, v: INK, ".": T },
-    rows: [
-      "...ll",
-      "..llg",
-      ".llgg",
-      "llggv",
-      "lgggv",
-      ".gggv",
-      "...vv",
-    ],
-  },
-  star: {
-    palette: { s: GOLD, w: WHITE, ".": T },
-    rows: [
-      "..w..",
-      "..s..",
-      "wsssw",
-      "..s..",
-      ".s.s.",
-    ],
-    ambient: { chars: "sw", className: "[animation:var(--animate-twinkle)]" },
-  },
-  bird: {
-    palette: { b: OLIVE, d: INK, e: "#2c2c2c", ".": T },
-    rows: [
-      "........",
-      "..bbb...",
-      ".bbbbbb.",
-      "bbbbbbe.",
-      ".dbbbb..",
-      "...d.d..",
-    ],
-  },
-  flower: {
-    palette: { p: ROSE, d: ROSE_D, c: GOLD, g: OLIVE, ".": T },
-    rows: [
-      ".p.p.",
-      "pdpdp",
-      ".pcp.",
-      "..g..",
-      ".gg..",
-      "..g..",
-    ],
-  },
-  chapel: {
-    palette: { r: ROSE_D, w: STONE, d: BARK, c: INK, y: GOLD, ".": T },
-    rows: [
-      "..c..",
-      "..c..",
-      ".rrr.",
-      "rrrrr",
-      "wwwww",
-      "wwyww",
-      "wwyww",
-    ],
-  },
-  book: {
-    palette: { c: BARK, p: WHITE, l: OLIVE, b: GOLD, ".": T },
-    rows: [
-      "ccccc",
-      "cpppc",
-      "cplpb",
-      "cpppc",
-      "cplpc",
-      "ccccc",
-    ],
-  },
-  bookmark: {
-    palette: { r: ROSE_D, l: ROSE, ".": T },
-    rows: [
-      "rrr",
-      "rlr",
-      "rlr",
-      "rlr",
-      "r.r",
-    ],
-  },
-  lantern: {
-    palette: { m: INK, g: GOLD, f: FLAME, ".": T },
-    rows: [
-      "..m..",
-      ".mmm.",
-      "mgfgm",
-      "mgfgm",
-      "mgggm",
-      ".mmm.",
-    ],
-    ambient: { chars: "f", className: "[animation:var(--animate-flicker)]" },
-  },
-  path: {
-    palette: { s: STONE, d: OLIVE_L, ".": T },
-    rows: [
-      ".s.d.",
-      "d.s.s",
-      ".d.s.",
-      "s.d.d",
-      ".s.d.",
-    ],
-  },
-  tree: {
-    palette: { g: OLIVE, l: OLIVE_L, b: BARK, ".": T },
-    rows: [
-      ".lgl.",
-      "lgggl",
-      "gglgg",
-      "lgggl",
-      "..b..",
-      "..b..",
-    ],
-    ambient: { chars: "gl", className: "origin-bottom [animation:var(--animate-sway-slow)]" },
-  },
-  sun: {
-    palette: { y: GOLD, o: FLAME, ".": T },
-    rows: [
-      "y.y.y",
-      ".ooo.",
-      "yoooy",
-      ".ooo.",
-      "y.y.y",
-    ],
-  },
-  heart: {
-    palette: { r: ROSE_D, l: ROSE, ".": T },
-    rows: [
-      ".r.r.",
-      "rlrlr",
-      "rlllr",
-      ".rlr.",
-      "..r..",
-    ],
-  },
-  hands: {
-    palette: { s: "#e8cba8", d: BROWN, ".": T },
-    rows: [
-      "s...s",
-      "ss.ss",
-      "sssss",
-      "ddddd",
-      ".ddd.",
-    ],
-  },
-  wheat: {
-    palette: { g: GOLD, d: GOLD_D, s: OLIVE, ".": T },
-    rows: [
-      "g.g.g",
-      "dgdgd",
-      ".dsd.",
-      "..s..",
-      "..s..",
-    ],
-  },
-  dove: {
-    palette: { w: WHITE, g: STONE, b: BLUE, ".": T },
-    rows: [
-      "..www..",
-      ".wwwwg.",
-      "wwwwwwb",
-      ".gwww..",
-      "...g.g.",
-    ],
-  },
-  cross: {
-    palette: { g: GOLD_B, d: GOLD_D, ".": T },
-    rows: [
-      "..g..",
-      "..g..",
-      "ggggg",
-      "..g..",
-      "..g..",
-      "..d..",
-      "..d..",
-    ],
-  },
-  door: {
-    palette: { s: STONE, e: EVERGREEN, l: EVERGREEN_L, g: GOLD_B, ".": T },
-    rows: [
-      ".sss.",
-      "seles",
-      "seees",
-      "seege",
-      "seees",
-      "seees",
-      "sssss",
-    ],
-  },
-  key: {
-    palette: { g: GOLD_B, d: GOLD_D, ".": T },
-    rows: [
-      "ggg..",
-      "g.g..",
-      "ggg..",
-      ".d...",
-      ".d.d.",
-      ".ddd.",
-    ],
-  },
-  scroll: {
-    palette: { g: GOLD_B, w: WHITE, e: EVERGREEN, ".": T },
-    rows: [
-      "ggggg",
-      "wwwww",
-      "weeww",
-      "wwwww",
-      "weeew",
-      "wwwww",
-      "ggggg",
-    ],
-  },
-  compass: {
-    palette: { s: STONE, w: WHITE, e: EVERGREEN_L, r: ROSE_D, ".": T },
-    rows: [
-      "..s..",
-      ".sws.",
-      "swrws",
-      ".sws.",
-      "..e..",
-    ],
-  },
-  crown: {
-    palette: { g: GOLD_B, d: GOLD_D, e: EVERGREEN_L, ".": T },
-    rows: [
-      "g.g.g",
-      "ggggg",
-      "gegeg",
-      "ddddd",
-    ],
-  },
-  mountain: {
-    palette: { e: EVERGREEN, l: EVERGREEN_L, w: WHITE, ".": T },
-    rows: [
-      "...w...",
-      "..wew..",
-      ".eelee.",
-      ".elele.",
-      "eeleele",
-      "lеeeeel".replace("е", "e"),
-    ],
-  },
-};
-
-export type PixelSpriteName = keyof typeof SPRITES;
-
-export const PIXEL_SPRITE_NAMES = Object.keys(SPRITES) as PixelSpriteName[];
+export { PIXEL_SPRITE_NAMES } from "./pixel-assets";
+export type { PixelSpriteName } from "./pixel-assets";
 
 interface PixelIconProps {
   name: PixelSpriteName;
@@ -312,13 +31,34 @@ export function PixelIcon({
   className,
   title,
 }: PixelIconProps) {
-  const sprite = SPRITES[name];
-  if (!sprite) return null;
-  const rows = sprite.rows;
+  const asset = PIXEL_SPRITES[name];
+  if (!asset) return null;
+
+  if (asset.kind === "png") {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- tiny local pixel art; next/image would blur and lazy-load it
+      <img
+        src={asset.src}
+        width={asset.cols * size}
+        height={asset.rows * size}
+        alt={title ?? ""}
+        role={title ? "img" : "presentation"}
+        aria-hidden={title ? undefined : true}
+        className={cn(
+          "pixelated shrink-0",
+          animate && "ambient",
+          animate && asset.ambientClassName,
+          className
+        )}
+      />
+    );
+  }
+
+  const rows = asset.rows;
   const cols = Math.max(...rows.map((r) => r.length));
   const width = cols * size;
   const height = rows.length * size;
-  const ambientChars = sprite.ambient?.chars ?? "";
+  const ambientChars = asset.ambient?.chars ?? "";
 
   return (
     <svg
@@ -332,8 +72,8 @@ export function PixelIcon({
     >
       {rows.flatMap((row, y) =>
         row.split("").map((ch, x) => {
-          const fill = sprite.palette[ch];
-          if (!fill || fill === T) return null;
+          const fill = asset.palette[ch];
+          if (!fill || fill === "transparent") return null;
           const isAmbient = animate && ambientChars.includes(ch);
           return (
             <rect
@@ -343,7 +83,7 @@ export function PixelIcon({
               width={1.02}
               height={1.02}
               fill={fill}
-              className={isAmbient ? sprite.ambient?.className : undefined}
+              className={isAmbient ? asset.ambient?.className : undefined}
             />
           );
         })

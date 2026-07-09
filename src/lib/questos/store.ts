@@ -42,8 +42,12 @@ import {
   type GrowthType,
   type QuestOSSnapshot,
   type SyncTombstones,
+  type StreakState,
+  type VerseRefresh,
   emptyTombstones,
+  emptyStreak,
 } from "./types";
+import { advanceStreak } from "./streak-engine";
 
 function id(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -73,6 +77,15 @@ interface QuestOSState {
   /** Milestones earned but not yet gently shown to the user. */
   pendingMilestones: string[];
   lastVisitDateKey: string | null;
+  /**
+   * The candle — consecutive days with a meaningful action. Advanced inside
+   * recordAction, so every quest/prayer/reflection/chapter keeps it warm.
+   * Device-local for now (not mapped by the sync engine — see
+   * src/lib/sync/mapping.ts); included in exports for restore.
+   */
+  streak: StreakState;
+  /** Same-day "Another verse" count; self-resets when the dateKey rolls. */
+  verseRefresh: VerseRefresh | null;
   /** Local deletions the sync engine still needs to propagate remotely. */
   tombstones: SyncTombstones;
 
@@ -81,9 +94,22 @@ interface QuestOSState {
   updateProfile: (patch: Partial<Profile>) => void;
   updateSettings: (patch: Partial<Settings>) => void;
   recordVisit: () => void;
-  clearAllData: () => void;
-  /** Replace all local data with a validated, previously-exported snapshot. */
-  importData: (snapshot: Partial<QuestOSSnapshot>) => void;
+  /**
+   * Reset to factory state. When a session exists, pass the signed-in user id
+   * as `purgeAccount` so the sync engine also deletes the account copy —
+   * otherwise the next initial sync merges it straight back.
+   */
+  clearAllData: (opts?: { purgeAccount?: string }) => void;
+  /**
+   * Replace all local data with a validated, previously-exported snapshot.
+   * When a session exists, pass the signed-in user id as `purgeAccount` so
+   * the account copy is replaced too instead of merging back on the next
+   * sync. The sync engine's own merge-apply passes no opts.
+   */
+  importData: (
+    snapshot: Partial<QuestOSSnapshot>,
+    opts?: { purgeAccount?: string }
+  ) => void;
 
   // -- daily loop (pick model: the user chooses up to MAX_DAILY_PICKS a day)
   /** Add a quest to today. Returns false when the day is full or already picked. */
@@ -111,6 +137,10 @@ interface QuestOSState {
   toggleBookmark: (bookmark: Omit<VerseBookmark, "id" | "createdAt">) => boolean;
   markChapterRead: (bookSlug: string, bookName: string, chapter: number) => { newMilestones: MilestoneSeed[] };
   setReadingPosition: (position: Omit<ReadingPosition, "updatedAt">) => void;
+
+  // -- daily verse
+  /** Deterministically show a different verse for the rest of today. */
+  refreshVerse: () => void;
 
   // -- milestones
   dismissPendingMilestone: (key: string) => void;
@@ -172,6 +202,10 @@ export const useQuestOS = create<QuestOSState>()(
           growthEvents: growth
             ? [...state.growthEvents, growth]
             : state.growthEvents,
+          // Every meaningful action keeps the candle lit. advanceStreak
+          // returns the same reference when today is already counted, so
+          // repeat actions don't churn the persisted blob.
+          streak: advanceStreak(get().streak, journey.dateKey),
         });
         return { journey, growth };
       }
@@ -303,6 +337,8 @@ export const useQuestOS = create<QuestOSState>()(
         chaptersRead: [],
         pendingMilestones: [],
         lastVisitDateKey: null,
+        streak: emptyStreak(),
+        verseRefresh: null,
         tombstones: emptyTombstones(),
 
         completeOnboarding: (profileData, settingsPatch) => {
@@ -332,7 +368,7 @@ export const useQuestOS = create<QuestOSState>()(
           set({ lastVisitDateKey: toDateKey() });
         },
 
-        clearAllData: () => {
+        clearAllData: (opts) => {
           set({
             profile: null,
             settings: DEFAULT_SETTINGS,
@@ -348,11 +384,18 @@ export const useQuestOS = create<QuestOSState>()(
             chaptersRead: [],
             pendingMilestones: [],
             lastVisitDateKey: null,
-            tombstones: emptyTombstones(),
+            streak: emptyStreak(),
+            verseRefresh: null,
+            // The purge marker survives the reset (it IS the reset's remote
+            // half); it subsumes any pending per-row tombstones.
+            tombstones: {
+              ...emptyTombstones(),
+              purgeAccount: opts?.purgeAccount ?? null,
+            },
           });
         },
 
-        importData: (snapshot) => {
+        importData: (snapshot, opts) => {
           // REPLACE (a restore, not a merge): start from clean defaults so
           // nothing from the current journey bleeds through, then overlay the
           // validated snapshot. Any omitted field keeps its default. Emits no
@@ -381,6 +424,24 @@ export const useQuestOS = create<QuestOSState>()(
             chaptersRead: snapshot.chaptersRead ?? [],
             pendingMilestones: snapshot.pendingMilestones ?? [],
             lastVisitDateKey: snapshot.lastVisitDateKey ?? null,
+            streak: snapshot.streak ?? emptyStreak(),
+            // Device-local and day-scoped — survives restores and the sync
+            // engine's merge-apply alike; self-resets at the next midnight.
+            verseRefresh: get().verseRefresh,
+            // A signed-in restore condemns the account copy: the purge marker
+            // makes the sync engine delete the remote rows and rebuild them
+            // from this snapshot instead of merging the old copy back in. It
+            // subsumes any pending per-row tombstones. Without opts (guest
+            // restore, or the engine applying a merge) tombstones are left
+            // untouched.
+            ...(opts?.purgeAccount
+              ? {
+                  tombstones: {
+                    ...emptyTombstones(),
+                    purgeAccount: opts.purgeAccount,
+                  },
+                }
+              : {}),
           });
         },
 
@@ -662,13 +723,27 @@ export const useQuestOS = create<QuestOSState>()(
           });
         },
 
+        refreshVerse: () => {
+          const dateKey = toDateKey();
+          const prev = get().verseRefresh;
+          set({
+            verseRefresh: {
+              dateKey,
+              // Yesterday's count doesn't carry — a new day starts at its
+              // own daily verse and refreshes from there.
+              count: prev?.dateKey === dateKey ? prev.count + 1 : 1,
+            },
+          });
+        },
+
         clearSyncTombstones: (cleared) => {
           // No-op when nothing can change — writing a fresh tombstones
           // object would wake the sync subscriber for no reason.
           if (
             !cleared.prayers.length &&
             !cleared.reflections.length &&
-            !cleared.bookmarks.length
+            !cleared.bookmarks.length &&
+            !cleared.purgeAccount
           ) {
             return;
           }
@@ -688,6 +763,12 @@ export const useQuestOS = create<QuestOSState>()(
                       c.verse === b.verse
                   )
               ),
+              // Only the exact purge that propagated clears — a marker for a
+              // different account stays pending until that user signs in.
+              purgeAccount:
+                t.purgeAccount && t.purgeAccount === cleared.purgeAccount
+                  ? null
+                  : t.purgeAccount,
             },
           });
         },
@@ -696,7 +777,7 @@ export const useQuestOS = create<QuestOSState>()(
     {
       name: "biblequest:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 3,
+      version: 5,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
@@ -723,6 +804,24 @@ export const useQuestOS = create<QuestOSState>()(
             }
           }
           state.assignments = next;
+        }
+        if (version < 4) {
+          // v4 adds the account-purge marker to tombstones.
+          state.tombstones = {
+            ...emptyTombstones(),
+            ...(state.tombstones as Partial<SyncTombstones> | undefined),
+          };
+        }
+        if (version < 5) {
+          // v5: candle streak + same-day verse refresh + bold-text setting.
+          state.streak = emptyStreak();
+          state.verseRefresh = null;
+          const settings = state.settings as
+            | { appearance?: Record<string, unknown> }
+            | undefined;
+          if (settings?.appearance && settings.appearance.boldText == null) {
+            settings.appearance.boldText = false;
+          }
         }
         return state as unknown as QuestOSState;
       },
@@ -758,6 +857,17 @@ export function selectTodayPicks(s: QuestOSState): DailyQuestAssignment[] {
 /** How many quests the user has picked today (0..MAX_DAILY_PICKS). */
 export function selectTodayPickCount(s: QuestOSState): number {
   return s.assignments[toDateKey()]?.length ?? 0;
+}
+
+/** The candle. Stable reference — the stored object itself. */
+export function selectStreak(s: QuestOSState): StreakState {
+  return s.streak;
+}
+
+/** Today's "Another verse" count (primitive — render-safe). */
+export function selectVerseRefreshCount(s: QuestOSState): number {
+  const r = s.verseRefresh;
+  return r && r.dateKey === toDateKey() ? r.count : 0;
 }
 
 export { getDailyVerse };

@@ -7,7 +7,7 @@
  *    recently visited Scripture stays available offline (Codex, Vol IV §18).
  *  - Never caches API routes.
  */
-const VERSION = "biblequest-v1";
+const VERSION = "biblequest-v2";
 const SHELL = `${VERSION}-shell`;
 const RUNTIME = `${VERSION}-runtime`;
 

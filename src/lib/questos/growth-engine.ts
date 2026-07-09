@@ -55,6 +55,35 @@ export function calculateTreeState(events: GrowthEvent[]): GrowthTreeState {
   };
 }
 
+const STAGE_FLOOR: Record<TreeStage, number> = {
+  seed: 0,
+  sprout: 5,
+  young: 15,
+  growing: 40,
+  "fruit-bearing": 100,
+  sheltering: 250,
+};
+
+/**
+ * Progress through the current stage, for the journey's gentle progression
+ * bar. Returns null at the final stage (the bar simply rests full).
+ * Presented as "steps", never as points/XP (Codex: no score energy).
+ */
+export function stageProgress(
+  state: GrowthTreeState
+): { done: number; needed: number; fraction: number } | null {
+  if (state.toNextStage == null) return null;
+  const floor = STAGE_FLOOR[state.stage];
+  const nextMin = state.totalActions + state.toNextStage;
+  const needed = nextMin - floor;
+  const done = state.totalActions - floor;
+  return {
+    done,
+    needed,
+    fraction: needed > 0 ? Math.min(1, Math.max(0, done / needed)) : 1,
+  };
+}
+
 /** What each growth type nourishes, for gentle UI explanations. */
 export const GROWTH_MEANINGS: Record<GrowthType, string> = {
   roots: "Prayer nourishes the roots",

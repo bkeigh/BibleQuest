@@ -59,6 +59,29 @@ export interface UIStrings {
     recently: string;
     quickPrayer: string;
     openSettings: string;
+    /** The gentle verse-refresh control. */
+    anotherVerse: string;
+    /** Subtitle on the Reflection quick-row. */
+    reflectionHint: string;
+  };
+  /** The candle — gentle daily-rhythm streak. Never shame, never loss. */
+  streak: {
+    title: string;
+    /** Uses {n}, e.g. "Day {n}". */
+    day: string;
+    lit: string;
+    unlit: string;
+    keepGoing: string;
+  };
+  journey: {
+    /** Uses {n}: steps remaining to the next tree stage. */
+    toNext: string;
+    /** Singular companion to toNext — full sentence, no {n}. */
+    toNextOne: string;
+    /** Shown at the final stage instead of a countdown. */
+    fullGrown: string;
+    sanctuary: string;
+    sanctuarySoon: string;
   };
   quests: {
     emptyTitle: string;
@@ -109,8 +132,19 @@ export interface UIStrings {
     themeDark: string;
     themeSystem: string;
     textSize: string;
+    textSizeDefault: string;
+    textSizeLarge: string;
+    boldText: string;
     reduceMotion: string;
     reminders: string;
+    profile: string;
+    displayName: string;
+    changePhoto: string;
+    removePhoto: string;
+    /** Toast after the profile photo saves. */
+    photoSaved: string;
+    /** Toast when the profile photo can’t be saved. */
+    photoError: string;
     data: string;
     exportData: string;
     importData: string;

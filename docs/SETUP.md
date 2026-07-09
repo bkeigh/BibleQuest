@@ -17,7 +17,8 @@ stored locally and privately in the browser.
 
 1. Create a project at [supabase.com](https://supabase.com).
 2. In the SQL editor, run, in order:
-   - `supabase/migrations/0001_init.sql`
+   - every file in `supabase/migrations/`, in filename order
+     (`0001_init.sql` first)
    - `supabase/policies.sql`
    - `supabase/seed.sql` (regenerate with
      `node scripts/build-supabase-seed.mjs <seed-result.json>` if content changes)
@@ -64,5 +65,6 @@ node scripts/build-supabase-seed.mjs <seed-result.json>
 ## 5. Icons
 
 ```bash
-node scripts/build-icons.mjs   # rebuilds PWA icons + OG image from icon.svg
+node scripts/build-icons.mjs   # rebuilds icon.svg, PWA icons, favicon.ico + OG image
+                               # from assets/BQ-Logo-Vector-Cross.svg
 ```

@@ -1,169 +1,21 @@
 /**
  * PixelMascot — medium, hand-placed pixel companions.
  *
- * Bigger cousins of PixelIcon: one friendly sprite per onboarding /
- * sign-in page, always centered, always singular. Sacred exploration,
- * never arcade — same limited brand palette, one consistent outline.
+ * Bigger cousins of PixelIcon, resolved from the same pixel-asset
+ * registry (pixel-assets.ts): grid assets render as SVG <rect>s, png
+ * assets as a plain pixelated <img>. One friendly sprite per
+ * onboarding / sign-in page, always centered, always singular. Sacred
+ * exploration, never arcade — same limited brand palette, one
+ * consistent outline.
  *
  * Rules (docs/PIXEL_SYSTEM.md): a mascot appears at most once per
  * screen, centered, at size 8-11. Never inline with body text.
  */
 import { cn } from "@/lib/utils/cn";
+import { PIXEL_MASCOTS, type PixelMascotName } from "./pixel-assets";
 
-const P: Record<string, string> = {
-  k: "#1e3329", // outline — twilight deep green
-  w: "#fffdf7", // warm white (wool, pages)
-  W: "#efe4cf", // parchment shade
-  f: "#8a6844", // face/limb brown
-  F: "#6b4f34", // dark brown (soil, logs)
-  g: "#d3a336", // brand gold
-  G: "#b68b2f", // gold shade
-  y: "#e7c563", // light gold (glow, flame highlight)
-  o: "#e8913f", // flame orange
-  e: "#0e533c", // brand evergreen
-  E: "#2f7c58", // evergreen light
-  l: "#6f8155", // olive leaf
-  L: "#a8b98c", // olive light
-  b: "#8fb9d4", // marian blue accent
-  p: "#e5a8a1", // rose (cheeks)
-  t: "#cfa878", // light tan (lamb muzzle)
-};
-
-const MASCOTS = {
-  /** Welcome — a small lamb, glad you're here. */
-  lamb: [
-    "...kkkkkkkkk....",
-    "..kwwwwwwwwwk...",
-    ".kwwWwwwwwWwwk..",
-    ".kwwwwwwwwwwwk..",
-    ".kkwwwwwwwwwkk..",
-    "kfkkffffffffkkfk",
-    ".kkkffffffffkkk.",
-    "...kfkffffkfk...",
-    "...kfttttttfk...",
-    "...kpttkkttpk...",
-    "...kttttttttk...",
-    "....kkkkkkkk....",
-  ],
-  /** Daily rhythm — a lantern for the path. */
-  lantern: [
-    "......kkkk......",
-    "......k..k......",
-    "....kkkkkkkk....",
-    "...kggggggggk...",
-    "...kg......gk...",
-    "...kg..y...gk...",
-    "...kg.yoy..gk...",
-    "...kg.yoy..gk...",
-    "...kg..o...gk...",
-    "...kg......gk...",
-    "...kggggggggk...",
-    "....kkkkkkkk....",
-    "......kGGk......",
-    "......kkkk......",
-  ],
-  /** Scripture — an open scroll. */
-  scroll: [
-    ".kkkkkkkkkkkkkkkk.",
-    "kgggggggggggggggGk",
-    "kGgggggggggggggGGk",
-    ".kkwwwwwwwwwwwwkk.",
-    "..kwwwwwwwwwwwk...",
-    "..kwweeeeewwwwk...",
-    "..kwwwwwwwwwwwk...",
-    "..kwweeeeeeewwk...",
-    "..kwwwwwwwwwwwk...",
-    "..kwweeeewwwwwk...",
-    "..kwwwwwwwwwwwk...",
-    ".kkwwwwwwwwwwwwkk.",
-    "kgggggggggggggggGk",
-    "kGgggggggggggggGGk",
-    ".kkkkkkkkkkkkkkkk.",
-  ],
-  /** Prayer — a dove in flight. */
-  dove: [
-    ".........kk.......",
-    "........kWWk......",
-    ".......kWWWk......",
-    "......kWWWWk......",
-    "..kkk.kWWWWk......",
-    ".kwkwkwWWWWwk.....",
-    "kgkwwwwwwwwwwk....",
-    ".kkwwwwwwwwwwkkk..",
-    "...kwwwwwwwwwwwwk.",
-    "...kwwwwwwwwkkk...",
-    "....kwwwwwwk......",
-    ".....kwwwk........",
-    "......kkk.........",
-  ],
-  /** Growth — a two-leaf seedling. */
-  sprout: [
-    "...kk.....kk....",
-    "..kLLk...kLLk...",
-    ".kLlLLk.kLLlLk..",
-    ".kLLLLklkLLLLk..",
-    "..kLLk.l.kLLk...",
-    "...kk.klk.kk....",
-    "......klk.......",
-    "......klk.......",
-    "...kkkFlFkkk....",
-    ".kkFFFFFFFFFkk..",
-    ".kFFfFFFFfFFFk..",
-    "..kkFFFFFFFkk...",
-    "....kkkkkkk.....",
-  ],
-  /** Sign-in — a key: your journey, kept. */
-  key: [
-    "....kkkk........",
-    "...kggggk.......",
-    "..kg....gk......",
-    "..kg.ee.gk......",
-    "..kg.ee.gk......",
-    "..kg....gk......",
-    "...kggggk.......",
-    "....kggk........",
-    "....kggk........",
-    "....kggk........",
-    "....kggkgk......",
-    "....kggkk.......",
-    "....kggkgk......",
-    ".....kkkk.......",
-  ],
-  /** Quests — a map with a trail to follow. */
-  map: [
-    ".kkkkkkkkkkkkkkkk.",
-    "kwWwwwwwwwwwwwwWwk",
-    "kwwwwwwwwwwwe.ewwk",
-    "kwwwwwwwwwwwwewwwk",
-    "kwwwwwwwwwgwe.ewwk",
-    "kwwwwwwwwwwwwwwwwk",
-    "kwwwwwwwgwwwwwwwwk",
-    "kwwwwwgwwwwwwwwwwk",
-    "kwwwgwwwwwwwwwwwwk",
-    "kwegwwwwwwwwwwwwwk",
-    "kwWwwwwwwwwwwwwWwk",
-    ".kkkkkkkkkkkkkkkk.",
-  ],
-  /** Reflection — a campfire to rest beside. */
-  campfire: [
-    "................",
-    ".......y........",
-    "......yoy.......",
-    ".....yooy.......",
-    ".....yogoy......",
-    "....yogggoy.....",
-    "....yoggoy......",
-    ".....yooy.......",
-    "..kFFkkkkFFk....",
-    ".kFfFFFFFFfFk...",
-    "..kkFFFFFFkk....",
-    "....kkkkkk......",
-  ],
-} satisfies Record<string, string[]>;
-
-export type PixelMascotName = keyof typeof MASCOTS;
-
-export const PIXEL_MASCOT_NAMES = Object.keys(MASCOTS) as PixelMascotName[];
+export { PIXEL_MASCOT_NAMES } from "./pixel-assets";
+export type { PixelMascotName } from "./pixel-assets";
 
 interface PixelMascotProps {
   name: PixelMascotName;
@@ -180,7 +32,25 @@ export function PixelMascot({
   className,
   title,
 }: PixelMascotProps) {
-  const rows = MASCOTS[name];
+  const asset = PIXEL_MASCOTS[name];
+  if (!asset) return null;
+
+  if (asset.kind === "png") {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- tiny local pixel art; next/image would blur and lazy-load it
+      <img
+        src={asset.src}
+        width={asset.cols * size}
+        height={asset.rows * size}
+        alt={title ?? ""}
+        role={title ? "img" : "presentation"}
+        aria-hidden={title ? undefined : true}
+        className={cn("pixelated mx-auto block shrink-0", className)}
+      />
+    );
+  }
+
+  const rows = asset.rows;
   const cols = Math.max(...rows.map((r) => r.length));
 
   return (
@@ -195,8 +65,8 @@ export function PixelMascot({
     >
       {rows.flatMap((row, y) =>
         row.split("").map((ch, x) => {
-          const fill = P[ch];
-          if (!fill) return null;
+          const fill = asset.palette[ch];
+          if (!fill || fill === "transparent") return null;
           return (
             <rect
               key={`${x}-${y}`}

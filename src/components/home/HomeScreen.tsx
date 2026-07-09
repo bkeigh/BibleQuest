@@ -6,12 +6,15 @@ import { motion } from "framer-motion";
 import {
   useQuestOS,
   selectDaysAway,
+  selectStreak,
   selectTodayPicks,
+  selectVerseRefreshCount,
   MAX_DAILY_PICKS,
 } from "@/lib/questos/store";
-import { calculateTreeState } from "@/lib/questos/growth-engine";
+import { calculateTreeState, stageProgress } from "@/lib/questos/growth-engine";
+import { selectSuggestedQuests } from "@/lib/questos/quest-engine";
 import { getDailyVerse } from "@/lib/questos/verse-engine";
-import { timeOfDay, toDateKey, formatFriendlyDate } from "@/lib/utils/dates";
+import { timeOfDay, toDateKey } from "@/lib/utils/dates";
 import { returnLine } from "@/lib/questos/copy";
 import { useStrings, fmt } from "@/lib/i18n";
 import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
@@ -25,6 +28,8 @@ import { QuestSlip } from "@/components/quests/QuestSlip";
 import { GrowthTree } from "@/components/journey/GrowthTree";
 import { SeasonalAtmosphere } from "@/components/design-system/SeasonalAtmosphere";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { Avatar } from "@/components/profile/Avatar";
+import { StreakCard } from "@/components/home/StreakCard";
 import {
   IconArrowRight,
   IconCheck,
@@ -32,7 +37,7 @@ import {
   IconSettings,
 } from "@/components/design-system/icons";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
-import { questBySlug } from "@/data/seed/quests";
+import { seedQuests, questBySlug } from "@/data/seed/quests";
 
 function HomeInner() {
   const profile = useQuestOS((s) => s.profile);
@@ -40,9 +45,16 @@ function HomeInner() {
   // recordVisit() overwrites lastVisitDateKey to today. A reactive read would
   // flip the warm "welcome back" line to same-day copy ~400ms in.
   const [daysAway] = useState(() => selectDaysAway(useQuestOS.getState()));
+  const settings = useQuestOS((s) => s.settings);
   const growthEvents = useQuestOS((s) => s.growthEvents);
   const readingPosition = useQuestOS((s) => s.readingPosition);
   const journeyEvents = useQuestOS((s) => s.journeyEvents);
+  const completions = useQuestOS((s) => s.completions);
+  // The candle. Stable ref — the stored object itself.
+  const streak = useQuestOS(selectStreak);
+  // Today's "Another verse" count (primitive) + the action that grows it.
+  const verseRefreshCount = useQuestOS(selectVerseRefreshCount);
+  const refreshVerse = useQuestOS((s) => s.refreshVerse);
   // Today's picked quests (0..MAX_DAILY_PICKS). Stable ref — render-safe.
   const picks = useQuestOS(selectTodayPicks);
   // Keep day-scoped content fresh when the local day rolls over while the app
@@ -71,7 +83,11 @@ function HomeInner() {
   }, []);
 
   const tree = useMemo(() => calculateTreeState(growthEvents), [growthEvents]);
-  const verse = useMemo(() => getDailyVerse(dayKey), [dayKey]);
+  const progress = useMemo(() => stageProgress(tree), [tree]);
+  const verse = useMemo(
+    () => getDailyVerse(dayKey, verseRefreshCount),
+    [dayKey, verseRefreshCount]
+  );
   const season = useMemo(() => getCurrentSeason(), []);
   const name = firstName(profile?.displayName);
   const time = timeOfDay();
@@ -93,6 +109,24 @@ function HomeInner() {
   ).length;
   const allDone = pickCount >= 1 && completedCount === pickCount;
 
+  // Suggested quests for the open day — the same deterministic shelf as the
+  // browse page, so home and browse always agree on today's offer.
+  const suggested = useMemo(() => {
+    if (pickCount > 0) return [];
+    return selectSuggestedQuests({
+      quests: seedQuests,
+      dateKey: dayKey,
+      profile,
+      settings,
+      season: season.key,
+      recentSlugs: completions.map((c) => c.questSlug),
+      excludeSlugs: completions
+        .filter((c) => c.dateKey === dayKey)
+        .map((c) => c.questSlug),
+      count: 3,
+    });
+  }, [pickCount, dayKey, profile, settings, season.key, completions]);
+
   const recent = [...journeyEvents]
     .filter((e) => e.type !== "milestone_reached")
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
@@ -105,16 +139,31 @@ function HomeInner() {
       </div>
 
       <PageContainer className="relative pt-safe">
-        {/* Greeting */}
+        {/* Greeting — my space: your face (or initial) beside your name */}
         <header className="flex items-start justify-between gap-4 pt-10 pb-6">
-          <div>
-            <p className="text-caption uppercase tracking-[0.16em] text-accent">
-              {formatFriendlyDate(dayKey)} · {season.label}
-            </p>
-            <h1 className="mt-2 font-display text-editorial text-graphite">
-              {hello}
-            </h1>
-            <p className="mt-1 text-body text-ash">{returnLine(daysAway)}</p>
+          <div className="flex min-w-0 items-start gap-3.5">
+            <Link
+              href="/app/settings"
+              aria-label={t.home.openSettings}
+              className="mt-1.5 shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <Avatar
+                name={profile?.displayName}
+                marker={profile?.avatarUpdatedAt}
+                size="md"
+              />
+            </Link>
+            <div className="min-w-0">
+              {/* Just the liturgical season — the phone already shows the
+                  date and time; we don't duplicate what the OS ships with. */}
+              <p className="text-caption uppercase tracking-[0.16em] text-accent">
+                {season.label}
+              </p>
+              <h1 className="mt-2 font-display text-editorial text-graphite">
+                {hello}
+              </h1>
+              <p className="mt-1 text-body text-ash">{returnLine(daysAway)}</p>
+            </div>
           </div>
           <Link
             href="/app/settings"
@@ -125,12 +174,58 @@ function HomeInner() {
           </Link>
         </header>
 
-        <div className="space-y-5 pb-4">
+        <div className="space-y-5 pb-4 sm:space-y-6">
+          {/* Today's light — the candle */}
+          <StreakCard streak={streak} dayKey={dayKey} />
+
           {/* Today's verse */}
-          <VerseCard verse={verse} />
+          <VerseCard verse={verse} onAnotherVerse={refreshVerse} />
+
+          {/* Growth preview — the journey, one glance */}
+          <Link href="/app/journey" className="block">
+            <PaperCard interactive padding="md" className="flex items-center gap-4">
+              <GrowthTree state={tree} size={92} showGround={false} />
+              <div className="min-w-0 flex-1">
+                <SectionLabel pixel>{t.home.yourGrowth}</SectionLabel>
+                <p className="font-display text-subheading text-graphite">
+                  {tree.stageLabel}
+                </p>
+                {/* Gentle progression bar — the caption carries the meaning. */}
+                <div
+                  aria-hidden="true"
+                  className="mt-2 h-1.5 overflow-hidden rounded-full bg-mist/60"
+                >
+                  <div
+                    className="h-full rounded-full bg-accent"
+                    style={{ width: `${(progress?.fraction ?? 1) * 100}%` }}
+                  />
+                </div>
+                <p className="mt-1.5 text-caption text-ash">
+                  {tree.toNextStage != null
+                    ? tree.toNextStage === 1
+                      ? t.journey.toNextOne
+                      : fmt(t.journey.toNext, { n: tree.toNextStage })
+                    : t.journey.fullGrown}
+                </p>
+              </div>
+              <IconChevronRight className="text-fog" />
+            </PaperCard>
+          </Link>
 
           {/* Today's quests — empty, picked (1-3), or day complete */}
           <section aria-label={t.home.todaysQuests}>
+            {/* The loudest title on the page — the day's work anchors it. */}
+            <div className="mb-2.5 flex items-baseline justify-between gap-3">
+              <h2 className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
+                {t.home.todaysQuests}
+              </h2>
+              {pickCount > 0 && !allDone && (
+                <p className="text-caption text-ash">
+                  {fmt(t.quests.picked, { n: pickCount })}
+                </p>
+              )}
+            </div>
+
             {/* Announce pick/completion changes to screen readers. */}
             <p aria-live="polite" className="sr-only">
               {pickCount === 0
@@ -141,34 +236,42 @@ function HomeInner() {
             </p>
 
             {pickCount === 0 && (
-              <PaperCard variant="outlined" padding="lg" className="text-center">
-                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-accent-surface">
-                  <PixelIcon name="lantern" size={5} animate />
-                </div>
-                <h2 className="font-display text-subheading text-graphite">
-                  {t.quests.emptyTitle}
-                </h2>
-                <p className="mx-auto mt-1.5 max-w-sm text-small leading-relaxed text-charcoal">
-                  {t.quests.emptyBody}
-                </p>
+              <>
+                <PaperCard variant="outlined" padding="lg" className="text-center">
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-accent-surface">
+                    <PixelIcon name="lantern" size={5} animate />
+                  </div>
+                  <h3 className="font-display text-subheading text-graphite">
+                    {t.quests.emptyTitle}
+                  </h3>
+                  <p className="mx-auto mt-1.5 max-w-sm text-small leading-relaxed text-charcoal">
+                    {t.quests.emptyBody}
+                  </p>
+                </PaperCard>
+                {/* The day's suggested quests, ready to be taken up. */}
+                {suggested.length > 0 && (
+                  <ul className="mt-3 space-y-3">
+                    {suggested.map((quest) => (
+                      <li key={quest.slug}>
+                        <QuestSlip
+                          quest={quest}
+                          href={`/app/quests/${quest.slug}`}
+                          compact
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <div className="mt-4 flex justify-center">
                   <GentleLink variant="primary" href="/app/quests">
                     {t.quests.pickCta} <IconArrowRight />
                   </GentleLink>
                 </div>
-              </PaperCard>
+              </>
             )}
 
             {pickCount > 0 && !allDone && (
               <>
-                <div className="mb-2 flex items-baseline justify-between gap-3">
-                  <p className="font-pixel text-small uppercase tracking-[0.1em] text-accent">
-                    {t.home.todaysQuests}
-                  </p>
-                  <p className="text-caption text-ash">
-                    {fmt(t.quests.picked, { n: pickCount })}
-                  </p>
-                </div>
                 <ul className="space-y-3">
                   {pickedQuests.map(({ pick, quest }) => {
                     const done = pick.status === "completed";
@@ -213,9 +316,9 @@ function HomeInner() {
                   <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gold-500/15">
                     <PixelIcon name="star" size={5} animate />
                   </div>
-                  <h2 className="font-display text-editorial text-graphite">
+                  <h3 className="font-display text-editorial text-graphite">
                     {t.dayComplete.title}
-                  </h2>
+                  </h3>
                   <p className="mx-auto mt-2 max-w-sm text-small leading-relaxed text-charcoal">
                     {t.dayComplete.body}
                   </p>
@@ -232,59 +335,45 @@ function HomeInner() {
             )}
           </section>
 
-          {/* Quick prayer */}
-          <QuickRow
-            href="/app/prayer/new"
-            sprite="candle"
-            title="One minute of prayer"
-            subtitle="Say what’s on your mind. It stays private."
-          />
-
-          {/* Growth preview */}
-          <Link href="/app/journey" className="block">
-            <PaperCard interactive padding="md" className="flex items-center gap-4">
-              <GrowthTree state={tree} size={92} showGround={false} />
-              <div className="min-w-0 flex-1">
-                <SectionLabel>{t.home.yourGrowth}</SectionLabel>
-                <p className="font-display text-subheading text-graphite">
-                  {tree.stageLabel}
-                </p>
-                <p className="mt-0.5 text-caption text-ash">
-                  {tree.totalActions === 0
-                    ? "Complete one quest and your tree starts growing."
-                    : `${tree.totalActions} meaningful ${
-                        tree.totalActions === 1 ? "step" : "steps"
-                      } so far.`}
-                </p>
-              </div>
-              <IconChevronRight className="text-fog" />
-            </PaperCard>
-          </Link>
-
-          {/* Continue reading */}
-          <QuickRow
-            href={
-              readingPosition
-                ? `/app/bible/${readingPosition.bookSlug}/${readingPosition.chapter}`
-                : "/app/bible"
-            }
-            sprite="book"
-            title={
-              readingPosition
-                ? `Continue ${readingPosition.bookName} ${readingPosition.chapter}`
-                : "Open the Bible"
-            }
-            subtitle={
-              readingPosition
-                ? "Pick up where you left off."
-                : "Pick a book and start reading."
-            }
-          />
+          {/* Snippet rows — prayer, reading, reflection. Each card names
+              itself; no extra label chrome (the phone gives us enough). */}
+          <div className="space-y-3 pt-1">
+            <QuickRow
+              href="/app/prayer/new"
+              sprite="candle"
+              title="One minute of prayer"
+              subtitle="Say what’s on your mind. It stays private."
+            />
+            <QuickRow
+              href={
+                readingPosition
+                  ? `/app/bible/${readingPosition.bookSlug}/${readingPosition.chapter}`
+                  : "/app/bible"
+              }
+              sprite="book"
+              title={
+                readingPosition
+                  ? `Continue ${readingPosition.bookName} ${readingPosition.chapter}`
+                  : "Open the Bible"
+              }
+              subtitle={
+                readingPosition
+                  ? "Pick up where you left off."
+                  : "Pick a book and start reading."
+              }
+            />
+            <QuickRow
+              href="/app/reflection"
+              sprite="sun"
+              title={t.titles.reflections}
+              subtitle={t.home.reflectionHint}
+            />
+          </div>
 
           {/* Recent growth */}
           {recent.length > 0 && (
             <section aria-label="Recent activity" className="pt-1">
-              <SectionLabel>{t.home.recently}</SectionLabel>
+              <SectionLabel pixel>{t.home.recently}</SectionLabel>
               <PaperCard variant="quiet" padding="sm">
                 <ul className="divide-y divide-mist/70">
                   {recent.map((e) => (
@@ -308,7 +397,21 @@ function HomeInner() {
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function SectionLabel({
+  children,
+  pixel,
+}: {
+  children: React.ReactNode;
+  /** Ithaca header voice — larger, and a real heading over its content. */
+  pixel?: boolean;
+}) {
+  if (pixel) {
+    return (
+      <h2 className="mb-2.5 font-pixel text-[1.25rem] leading-tight uppercase tracking-[0.05em] text-accent">
+        {children}
+      </h2>
+    );
+  }
   return (
     <p className="mb-2 text-caption uppercase tracking-[0.16em] text-accent">
       {children}

@@ -447,6 +447,9 @@ export function rowsToSettings(
       reducedMotion: settings?.reduced_motion ?? d.appearance.reducedMotion,
       textSize: (settings?.text_size ??
         d.appearance.textSize) as Settings["appearance"]["textSize"],
+      // Device-local; no remote column. mergeSnapshots preserves the local
+      // value — this default only satisfies the shape.
+      boldText: d.appearance.boldText,
     },
     notifications: {
       dailyVerse: notifications?.daily_verse_enabled ?? d.notifications.dailyVerse,

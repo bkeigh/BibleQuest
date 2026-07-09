@@ -72,7 +72,7 @@ you're ready to wire up Supabase, analytics, or payments.
 | `pnpm lint` | ESLint |
 | `node scripts/import-bible.mjs` | Re-import the WEB Bible → `src/data/bible/` |
 | `node scripts/build-seed.mjs <json>` | Rebuild typed seed content |
-| `node scripts/build-icons.mjs` | Rasterize the app icon set + OG image |
+| `node scripts/build-icons.mjs` | Rebuild the icon set, favicon, + OG image from the brand art |
 | `node scripts/build-supabase-seed.mjs <json>` | Emit `supabase/seed.sql` |
 
 ---

@@ -385,12 +385,42 @@ export interface Profile {
   calling?: Calling;
   onboardingCompleted: boolean;
   createdAt: string;
+  /**
+   * Set when a profile photo exists in the on-device media store (IndexedDB —
+   * see src/lib/utils/avatar.ts). The image itself deliberately stays OUT of
+   * this persisted blob: localStorage re-serializes the whole store on every
+   * write, and the sync engine must never ship the photo to the account.
+   */
+  avatarUpdatedAt?: string | null;
 }
 
 export interface AppearanceSettings {
   theme: "light" | "dark" | "system";
   reducedMotion: boolean;
   textSize: "default" | "large";
+  /** Accessibility: heavier weights across the UI (html.text-bold). */
+  boldText: boolean;
+}
+
+/**
+ * Gentle daily-rhythm streak ("the candle"). Counts days with at least one
+ * meaningful action (quest, prayer, reflection, chapter read). Never decays
+ * mid-day; a missed day simply starts the next candle at 1 — no shame copy,
+ * no regression mechanics anywhere in the UI.
+ */
+export interface StreakState {
+  /** Consecutive active days including the most recent active day. */
+  current: number;
+  /** Longest run ever reached (never decreases). */
+  longest: number;
+  /** dateKey of the most recent active day, null before the first action. */
+  lastActiveDateKey: string | null;
+}
+
+/** Same-day verse refreshes — deterministic, resets naturally at midnight. */
+export interface VerseRefresh {
+  dateKey: string;
+  count: number;
 }
 
 export interface NotificationPreferences {
@@ -411,7 +441,12 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  appearance: { theme: "light", reducedMotion: false, textSize: "default" },
+  appearance: {
+    theme: "light",
+    reducedMotion: false,
+    textSize: "default",
+    boldText: false,
+  },
   language: "en",
   notifications: {
     dailyVerse: false,
@@ -432,10 +467,18 @@ export interface SyncTombstones {
   prayers: string[];
   reflections: string[];
   bookmarks: Array<{ bookSlug: string; chapter: number; verse: number }>;
+  /**
+   * User id whose ENTIRE account copy must be deleted before the next push.
+   * Set when the user clears or restores-over their data while signed in —
+   * without it, the next initial sync would merge the account copy straight
+   * back. Scoped to the id so a purge pending for account A can never touch
+   * account B's rows if a different user signs in first.
+   */
+  purgeAccount: string | null;
 }
 
 export function emptyTombstones(): SyncTombstones {
-  return { prayers: [], reflections: [], bookmarks: [] };
+  return { prayers: [], reflections: [], bookmarks: [], purgeAccount: null };
 }
 
 /**
@@ -458,6 +501,12 @@ export interface QuestOSSnapshot {
   chaptersRead: ChapterRead[];
   pendingMilestones: string[];
   lastVisitDateKey: string | null;
+  /** Optional — exports from before the candle streak omit it. */
+  streak?: StreakState;
+}
+
+export function emptyStreak(): StreakState {
+  return { current: 0, longest: 0, lastActiveDateKey: null };
 }
 
 // ---------------------------------------------------------------------------

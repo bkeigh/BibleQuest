@@ -25,6 +25,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { useQuestOS } from "@/lib/questos/store";
 import type { QuestOSSnapshot, SyncTombstones } from "@/lib/questos/types";
 import { useSyncStatus } from "./status";
+import { localDataBelongsToOtherUser, setLastSyncedUserId } from "./last-user";
 import {
   assignmentToRow,
   bookmarkToRow,
@@ -121,6 +122,15 @@ export function stopSync() {
 export async function startSync(userId: string) {
   if (!isSupabaseConfigured()) return;
   if (currentUserId === userId) return;
+  // The device still holds a journey last synced by a DIFFERENT account.
+  // Refuse to sync — merging here would copy that user's private prayers and
+  // reflections into this account's rows. SyncManager detects the same
+  // condition and asks the person to either start fresh or claim the data;
+  // resolution calls setLastSyncedUserId and retries.
+  if (localDataBelongsToOtherUser(userId)) {
+    setStatus("off");
+    return;
+  }
   stopSync();
   currentUserId = userId;
   const token = ++runToken;
@@ -161,6 +171,20 @@ export async function startSync(userId: string) {
     if (state.tombstones !== prev.tombstones) changed = true;
     if (changed) schedulePush();
   });
+
+  // A clear/restore/deletion that landed while the initial sync's network
+  // calls were in flight predates the subscriber and would otherwise sit
+  // unpushed until the next local change — catch it up now. (runPush widens
+  // a purge push to all fields itself.)
+  const pending = useQuestOS.getState().tombstones;
+  if (
+    pending.purgeAccount === userId ||
+    pending.prayers.length ||
+    pending.reflections.length ||
+    pending.bookmarks.length
+  ) {
+    schedulePush();
+  }
 }
 
 function schedulePush() {
@@ -189,21 +213,30 @@ async function runPush() {
     const supabase = createClient();
     const state = useQuestOS.getState();
     const tombstones = state.tombstones;
-    const fields = new Set(dirty);
+    // A purge empties the whole account copy, so the push that follows must
+    // rebuild every collection from local state — not just the dirty ones.
+    const fields = new Set(
+      tombstones.purgeAccount === userId ? SYNCED_FIELDS : dirty
+    );
     dirty.clear();
 
-    await propagateTombstones(supabase, tombstones);
+    const cleared = await propagateTombstones(supabase, tombstones, userId);
     // Only clear when there was something to propagate — an unconditional
     // clear writes a fresh tombstones object every push, which the
     // subscriber sees as a change and turns into an endless push loop.
     if (
-      tombstones.prayers.length ||
-      tombstones.reflections.length ||
-      tombstones.bookmarks.length
+      cleared.prayers.length ||
+      cleared.reflections.length ||
+      cleared.bookmarks.length ||
+      cleared.purgeAccount
     ) {
-      useQuestOS.getState().clearSyncTombstones(tombstones);
+      useQuestOS.getState().clearSyncTombstones(cleared);
     }
     await pushFields(supabase, userId, snapshotFromStore(), fields);
+    // Re-stamp ownership on every successful push: "Clear my data" in
+    // settings drops the marker, but anything written afterwards while still
+    // signed in lands in this account's rows and belongs to it.
+    setLastSyncedUserId(userId);
     if (currentUserId === userId) setStatus("idle", true);
   } catch {
     // Push failed (offline, etc.) — mark everything dirty again and retry.
@@ -237,9 +270,14 @@ async function initialSync(
   // mid-sync) don't resurrect from the account copy.
   const tombstones = useQuestOS.getState().tombstones;
   const local = snapshotFromStore();
-  const merged = normalizeIds(
-    mergeSnapshots(local, filterByTombstones(remote, tombstones))
-  );
+  // A pending purge for this account ("Clear my data" / restore-from-file
+  // while signed in) condemns the whole account copy — merging any of it
+  // back would resurrect exactly what the user erased.
+  const remoteKept =
+    tombstones.purgeAccount === userId
+      ? {}
+      : filterByTombstones(remote, tombstones);
+  const merged = normalizeIds(mergeSnapshots(local, remoteKept));
 
   applyingRemote = true;
   try {
@@ -247,9 +285,12 @@ async function initialSync(
   } finally {
     applyingRemote = false;
   }
+  // From this moment the local store holds this account's (merged) journey —
+  // record the owner even if the pushes below fail and retry later.
+  setLastSyncedUserId(userId);
 
-  await propagateTombstones(supabase, tombstones);
-  useQuestOS.getState().clearSyncTombstones(tombstones);
+  const cleared = await propagateTombstones(supabase, tombstones, userId);
+  useQuestOS.getState().clearSyncTombstones(cleared);
 
   if (!isCurrent()) return;
   await pushFields(supabase, userId, merged, new Set(SYNCED_FIELDS));
@@ -272,6 +313,10 @@ function snapshotFromStore(): QuestOSSnapshot {
     chaptersRead: s.chaptersRead,
     pendingMilestones: s.pendingMilestones,
     lastVisitDateKey: s.lastVisitDateKey,
+    // Device-local; not synced, but MUST ride through the merge-apply —
+    // importData resets any omitted field to its default, which would
+    // extinguish the candle on every signed-in launch.
+    streak: s.streak,
   };
 }
 
@@ -410,7 +455,18 @@ export function mergeSnapshots(
   const profile = adoptRemote
     ? remote.profile ?? null
     : local.profile ?? remote.profile ?? null;
-  const settings = adoptRemote && remote.settings ? remote.settings : local.settings;
+  // boldText is a device-local accessibility preference (no remote column;
+  // like OS-level bold text it shouldn't follow the account across devices).
+  const settings =
+    adoptRemote && remote.settings
+      ? {
+          ...remote.settings,
+          appearance: {
+            ...remote.settings.appearance,
+            boldText: local.settings.appearance.boldText,
+          },
+        }
+      : local.settings;
 
   // Assignments: per-day pick lists, unioned by questSlug so one device's
   // sync can never destroy another device's picks. Completed always wins
@@ -497,6 +553,7 @@ export function mergeSnapshots(
     // Device-local fields pass through untouched.
     pendingMilestones: local.pendingMilestones,
     lastVisitDateKey: local.lastVisitDateKey,
+    streak: local.streak,
   };
 }
 
@@ -549,10 +606,24 @@ export function normalizeIds(snapshot: QuestOSSnapshot): QuestOSSnapshot {
 // Push
 // ---------------------------------------------------------------------------
 
+/**
+ * Deletes tombstoned rows from the account, returning what actually
+ * propagated so the caller clears exactly that. A pending account purge
+ * ("Clear my data" / restore-from-file while signed in) deletes EVERY
+ * user-data row via the purge_user_data RPC (migration 0004) and subsumes
+ * the per-row tombstones. A purge marker for a DIFFERENT account is left
+ * pending — it propagates only when that user signs back in.
+ */
 async function propagateTombstones(
   supabase: SupabaseClient,
-  t: SyncTombstones
-) {
+  t: SyncTombstones,
+  userId: string
+): Promise<SyncTombstones> {
+  if (t.purgeAccount === userId) {
+    const { error } = await supabase.rpc("purge_user_data");
+    if (error) throw error;
+    return t;
+  }
   if (t.prayers.length) {
     const { error } = await supabase.from("prayers").delete().in("id", t.prayers);
     if (error) throw error;
@@ -571,6 +642,7 @@ async function propagateTombstones(
       .match({ book_slug: b.bookSlug, chapter: b.chapter, verse: b.verse });
     if (error) throw error;
   }
+  return { ...t, purgeAccount: null };
 }
 
 async function pushFields(

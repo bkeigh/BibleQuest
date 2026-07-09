@@ -10,8 +10,12 @@ import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
 import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosure";
+import { Avatar } from "@/components/profile/Avatar";
 import { applyAppearance } from "@/lib/theme";
+import { saveAvatar, clearAvatar } from "@/lib/utils/avatar";
 import { parseSnapshot } from "@/lib/questos/import-schema";
+import { clearLastSyncedUserId } from "@/lib/sync/last-user";
+import { useSession } from "@/lib/supabase/useSession";
 import type { QuestOSSnapshot } from "@/lib/questos/types";
 import { useStrings, LANGUAGES, languageMeta } from "@/lib/i18n";
 import { IconCheck } from "@/components/design-system/icons";
@@ -104,9 +108,9 @@ function Toggle({
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mb-2 mt-6 px-1 text-[0.75rem] uppercase tracking-[0.16em] text-accent">
+    <h2 className="mb-2 mt-7 px-1 font-pixel text-[1.125rem] leading-tight uppercase tracking-[0.05em] text-accent">
       {children}
-    </p>
+    </h2>
   );
 }
 
@@ -182,8 +186,12 @@ function LanguagePicker({
 function SettingsInner() {
   const router = useRouter();
   const { toast } = useToast();
+  // Signed-in clears/restores must also purge the account copy, or the next
+  // initial sync merges it straight back (see lib/sync/engine.ts).
+  const { user } = useSession();
   const profile = useQuestOS((s) => s.profile);
   const settings = useQuestOS((s) => s.settings);
+  const updateProfile = useQuestOS((s) => s.updateProfile);
   const updateSettings = useQuestOS((s) => s.updateSettings);
   const clearAllData = useQuestOS((s) => s.clearAllData);
   const importData = useQuestOS((s) => s.importData);
@@ -195,6 +203,10 @@ function SettingsInner() {
   const [pendingImport, setPendingImport] =
     useState<Partial<QuestOSSnapshot> | null>(null);
 
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+
   const appearance = settings.appearance;
   const t = useStrings();
   const language = settings.language ?? "en";
@@ -203,6 +215,33 @@ function SettingsInner() {
     const next = { ...appearance, ...patch };
     updateSettings({ appearance: next });
     applyAppearance(next);
+  }
+
+  function saveName() {
+    const trimmed = nameDraft.trim();
+    if (!trimmed) return;
+    updateProfile({ displayName: trimmed });
+    setEditingName(false);
+  }
+
+  async function onPhotoPicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // reset so re-picking the same file still fires onChange
+    if (!file) return;
+    const ok = await saveAvatar(file);
+    if (ok) {
+      // The photo lives in IndexedDB; the store only carries this marker so
+      // Avatar knows to refetch (and it syncs/exports as a harmless string).
+      updateProfile({ avatarUpdatedAt: new Date().toISOString() });
+      toast(t.settings.photoSaved, { variant: "success" });
+    } else {
+      toast(t.settings.photoError);
+    }
+  }
+
+  async function removePhoto() {
+    await clearAvatar();
+    updateProfile({ avatarUpdatedAt: null });
   }
 
   function exportData() {
@@ -241,7 +280,13 @@ function SettingsInner() {
 
   function confirmImport() {
     if (!pendingImport) return;
-    importData(pendingImport);
+    importData(
+      pendingImport,
+      user ? { purgeAccount: user.id } : undefined
+    );
+    // A restore whose profile carries no photo marker must not resurrect a
+    // stale on-device photo blob for the incoming profile.
+    if (!pendingImport.profile?.avatarUpdatedAt) void clearAvatar();
     setPendingImport(null);
     applyAppearance(store.getState().settings.appearance);
     toast("Restored.", { variant: "success" });
@@ -251,16 +296,118 @@ function SettingsInner() {
     <>
       <PageHeader title={t.titles.settings} />
       <PageContainer className="pb-8">
+        <SectionTitle>{t.settings.profile}</SectionTitle>
+        <PaperCard variant="paper" padding="md">
+          <div className="flex items-start gap-4">
+            <Avatar
+              name={profile?.displayName}
+              marker={profile?.avatarUpdatedAt}
+              size="lg"
+            />
+            <div className="min-w-0 flex-1">
+              {editingName ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    saveName();
+                  }}
+                >
+                  <label
+                    htmlFor="display-name"
+                    className="mb-1.5 block text-[0.8125rem] text-ash"
+                  >
+                    {t.settings.displayName}
+                  </label>
+                  <input
+                    id="display-name"
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    onKeyDown={(e) =>
+                      e.key === "Escape" && setEditingName(false)
+                    }
+                    maxLength={40}
+                    autoFocus
+                    autoComplete="given-name"
+                    className="w-full rounded-[var(--radius-button)] border border-mist bg-paper px-4 py-2.5 text-[0.9375rem] text-graphite outline-none transition-colors focus:border-accent/50"
+                  />
+                  <div className="mt-2.5 flex gap-2.5">
+                    <GentleButton
+                      type="submit"
+                      variant="primary"
+                      size="sm"
+                      className="min-h-11"
+                      disabled={!nameDraft.trim()}
+                    >
+                      {t.common.save}
+                    </GentleButton>
+                    <GentleButton
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="min-h-11"
+                      onClick={() => setEditingName(false)}
+                    >
+                      {t.common.cancel}
+                    </GentleButton>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="min-w-0 truncate text-[1.0625rem] font-medium text-graphite">
+                      {profile?.displayName}
+                    </p>
+                    <GentleButton
+                      variant="text"
+                      size="sm"
+                      className="min-h-11 shrink-0"
+                      onClick={() => {
+                        setNameDraft(profile?.displayName ?? "");
+                        setEditingName(true);
+                      }}
+                    >
+                      {t.common.edit}
+                    </GentleButton>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      // Proxy-triggered by the visible button; without this
+                      // the sr-only input is an invisible tab stop.
+                      tabIndex={-1}
+                      aria-hidden="true"
+                      onChange={onPhotoPicked}
+                    />
+                    <GentleButton
+                      variant="outline"
+                      size="sm"
+                      className="min-h-11"
+                      onClick={() => photoInputRef.current?.click()}
+                    >
+                      {t.settings.changePhoto}
+                    </GentleButton>
+                    {profile?.avatarUpdatedAt && (
+                      <GentleButton
+                        variant="text"
+                        size="sm"
+                        className="min-h-11"
+                        onClick={removePhoto}
+                      >
+                        {t.settings.removePhoto}
+                      </GentleButton>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </PaperCard>
+
         <SectionTitle>{t.settings.account}</SectionTitle>
         <PaperCard variant="paper" padding="none" className="overflow-hidden">
-          {profile && (
-            <div className="flex items-center justify-between border-b border-mist/70 px-4 py-3.5">
-              <span className="text-[0.9375rem] text-charcoal">Profile</span>
-              <span className="text-[0.8125rem] text-ash">
-                {profile.displayName} · on this device
-              </span>
-            </div>
-          )}
           <Link
             href="/app/account"
             className="flex items-center justify-between px-4 py-3.5 text-charcoal hover:bg-linen"
@@ -268,6 +415,51 @@ function SettingsInner() {
             <span className="text-[0.9375rem]">Sync across devices</span>
             <span className="text-[0.8125rem] text-ash">Optional</span>
           </Link>
+        </PaperCard>
+
+        {/* Always visible — text size and bold text are comfort settings
+            people shouldn't have to hunt for behind a disclosure. */}
+        <SectionTitle>{t.settings.appearance}</SectionTitle>
+        <PaperCard variant="paper" padding="none" className="px-4">
+          <div className="divide-y divide-mist/70">
+            <Row label={t.settings.theme}>
+              <Segmented
+                label={t.settings.theme}
+                value={appearance.theme}
+                onChange={(theme) => setAppearance({ theme })}
+                options={[
+                  { value: "light", label: t.settings.themeLight },
+                  { value: "dark", label: t.settings.themeDark },
+                  { value: "system", label: t.settings.themeSystem },
+                ]}
+              />
+            </Row>
+            <Row label={t.settings.textSize}>
+              <Segmented
+                label={t.settings.textSize}
+                value={appearance.textSize}
+                onChange={(textSize) => setAppearance({ textSize })}
+                options={[
+                  { value: "default", label: t.settings.textSizeDefault },
+                  { value: "large", label: t.settings.textSizeLarge },
+                ]}
+              />
+            </Row>
+            <Row label={t.settings.boldText}>
+              <Toggle
+                label={t.settings.boldText}
+                on={appearance.boldText}
+                onChange={(boldText) => setAppearance({ boldText })}
+              />
+            </Row>
+            <Row label={t.settings.reduceMotion}>
+              <Toggle
+                label={t.settings.reduceMotion}
+                on={appearance.reducedMotion}
+                onChange={(reducedMotion) => setAppearance({ reducedMotion })}
+              />
+            </Row>
+          </div>
         </PaperCard>
 
         <DisclosureGroup className="mt-6">
@@ -283,41 +475,6 @@ function SettingsInner() {
               value={language}
               onChange={(code) => updateSettings({ language: code })}
             />
-          </Disclosure>
-
-          <Disclosure variant="card" label={t.settings.appearance} defaultOpen>
-            <div className="divide-y divide-mist/70">
-              <Row label={t.settings.theme}>
-                <Segmented
-                  label={t.settings.theme}
-                  value={appearance.theme}
-                  onChange={(theme) => setAppearance({ theme })}
-                  options={[
-                    { value: "light", label: t.settings.themeLight },
-                    { value: "dark", label: t.settings.themeDark },
-                    { value: "system", label: t.settings.themeSystem },
-                  ]}
-                />
-              </Row>
-              <Row label={t.settings.textSize}>
-                <Segmented
-                  label={t.settings.textSize}
-                  value={appearance.textSize}
-                  onChange={(textSize) => setAppearance({ textSize })}
-                  options={[
-                    { value: "default", label: "Default" },
-                    { value: "large", label: "Large" },
-                  ]}
-                />
-              </Row>
-              <Row label={t.settings.reduceMotion}>
-                <Toggle
-                  label={t.settings.reduceMotion}
-                  on={appearance.reducedMotion}
-                  onChange={(reducedMotion) => setAppearance({ reducedMotion })}
-                />
-              </Row>
-            </div>
           </Disclosure>
 
           <Disclosure variant="card" label={t.settings.reminders}>
@@ -343,7 +500,9 @@ function SettingsInner() {
                 type="file"
                 accept="application/json,.json"
                 className="sr-only"
-                aria-label="Choose a BibleQuest export file"
+                // Proxy-triggered by the visible button below.
+                tabIndex={-1}
+                aria-hidden="true"
                 onChange={onFilePicked}
               />
               <GentleButton
@@ -371,8 +530,9 @@ function SettingsInner() {
             {pendingImport && (
               <div className="mt-3 rounded-[var(--radius-card)] border border-mist bg-linen p-3.5">
                 <p className="text-[0.9375rem] leading-relaxed text-charcoal">
-                  This replaces everything on this device with the data in that
-                  file. Consider exporting first — it can’t be undone.
+                  {user
+                    ? "This replaces everything on this device — and the synced copy in your account — with the data in that file. Consider exporting first — it can’t be undone."
+                    : "This replaces everything on this device with the data in that file. Consider exporting first — it can’t be undone."}
                 </p>
                 <div className="mt-3 flex gap-2.5">
                   <GentleButton variant="danger" size="sm" onClick={confirmImport}>
@@ -428,8 +588,9 @@ function SettingsInner() {
           {!confirmClear ? (
             <>
               <p className="text-[0.875rem] leading-relaxed text-ash">
-                This deletes everything on this device — prayers, reflections,
-                and your journey. It can’t be undone.
+                {user
+                  ? "This deletes everything on this device and the synced copy in your account — prayers, reflections, and your journey. It can’t be undone."
+                  : "This deletes everything on this device — prayers, reflections, and your journey. It can’t be undone."}
               </p>
               <GentleButton
                 variant="danger"
@@ -450,7 +611,18 @@ function SettingsInner() {
                   variant="danger"
                   size="sm"
                   onClick={() => {
-                    clearAllData();
+                    // Signed in, the purge marker condemns the account copy
+                    // too; the sync engine deletes it on the next push or
+                    // initial sync, even if that happens after a reload.
+                    clearAllData(user ? { purgeAccount: user.id } : undefined);
+                    // "Everything on this device" includes the profile photo,
+                    // which lives beside the store in IndexedDB.
+                    void clearAvatar();
+                    // The device no longer holds anyone's journey — drop the
+                    // sync-ownership marker so the next sign-in isn't asked
+                    // about data that no longer exists. (If still signed in,
+                    // the next successful push re-stamps it.)
+                    clearLastSyncedUserId();
                     router.replace("/onboarding");
                   }}
                 >

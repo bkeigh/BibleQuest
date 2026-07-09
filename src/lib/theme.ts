@@ -15,6 +15,8 @@ export function applyAppearance(a: AppearanceSettings) {
 
   root.classList.toggle("theme-dark", dark);
   root.classList.toggle("text-large", a.textSize === "large");
+  // !! guards pre-v5 persisted appearance objects that lack the field.
+  root.classList.toggle("text-bold", !!a.boldText);
   root.classList.toggle("force-reduce-motion", a.reducedMotion);
   root.style.colorScheme = dark ? "dark" : "light";
 }

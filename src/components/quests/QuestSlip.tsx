@@ -45,6 +45,12 @@ interface QuestSlipProps {
   picked?: boolean;
   /** This quest was completed today — done chip. */
   completed?: boolean;
+  /**
+   * Compact: sprite chip, title, meta row, and badges only — the invitation
+   * and scripture wait on the quest page. For suggestion shelves, where the
+   * card should pull you in, not read it all to you.
+   */
+  compact?: boolean;
 }
 
 /**
@@ -57,6 +63,7 @@ export function QuestSlip({
   action,
   picked,
   completed,
+  compact,
 }: QuestSlipProps) {
   const badge = completed ? (
     <span className="pixel-frame ml-auto inline-flex shrink-0 items-center gap-1 bg-accent-surface px-2 py-0.5 font-pixel text-[0.875rem] text-accent-ink">
@@ -97,12 +104,16 @@ export function QuestSlip({
           <h3 className="mt-1 font-display text-[1.1875rem] leading-snug text-graphite">
             {quest.title}
           </h3>
-          <p className="mt-1.5 text-[0.9375rem] leading-relaxed text-charcoal">
-            {quest.invitation}
-          </p>
-          <p className="mt-2.5 text-[0.8125rem] italic text-ash">
-            {quest.scriptureReference}
-          </p>
+          {!compact && (
+            <>
+              <p className="mt-1.5 text-[0.9375rem] leading-relaxed text-charcoal">
+                {quest.invitation}
+              </p>
+              <p className="mt-2.5 text-[0.8125rem] italic text-ash">
+                {quest.scriptureReference}
+              </p>
+            </>
+          )}
         </div>
       </div>
     </PaperCard>

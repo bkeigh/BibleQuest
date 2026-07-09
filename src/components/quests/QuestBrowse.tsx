@@ -39,7 +39,9 @@ const ENERGY_LEVELS: { value: EnergyLevel; label: string }[] = [
 
 function ShelfTitle({ children }: { children: React.ReactNode }) {
   return (
-    <p className="font-pixel text-[1rem] text-accent">{children}</p>
+    <h2 className="font-pixel text-[1.25rem] leading-tight uppercase tracking-[0.05em] text-accent">
+      {children}
+    </h2>
   );
 }
 
@@ -141,7 +143,7 @@ function QuestBrowseInner() {
   }
 
   /** A browse-list slip: picked/done state + an add-to-today control. */
-  function browseSlip(quest: QuestTemplate) {
+  function browseSlip(quest: QuestTemplate, compact = false) {
     const done = completedToday.has(quest.slug);
     const isPicked = pickedSlugs.has(quest.slug);
     return (
@@ -151,6 +153,7 @@ function QuestBrowseInner() {
         href={`/app/quests/${quest.slug}`}
         picked={isPicked}
         completed={done}
+        compact={compact}
         action={
           !isPicked && !done ? (
             <button
@@ -343,11 +346,14 @@ function QuestBrowseInner() {
           </div>
         </Disclosure>
 
-        {/* Suggested for today — the old daily scorer, now an offer */}
+        {/* Suggested for today — the old daily scorer, now an offer.
+            Compact slips: the shelf invites, the quest page tells the story. */}
         {!hasFilters && suggested.length > 0 && (
           <section className="mt-6" aria-label={t.quests.suggested}>
             <ShelfTitle>{t.quests.suggested}</ShelfTitle>
-            <div className="mt-2 space-y-3">{suggested.map(browseSlip)}</div>
+            <div className="mt-2 space-y-3">
+              {suggested.map((quest) => browseSlip(quest, true))}
+            </div>
           </section>
         )}
 
@@ -355,7 +361,9 @@ function QuestBrowseInner() {
         {seasonal.length > 0 && !hasFilters && (
           <section className="mt-6" aria-label={`For ${season.label}`}>
             <ShelfTitle>For {season.label}</ShelfTitle>
-            <div className="mt-2 space-y-3">{seasonal.map(browseSlip)}</div>
+            <div className="mt-2 space-y-3">
+              {seasonal.map((quest) => browseSlip(quest))}
+            </div>
           </section>
         )}
 
@@ -369,7 +377,9 @@ function QuestBrowseInner() {
               {t.empty.questsFiltered}
             </p>
           ) : (
-            <div className="space-y-3 pb-6">{results.map(browseSlip)}</div>
+            <div className="space-y-3 pb-6">
+              {results.map((quest) => browseSlip(quest))}
+            </div>
           )}
         </section>
       </PageContainer>

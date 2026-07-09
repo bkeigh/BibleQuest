@@ -4,8 +4,16 @@
     {
       "name": "biblequest",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev", "--port", "3200"],
-      "port": 3200
+      "runtimeArgs": ["dev"],
+      "port": 3200,
+      "autoPort": true
+    },
+    {
+      "name": "biblequest-alt",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev"],
+      "port": 3211,
+      "autoPort": true
     }
   ]
 }

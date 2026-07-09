@@ -37,6 +37,9 @@ const isProfile = (o: unknown) =>
 const isReadingPosition = (o: unknown) =>
   isObj(o) && str(o.bookSlug) && str(o.bookName) && num(o.chapter);
 const isAssignment = (o: unknown) => isObj(o) && str(o.dateKey) && str(o.questSlug) && str(o.status);
+const isStreak = (o: unknown) =>
+  isObj(o) && num(o.current) && num(o.longest) &&
+  (str(o.lastActiveDateKey) || o.lastActiveDateKey === null);
 
 // field name -> element guard. Elements failing the guard are dropped.
 const ARRAY_GUARDS: Record<string, (o: unknown) => boolean> = {
@@ -58,6 +61,7 @@ const ALL_KEYS: string[] = [
   "profile",
   "readingPosition",
   "lastVisitDateKey",
+  "streak",
 ];
 
 export type ParseResult =
@@ -119,6 +123,7 @@ export function parseSnapshot(rawText: string): ParseResult {
   }
   // Nullable objects: keep only when well-formed, else drop to the default (null).
   if (isProfile(src.profile)) out.profile = src.profile;
+  if (isStreak(src.streak)) out.streak = src.streak;
   if (isReadingPosition(src.readingPosition)) out.readingPosition = src.readingPosition;
   if (str(src.lastVisitDateKey) || src.lastVisitDateKey === null) {
     out.lastVisitDateKey = src.lastVisitDateKey;

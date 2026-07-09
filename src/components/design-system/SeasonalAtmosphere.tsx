@@ -43,15 +43,22 @@ export function SeasonalAtmosphere({
   const kind = SEASON_PARTICLE[season.key] ?? "leaf";
 
   // Deterministic per-day layout so it doesn't reshuffle on every render.
+  // Each particle gets a STATIC resting position and only breathes gently
+  // around it (ambient-float). This is deliberate: the old full-height fall
+  // relied on the animation for vertical spread, so reduced-motion froze
+  // every particle into a hard row of dots along the container's top edge.
+  // Now, with animation off, the scatter simply holds still — intentional
+  // in both modes.
   const particles = useMemo(() => {
     const rand = seededRandom(hashString(`${toDateKey()}:${kind}`));
     return Array.from({ length: density }, (_, i) => ({
-      left: rand() * 100,
-      size: 3 + rand() * 4,
-      duration: 16 + rand() * 16,
-      delay: -rand() * 24,
-      drift: (rand() - 0.5) * 24,
-      opacity: 0.25 + rand() * 0.35,
+      left: 3 + rand() * 94,
+      top: 6 + rand() * 82,
+      size: 2.5 + rand() * 3.5,
+      duration: 10 + rand() * 10,
+      delay: -rand() * 12,
+      drift: (rand() - 0.5) * 18,
+      opacity: 0.14 + rand() * 0.22,
       key: i,
     }));
   }, [kind, density]);
@@ -64,15 +71,16 @@ export function SeasonalAtmosphere({
       {particles.map((p) => (
         <span
           key={p.key}
-          className="absolute top-0 rounded-full"
+          className="absolute rounded-full"
           style={{
             left: `${p.left}%`,
+            top: `${p.top}%`,
             width: p.size,
             height: p.size,
             backgroundColor: COLORS[kind],
             opacity: p.opacity,
             ["--drift" as string]: `${p.drift}px`,
-            animation: `drift ${p.duration}s linear ${p.delay}s infinite`,
+            animation: `ambient-float ${p.duration}s ease-in-out ${p.delay}s infinite`,
             filter: kind === "snow" ? "blur(0.3px)" : undefined,
           }}
         />
