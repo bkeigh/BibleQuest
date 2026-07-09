@@ -50,6 +50,10 @@ export const pt: UIStrings = {
     openSettings: "Ajustes",
   },
   quests: {
+    emptyTitle: "Hoje está em aberto.",
+    emptyBody: "Escolha até três missões. Uma já basta.",
+    pickCta: "Escolher as missões de hoje",
+    addAnother: "Adicionar outra missão",
     filters: "Filtros",
     search: "Buscar",
     duration: "Tempo",

@@ -12,12 +12,8 @@ import {
 import { calculateTreeState } from "@/lib/questos/growth-engine";
 import { getDailyVerse } from "@/lib/questos/verse-engine";
 import { timeOfDay, toDateKey, formatFriendlyDate } from "@/lib/utils/dates";
-import {
-  greeting,
-  returnLine,
-  dayCompleteLines,
-  questPicks,
-} from "@/lib/questos/copy";
+import { returnLine } from "@/lib/questos/copy";
+import { useStrings, fmt } from "@/lib/i18n";
 import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
 import { firstName } from "@/lib/utils/name";
 import { celebrationScale } from "@/lib/motion";
@@ -33,6 +29,7 @@ import {
   IconArrowRight,
   IconCheck,
   IconChevronRight,
+  IconSettings,
 } from "@/components/design-system/icons";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { questBySlug } from "@/data/seed/quests";
@@ -78,6 +75,8 @@ function HomeInner() {
   const season = useMemo(() => getCurrentSeason(), []);
   const name = firstName(profile?.displayName);
   const time = timeOfDay();
+  const t = useStrings();
+  const hello = `${t.greeting[time]}${name ? `, ${name}` : ""}.`;
 
   // Resolve picks to their quest templates (drop any unknown slugs safely).
   const pickedQuests = useMemo(
@@ -107,14 +106,23 @@ function HomeInner() {
 
       <PageContainer className="relative pt-safe">
         {/* Greeting */}
-        <header className="pt-10 pb-6">
-          <p className="text-caption uppercase tracking-[0.16em] text-accent">
-            {formatFriendlyDate(dayKey)} · {season.label}
-          </p>
-          <h1 className="mt-2 font-display text-editorial text-graphite">
-            {greeting(time, name)}
-          </h1>
-          <p className="mt-1 text-body text-ash">{returnLine(daysAway)}</p>
+        <header className="flex items-start justify-between gap-4 pt-10 pb-6">
+          <div>
+            <p className="text-caption uppercase tracking-[0.16em] text-accent">
+              {formatFriendlyDate(dayKey)} · {season.label}
+            </p>
+            <h1 className="mt-2 font-display text-editorial text-graphite">
+              {hello}
+            </h1>
+            <p className="mt-1 text-body text-ash">{returnLine(daysAway)}</p>
+          </div>
+          <Link
+            href="/app/settings"
+            aria-label={t.home.openSettings}
+            className="mt-8 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ash transition-colors duration-300 hover:bg-linen hover:text-charcoal"
+          >
+            <IconSettings size={21} />
+          </Link>
         </header>
 
         <div className="space-y-5 pb-4">
@@ -122,30 +130,30 @@ function HomeInner() {
           <VerseCard verse={verse} />
 
           {/* Today's quests — empty, picked (1-3), or day complete */}
-          <section aria-label="Today’s quests">
+          <section aria-label={t.home.todaysQuests}>
             {/* Announce pick/completion changes to screen readers. */}
             <p aria-live="polite" className="sr-only">
               {pickCount === 0
-                ? questPicks.emptyTitle
+                ? t.quests.emptyTitle
                 : allDone
-                  ? dayCompleteLines.title
+                  ? t.dayComplete.title
                   : `${completedCount} of ${pickCount} quests completed.`}
             </p>
 
             {pickCount === 0 && (
               <PaperCard variant="outlined" padding="lg" className="text-center">
                 <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-accent-surface">
-                  <PixelIcon name="compass" size={5} />
+                  <PixelIcon name="lantern" size={5} animate />
                 </div>
                 <h2 className="font-display text-subheading text-graphite">
-                  {questPicks.emptyTitle}
+                  {t.quests.emptyTitle}
                 </h2>
                 <p className="mx-auto mt-1.5 max-w-sm text-small leading-relaxed text-charcoal">
-                  {questPicks.emptyBody}
+                  {t.quests.emptyBody}
                 </p>
                 <div className="mt-4 flex justify-center">
                   <GentleLink variant="primary" href="/app/quests">
-                    {questPicks.cta} <IconArrowRight />
+                    {t.quests.pickCta} <IconArrowRight />
                   </GentleLink>
                 </div>
               </PaperCard>
@@ -155,10 +163,10 @@ function HomeInner() {
               <>
                 <div className="mb-2 flex items-baseline justify-between gap-3">
                   <p className="font-pixel text-small uppercase tracking-[0.1em] text-accent">
-                    Today’s quests
+                    {t.home.todaysQuests}
                   </p>
                   <p className="text-caption text-ash">
-                    {questPicks.counter(pickCount)}
+                    {fmt(t.quests.picked, { n: pickCount })}
                   </p>
                 </div>
                 <ul className="space-y-3">
@@ -174,7 +182,7 @@ function HomeInner() {
                         {done && (
                           <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-accent-surface px-2 py-0.5 text-caption text-accent-ink">
                             <IconCheck size={13} />
-                            Done
+                            {t.common.done}
                           </span>
                         )}
                       </li>
@@ -184,7 +192,7 @@ function HomeInner() {
                 {pickCount < MAX_DAILY_PICKS && (
                   <div className="mt-2.5">
                     <GentleLink variant="text" size="sm" href="/app/quests">
-                      {questPicks.browseMore} <IconArrowRight size={14} />
+                      {t.quests.addAnother} <IconArrowRight size={14} />
                     </GentleLink>
                   </div>
                 )}
@@ -206,10 +214,10 @@ function HomeInner() {
                     <PixelIcon name="star" size={5} animate />
                   </div>
                   <h2 className="font-display text-editorial text-graphite">
-                    {dayCompleteLines.title}
+                    {t.dayComplete.title}
                   </h2>
                   <p className="mx-auto mt-2 max-w-sm text-small leading-relaxed text-charcoal">
-                    {dayCompleteLines.body}
+                    {t.dayComplete.body}
                   </p>
                   <div className="mt-4 flex justify-center gap-3">
                     <GentleLink variant="outline" size="sm" href="/app/bible">
@@ -237,7 +245,7 @@ function HomeInner() {
             <PaperCard interactive padding="md" className="flex items-center gap-4">
               <GrowthTree state={tree} size={92} showGround={false} />
               <div className="min-w-0 flex-1">
-                <SectionLabel>Your growth</SectionLabel>
+                <SectionLabel>{t.home.yourGrowth}</SectionLabel>
                 <p className="font-display text-subheading text-graphite">
                   {tree.stageLabel}
                 </p>
@@ -276,7 +284,7 @@ function HomeInner() {
           {/* Recent growth */}
           {recent.length > 0 && (
             <section aria-label="Recent activity" className="pt-1">
-              <SectionLabel>Recently</SectionLabel>
+              <SectionLabel>{t.home.recently}</SectionLabel>
               <PaperCard variant="quiet" padding="sm">
                 <ul className="divide-y divide-mist/70">
                   {recent.map((e) => (

@@ -45,6 +45,10 @@ export const id: UIStrings = {
     openSettings: "Pengaturan",
   },
   quests: {
+    emptyTitle: "Hari ini menantimu.",
+    emptyBody: "Pilih sampai tiga misi. Satu saja sudah cukup.",
+    pickCta: "Pilih misi hari ini",
+    addAnother: "Tambahkan misi lain",
     filters: "Filter",
     search: "Cari",
     duration: "Waktu",

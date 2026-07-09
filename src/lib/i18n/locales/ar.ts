@@ -45,6 +45,10 @@ export const ar: UIStrings = {
     openSettings: "الإعدادات",
   },
   quests: {
+    emptyTitle: "يومك مفتوح.",
+    emptyBody: "اختر حتى ثلاث مهام. واحدة تكفي.",
+    pickCta: "اختر مهام اليوم",
+    addAnother: "أضِف مهمة أخرى",
     filters: "تصفية",
     search: "بحث",
     duration: "المدة",

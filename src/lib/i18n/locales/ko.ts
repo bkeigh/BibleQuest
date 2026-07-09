@@ -45,6 +45,10 @@ export const ko: UIStrings = {
     openSettings: "설정",
   },
   quests: {
+    emptyTitle: "오늘은 아직 비어 있어요.",
+    emptyBody: "실천을 세 개까지 골라 보세요. 하나만 해도 충분해요.",
+    pickCta: "오늘의 실천 고르기",
+    addAnother: "실천 하나 더 추가",
     filters: "필터",
     search: "검색",
     duration: "시간",

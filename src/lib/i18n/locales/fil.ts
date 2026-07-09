@@ -45,6 +45,10 @@ export const fil: UIStrings = {
     openSettings: "Mga Setting",
   },
   quests: {
+    emptyTitle: "Sa iyo ang araw na ito.",
+    emptyBody: "Pumili ng hanggang tatlong gawain. Sapat na ang isa.",
+    pickCta: "Pumili ng mga gawain ngayong araw",
+    addAnother: "Magdagdag ng isa pang gawain",
     filters: "Mga filter",
     search: "Maghanap",
     duration: "Tagal",

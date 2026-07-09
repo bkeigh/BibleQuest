@@ -45,6 +45,10 @@ export const la: UIStrings = {
     openSettings: "Optiones",
   },
   quests: {
+    emptyTitle: "Dies hodiernus patet.",
+    emptyBody: "Elige usque ad tria munera. Unum satis est.",
+    pickCta: "Elige munera hodierna",
+    addAnother: "Adde aliud munus",
     filters: "Filtra",
     search: "Quaere",
     duration: "Tempus",

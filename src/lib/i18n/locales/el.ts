@@ -45,6 +45,10 @@ export const el: UIStrings = {
     openSettings: "Ρυθμίσεις",
   },
   quests: {
+    emptyTitle: "Το σήμερα είναι ανοιχτό.",
+    emptyBody: "Διάλεξε έως τρεις αποστολές. Μία φτάνει και περισσεύει.",
+    pickCta: "Διάλεξε τις σημερινές αποστολές",
+    addAnother: "Πρόσθεσε άλλη μία αποστολή",
     filters: "Φίλτρα",
     search: "Αναζήτηση",
     duration: "Χρόνος",

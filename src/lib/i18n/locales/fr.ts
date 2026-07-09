@@ -45,6 +45,10 @@ export const fr: UIStrings = {
     openSettings: "Réglages",
   },
   quests: {
+    emptyTitle: "Aujourd’hui est à vous.",
+    emptyBody: "Choisissez jusqu’à trois quêtes. Une seule suffit.",
+    pickCta: "Choisir les quêtes du jour",
+    addAnother: "Ajouter une autre quête",
     filters: "Filtres",
     search: "Rechercher",
     duration: "Durée",

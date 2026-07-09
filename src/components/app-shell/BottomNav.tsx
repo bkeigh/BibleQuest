@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
+import { useStrings } from "@/lib/i18n";
 import {
   IconHome,
   IconQuest,
@@ -11,16 +12,24 @@ import {
   IconJourney,
 } from "@/components/design-system/icons";
 
-const ITEMS = [
-  { href: "/app", label: "Home", Icon: IconHome, exact: true },
-  { href: "/app/quests", label: "Quests", Icon: IconQuest },
-  { href: "/app/bible", label: "Bible", Icon: IconBible },
-  { href: "/app/prayer", label: "Prayer", Icon: IconPrayer },
-  { href: "/app/journey", label: "Journey", Icon: IconJourney },
+interface NavItem {
+  href: string;
+  key: "home" | "quests" | "bible" | "prayer" | "journey";
+  Icon: typeof IconHome;
+  exact?: boolean;
+}
+
+const ITEMS: NavItem[] = [
+  { href: "/app", key: "home", Icon: IconHome, exact: true },
+  { href: "/app/quests", key: "quests", Icon: IconQuest },
+  { href: "/app/bible", key: "bible", Icon: IconBible },
+  { href: "/app/prayer", key: "prayer", Icon: IconPrayer },
+  { href: "/app/journey", key: "journey", Icon: IconJourney },
 ];
 
 export function BottomNav() {
   const pathname = usePathname();
+  const t = useStrings();
 
   return (
     <nav
@@ -28,7 +37,8 @@ export function BottomNav() {
       className="fixed inset-x-0 bottom-0 z-40 border-t border-mist bg-parchment/90 backdrop-blur-md pb-safe"
     >
       <ul className="mx-auto flex max-w-lg items-stretch justify-around px-2">
-        {ITEMS.map(({ href, label, Icon, exact }) => {
+        {ITEMS.map(({ href, key, Icon, exact }) => {
+          const label = t.nav[key];
           const active = exact
             ? pathname === href
             : pathname === href || pathname.startsWith(`${href}/`);

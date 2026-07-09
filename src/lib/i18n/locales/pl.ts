@@ -45,6 +45,10 @@ export const pl: UIStrings = {
     openSettings: "Ustawienia",
   },
   quests: {
+    emptyTitle: "Dzień stoi otworem.",
+    emptyBody: "Wybierz do trzech zadań. Jedno w zupełności wystarczy.",
+    pickCta: "Wybierz zadania na dziś",
+    addAnother: "Dodaj kolejne zadanie",
     filters: "Filtry",
     search: "Szukaj",
     duration: "Czas",

@@ -45,6 +45,10 @@ export const ru: UIStrings = {
     openSettings: "Настройки",
   },
   quests: {
+    emptyTitle: "Сегодня — чистый лист.",
+    emptyBody: "Выберите до трёх заданий. Одного вполне достаточно.",
+    pickCta: "Выбрать задания на сегодня",
+    addAnother: "Добавить ещё задание",
     filters: "Фильтры",
     search: "Поиск",
     duration: "Время",

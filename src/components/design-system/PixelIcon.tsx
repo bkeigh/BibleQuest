@@ -262,12 +262,11 @@ const SPRITES: Record<string, Sprite> = {
   compass: {
     palette: { s: STONE, w: WHITE, e: EVERGREEN_L, r: ROSE_D, ".": T },
     rows: [
-      ".sss.",
+      "..s..",
+      ".sws.",
       "swrws",
-      "swrws",
-      "swews",
-      "swews",
-      ".sss.",
+      ".sws.",
+      "..e..",
     ],
   },
   crown: {

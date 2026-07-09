@@ -45,6 +45,10 @@ export const zh: UIStrings = {
     openSettings: "设置",
   },
   quests: {
+    emptyTitle: "今天还空着。",
+    emptyBody: "最多挑三项任务。一项就足够了。",
+    pickCta: "挑选今日任务",
+    addAnother: "再加一项任务",
     filters: "筛选",
     search: "搜索",
     duration: "时长",

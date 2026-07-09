@@ -61,6 +61,10 @@ export interface UIStrings {
     openSettings: string;
   };
   quests: {
+    emptyTitle: string;
+    emptyBody: string;
+    pickCta: string;
+    addAnother: string;
     filters: string;
     search: string;
     duration: string;

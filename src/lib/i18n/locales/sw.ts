@@ -45,6 +45,10 @@ export const sw: UIStrings = {
     openSettings: "Mipangilio",
   },
   quests: {
+    emptyTitle: "Leo iko wazi.",
+    emptyBody: "Chagua hadi mazoezi matatu. Moja linatosha.",
+    pickCta: "Chagua mazoezi ya leo",
+    addAnother: "Ongeza zoezi jingine",
     filters: "Vichujio",
     search: "Tafuta",
     duration: "Muda",

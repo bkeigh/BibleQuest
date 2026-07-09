@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { BottomNav } from "./BottomNav";
 import { InstallPrompt } from "./InstallPrompt";
+import { LanguageApplier } from "./LanguageApplier";
 import { ToastProvider } from "@/components/design-system/Toast";
 import { useQuestOS } from "@/lib/questos/store";
 
@@ -29,6 +30,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
       <div className="relative flex min-h-dvh flex-col bg-parchment">
+        <LanguageApplier />
         <main className="flex-1 pb-28">{children}</main>
         <BottomNav />
         <InstallPrompt />

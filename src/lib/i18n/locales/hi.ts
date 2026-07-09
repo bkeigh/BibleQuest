@@ -45,6 +45,10 @@ export const hi: UIStrings = {
     openSettings: "सेटिंग्स",
   },
   quests: {
+    emptyTitle: "आज का दिन खुला है।",
+    emptyBody: "तीन तक क्वेस्ट चुनें। एक भी काफ़ी है।",
+    pickCta: "आज के क्वेस्ट चुनें",
+    addAnother: "एक और क्वेस्ट जोड़ें",
     filters: "फ़िल्टर",
     search: "खोजें",
     duration: "समय",

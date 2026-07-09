@@ -13,6 +13,8 @@ import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosu
 import { applyAppearance } from "@/lib/theme";
 import { parseSnapshot } from "@/lib/questos/import-schema";
 import type { QuestOSSnapshot } from "@/lib/questos/types";
+import { useStrings, LANGUAGES, languageMeta } from "@/lib/i18n";
+import { IconCheck } from "@/components/design-system/icons";
 import { cn } from "@/lib/utils/cn";
 
 function Row({
@@ -106,6 +108,45 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
+function LanguagePicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (code: string) => void;
+}) {
+  return (
+    <div role="radiogroup" aria-label="App language" className="divide-y divide-mist/60">
+      {LANGUAGES.map((l) => {
+        const selected = l.code === value;
+        return (
+          <button
+            key={l.code}
+            role="radio"
+            aria-checked={selected}
+            lang={l.code}
+            onClick={() => onChange(l.code)}
+            className={cn(
+              "flex w-full items-center justify-between gap-3 px-1 py-3 text-left transition-colors duration-200",
+              selected ? "text-graphite" : "text-charcoal hover:text-graphite"
+            )}
+          >
+            <span className="flex min-w-0 items-baseline gap-2.5">
+              <span className="text-[0.9375rem]">{l.endonym}</span>
+              {l.code !== "en" && (
+                <span className="truncate text-[0.8125rem] text-ash" lang="en">
+                  {l.english}
+                </span>
+              )}
+            </span>
+            {selected && <IconCheck size={16} className="shrink-0 text-accent" />}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function SettingsInner() {
   const router = useRouter();
   const { toast } = useToast();
@@ -123,6 +164,8 @@ function SettingsInner() {
     useState<Partial<QuestOSSnapshot> | null>(null);
 
   const appearance = settings.appearance;
+  const t = useStrings();
+  const language = settings.language ?? "en";
 
   function setAppearance(patch: Partial<typeof appearance>) {
     const next = { ...appearance, ...patch };
@@ -174,9 +217,9 @@ function SettingsInner() {
 
   return (
     <>
-      <PageHeader title="Settings" />
+      <PageHeader title={t.titles.settings} />
       <PageContainer className="pb-8">
-        <SectionTitle>Account</SectionTitle>
+        <SectionTitle>{t.settings.account}</SectionTitle>
         <PaperCard variant="paper" padding="none" className="overflow-hidden">
           {profile && (
             <div className="flex items-center justify-between border-b border-mist/70 px-4 py-3.5">
@@ -196,23 +239,37 @@ function SettingsInner() {
         </PaperCard>
 
         <DisclosureGroup className="mt-6">
-          <Disclosure variant="card" label="Appearance" defaultOpen>
+          <Disclosure
+            variant="card"
+            label={t.settings.language}
+            summary={<span className="text-[0.8125rem] text-ash">{languageMeta(language).endonym}</span>}
+          >
+            <p className="pb-1 text-[0.875rem] leading-relaxed text-ash">
+              {t.settings.languageNote}
+            </p>
+            <LanguagePicker
+              value={language}
+              onChange={(code) => updateSettings({ language: code })}
+            />
+          </Disclosure>
+
+          <Disclosure variant="card" label={t.settings.appearance} defaultOpen>
             <div className="divide-y divide-mist/70">
-              <Row label="Theme">
+              <Row label={t.settings.theme}>
                 <Segmented
-                  label="Theme"
+                  label={t.settings.theme}
                   value={appearance.theme}
                   onChange={(theme) => setAppearance({ theme })}
                   options={[
-                    { value: "light", label: "Light" },
-                    { value: "dark", label: "Candle" },
-                    { value: "system", label: "System" },
+                    { value: "light", label: t.settings.themeLight },
+                    { value: "dark", label: t.settings.themeDark },
+                    { value: "system", label: t.settings.themeSystem },
                   ]}
                 />
               </Row>
-              <Row label="Text size">
+              <Row label={t.settings.textSize}>
                 <Segmented
-                  label="Text size"
+                  label={t.settings.textSize}
                   value={appearance.textSize}
                   onChange={(textSize) => setAppearance({ textSize })}
                   options={[
@@ -221,9 +278,9 @@ function SettingsInner() {
                   ]}
                 />
               </Row>
-              <Row label="Reduce motion">
+              <Row label={t.settings.reduceMotion}>
                 <Toggle
-                  label="Reduce motion"
+                  label={t.settings.reduceMotion}
                   on={appearance.reducedMotion}
                   onChange={(reducedMotion) => setAppearance({ reducedMotion })}
                 />

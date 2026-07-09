@@ -19,7 +19,8 @@ import {
 } from "@/components/design-system/icons";
 import { MoodPicker } from "@/components/reflection/MoodPicker";
 import { formatDuration, CATEGORY_LABEL } from "@/components/quests/QuestSlip";
-import { completionLine, questPicks } from "@/lib/questos/copy";
+import { completionLine } from "@/lib/questos/copy";
+import { useStrings } from "@/lib/i18n";
 import { gentleEase, celebrationScale, pixelSparkle } from "@/lib/motion";
 import { cleanVerseText } from "@/lib/utils/scripture";
 import { toDateKey, hashString } from "@/lib/utils/dates";
@@ -41,6 +42,7 @@ function Meta({ label, value }: { label: string; value: string }) {
 
 function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
   const { toast } = useToast();
+  const t = useStrings();
   const completeQuestBySlug = useQuestOS((s) => s.completeQuestBySlug);
   const pickQuest = useQuestOS((s) => s.pickQuest);
   const startQuest = useQuestOS((s) => s.startQuest);
@@ -63,9 +65,9 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
 
   function addToToday() {
     if (pickQuest(quest.slug)) {
-      toast(questPicks.added, { variant: "success" });
+      toast(t.quests.added, { variant: "success" });
     } else {
-      toast(questPicks.capReached);
+      toast(t.quests.capReached);
     }
   }
 

@@ -45,6 +45,10 @@ export const vi: UIStrings = {
     openSettings: "Cài đặt",
   },
   quests: {
+    emptyTitle: "Hôm nay còn để ngỏ.",
+    emptyBody: "Hãy chọn tối đa ba việc lành. Một việc thôi cũng đủ rồi.",
+    pickCta: "Chọn việc lành hôm nay",
+    addAnother: "Thêm một việc lành nữa",
     filters: "Bộ lọc",
     search: "Tìm kiếm",
     duration: "Thời gian",

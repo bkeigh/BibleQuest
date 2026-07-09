@@ -23,7 +23,7 @@ import { Disclosure } from "@/components/design-system/Disclosure";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { useToast } from "@/components/design-system/Toast";
 import { IconPlus, IconClose } from "@/components/design-system/icons";
-import { emptyStates, questPicks } from "@/lib/questos/copy";
+import { useStrings, fmt } from "@/lib/i18n";
 import { toDateKey } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils/cn";
 
@@ -45,6 +45,7 @@ function ShelfTitle({ children }: { children: React.ReactNode }) {
 
 function QuestBrowseInner() {
   const { toast } = useToast();
+  const t = useStrings();
   const pickQuest = useQuestOS((s) => s.pickQuest);
   const unpickQuest = useQuestOS((s) => s.unpickQuest);
   const picks = useQuestOS(selectTodayPicks);
@@ -128,15 +129,15 @@ function QuestBrowseInner() {
 
   function handleAdd(quest: QuestTemplate) {
     if (pickQuest(quest.slug)) {
-      toast(questPicks.added, { variant: "success" });
+      toast(t.quests.added, { variant: "success" });
     } else {
-      toast(questPicks.capReached);
+      toast(t.quests.capReached);
     }
   }
 
   function handleRemove(quest: QuestTemplate) {
     unpickQuest(quest.slug);
-    toast(questPicks.removed);
+    toast(t.quests.removed);
   }
 
   /** A browse-list slip: picked/done state + an add-to-today control. */
@@ -179,17 +180,17 @@ function QuestBrowseInner() {
         {/* Today's picks — the day you chose, pinned above everything */}
         <section aria-label="Today's picks">
           <div className="flex items-baseline justify-between">
-            <ShelfTitle>{questPicks.pinnedTitle}</ShelfTitle>
+            <ShelfTitle>{t.quests.today}</ShelfTitle>
             {picks.length > 0 && (
               <p aria-live="polite" className="text-caption text-ash">
-                {questPicks.counter(picks.length)}
+                {fmt(t.quests.picked, { n: picks.length })}
               </p>
             )}
           </div>
           {picks.length === 0 ? (
             <PaperCard variant="quiet" padding="sm" className="mt-2">
               <p className="text-small text-charcoal">
-                {emptyStates.questsUnpicked}
+                {t.empty.questsUnpicked}
               </p>
             </PaperCard>
           ) : (
@@ -228,7 +229,7 @@ function QuestBrowseInner() {
 
         {/* Filters — collapsed by default so browsing stays calm */}
         <Disclosure
-          label="Filters"
+          label={t.quests.filters}
           variant="card"
           defaultOpen={false}
           count={hasFilters ? activeFilterCount : undefined}
@@ -344,8 +345,8 @@ function QuestBrowseInner() {
 
         {/* Suggested for today — the old daily scorer, now an offer */}
         {!hasFilters && suggested.length > 0 && (
-          <section className="mt-6" aria-label={questPicks.suggestedTitle}>
-            <ShelfTitle>{questPicks.suggestedTitle}</ShelfTitle>
+          <section className="mt-6" aria-label={t.quests.suggested}>
+            <ShelfTitle>{t.quests.suggested}</ShelfTitle>
             <div className="mt-2 space-y-3">{suggested.map(browseSlip)}</div>
           </section>
         )}
@@ -365,7 +366,7 @@ function QuestBrowseInner() {
           </p>
           {results.length === 0 ? (
             <p className="py-10 text-center text-small text-ash">
-              {emptyStates.questsFiltered}
+              {t.empty.questsFiltered}
             </p>
           ) : (
             <div className="space-y-3 pb-6">{results.map(browseSlip)}</div>

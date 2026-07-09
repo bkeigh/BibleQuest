@@ -45,6 +45,10 @@ export const ro: UIStrings = {
     openSettings: "Setări",
   },
   quests: {
+    emptyTitle: "Ziua de azi e a ta.",
+    emptyBody: "Alege până la trei misiuni. Și una e de ajuns.",
+    pickCta: "Alege misiunile de azi",
+    addAnother: "Adaugă încă o misiune",
     filters: "Filtre",
     search: "Caută",
     duration: "Durată",
