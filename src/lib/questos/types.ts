@@ -406,10 +406,13 @@ export interface Settings {
   notifications: NotificationPreferences;
   questDurationPreference: QuestDuration[];
   questCategoryPreference: QuestCategory[];
+  /** UI-chrome language code (see src/lib/i18n). Scripture stays English (WEB). */
+  language: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   appearance: { theme: "light", reducedMotion: false, textSize: "default" },
+  language: "en",
   notifications: {
     dailyVerse: false,
     dailyQuest: false,

@@ -149,6 +149,7 @@ export interface UserSettingsRow {
   text_size: string;
   quest_duration_pref: number[];
   quest_category_pref: string[];
+  language: string;
 }
 
 export interface NotificationPrefsRow {
@@ -306,6 +307,7 @@ export function settingsToRows(
       text_size: s.appearance.textSize,
       quest_duration_pref: s.questDurationPreference,
       quest_category_pref: s.questCategoryPreference,
+      language: s.language,
     },
     notifications: {
       user_id: uid,
@@ -460,5 +462,6 @@ export function rowsToSettings(
       d.questDurationPreference) as Settings["questDurationPreference"],
     questCategoryPreference: (settings?.quest_category_pref ??
       d.questCategoryPreference) as Settings["questCategoryPreference"],
+    language: settings?.language ?? d.language,
   };
 }

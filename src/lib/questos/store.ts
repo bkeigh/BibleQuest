@@ -686,6 +686,11 @@ export const useQuestOS = create<QuestOSState>()(
           state.tombstones = emptyTombstones();
         }
         if (version < 3) {
+          // v3 also introduces the UI language preference.
+          const settings = state.settings as Record<string, unknown> | undefined;
+          if (settings && typeof settings === "object" && !settings.language) {
+            settings.language = "en";
+          }
           // v3: pick model — each day holds an ARRAY of picked quests
           // (was a single assigned quest). Wrap old values; drop garbage.
           const old = state.assignments;
