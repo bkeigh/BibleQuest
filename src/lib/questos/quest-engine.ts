@@ -1,8 +1,10 @@
 /**
- * Quest engine — daily assignment, filtering, and selection.
+ * Quest engine — picking, filtering, and suggestion.
  *
- * Selection is deterministic per user + date (seeded), avoids recent repeats,
- * respects preferences with graceful fallback, and honors the current season.
+ * The user picks their own quests now (up to MAX_DAILY_PICKS a day);
+ * the old daily-assignment scorer lives on as the "Suggested for today"
+ * shelf. Suggestion is deterministic per user + date (seeded), avoids
+ * recent repeats, respects preferences, and honors the current season.
  */
 import { hashString, seededRandom } from "@/lib/utils/dates";
 import type {
@@ -13,6 +15,13 @@ import type {
   SeasonKey,
   Settings,
 } from "./types";
+
+/**
+ * How many quests a user may pick per day. This is the free tier's cap —
+ * if Plus ever lifts it, route the number through subscription-engine
+ * instead of importing the constant directly.
+ */
+export const MAX_DAILY_PICKS = 3;
 
 export interface QuestFilters {
   durations?: QuestDuration[];
@@ -130,4 +139,36 @@ export function selectDailyQuest(options: {
   );
   const rand = seededRandom(seed);
   return pool[Math.floor(rand() * pool.length)].quest;
+}
+
+/**
+ * The "Suggested for today" shelf — the scorer above, run for up to
+ * `count` distinct quests. Deterministic for a given (profile, date),
+ * so the shelf holds steady all day. Callers pass already-picked and
+ * already-completed slugs via `excludeSlugs`.
+ */
+export function selectSuggestedQuests(options: {
+  quests: QuestTemplate[];
+  dateKey: string;
+  profile: Profile | null;
+  settings: Settings;
+  season: SeasonKey;
+  recentSlugs: string[];
+  excludeSlugs?: string[];
+  count?: number;
+}): QuestTemplate[] {
+  const { count = MAX_DAILY_PICKS, excludeSlugs = [], ...rest } = options;
+  const picked: QuestTemplate[] = [];
+  const exclude = [...excludeSlugs];
+  for (let i = 0; i < count; i++) {
+    const quest = selectDailyQuest({
+      ...rest,
+      reroll: i,
+      excludeSlugs: exclude,
+    });
+    if (!quest) break;
+    picked.push(quest);
+    exclude.push(quest.slug);
+  }
+  return picked;
 }

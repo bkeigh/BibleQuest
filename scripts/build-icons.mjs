@@ -27,7 +27,7 @@ await png(180, "apple-touch-icon.png");
 // survives Android's circular/rounded masks.
 const maskableSvg = Buffer.from(
   `<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
-     <rect width="512" height="512" fill="#fefffc"/>
+     <rect width="512" height="512" fill="#f4e8c9"/>
      <image href="data:image/svg+xml;base64,${svg.toString("base64")}"
             x="72" y="72" width="368" height="368"/>
    </svg>`
@@ -42,15 +42,17 @@ console.log("✓ icon-maskable-512.png");
 await sharp(svg, { density: 256 }).resize(48, 48).png().toFile(path.join(dir, "favicon-48.png"));
 console.log("✓ favicon-48.png");
 
-// A simple OG image on parchment
+// OG image — deep Bible-cover green, gold rule, the mark + wordmark in cream
+const logo = await readFile(
+  path.join(process.cwd(), "public", "brand", "bq-logo.svg")
+);
 const og = Buffer.from(
   `<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
-     <rect width="1200" height="630" fill="#fefffc"/>
-     <rect x="8" y="8" width="1184" height="614" fill="none" stroke="#dee2de" stroke-width="4"/>
-     <image href="data:image/svg+xml;base64,${svg.toString("base64")}" x="470" y="70" width="260" height="260"/>
-     <text x="600" y="410" text-anchor="middle" font-family="Georgia, serif" font-size="60" fill="#2c2c2c">BibleQuest</text>
-     <text x="600" y="470" text-anchor="middle" font-family="Georgia, serif" font-size="30" fill="#646464">One meaningful step with God today</text>
-     <text x="600" y="540" text-anchor="middle" font-family="sans-serif" font-size="22" fill="#6f8155">Scripture · Prayer · Reflection · Quests</text>
+     <rect width="1200" height="630" fill="#0e533c"/>
+     <rect x="14" y="14" width="1172" height="602" fill="none" stroke="#d3a336" stroke-width="3" rx="18"/>
+     <image href="data:image/svg+xml;base64,${logo.toString("base64")}" x="497" y="88" width="206" height="262"/>
+     <text x="600" y="452" text-anchor="middle" font-family="Georgia, serif" font-size="64" fill="#faf6ec">BibleQuest</text>
+     <text x="600" y="520" text-anchor="middle" font-family="Georgia, serif" font-size="28" fill="#e7c563">Scripture, prayer, and real-life quests — one step a day</text>
    </svg>`
 );
 await sharp(og).png().toFile(path.join(process.cwd(), "public", "og.png"));

@@ -12,6 +12,8 @@ export type AnalyticsEvent =
   | "onboarding_started"
   | "onboarding_completed"
   | "quest_viewed"
+  | "quest_picked"
+  | "quest_unpicked"
   | "quest_started"
   | "quest_completed"
   | "reflection_created"

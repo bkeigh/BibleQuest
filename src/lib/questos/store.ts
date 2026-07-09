@@ -13,12 +13,11 @@
  */
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { seedQuests, questBySlug } from "@/data/seed/quests";
+import { questBySlug } from "@/data/seed/quests";
 import { seedMilestones } from "@/data/seed/milestones";
 import { getDailyVerse } from "./verse-engine";
-import { selectDailyQuest } from "./quest-engine";
+import { MAX_DAILY_PICKS } from "./quest-engine";
 import { computeMetrics, checkMilestones } from "./milestone-engine";
-import { getCurrentSeason } from "./seasonal-engine";
 import { toDateKey, daysBetween } from "@/lib/utils/dates";
 import { track } from "@/lib/analytics/events";
 import {
@@ -60,7 +59,8 @@ function id(): string {
 interface QuestOSState {
   profile: Profile | null;
   settings: Settings;
-  assignments: Record<string, DailyQuestAssignment>;
+  /** Per-day picked quests, up to MAX_DAILY_PICKS per dateKey. */
+  assignments: Record<string, DailyQuestAssignment[]>;
   completions: QuestCompletion[];
   prayers: Prayer[];
   reflections: Reflection[];
@@ -85,14 +85,13 @@ interface QuestOSState {
   /** Replace all local data with a validated, previously-exported snapshot. */
   importData: (snapshot: Partial<QuestOSSnapshot>) => void;
 
-  // -- daily loop
-  /** Pure read — safe during render. Does NOT persist. */
-  getTodayAssignment: () => { assignment: DailyQuestAssignment; quest: QuestTemplate } | null;
-  /** Persists today's assignment if missing. Call from an effect, never render. */
-  ensureDailyQuest: () => void;
-  rerollTodayQuest: () => void;
-  startTodayQuest: () => void;
-  completeTodayQuest: (reflection?: { body: string; mood?: ReflectionMood }) => { newMilestones: MilestoneSeed[] };
+  // -- daily loop (pick model: the user chooses up to MAX_DAILY_PICKS a day)
+  /** Add a quest to today. Returns false when the day is full or already picked. */
+  pickQuest: (slug: string) => boolean;
+  /** Remove an uncompleted quest from today. Completed picks stay. */
+  unpickQuest: (slug: string) => void;
+  /** Mark a picked quest as underway. */
+  startQuest: (slug: string) => void;
   completeQuestBySlug: (slug: string, reflection?: { body: string; mood?: ReflectionMood }) => { newMilestones: MilestoneSeed[] };
 
   // -- prayer
@@ -257,16 +256,20 @@ export const useQuestOS = create<QuestOSState>()(
         };
         set({ completions: [...get().completions, completion] });
 
-        const assignment = s.assignments[dateKey];
-        if (assignment && assignment.questSlug === quest.slug) {
+        const dayPicks = s.assignments[dateKey] ?? [];
+        if (dayPicks.some((a) => a.questSlug === quest.slug)) {
           set({
             assignments: {
               ...get().assignments,
-              [dateKey]: {
-                ...assignment,
-                status: "completed",
-                completedAt: now.toISOString(),
-              },
+              [dateKey]: dayPicks.map((a) =>
+                a.questSlug === quest.slug
+                  ? {
+                      ...a,
+                      status: "completed" as const,
+                      completedAt: now.toISOString(),
+                    }
+                  : a
+              ),
             },
           });
         }
@@ -372,116 +375,76 @@ export const useQuestOS = create<QuestOSState>()(
           });
         },
 
-        getTodayAssignment: () => {
+        pickQuest: (slug) => {
           const s = get();
           const dateKey = toDateKey();
-          const existing = s.assignments[dateKey];
-          if (existing) {
-            const quest = questBySlug.get(existing.questSlug);
-            if (quest) return { assignment: existing, quest };
-          }
-          // Compute today's quest deterministically WITHOUT persisting, so this
-          // is safe to call during render. ensureDailyQuest() persists it.
-          const quest = selectDailyQuest({
-            quests: seedQuests,
-            dateKey,
-            profile: s.profile,
-            settings: s.settings,
-            season: getCurrentSeason().key,
-            recentSlugs: s.completions.map((c) => c.questSlug),
-          });
-          if (!quest) return null;
-          return {
-            assignment: {
-              dateKey,
-              questSlug: quest.slug,
-              status: "assigned",
-              rerolls: 0,
-            },
-            quest,
-          };
-        },
-
-        ensureDailyQuest: () => {
-          const s = get();
-          const dateKey = toDateKey();
-          if (s.assignments[dateKey]) return;
-          const quest = selectDailyQuest({
-            quests: seedQuests,
-            dateKey,
-            profile: s.profile,
-            settings: s.settings,
-            season: getCurrentSeason().key,
-            recentSlugs: s.completions.map((c) => c.questSlug),
-          });
-          if (!quest) return;
+          const dayPicks = s.assignments[dateKey] ?? [];
+          if (dayPicks.length >= MAX_DAILY_PICKS) return false;
+          if (dayPicks.some((a) => a.questSlug === slug)) return false;
+          if (!questBySlug.has(slug)) return false;
+          const now = new Date().toISOString();
+          // A quest already completed today joins the day as completed, so
+          // picks and completions can't disagree.
+          const doneToday = s.completions.some(
+            (c) => c.dateKey === dateKey && c.questSlug === slug
+          );
           set({
             assignments: {
               ...s.assignments,
-              [dateKey]: {
-                dateKey,
-                questSlug: quest.slug,
-                status: "assigned",
-                rerolls: 0,
-              },
+              [dateKey]: [
+                ...dayPicks,
+                {
+                  dateKey,
+                  questSlug: slug,
+                  status: doneToday ? ("completed" as const) : ("assigned" as const),
+                  pickedAt: now,
+                  ...(doneToday ? { completedAt: now } : {}),
+                  rerolls: 0,
+                },
+              ],
             },
           });
+          track("quest_picked");
+          return true;
         },
 
-        rerollTodayQuest: () => {
+        unpickQuest: (slug) => {
           const s = get();
           const dateKey = toDateKey();
-          const current = s.assignments[dateKey];
-          if (!current || current.status === "completed") return;
-          const quest = selectDailyQuest({
-            quests: seedQuests,
-            dateKey,
-            profile: s.profile,
-            settings: s.settings,
-            season: getCurrentSeason().key,
-            recentSlugs: s.completions.map((c) => c.questSlug),
-            reroll: current.rerolls + 1,
-            excludeSlugs: [current.questSlug],
-          });
-          if (!quest) return;
+          const dayPicks = s.assignments[dateKey];
+          if (!dayPicks) return;
+          const target = dayPicks.find((a) => a.questSlug === slug);
+          // Completed picks are part of the record — they don't come off.
+          if (!target || target.status === "completed") return;
+          // Keep the (possibly empty) array so sync knows this device
+          // deliberately cleared the day — a missing key would let a stale
+          // remote day resurrect on merge.
           set({
             assignments: {
               ...s.assignments,
-              [dateKey]: {
-                dateKey,
-                questSlug: quest.slug,
-                status: "assigned",
-                rerolls: current.rerolls + 1,
-              },
+              [dateKey]: dayPicks.filter((a) => a.questSlug !== slug),
             },
           });
+          track("quest_unpicked");
         },
 
-        startTodayQuest: () => {
+        startQuest: (slug) => {
           const s = get();
           const dateKey = toDateKey();
-          const current = s.assignments[dateKey];
-          if (!current || current.status !== "assigned") return;
+          const dayPicks = s.assignments[dateKey];
+          if (!dayPicks?.some((a) => a.questSlug === slug && a.status === "assigned"))
+            return;
           set({
             assignments: {
               ...s.assignments,
-              [dateKey]: {
-                ...current,
-                status: "started",
-                startedAt: new Date().toISOString(),
-              },
+              [dateKey]: dayPicks.map((a) =>
+                a.questSlug === slug && a.status === "assigned"
+                  ? { ...a, status: "started" as const, startedAt: new Date().toISOString() }
+                  : a
+              ),
             },
           });
           track("quest_started");
-        },
-
-        completeTodayQuest: (reflection) => {
-          const s = get();
-          const dateKey = toDateKey();
-          const current = s.assignments[dateKey];
-          const quest = current ? questBySlug.get(current.questSlug) : null;
-          if (!quest) return { newMilestones: [] };
-          return completeQuest(quest, reflection);
         },
 
         completeQuestBySlug: (slug, reflection) => {
@@ -715,12 +678,28 @@ export const useQuestOS = create<QuestOSState>()(
     {
       name: "biblequest:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 2,
+      version: 3,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
           // v2 adds sync tombstones.
           state.tombstones = emptyTombstones();
+        }
+        if (version < 3) {
+          // v3: pick model — each day holds an ARRAY of picked quests
+          // (was a single assigned quest). Wrap old values; drop garbage.
+          const old = state.assignments;
+          const next: Record<string, DailyQuestAssignment[]> = {};
+          if (old && typeof old === "object" && !Array.isArray(old)) {
+            for (const [key, value] of Object.entries(old)) {
+              if (Array.isArray(value)) {
+                next[key] = value as DailyQuestAssignment[];
+              } else if (value && typeof value === "object") {
+                next[key] = [value as DailyQuestAssignment];
+              }
+            }
+          }
+          state.assignments = next;
         }
         return state as unknown as QuestOSState;
       },
@@ -744,4 +723,19 @@ export function selectDaysAway(s: QuestOSState): number | null {
   return daysBetween(s.lastVisitDateKey, toDateKey());
 }
 
+// Shared empty array so the selector returns a stable reference on days
+// with no picks (a fresh [] every call would loop zustand's getSnapshot).
+const NO_PICKS: DailyQuestAssignment[] = [];
+
+/** Today's picked quests, in pick order. Stable reference — render-safe. */
+export function selectTodayPicks(s: QuestOSState): DailyQuestAssignment[] {
+  return s.assignments[toDateKey()] ?? NO_PICKS;
+}
+
+/** How many quests the user has picked today (0..MAX_DAILY_PICKS). */
+export function selectTodayPickCount(s: QuestOSState): number {
+  return s.assignments[toDateKey()]?.length ?? 0;
+}
+
 export { getDailyVerse };
+export { MAX_DAILY_PICKS };

@@ -1,13 +1,6 @@
-<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440.54 560.46">
   <defs>
-    <radialGradient id="parch" cx="50%" cy="36%" r="72%">
-      <stop offset="0%" stop-color="#f9efd8"/>
-      <stop offset="100%" stop-color="#efe1bd"/>
-    </radialGradient>
-  </defs>
-  <rect width="512" height="512" rx="112" fill="url(#parch)"/>
-  <svg x="118" y="80" width="277" height="352" viewBox="0 0 440.54 560.46">
-<defs>
     <style>
       .cls-1 {
         fill: #0f533c;
@@ -52,5 +45,4 @@
       <path class="cls-2" d="M141.62,321.35c-2.56.94-5.06,1.81-7.81,1.85l-15.61.24.07-47.35,8.61-.27c4.44-.14,8.68.51,12.84,1.8,6.33,1.97,10.92,6.48,12.59,12.98,1.52,5.92,1.47,12.21-.16,18.15s-5.35,10-10.51,12.59Z"/>
     </g>
   </g>
-  </svg>
 </svg>

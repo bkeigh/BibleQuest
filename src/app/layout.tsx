@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { ServiceWorkerRegistrar } from "@/components/app-shell/ServiceWorkerRegistrar";
 
@@ -14,16 +15,25 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
+/* Ithaca (SIL OFL 1.1, by GGBotNet) — the pixel accent voice.
+   Used only for quest labels, badges, unlocks, tiny decorative headings. */
+const ithaca = localFont({
+  src: "../fonts/Ithaca.ttf",
+  variable: "--font-ithaca",
+  display: "swap",
+  preload: false,
+});
+
 export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_APP_URL ?? "https://biblequest.co"
   ),
   title: {
-    default: "BibleQuest — One Meaningful Step with God Today",
+    default: "BibleQuest — Scripture, prayer, and real-life quests",
     template: "%s — BibleQuest",
   },
   description:
-    "BibleQuest helps Christians build a peaceful daily rhythm of Scripture, prayer, reflection, and real-life quests. One verse, one prayer, one quest — one step closer to God today.",
+    "One verse, one prayer, one quest a day. BibleQuest is a calm way to actually live your faith. Not a streak. A pilgrimage.",
   applicationName: "BibleQuest",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
@@ -32,18 +42,20 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
   },
   openGraph: {
-    title: "BibleQuest — One Meaningful Step with God Today",
+    title: "BibleQuest — Scripture, prayer, and real-life quests",
     description:
-      "A peaceful daily rhythm of Scripture, prayer, reflection, and small acts of faith. Not a streak. A pilgrimage.",
+      "One verse, one prayer, one quest a day. A calm way to actually live your faith. Not a streak. A pilgrimage.",
     url: "/",
     siteName: "BibleQuest",
     type: "website",
+    images: [{ url: "/og.png", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "BibleQuest — One Meaningful Step with God Today",
+    title: "BibleQuest — Scripture, prayer, and real-life quests",
     description:
-      "A peaceful daily rhythm of Scripture, prayer, reflection, and small acts of faith.",
+      "One verse, one prayer, one quest a day. A calm way to actually live your faith.",
+    images: ["/og.png"],
   },
   icons: {
     icon: [
@@ -55,7 +67,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#fefffc",
+  themeColor: "#faf6ec",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -69,7 +81,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fraunces.variable} ${inter.variable} h-full antialiased`}
+      className={`${fraunces.variable} ${inter.variable} ${ithaca.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-parchment text-charcoal">
         {children}

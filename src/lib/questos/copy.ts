@@ -1,7 +1,11 @@
 /**
  * Voice library — every reusable line of product copy in one place so the
- * BibleQuest voice stays warm, invitational, and shame-free.
- * See docs/BIBLEQUEST_CODEX.md, Volume III §17 and Volume VIII.
+ * BibleQuest voice stays warm, direct, and shame-free.
+ *
+ * Register: plain and confident, never hushed-precious. Say the thing.
+ * Target lines: "Not a streak. A pilgrimage." / "go live it" /
+ * "How are you, honestly?" No "gently", no "carried", no guilt.
+ * See docs/BIBLEQUEST_CODEX.md Vol III §17, Vol VIII, docs/CONTENT_GUIDE.md.
  */
 import type { TimeOfDay } from "@/lib/utils/dates";
 
@@ -21,17 +25,17 @@ export function greeting(time: TimeOfDay, name?: string): string {
 
 /** Sub-greeting adapts to how long the user has been away. Never shame. */
 export function returnLine(daysAway: number | null): string {
-  if (daysAway === null) return "Your journey begins with one small step.";
-  if (daysAway <= 1) return "Your journey continues.";
-  if (daysAway <= 7) return "Welcome back. Begin again with one small step.";
-  return "Your journal is still here. Start with today.";
+  if (daysAway === null) return "Today's a good day to start.";
+  if (daysAway <= 1) return "Right where you left off.";
+  if (daysAway <= 7) return "Welcome back. Pick one small thing.";
+  return "It's all still here. Start with today.";
 }
 
 export const completionLines = [
-  "This became part of your journey.",
-  "A small act, faithfully done.",
+  "Done. That counts.",
+  "A small thing, done well.",
   "Your tree grew today.",
-  "Carry this with you.",
+  "That one's yours now.",
 ] as const;
 
 export function completionLine(seed: number): string {
@@ -39,12 +43,12 @@ export function completionLine(seed: number): string {
 }
 
 export const emptyStates = {
-  prayer: "This can be a quiet place to bring what you’re carrying.",
-  reflections: "Your reflections will gather here over time.",
-  journey: "Your pilgrimage begins with one small step.",
-  bookmarks: "Save verses you want to return to.",
-  questsFiltered:
-    "No quests match that yet. Try a shorter time or a different category.",
+  prayer: "Write what's actually on your mind. It stays private.",
+  reflections: "Your reflections will collect here.",
+  journey: "Nothing here yet. Your first quest will show up here.",
+  bookmarks: "Save verses you want to come back to.",
+  questsFiltered: "Nothing matches those filters. Try widening them.",
+  questsUnpicked: "No quests picked yet. Choose up to three for today.",
 } as const;
 
 export const errors = {
@@ -54,8 +58,23 @@ export const errors = {
 } as const;
 
 export const dayCompleteLines = {
-  title: "Today’s journey is complete.",
-  body: "Carry this with you. There is nothing left to check off — go and live it.",
+  title: "That’s everything for today.",
+  body: "Nothing left to check off. Go live it.",
+} as const;
+
+/** The pick-up-to-3 quest model (Home + Quests page share these). */
+export const questPicks = {
+  /** Home, no picks yet */
+  emptyTitle: "Today’s open.",
+  emptyBody: "Pick up to three quests. One is plenty.",
+  cta: "Pick today’s quests",
+  browseMore: "Add another quest",
+  counter: (n: number) => `${n} of 3 picked`,
+  capReached: "That’s your three for today. Finish one first.",
+  added: "Added to today.",
+  removed: "Removed from today.",
+  pinnedTitle: "Today",
+  suggestedTitle: "Suggested for today",
 } as const;
 
 export const treeStageLabels: Record<string, string> = {
@@ -67,5 +86,4 @@ export const treeStageLabels: Record<string, string> = {
   sheltering: "Sheltering Tree",
 };
 
-export const treeReturnLine =
-  "Your tree has been waiting. Continue with one small step.";
+export const treeReturnLine = "One quest is enough to keep growing.";

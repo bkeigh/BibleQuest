@@ -22,8 +22,11 @@ const T = "transparent";
 const INK = "#3f4d31";
 const OLIVE = "#6f8155";
 const OLIVE_L = "#a8b98c";
-const GOLD = "#e5c36d";
+const GOLD = "#e7c563";
+const GOLD_B = "#d3a336"; // brand gold — solid sacred objects
 const GOLD_D = "#b68b2f";
+const EVERGREEN = "#0e533c"; // brand green — doors, banners, ink
+const EVERGREEN_L = "#2f7c58";
 const FLAME = "#f2b24a";
 const WHITE = "#fffaf0";
 const ROSE = "#e5a8a1";
@@ -164,7 +167,7 @@ const SPRITES: Record<string, Sprite> = {
     rows: [
       "y.y.y",
       ".ooo.",
-      "yooooy".slice(0, 5),
+      "yoooy",
       ".ooo.",
       "y.y.y",
     ],
@@ -207,6 +210,84 @@ const SPRITES: Record<string, Sprite> = {
       "wwwwwwb",
       ".gwww..",
       "...g.g.",
+    ],
+  },
+  cross: {
+    palette: { g: GOLD_B, d: GOLD_D, ".": T },
+    rows: [
+      "..g..",
+      "..g..",
+      "ggggg",
+      "..g..",
+      "..g..",
+      "..d..",
+      "..d..",
+    ],
+  },
+  door: {
+    palette: { s: STONE, e: EVERGREEN, l: EVERGREEN_L, g: GOLD_B, ".": T },
+    rows: [
+      ".sss.",
+      "seles",
+      "seees",
+      "seege",
+      "seees",
+      "seees",
+      "sssss",
+    ],
+  },
+  key: {
+    palette: { g: GOLD_B, d: GOLD_D, ".": T },
+    rows: [
+      "ggg..",
+      "g.g..",
+      "ggg..",
+      ".d...",
+      ".d.d.",
+      ".ddd.",
+    ],
+  },
+  scroll: {
+    palette: { g: GOLD_B, w: WHITE, e: EVERGREEN, ".": T },
+    rows: [
+      "ggggg",
+      "wwwww",
+      "weeww",
+      "wwwww",
+      "weeew",
+      "wwwww",
+      "ggggg",
+    ],
+  },
+  compass: {
+    palette: { s: STONE, w: WHITE, e: EVERGREEN_L, r: ROSE_D, ".": T },
+    rows: [
+      ".sss.",
+      "swrws",
+      "swrws",
+      "swews",
+      "swews",
+      ".sss.",
+    ],
+  },
+  crown: {
+    palette: { g: GOLD_B, d: GOLD_D, e: EVERGREEN_L, ".": T },
+    rows: [
+      "g.g.g",
+      "ggggg",
+      "gegeg",
+      "ddddd",
+    ],
+  },
+  mountain: {
+    palette: { e: EVERGREEN, l: EVERGREEN_L, w: WHITE, ".": T },
+    rows: [
+      "...w...",
+      "..wew..",
+      ".eelee.",
+      ".elele.",
+      "eeleele",
+      "lеeeeel".replace("е", "e"),
     ],
   },
 };
@@ -272,7 +353,7 @@ export function PixelIcon({
   );
 }
 
-/** Category → sprite, for quest glyphs. */
+/** Category → sprite, for quest glyphs. Every category gets its own mark. */
 export const CATEGORY_SPRITE: Record<string, PixelSpriteName> = {
   prayer: "candle",
   scripture: "book",
@@ -284,8 +365,11 @@ export const CATEGORY_SPRITE: Record<string, PixelSpriteName> = {
   gratitude: "flower",
   silence: "leaf",
   worship: "chapel",
-  family: "chapel",
-  community: "chapel",
-  reflection: "sun",
+  family: "sun",
+  community: "door",
+  reflection: "compass",
   patience: "tree",
+  evangelization: "scroll",
+  "self-control": "key",
+  humility: "path",
 };

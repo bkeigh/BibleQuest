@@ -95,11 +95,18 @@ export function parseSnapshot(rawText: string): ParseResult {
   if (Array.isArray(src.pendingMilestones)) {
     out.pendingMilestones = src.pendingMilestones.filter(str);
   }
-  // Assignments: a record of well-formed assignments.
+  // Assignments: per-day picked quests. Accept BOTH shapes — new exports
+  // hold arrays, pre-pick-model exports hold a single assignment object —
+  // and normalize everything to arrays so old backups still restore.
   if (isObj(src.assignments)) {
     const clean: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(src.assignments)) {
-      if (isAssignment(v)) clean[k] = v;
+      if (Array.isArray(v)) {
+        const picks = v.filter(isAssignment);
+        if (picks.length || v.length === 0) clean[k] = picks;
+      } else if (isAssignment(v)) {
+        clean[k] = [v];
+      }
     }
     out.assignments = clean;
   }

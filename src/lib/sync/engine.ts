@@ -312,7 +312,7 @@ async function pullAll(
   const assignments: QuestOSSnapshot["assignments"] = {};
   for (const row of dailyRes.data ?? []) {
     const a = rowToAssignment(row);
-    assignments[a.dateKey] = a;
+    (assignments[a.dateKey] ??= []).push(a);
   }
 
   return {
@@ -394,7 +394,9 @@ export function mergeSnapshots(
     : local.profile ?? remote.profile ?? null;
   const settings = adoptRemote && remote.settings ? remote.settings : local.settings;
 
-  // Assignments: per-day; this device wins conflicts (it's the one in use).
+  // Assignments: per-day pick lists; this device wins conflicts (it's the
+  // one in use). A locally-present day — even an emptied one — replaces the
+  // remote day wholesale, so unpicks propagate instead of resurrecting.
   const assignments = { ...(remote.assignments ?? {}), ...local.assignments };
 
   // Bookmarks: union by natural key, local wins duplicates.
@@ -558,16 +560,28 @@ async function pushFields(
     );
   }
   if (fields.has("assignments")) {
-    const rows = Object.values(snap.assignments).map((a) =>
-      assignmentToRow(uid, a)
-    );
-    if (rows.length) {
+    // Day-level replace: a day's pick list is owned wholesale by the device
+    // (mergeSnapshots gives local days precedence), so clear every locally
+    // known day and re-insert its picks. Upserting alone would leave stale
+    // rows behind after an unpick.
+    const days = Object.keys(snap.assignments);
+    if (days.length) {
+      const rows = Object.values(snap.assignments)
+        .flat()
+        .map((a) => assignmentToRow(uid, a));
       jobs.push(
-        run(
-          supabase
+        (async () => {
+          const del = await supabase
             .from("user_daily_quests")
-            .upsert(rows, { onConflict: "user_id,assigned_date" })
-        )
+            .delete()
+            .eq("user_id", uid)
+            .in("assigned_date", days);
+          if (del.error) throw del.error;
+          if (rows.length) {
+            const ins = await supabase.from("user_daily_quests").insert(rows);
+            if (ins.error) throw ins.error;
+          }
+        })()
       );
     }
   }

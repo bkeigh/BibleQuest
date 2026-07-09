@@ -97,13 +97,20 @@ export interface QuestTemplate {
 
 export type DailyQuestStatus = "assigned" | "started" | "completed";
 
+/**
+ * One quest the user picked for a given day. Days hold up to
+ * MAX_DAILY_PICKS of these (see quest-engine.ts) — picking is the
+ * user's move now, not the algorithm's.
+ */
 export interface DailyQuestAssignment {
   dateKey: string; // YYYY-MM-DD (local)
   questSlug: string;
   status: DailyQuestStatus;
+  /** When the user added this quest to their day. */
+  pickedAt?: string;
   startedAt?: string;
   completedAt?: string;
-  /** Number of times the user asked for a different quest that day. */
+  /** Legacy (pre-pick model): times the user rerolled the assigned quest. */
   rerolls: number;
 }
 
@@ -435,7 +442,8 @@ export function emptyTombstones(): SyncTombstones {
 export interface QuestOSSnapshot {
   profile: Profile | null;
   settings: Settings;
-  assignments: Record<string, DailyQuestAssignment>;
+  /** Per-day picked quests (up to MAX_DAILY_PICKS per dateKey). */
+  assignments: Record<string, DailyQuestAssignment[]>;
   completions: QuestCompletion[];
   prayers: Prayer[];
   reflections: Reflection[];
