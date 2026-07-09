@@ -1,6 +1,8 @@
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { IconCheck, IconSparkle } from "@/components/design-system/icons";
+import { PlusCta } from "@/components/plus/PlusCta";
+import { isRevenueCatConfigured } from "@/lib/revenuecat/client";
 
 const FREE_INCLUDES = [
   "Daily verse, prayer, and quests",
@@ -57,7 +59,8 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
           <PixelIcon name="lantern" size={9} animate />
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-gold-500/45 bg-gold-500/15 px-3 py-1 text-[0.75rem] text-gilt">
-          <IconSparkle size={14} /> BibleQuest Plus — coming soon
+          <IconSparkle size={14} /> BibleQuest Plus
+          {isRevenueCatConfigured() ? "" : " — coming soon"}
         </span>
         <h3 className="mt-3 font-display text-[1.5rem] text-graphite">
           Go deeper, when you’re ready
@@ -73,10 +76,7 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
             </li>
           ))}
         </ul>
-        <p className="mt-5 text-[0.8125rem] text-ash">
-          Plus isn’t out yet. We’re planning around $5 a month — no pressure,
-          no countdown timers — and the free app stays complete either way.
-        </p>
+        <PlusCta />
       </PaperCard>
 
       {/* Patron */}
