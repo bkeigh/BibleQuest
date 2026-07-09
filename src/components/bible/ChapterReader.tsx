@@ -53,31 +53,44 @@ function ReaderInner({ content }: { content: ChapterContent }) {
         >
           <IconArrowLeft size={16} /> {content.bookName}
         </Link>
-        <span className="text-[0.75rem] text-fog">World English Bible</span>
+        <span className="text-[0.75rem] text-ash">World English Bible</span>
       </div>
 
-      <h1 className="mt-5 font-display text-[1.75rem] text-graphite">
+      <h1 className="mt-5 font-display text-editorial text-graphite">
         {content.bookName} {content.chapter}
       </h1>
 
-      {/* Verses */}
+      {/* Verses — each verse is a toggle so keyboard and screen-reader users
+          can select and save, not just mouse users. Spans (not <button>s)
+          keep Scripture flowing as continuous text. */}
       <div className="measure-reading mt-5">
         {content.verses.map((text, i) => {
           const num = i + 1;
           const isSel = selected === num;
           const isSaved = bookmarkedVerses.has(num);
+          const toggle = () => setSelected(isSel ? null : num);
           return (
             <span
               key={num}
-              onClick={() => setSelected(isSel ? null : num)}
+              role="button"
+              tabIndex={0}
+              aria-pressed={isSel}
+              onClick={toggle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  toggle();
+                }
+              }}
               className={cn(
                 "cursor-pointer rounded transition-colors",
-                isSel && "bg-gold-50",
-                isSaved && !isSel && "bg-gold-50/50"
+                isSel && "bg-gold-500/20",
+                isSaved && !isSel && "bg-gold-500/10"
               )}
             >
               <span className="verse-number">{num}</span>
               <span className="verse-text">{text} </span>
+              {isSaved && <span className="sr-only">(saved)</span>}
             </span>
           );
         })}
@@ -100,7 +113,8 @@ function ReaderInner({ content }: { content: ChapterContent }) {
               });
               toast(nowSaved ? "Verse saved." : "Removed.");
             }}
-            className="inline-flex items-center gap-1.5 text-[0.875rem] text-olive-700"
+            aria-pressed={bookmarkedVerses.has(selected)}
+            className="inline-flex items-center gap-1.5 text-[0.875rem] text-accent"
           >
             {bookmarkedVerses.has(selected) ? (
               <IconBookmarkFilled size={16} />

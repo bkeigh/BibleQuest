@@ -10,6 +10,7 @@ import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { VerseCard } from "@/components/bible/VerseCard";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosure";
 import { IconChevronRight } from "@/components/design-system/icons";
 import type { BibleBookMeta } from "@/lib/questos/types";
 
@@ -17,6 +18,14 @@ function BibleIndexInner() {
   const readingPosition = useQuestOS((s) => s.readingPosition);
   const bookmarks = useQuestOS((s) => s.bookmarks);
   const verse = useMemo(() => getDailyVerse(), []);
+
+  // Open the testament the reader is currently in; default to New Testament.
+  const readingTestament = useMemo(() => {
+    if (!readingPosition) return "new";
+    return oldTestament.some((b) => b.slug === readingPosition.bookSlug)
+      ? "old"
+      : "new";
+  }, [readingPosition]);
 
   return (
     <>
@@ -32,7 +41,7 @@ function BibleIndexInner() {
                 <PixelIcon name="bookmark" size={5} />
               </span>
               <div className="flex-1">
-                <p className="text-[0.75rem] uppercase tracking-wide text-olive-500">
+                <p className="text-[0.75rem] uppercase tracking-wide text-accent">
                   Continue reading
                 </p>
                 <p className="text-[1.0625rem] text-graphite">
@@ -55,7 +64,7 @@ function BibleIndexInner() {
               <div className="flex-1">
                 <p className="text-[1rem] text-graphite">Saved verses</p>
                 <p className="text-[0.8125rem] text-ash">
-                  {bookmarks.length} kept to return to
+                  {bookmarks.length} saved
                 </p>
               </div>
               <IconChevronRight className="text-fog" />
@@ -63,10 +72,20 @@ function BibleIndexInner() {
           </Link>
         )}
 
-        <BookList title="New Testament" books={newTestament} />
-        <BookList title="Old Testament" books={oldTestament} />
+        <DisclosureGroup className="mt-7">
+          <BookList
+            title="New Testament"
+            books={newTestament}
+            defaultOpen={readingTestament === "new"}
+          />
+          <BookList
+            title="Old Testament"
+            books={oldTestament}
+            defaultOpen={readingTestament === "old"}
+          />
+        </DisclosureGroup>
 
-        <p className="mt-6 pb-4 text-center text-[0.75rem] text-fog">
+        <p className="mt-6 pb-4 text-center text-[0.75rem] text-ash">
           World English Bible · Public Domain
         </p>
       </PageContainer>
@@ -74,12 +93,25 @@ function BibleIndexInner() {
   );
 }
 
-function BookList({ title, books }: { title: string; books: BibleBookMeta[] }) {
+function BookList({
+  title,
+  books,
+  defaultOpen,
+}: {
+  title: string;
+  books: BibleBookMeta[];
+  defaultOpen?: boolean;
+}) {
   return (
-    <section className="mt-7">
-      <p className="mb-2.5 text-[0.75rem] uppercase tracking-[0.16em] text-olive-500">
-        {title}
-      </p>
+    <Disclosure
+      defaultOpen={defaultOpen}
+      count={books.length}
+      label={
+        <span className="text-[0.75rem] uppercase tracking-[0.16em] text-accent">
+          {title}
+        </span>
+      }
+    >
       <PaperCard variant="paper" padding="none" className="overflow-hidden">
         <ul className="divide-y divide-mist/70">
           {books.map((b) => (
@@ -89,7 +121,7 @@ function BookList({ title, books }: { title: string; books: BibleBookMeta[] }) {
                 className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-linen"
               >
                 <span className="text-[1rem] text-charcoal">{b.name}</span>
-                <span className="text-[0.8125rem] text-fog">
+                <span className="text-[0.8125rem] text-ash">
                   {b.chapterCount} {b.chapterCount === 1 ? "chapter" : "chapters"}
                 </span>
               </Link>
@@ -97,7 +129,7 @@ function BookList({ title, books }: { title: string; books: BibleBookMeta[] }) {
           ))}
         </ul>
       </PaperCard>
-    </section>
+    </Disclosure>
   );
 }
 

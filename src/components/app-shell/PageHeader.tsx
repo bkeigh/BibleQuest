@@ -24,12 +24,10 @@ export function PageHeader({
     >
       <div className="flex items-end justify-between gap-4 pt-8 pb-2">
         <div>
-          <h1 className="font-display text-[1.75rem] leading-tight text-graphite">
+          <h1 className="font-display text-editorial text-graphite">
             {title}
           </h1>
-          {subtitle && (
-            <p className="mt-1 text-[0.9375rem] text-ash">{subtitle}</p>
-          )}
+          {subtitle && <p className="mt-1 text-small text-ash">{subtitle}</p>}
         </div>
         {action}
       </div>

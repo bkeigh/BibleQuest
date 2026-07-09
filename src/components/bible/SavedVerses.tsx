@@ -31,7 +31,7 @@ function SavedVersesInner() {
         </Link>
       </div>
 
-      <h1 className="mt-5 font-display text-[1.75rem] text-graphite">Saved verses</h1>
+      <h1 className="mt-5 font-display text-editorial text-graphite">Saved verses</h1>
 
       {sorted.length === 0 ? (
         <PaperCard variant="quiet" padding="lg" className="mt-6 text-center">
@@ -48,24 +48,30 @@ function SavedVersesInner() {
                 <blockquote className="verse-text">
                   “{cleanVerseText(b.text)}”
                 </blockquote>
-                <cite className="mt-2 block text-[0.875rem] not-italic text-olive-700">
+                <cite className="mt-2 block text-[0.875rem] not-italic text-accent">
                   {b.bookName} {b.chapter}:{b.verse}
                 </cite>
               </Link>
               <button
                 onClick={() => {
-                  toggleBookmark({
+                  const entry = {
                     bookSlug: b.bookSlug,
                     bookName: b.bookName,
                     chapter: b.chapter,
                     verse: b.verse,
                     text: b.text,
+                  };
+                  toggleBookmark(entry);
+                  toast("Removed.", {
+                    action: {
+                      label: "Undo",
+                      onClick: () => toggleBookmark(entry),
+                    },
                   });
-                  toast("Removed from your verses.");
                 }}
                 className="mt-2.5 inline-flex items-center gap-1.5 text-[0.8125rem] text-ash transition-colors hover:text-charcoal"
               >
-                <IconBookmarkFilled size={15} className="text-olive-500" /> Saved
+                <IconBookmarkFilled size={15} className="text-accent" /> Saved
               </button>
             </PaperCard>
           ))}

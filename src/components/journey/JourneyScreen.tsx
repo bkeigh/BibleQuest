@@ -7,13 +7,19 @@ import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PixelIcon, type PixelSpriteName } from "@/components/design-system/PixelIcon";
+import { PixelMascot } from "@/components/design-system/PixelMascot";
+import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosure";
 import { GrowthTree } from "@/components/journey/GrowthTree";
 import { GROWTH_MEANINGS } from "@/lib/questos/growth-engine";
 import { treeReturnLine, emptyStates } from "@/lib/questos/copy";
 import { seedMilestones } from "@/data/seed/milestones";
 import { formatShortDate } from "@/lib/utils/dates";
 import { SeasonalAtmosphere } from "@/components/design-system/SeasonalAtmosphere";
-import type { GrowthType, JourneyEventType } from "@/lib/questos/types";
+import type {
+  GrowthType,
+  JourneyEvent,
+  JourneyEventType,
+} from "@/lib/questos/types";
 
 const GROWTH_ORDER: GrowthType[] = [
   "roots",
@@ -34,6 +40,13 @@ const EVENT_SPRITE: Record<JourneyEventType, PixelSpriteName> = {
   milestone_reached: "star",
 };
 
+function monthLabel(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
 function JourneyScreenInner() {
   const growthEvents = useQuestOS((s) => s.growthEvents);
   const journeyEvents = useQuestOS((s) => s.journeyEvents);
@@ -46,6 +59,22 @@ function JourneyScreenInner() {
     [journeyEvents]
   );
 
+  // Group the timeline by month, newest first. The current (most recent)
+  // month starts open; older months collapse.
+  const months = useMemo(() => {
+    const groups: { label: string; events: JourneyEvent[] }[] = [];
+    for (const e of timeline) {
+      const label = monthLabel(e.occurredAt);
+      const last = groups[groups.length - 1];
+      if (last && last.label === label) {
+        last.events.push(e);
+      } else {
+        groups.push({ label, events: [e] });
+      }
+    }
+    return groups;
+  }, [timeline]);
+
   const earnedKeys = useMemo(() => new Set(earned.map((e) => e.key)), [earned]);
   const nextMilestones = useMemo(
     () => seedMilestones.filter((m) => !earnedKeys.has(m.key)).slice(0, 3),
@@ -56,7 +85,7 @@ function JourneyScreenInner() {
 
   return (
     <>
-      <PageHeader title="Journey" subtitle="Your pilgrimage, one small step at a time." />
+      <PageHeader title="Journey" subtitle="What’s grown so far." />
       <PageContainer>
         {/* Growth tree hero */}
         <PaperCard variant="atmospheric" padding="lg" className="relative overflow-hidden text-center">
@@ -71,7 +100,7 @@ function JourneyScreenInner() {
           </h2>
           <p className="relative mt-1 text-[0.9375rem] text-ash">
             {tree.totalActions === 0
-              ? "Your tree is waiting for its first small step."
+              ? "Complete one quest and it starts growing."
               : returning
                 ? `${tree.totalActions} meaningful steps have shaped it.`
                 : treeReturnLine}
@@ -95,8 +124,8 @@ function JourneyScreenInner() {
         {/* Milestones */}
         {(earned.length > 0 || nextMilestones.length > 0) && (
           <section className="mt-6">
-            <p className="mb-2.5 text-[0.75rem] uppercase tracking-[0.16em] text-olive-500">
-              Markers
+            <p className="mb-2.5 text-[0.75rem] uppercase tracking-[0.16em] text-accent">
+              Milestones
             </p>
             <div className="flex flex-wrap gap-2.5">
               {earned.map((e) => {
@@ -105,7 +134,7 @@ function JourneyScreenInner() {
                 return (
                   <span
                     key={e.key}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-gold-300 bg-gold-50 px-3 py-1.5 text-[0.8125rem] text-gold-700"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-gold-500/45 bg-gold-500/15 px-3 py-1.5 font-pixel text-[0.875rem] text-gilt"
                   >
                     <PixelIcon name={(m.iconKey as PixelSpriteName) ?? "star"} size={3} />
                     {m.title}
@@ -115,7 +144,7 @@ function JourneyScreenInner() {
               {nextMilestones.map((m) => (
                 <span
                   key={m.key}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-mist bg-linen px-3 py-1.5 text-[0.8125rem] text-fog"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-mist bg-linen px-3 py-1.5 font-pixel text-[0.875rem] text-ash"
                 >
                   <PixelIcon name={(m.iconKey as PixelSpriteName) ?? "star"} size={3} />
                   {m.title}
@@ -127,27 +156,43 @@ function JourneyScreenInner() {
 
         {/* Timeline */}
         <section className="mt-7 pb-6">
-          <p className="mb-3 text-[0.75rem] uppercase tracking-[0.16em] text-olive-500">
+          <p className="mb-3 text-[0.75rem] uppercase tracking-[0.16em] text-accent">
             The road so far
           </p>
           {timeline.length === 0 ? (
-            <p className="py-8 text-center text-[0.9375rem] text-ash">
-              {emptyStates.journey}
-            </p>
+            <div className="py-6 text-center">
+              <PixelMascot name="sprout" size={8} className="mb-4" />
+              <p className="text-[0.9375rem] text-ash">{emptyStates.journey}</p>
+            </div>
           ) : (
-            <ol className="relative ml-2 border-l border-mist">
-              {timeline.map((e) => (
-                <li key={e.id} className="relative ml-6 pb-6 last:pb-0">
-                  <span className="absolute -left-[2.05rem] top-0 flex h-6 w-6 items-center justify-center rounded-full bg-parchment ring-1 ring-mist">
-                    <PixelIcon name={EVENT_SPRITE[e.type]} size={3} />
-                  </span>
-                  <p className="text-[0.9375rem] text-charcoal">{e.title}</p>
-                  <p className="mt-0.5 text-[0.75rem] text-fog">
-                    {formatShortDate(e.occurredAt)}
-                  </p>
-                </li>
+            <DisclosureGroup>
+              {months.map((month, i) => (
+                <Disclosure
+                  key={month.label}
+                  defaultOpen={i === 0}
+                  count={month.events.length}
+                  label={
+                    <span className="text-[0.9375rem] font-medium text-graphite">
+                      {month.label}
+                    </span>
+                  }
+                >
+                  <ol className="relative ml-2 mt-1 border-l border-mist">
+                    {month.events.map((e) => (
+                      <li key={e.id} className="relative ml-6 pb-6 last:pb-0">
+                        <span className="absolute -left-[2.05rem] top-0 flex h-6 w-6 items-center justify-center rounded-full bg-parchment ring-1 ring-mist">
+                          <PixelIcon name={EVENT_SPRITE[e.type]} size={3} />
+                        </span>
+                        <p className="text-[0.9375rem] text-charcoal">{e.title}</p>
+                        <p className="mt-0.5 text-[0.75rem] text-ash">
+                          {formatShortDate(e.occurredAt)}
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
+                </Disclosure>
               ))}
-            </ol>
+            </DisclosureGroup>
           )}
         </section>
       </PageContainer>

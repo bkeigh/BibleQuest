@@ -116,8 +116,8 @@ export function GrowthTree({
     >
       <defs>
         <radialGradient id="tree-light" cx="50%" cy="30%" r="70%">
-          <stop offset="0%" stopColor="var(--color-gold-50)" stopOpacity="0.9" />
-          <stop offset="100%" stopColor="var(--color-gold-50)" stopOpacity="0" />
+          <stop offset="0%" stopColor="var(--color-gold-100)" stopOpacity="0.8" />
+          <stop offset="100%" stopColor="var(--color-gold-100)" stopOpacity="0" />
         </radialGradient>
       </defs>
 
@@ -128,7 +128,15 @@ export function GrowthTree({
 
       {showGround && (
         <>
-          <ellipse cx="110" cy="172" rx="78" ry="9" fill="var(--color-olive-100)" />
+          {/* Semantic surface so the ground stays subtle in Candle mode
+              (raw olive-100 would glow near-white on a dark canvas). */}
+          <ellipse
+            cx="110"
+            cy="172"
+            rx="78"
+            ry="9"
+            fill="var(--color-accent-surface)"
+          />
           <path
             d="M40 172 Q 110 166 180 172"
             stroke="var(--color-olive-300)"
@@ -163,16 +171,17 @@ export function GrowthTree({
                C ${112 + stage} ${canopy.y + 30}, ${112 + stage} ${
               150 - stage * 6
             }, ${110 + (2 + stage)} 172 Z`}
-            fill="var(--color-olive-700)"
+            fill="#6b4f34"
             opacity="0.92"
           />
 
-          {/* Branches */}
+          {/* Branches — bark brown (shared pixel-palette tone) reads on both
+              parchment and the dark Candle canvas; olive-700 vanished in dark. */}
           {branches.map((d, i) => (
             <path
               key={i}
               d={d}
-              stroke="var(--color-olive-700)"
+              stroke="#6b4f34"
               strokeWidth={2.4 - i * 0.3}
               fill="none"
               strokeLinecap="round"

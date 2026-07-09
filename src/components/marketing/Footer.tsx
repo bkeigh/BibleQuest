@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import Image from "next/image";
 
 export function Footer() {
   return (
@@ -7,15 +7,21 @@ export function Footer() {
       <div className="mx-auto w-full max-w-5xl px-5 py-14 sm:px-8">
         <div className="flex flex-col gap-10 sm:flex-row sm:justify-between">
           <div className="max-w-xs">
-            <Link href="/" className="flex items-center gap-2">
-              <PixelIcon name="candle" size={5} />
+            <Link href="/" className="flex items-center gap-2.5">
+              <Image
+                src="/brand/bq-logo.svg"
+                alt=""
+                width={22}
+                height={28}
+                className="h-[26px] w-auto"
+              />
               <span className="font-display text-[1.25rem] text-graphite">
                 BibleQuest
               </span>
             </Link>
             <p className="mt-3 text-[0.9375rem] leading-relaxed text-ash">
-              A peaceful daily rhythm of Scripture, prayer, reflection, and small
-              acts of faith. One meaningful step with God today.
+              Scripture, prayer, and small quests you choose. Built to help you
+              live your faith, not scroll it.
             </p>
           </div>
 
@@ -29,6 +35,12 @@ export function Footer() {
               <FooterLink href="/about">About</FooterLink>
               <FooterLink href="/writing">Writing</FooterLink>
               <FooterLink href="/churches">Churches</FooterLink>
+              <a
+                href="mailto:hello@biblequest.co"
+                className="text-ash transition-colors hover:text-accent"
+              >
+                Contact
+              </a>
             </FooterCol>
             <FooterCol title="Legal">
               <FooterLink href="/privacy">Privacy</FooterLink>
@@ -37,10 +49,21 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-12 flex flex-col gap-2 border-t border-mist pt-6 text-[0.8125rem] text-fog sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-12 flex flex-col gap-2 border-t border-mist pt-6 text-[0.8125rem] text-ash sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            © {new Date().getFullYear()} BibleQuest ·{" "}
+            <a
+              href="mailto:hello@biblequest.co"
+              className="transition-colors hover:text-accent"
+            >
+              hello@biblequest.co
+            </a>
+          </p>
           <p>Scripture: World English Bible · Public Domain.</p>
-          <p>Built with care. Not a replacement for church or community.</p>
         </div>
+        <p className="mt-2 text-[0.8125rem] text-ash">
+          Built with care. Not a replacement for church or community.
+        </p>
       </div>
     </footer>
   );
@@ -55,7 +78,7 @@ function FooterCol({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <p className="mb-1 text-[0.75rem] uppercase tracking-wide text-olive-500">
+      <p className="mb-1 text-[0.75rem] uppercase tracking-wide text-accent">
         {title}
       </p>
       {children}
@@ -65,7 +88,7 @@ function FooterCol({
 
 function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="text-ash transition-colors hover:text-olive-700">
+    <Link href={href} className="text-ash transition-colors hover:text-accent">
       {children}
     </Link>
   );

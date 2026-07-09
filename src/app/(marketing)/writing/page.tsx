@@ -22,18 +22,20 @@ export default function WritingPage() {
     <MarketingPage
       eyebrow="Writing"
       title="Ideas before features."
-      intro="BibleQuest leads with a way of thinking about faith and technology. Essays are on the way — warm, honest, and unhurried."
+      intro="BibleQuest starts from a way of thinking about faith and technology. Essays are coming. These are first:"
     >
-      <Prose>Here’s what we’re working on first:</Prose>
       <div className="not-prose space-y-3">
         {PLANNED.map((title) => (
           <PaperCard key={title} variant="quiet" padding="md" className="flex items-center gap-3">
             <PixelIcon name="book" size={4} />
             <span className="text-[1rem] text-charcoal">{title}</span>
-            <span className="ml-auto text-[0.75rem] text-fog">Soon</span>
           </PaperCard>
         ))}
       </div>
+      <Prose>
+        Nothing is published yet — when the first essay is ready, it will live
+        here.
+      </Prose>
     </MarketingPage>
   );
 }

@@ -79,7 +79,7 @@ function ReflectionComposerInner() {
         </div>
         <PaperCard variant="quiet" padding="lg" className="mt-6 text-center">
           <p className="text-[0.9375rem] text-ash">This reflection is no longer here.</p>
-          <GentleLink variant="dark" size="md" href="/app/reflection" className="mt-4">
+          <GentleLink variant="primary" size="md" href="/app/reflection" className="mt-4">
             Back to reflections
           </GentleLink>
         </PaperCard>
@@ -98,7 +98,7 @@ function ReflectionComposerInner() {
         </Link>
       </div>
 
-      <h1 className="mt-5 font-display text-[1.75rem] leading-tight text-graphite">
+      <h1 className="mt-5 font-display text-editorial leading-tight text-graphite">
         {isEdit ? "Editing a reflection" : "A reflection"}
       </h1>
       {verseRef && (
@@ -106,8 +106,14 @@ function ReflectionComposerInner() {
       )}
 
       <PaperCard variant="paper" padding="md" className="mt-5">
-        <p className="text-[0.9375rem] font-medium text-graphite">{displayPrompt}</p>
+        <label
+          htmlFor="reflection-body"
+          className="block text-[0.9375rem] font-medium text-graphite"
+        >
+          {displayPrompt}
+        </label>
         <textarea
+          id="reflection-body"
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={8}
@@ -122,7 +128,7 @@ function ReflectionComposerInner() {
 
       <div className="mt-6 flex items-center gap-3 pb-8">
         <GentleButton
-          variant="dark"
+          variant="primary"
           size="lg"
           className="flex-1"
           onClick={save}

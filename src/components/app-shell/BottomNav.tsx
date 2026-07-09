@@ -38,10 +38,19 @@ export function BottomNav() {
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex flex-col items-center gap-1 px-1 pt-2.5 pb-2 text-[0.6875rem] transition-colors duration-300",
-                  active ? "text-olive-700" : "text-ash hover:text-charcoal"
+                  "relative flex min-h-[44px] flex-col items-center gap-1 px-1 pt-2.5 pb-2 text-[0.6875rem] transition-colors duration-300",
+                  active ? "text-accent" : "text-ash hover:text-charcoal"
                 )}
               >
+                {/* Pixel-crisp active indicator: a hard-edged bar flush with
+                    the top hairline — deliberately unrounded. */}
+                <span
+                  aria-hidden
+                  className={cn(
+                    "absolute top-0 h-[3px] w-5 bg-accent transition-opacity duration-300",
+                    active ? "opacity-100" : "opacity-0"
+                  )}
+                />
                 <Icon size={23} strokeWidth={active ? 1.9 : 1.6} />
                 <span className={cn(active && "font-medium")}>{label}</span>
               </Link>

@@ -3,7 +3,7 @@ import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { IconCheck, IconSparkle } from "@/components/design-system/icons";
 
 const FREE_INCLUDES = [
-  "Daily verse, prayer, and quest",
+  "Daily verse, prayer, and quests",
   "The full Bible reader",
   "Private prayer journal",
   "Private reflection journal",
@@ -12,7 +12,7 @@ const FREE_INCLUDES = [
 ];
 
 const PLUS_FEATURES = [
-  "A gentle AI study companion",
+  "An AI study companion",
   "Personalized quests for your life",
   "Guided reading plans",
   "Reflection insights over time",
@@ -31,7 +31,7 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
     <div className={compact ? "space-y-5" : "space-y-6"}>
       {/* The free promise, stated plainly and first */}
       <PaperCard variant="paper" padding="lg">
-        <p className="text-[0.75rem] uppercase tracking-[0.16em] text-olive-500">
+        <p className="text-[0.75rem] uppercase tracking-[0.16em] text-accent">
           Free, always
         </p>
         <h3 className="mt-1.5 font-display text-[1.5rem] text-graphite">
@@ -39,12 +39,13 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
         </h3>
         <p className="mt-2 text-[0.9375rem] leading-relaxed text-charcoal">
           Your relationship with God is never paywalled. Scripture, prayer,
-          reflection, quests, and your journey are free — and complete.
+          reflection, quests, and your journey are free — and complete. This is
+          the whole app, and it’s what you get today.
         </p>
         <ul className="mt-4 grid gap-2 sm:grid-cols-2">
           {FREE_INCLUDES.map((f) => (
             <li key={f} className="flex items-center gap-2 text-[0.9375rem] text-charcoal">
-              <IconCheck size={17} className="text-olive-500" /> {f}
+              <IconCheck size={17} className="text-accent" /> {f}
             </li>
           ))}
         </ul>
@@ -55,41 +56,41 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
         <div className="pointer-events-none absolute -right-4 -top-3 opacity-40">
           <PixelIcon name="lantern" size={9} animate />
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-gold-300 bg-gold-50 px-3 py-1 text-[0.75rem] text-gold-700">
-          <IconSparkle size={14} /> BibleQuest Plus
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-gold-500/45 bg-gold-500/15 px-3 py-1 text-[0.75rem] text-gilt">
+          <IconSparkle size={14} /> BibleQuest Plus — coming soon
         </span>
         <h3 className="mt-3 font-display text-[1.5rem] text-graphite">
           Go deeper, when you’re ready
         </h3>
         <p className="mt-2 text-[0.9375rem] leading-relaxed text-charcoal">
-          Plus adds guidance, personalization, and long-term insight. It deepens
-          the experience — it never decides how close you are to God.
+          Plus adds guidance, personalization, and long-term insight. It
+          deepens the experience — it never decides how close you are to God.
         </p>
         <ul className="mt-4 grid gap-2 sm:grid-cols-2">
           {PLUS_FEATURES.map((f) => (
             <li key={f} className="flex items-center gap-2 text-[0.9375rem] text-charcoal">
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold-300" /> {f}
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold-500" /> {f}
             </li>
           ))}
         </ul>
         <p className="mt-5 text-[0.8125rem] text-ash">
-          Plus is in preparation. It will arrive with honest, simple pricing —
-          and the free experience will always stay whole.
+          Plus isn’t out yet. We’re planning around $5 a month — no pressure,
+          no countdown timers — and the free app stays complete either way.
         </p>
       </PaperCard>
 
       {/* Patron */}
       <PaperCard variant="paper" padding="lg">
-        <p className="text-[0.75rem] uppercase tracking-[0.16em] text-olive-500">
+        <p className="text-[0.75rem] uppercase tracking-[0.16em] text-accent">
           Patron
         </p>
         <h3 className="mt-1.5 font-display text-[1.375rem] text-graphite">
           Support the mission
         </h3>
         <p className="mt-2 text-[0.9375rem] leading-relaxed text-charcoal">
-          Some people simply want to help keep BibleQuest free and accessible.
-          Patrons carry no spiritual advantage — only our gratitude. This too is
-          coming soon.
+          Some people just want to help keep BibleQuest free for everyone.
+          Patrons get our gratitude — no spiritual perks, ever. Coming after
+          Plus.
         </p>
       </PaperCard>
     </div>

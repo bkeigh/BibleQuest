@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuestOS } from "@/lib/questos/store";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { PixelMascot } from "@/components/design-system/PixelMascot";
 
 /**
  * Sends first-time visitors to onboarding before the app opens. Renders a
@@ -27,8 +27,8 @@ function Gate({ children }: { children: React.ReactNode }) {
 function LoadingVeil() {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-parchment">
-      <PixelIcon name="candle" size={8} animate />
-      <p className="text-[0.9375rem] text-ash">Preparing today’s journey…</p>
+      <PixelMascot name="lantern" size={7} />
+      <p className="text-small text-ash">Setting things up.</p>
     </div>
   );
 }

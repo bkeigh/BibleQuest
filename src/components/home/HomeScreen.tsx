@@ -2,13 +2,25 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useQuestOS, selectDaysAway } from "@/lib/questos/store";
+import { motion } from "framer-motion";
+import {
+  useQuestOS,
+  selectDaysAway,
+  selectTodayPicks,
+  MAX_DAILY_PICKS,
+} from "@/lib/questos/store";
 import { calculateTreeState } from "@/lib/questos/growth-engine";
 import { getDailyVerse } from "@/lib/questos/verse-engine";
 import { timeOfDay, toDateKey, formatFriendlyDate } from "@/lib/utils/dates";
-import { greeting, returnLine, dayCompleteLines } from "@/lib/questos/copy";
+import {
+  greeting,
+  returnLine,
+  dayCompleteLines,
+  questPicks,
+} from "@/lib/questos/copy";
 import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
 import { firstName } from "@/lib/utils/name";
+import { celebrationScale } from "@/lib/motion";
 import { PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleLink } from "@/components/design-system/GentleButton";
@@ -16,8 +28,12 @@ import { VerseCard } from "@/components/bible/VerseCard";
 import { QuestSlip } from "@/components/quests/QuestSlip";
 import { GrowthTree } from "@/components/journey/GrowthTree";
 import { SeasonalAtmosphere } from "@/components/design-system/SeasonalAtmosphere";
-import { PixelIcon, CATEGORY_SPRITE } from "@/components/design-system/PixelIcon";
-import { IconArrowRight, IconChevronRight } from "@/components/design-system/icons";
+import { PixelIcon } from "@/components/design-system/PixelIcon";
+import {
+  IconArrowRight,
+  IconCheck,
+  IconChevronRight,
+} from "@/components/design-system/icons";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { questBySlug } from "@/data/seed/quests";
 
@@ -29,16 +45,13 @@ function HomeInner() {
   const [daysAway] = useState(() => selectDaysAway(useQuestOS.getState()));
   const growthEvents = useQuestOS((s) => s.growthEvents);
   const readingPosition = useQuestOS((s) => s.readingPosition);
-  const getTodayAssignment = useQuestOS((s) => s.getTodayAssignment);
-  const ensureDailyQuest = useQuestOS((s) => s.ensureDailyQuest);
-  const rerollTodayQuest = useQuestOS((s) => s.rerollTodayQuest);
   const journeyEvents = useQuestOS((s) => s.journeyEvents);
+  // Today's picked quests (0..MAX_DAILY_PICKS). Stable ref — render-safe.
+  const picks = useQuestOS(selectTodayPicks);
   // Keep day-scoped content fresh when the local day rolls over while the app
   // is left open (or the tab regains focus) — otherwise the verse and date
   // silently show "yesterday".
   const [dayKey, setDayKey] = useState(() => toDateKey());
-  // Subscribe to today's assignment slice so reroll/completion re-renders Home.
-  const todayAssignment = useQuestOS((s) => s.assignments[dayKey]);
 
   // Watch for a local day rollover: re-check on an interval, on focus, and on
   // visibility change. setDayKey is a no-op when the day hasn't changed.
@@ -60,28 +73,27 @@ function HomeInner() {
     };
   }, []);
 
-  // Persist today's quest once per day (never during render).
-  useEffect(() => {
-    ensureDailyQuest();
-  }, [dayKey, ensureDailyQuest]);
-
   const tree = useMemo(() => calculateTreeState(growthEvents), [growthEvents]);
   const verse = useMemo(() => getDailyVerse(dayKey), [dayKey]);
   const season = useMemo(() => getCurrentSeason(), []);
-  // Prefer the persisted assignment; fall back to a deterministic preview on the
-  // very first render before ensureDailyQuest() has run.
-  const today = useMemo(() => {
-    if (todayAssignment) {
-      const quest = questBySlug.get(todayAssignment.questSlug);
-      if (quest) return { assignment: todayAssignment, quest };
-    }
-    return getTodayAssignment();
-  }, [todayAssignment, getTodayAssignment]);
   const name = firstName(profile?.displayName);
   const time = timeOfDay();
 
-  const completedToday = today?.assignment.status === "completed";
-  const todayKey = dayKey;
+  // Resolve picks to their quest templates (drop any unknown slugs safely).
+  const pickedQuests = useMemo(
+    () =>
+      picks.flatMap((pick) => {
+        const quest = questBySlug.get(pick.questSlug);
+        return quest ? [{ pick, quest }] : [];
+      }),
+    [picks]
+  );
+  const pickCount = pickedQuests.length;
+  const completedCount = pickedQuests.filter(
+    ({ pick }) => pick.status === "completed"
+  ).length;
+  const allDone = pickCount >= 1 && completedCount === pickCount;
+
   const recent = [...journeyEvents]
     .filter((e) => e.type !== "milestone_reached")
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
@@ -96,70 +108,128 @@ function HomeInner() {
       <PageContainer className="relative pt-safe">
         {/* Greeting */}
         <header className="pt-10 pb-6">
-          <p className="text-[0.8125rem] uppercase tracking-[0.16em] text-olive-500">
-            {formatFriendlyDate(todayKey)} · {season.label}
+          <p className="text-caption uppercase tracking-[0.16em] text-accent">
+            {formatFriendlyDate(dayKey)} · {season.label}
           </p>
-          <h1 className="mt-2 font-display text-[2rem] leading-tight text-graphite">
+          <h1 className="mt-2 font-display text-editorial text-graphite">
             {greeting(time, name)}
           </h1>
-          <p className="mt-1 text-[1.0625rem] text-ash">{returnLine(daysAway)}</p>
+          <p className="mt-1 text-body text-ash">{returnLine(daysAway)}</p>
         </header>
 
         <div className="space-y-5 pb-4">
           {/* Today's verse */}
           <VerseCard verse={verse} />
 
-          {/* Today's quest — the one primary action, or a peaceful complete state */}
-          {today && !completedToday && (
-            <section aria-label="Today's quest">
-              <SectionLabel>Today’s quest</SectionLabel>
-              <QuestSlip quest={today.quest} href={`/app/quests/${today.quest.slug}`} />
-              <div className="mt-2.5 flex items-center gap-4">
-                <GentleLink
-                  variant="dark"
-                  href={`/app/quests/${today.quest.slug}`}
-                  className="flex-1"
-                >
-                  Begin <IconArrowRight />
-                </GentleLink>
-                <button
-                  onClick={rerollTodayQuest}
-                  className="text-[0.875rem] text-ash transition-colors hover:text-charcoal"
-                >
-                  Something else?
-                </button>
-              </div>
-            </section>
-          )}
+          {/* Today's quests — empty, picked (1-3), or day complete */}
+          <section aria-label="Today’s quests">
+            {/* Announce pick/completion changes to screen readers. */}
+            <p aria-live="polite" className="sr-only">
+              {pickCount === 0
+                ? questPicks.emptyTitle
+                : allDone
+                  ? dayCompleteLines.title
+                  : `${completedCount} of ${pickCount} quests completed.`}
+            </p>
 
-          {completedToday && today && (
-            <PaperCard variant="atmospheric" padding="lg" className="text-center">
-              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-olive-50 ring-1 ring-olive-100">
-                <PixelIcon name={CATEGORY_SPRITE[today.quest.category] ?? "leaf"} size={6} animate />
-              </div>
-              <h2 className="font-display text-[1.375rem] text-graphite">
-                {dayCompleteLines.title}
-              </h2>
-              <p className="mx-auto mt-2 max-w-sm text-[0.9375rem] leading-relaxed text-charcoal">
-                {dayCompleteLines.body}
-              </p>
-              <div className="mt-4 flex justify-center gap-3">
-                <GentleLink variant="outline" size="sm" href="/app/bible">
-                  Read Scripture
-                </GentleLink>
-                <GentleLink variant="ghost" size="sm" href="/app/prayer/new">
-                  Write a prayer
-                </GentleLink>
-              </div>
-            </PaperCard>
-          )}
+            {pickCount === 0 && (
+              <PaperCard variant="outlined" padding="lg" className="text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-accent-surface">
+                  <PixelIcon name="compass" size={5} />
+                </div>
+                <h2 className="font-display text-subheading text-graphite">
+                  {questPicks.emptyTitle}
+                </h2>
+                <p className="mx-auto mt-1.5 max-w-sm text-small leading-relaxed text-charcoal">
+                  {questPicks.emptyBody}
+                </p>
+                <div className="mt-4 flex justify-center">
+                  <GentleLink variant="primary" href="/app/quests">
+                    {questPicks.cta} <IconArrowRight />
+                  </GentleLink>
+                </div>
+              </PaperCard>
+            )}
+
+            {pickCount > 0 && !allDone && (
+              <>
+                <div className="mb-2 flex items-baseline justify-between gap-3">
+                  <p className="font-pixel text-small uppercase tracking-[0.1em] text-accent">
+                    Today’s quests
+                  </p>
+                  <p className="text-caption text-ash">
+                    {questPicks.counter(pickCount)}
+                  </p>
+                </div>
+                <ul className="space-y-3">
+                  {pickedQuests.map(({ pick, quest }) => {
+                    const done = pick.status === "completed";
+                    return (
+                      <li key={quest.slug} className="relative">
+                        <QuestSlip
+                          quest={quest}
+                          href={`/app/quests/${quest.slug}`}
+                          className={done ? "opacity-60" : undefined}
+                        />
+                        {done && (
+                          <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-accent-surface px-2 py-0.5 text-caption text-accent-ink">
+                            <IconCheck size={13} />
+                            Done
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+                {pickCount < MAX_DAILY_PICKS && (
+                  <div className="mt-2.5">
+                    <GentleLink variant="text" size="sm" href="/app/quests">
+                      {questPicks.browseMore} <IconArrowRight size={14} />
+                    </GentleLink>
+                  </div>
+                )}
+              </>
+            )}
+
+            {allDone && (
+              <motion.div
+                variants={celebrationScale}
+                initial="hidden"
+                animate="visible"
+              >
+                <PaperCard
+                  variant="paper"
+                  padding="lg"
+                  className="pixel-frame-gold text-center"
+                >
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gold-500/15">
+                    <PixelIcon name="star" size={5} animate />
+                  </div>
+                  <h2 className="font-display text-editorial text-graphite">
+                    {dayCompleteLines.title}
+                  </h2>
+                  <p className="mx-auto mt-2 max-w-sm text-small leading-relaxed text-charcoal">
+                    {dayCompleteLines.body}
+                  </p>
+                  <div className="mt-4 flex justify-center gap-3">
+                    <GentleLink variant="outline" size="sm" href="/app/bible">
+                      Read Scripture
+                    </GentleLink>
+                    <GentleLink variant="ghost" size="sm" href="/app/prayer/new">
+                      Write a prayer
+                    </GentleLink>
+                  </div>
+                </PaperCard>
+              </motion.div>
+            )}
+          </section>
 
           {/* Quick prayer */}
           <QuickRow
             href="/app/prayer/new"
             sprite="candle"
-            title="Take one quiet minute"
-            subtitle="Bring what you’re carrying to God."
+            title="One minute of prayer"
+            subtitle="Say what’s on your mind. It stays private."
           />
 
           {/* Growth preview */}
@@ -167,13 +237,13 @@ function HomeInner() {
             <PaperCard interactive padding="md" className="flex items-center gap-4">
               <GrowthTree state={tree} size={92} showGround={false} />
               <div className="min-w-0 flex-1">
-                <SectionLabel>Your pilgrimage</SectionLabel>
-                <p className="font-display text-[1.25rem] text-graphite">
+                <SectionLabel>Your growth</SectionLabel>
+                <p className="font-display text-subheading text-graphite">
                   {tree.stageLabel}
                 </p>
-                <p className="mt-0.5 text-[0.875rem] text-ash">
+                <p className="mt-0.5 text-caption text-ash">
                   {tree.totalActions === 0
-                    ? "Your tree is waiting for its first small step."
+                    ? "Complete one quest and your tree starts growing."
                     : `${tree.totalActions} meaningful ${
                         tree.totalActions === 1 ? "step" : "steps"
                       } so far.`}
@@ -199,7 +269,7 @@ function HomeInner() {
             subtitle={
               readingPosition
                 ? "Pick up where you left off."
-                : "Read a chapter in a calm, quiet reader."
+                : "Pick a book and start reading."
             }
           />
 
@@ -215,7 +285,7 @@ function HomeInner() {
                       className="flex items-center gap-3 py-2.5 first:pt-1 last:pb-1"
                     >
                       <span className="h-1.5 w-1.5 rounded-full bg-olive-300" />
-                      <span className="flex-1 text-[0.9375rem] text-charcoal">
+                      <span className="flex-1 text-small text-charcoal">
                         {e.title}
                       </span>
                     </li>
@@ -232,7 +302,7 @@ function HomeInner() {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mb-2 text-[0.75rem] uppercase tracking-[0.16em] text-olive-500">
+    <p className="mb-2 text-caption uppercase tracking-[0.16em] text-accent">
       {children}
     </p>
   );
@@ -256,8 +326,8 @@ function QuickRow({
           <PixelIcon name={sprite} size={5} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[1rem] text-graphite">{title}</p>
-          <p className="text-[0.8125rem] text-ash">{subtitle}</p>
+          <p className="text-body text-graphite">{title}</p>
+          <p className="text-caption text-ash">{subtitle}</p>
         </div>
         <IconChevronRight className="text-fog" />
       </PaperCard>

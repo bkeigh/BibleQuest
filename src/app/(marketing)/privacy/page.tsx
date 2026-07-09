@@ -47,7 +47,14 @@ export default function PrivacyPage() {
       <ProseHeading>Questions</ProseHeading>
       <Prose>
         This policy will grow more formal before public launch. If you have a
-        concern in the meantime, please reach out through the site.
+        concern in the meantime, email{" "}
+        <a
+          href="mailto:hello@biblequest.co"
+          className="text-accent underline underline-offset-4"
+        >
+          hello@biblequest.co
+        </a>
+        .
       </Prose>
     </MarketingPage>
   );

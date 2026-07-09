@@ -15,7 +15,7 @@ import { PRAYER_CATEGORIES, type PrayerCategory } from "@/lib/questos/types";
 import { hashString, toDateKey } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils/cn";
 
-const CATEGORY_LABEL: Record<PrayerCategory, string> = {
+export const CATEGORY_LABEL: Record<PrayerCategory, string> = {
   morning: "Morning",
   evening: "Evening",
   gratitude: "Gratitude",
@@ -60,10 +60,10 @@ function PrayerComposerInner() {
     if (!body.trim()) return;
     if (isEdit && existing) {
       updatePrayer(existing.id, { title: title.trim() || undefined, body: body.trim(), category });
-      toast("Changes held privately.");
+      toast("Changes saved.");
     } else {
       addPrayer({ title, body, category });
-      toast("Saved. This is held privately.");
+      toast("Saved. Only you can see this.", { variant: "success" });
     }
     router.replace("/app/prayer");
   }
@@ -82,7 +82,7 @@ function PrayerComposerInner() {
         </div>
         <PaperCard variant="quiet" padding="lg" className="mt-6 text-center">
           <p className="text-[0.9375rem] text-ash">This prayer is no longer here.</p>
-          <GentleLink variant="dark" size="md" href="/app/prayer" className="mt-4">
+          <GentleLink variant="primary" size="md" href="/app/prayer" className="mt-4">
             Back to prayer
           </GentleLink>
         </PaperCard>
@@ -101,7 +101,7 @@ function PrayerComposerInner() {
         </Link>
       </div>
 
-      <h1 className="mt-5 font-display text-[1.75rem] leading-tight text-graphite">
+      <h1 className="mt-5 font-display text-editorial leading-tight text-graphite">
         {isEdit ? "Editing a prayer" : "A prayer"}
       </h1>
       <p className="mt-1 text-[0.9375rem] text-ash">
@@ -109,13 +109,21 @@ function PrayerComposerInner() {
       </p>
 
       <PaperCard variant="paper" padding="md" className="mt-5">
+        <label htmlFor="prayer-title" className="sr-only">
+          Title (optional)
+        </label>
         <input
+          id="prayer-title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="A word for this prayer (optional)"
-          className="w-full border-b border-mist bg-transparent pb-2 text-[1.0625rem] text-graphite outline-none placeholder:text-fog focus:border-olive-300"
+          placeholder="Title (optional)"
+          className="w-full border-b border-mist bg-transparent pb-2 text-[1.0625rem] text-graphite outline-none placeholder:text-fog focus:border-accent"
         />
+        <label htmlFor="prayer-body" className="sr-only">
+          Your prayer
+        </label>
         <textarea
+          id="prayer-body"
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={7}
@@ -125,17 +133,25 @@ function PrayerComposerInner() {
         />
       </PaperCard>
 
-      <p className="mt-5 mb-2 text-[0.8125rem] text-ash">This prayer is about…</p>
-      <div className="flex flex-wrap gap-2">
+      <p id="prayer-category-label" className="mt-5 mb-2 text-[0.8125rem] text-ash">
+        This prayer is about…
+      </p>
+      <div
+        role="group"
+        aria-labelledby="prayer-category-label"
+        className="flex flex-wrap gap-2"
+      >
         {PRAYER_CATEGORIES.map((c) => (
           <button
             key={c}
+            type="button"
+            aria-pressed={category === c}
             onClick={() => setCategory(c)}
             className={cn(
               "rounded-full border px-3 py-1.5 text-[0.8125rem] transition-all duration-300",
               category === c
-                ? "border-olive-500 bg-olive-50 text-olive-700"
-                : "border-mist bg-paper text-ash hover:border-olive-300"
+                ? "border-accent bg-accent-surface text-accent"
+                : "border-mist bg-paper text-ash hover:border-accent/50"
             )}
           >
             {CATEGORY_LABEL[c]}
@@ -145,7 +161,7 @@ function PrayerComposerInner() {
 
       <div className="mt-7 flex items-center gap-3 pb-8">
         <GentleButton
-          variant="dark"
+          variant="primary"
           size="lg"
           className="flex-1"
           onClick={save}

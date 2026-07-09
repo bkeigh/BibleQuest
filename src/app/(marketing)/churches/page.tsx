@@ -16,13 +16,13 @@ export default function ChurchesPage() {
     <MarketingPage
       eyebrow="For churches & groups"
       title="Faith that continues through the week."
-      intro="Many communities want members to practice faith between Sundays — not just attend on them. BibleQuest is built to help, gently."
+      intro="Many communities want members to practice faith between Sundays — not just attend on them. BibleQuest is built for exactly that."
     >
       <Prose>
-        Today, BibleQuest is a personal daily companion: one verse, one prayer,
-        one reflection, and one small quest. It is not a replacement for church,
-        Bible study, pastoral care, or discipleship — it’s a quiet way to carry
-        faith into ordinary days.
+        Today, BibleQuest is a personal daily companion: a verse, a place to
+        pray, and small quests each person chooses for the day. It is not a
+        replacement for church, Bible study, pastoral care, or discipleship —
+        it’s a simple way to keep faith present on ordinary days.
       </Prose>
 
       <ProseHeading>What’s coming for communities</ProseHeading>
@@ -37,7 +37,14 @@ export default function ChurchesPage() {
       <Prose>
         If you lead a church, parish, ministry, or small group and care about
         discipleship, we’d love your honest feedback on what would actually be
-        useful for your community.
+        useful for your community. Write to us at{" "}
+        <a
+          href="mailto:hello@biblequest.co"
+          className="text-accent underline underline-offset-4"
+        >
+          hello@biblequest.co
+        </a>{" "}
+        — we read everything.
       </Prose>
       <div className="not-prose pt-2">
         <GentleLink variant="dark" href="/onboarding">

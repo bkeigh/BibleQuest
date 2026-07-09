@@ -11,6 +11,7 @@ import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { IconPlus } from "@/components/design-system/icons";
+import { expander } from "@/lib/motion";
 import { emptyStates } from "@/lib/questos/copy";
 import { formatShortDate } from "@/lib/utils/dates";
 import { questBySlug } from "@/data/seed/quests";
@@ -43,7 +44,7 @@ function ReflectionScreenInner() {
               {emptyStates.reflections}
             </p>
             <GentleLink
-              variant="dark"
+              variant="primary"
               href="/app/reflection/new"
               className="mt-5"
             >
@@ -71,7 +72,7 @@ function ReflectionCard({ reflection: r }: { reflection: Reflection }) {
   return (
     <PaperCard variant="paper" padding="md">
       {(quest || r.relatedVerseReference) && (
-        <p className="mb-1.5 text-[0.75rem] uppercase tracking-wide text-olive-500">
+        <p className="mb-1.5 text-[0.75rem] uppercase tracking-wide text-accent">
           {quest ? quest.title : `On ${r.relatedVerseReference}`}
         </p>
       )}
@@ -81,7 +82,7 @@ function ReflectionCard({ reflection: r }: { reflection: Reflection }) {
       <p className="mt-1.5 whitespace-pre-wrap text-[1rem] leading-relaxed text-charcoal">
         {r.body}
       </p>
-      <p className="mt-2.5 text-[0.75rem] text-fog">
+      <p className="mt-2.5 text-[0.75rem] text-ash">
         {formatShortDate(r.createdAt)}
         {r.mood ? ` · ${r.mood}` : ""}
       </p>
@@ -90,7 +91,7 @@ function ReflectionCard({ reflection: r }: { reflection: Reflection }) {
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
           <Link
             href={`/app/reflection/new?edit=${r.id}`}
-            className="text-[0.875rem] text-olive-700 transition-colors hover:text-olive-500"
+            className="text-[0.875rem] text-accent transition-colors hover:text-accent/80"
           >
             Edit
           </Link>
@@ -106,14 +107,15 @@ function ReflectionCard({ reflection: r }: { reflection: Reflection }) {
       <AnimatePresence>
         {confirmingDelete && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
+            variants={expander}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
             className="overflow-hidden"
           >
             <div className="mt-3 rounded-[var(--radius-button)] bg-linen px-3.5 py-3">
               <p className="text-[0.875rem] text-charcoal">
-                Let this reflection go? This can’t be undone.
+                Delete this reflection? It can’t be undone.
               </p>
               <div className="mt-2.5 flex gap-2">
                 <GentleButton
@@ -121,7 +123,7 @@ function ReflectionCard({ reflection: r }: { reflection: Reflection }) {
                   size="sm"
                   onClick={() => {
                     deleteReflection(r.id);
-                    toast("Released.");
+                    toast("Deleted.");
                   }}
                 >
                   Delete

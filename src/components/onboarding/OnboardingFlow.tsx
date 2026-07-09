@@ -1,27 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { useQuestOS } from "@/lib/questos/store";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { PixelMascot } from "@/components/design-system/PixelMascot";
+import type { PixelMascotName } from "@/components/design-system/PixelMascot";
 import { QuestSlip } from "@/components/quests/QuestSlip";
 import { VerseCard } from "@/components/bible/VerseCard";
 import { getDailyVerse } from "@/lib/questos/verse-engine";
-import { selectDailyQuest } from "@/lib/questos/quest-engine";
+import { selectSuggestedQuests } from "@/lib/questos/quest-engine";
 import { seedQuests } from "@/data/seed/quests";
 import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
 import { toDateKey } from "@/lib/utils/dates";
 import { track } from "@/lib/analytics/events";
+import { riseIn, stepTransition } from "@/lib/motion";
 import { DEFAULT_SETTINGS } from "@/lib/questos/types";
 import type {
   Calling,
   DailyRhythm,
   PrimaryGoal,
   QuestStyle,
+  QuestTemplate,
   Tradition,
 } from "@/lib/questos/types";
 
@@ -91,12 +94,18 @@ interface Draft {
 
 const TOTAL_STEPS = 7;
 
+/** The one heading rendered per step — focus lands here on step change. */
+const STEP_HEADING_ID = "onboarding-step-heading";
+
 function OnboardingInner() {
   const router = useRouter();
   const completeOnboarding = useQuestOS((s) => s.completeOnboarding);
+  const pickQuest = useQuestOS((s) => s.pickQuest);
   const alreadyDone = useQuestOS((s) => s.profile?.onboardingCompleted ?? false);
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<Draft>({ displayName: "" });
+  // Only move focus after the user navigates — never on first paint.
+  const hasNavigated = useRef(false);
 
   useEffect(() => {
     if (alreadyDone) router.replace("/app");
@@ -107,16 +116,22 @@ function OnboardingInner() {
   }, []);
 
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
-  const next = () => setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
-  const back = () => setStep((s) => Math.max(s - 1, 0));
+  const next = () => {
+    hasNavigated.current = true;
+    setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
+  };
+  const back = () => {
+    hasNavigated.current = true;
+    setStep((s) => Math.max(s - 1, 0));
+  };
 
-  const previewQuest = useMemo(
+  const suggestedQuest = useMemo<QuestTemplate | null>(
     () =>
-      selectDailyQuest({
+      selectSuggestedQuests({
         quests: seedQuests,
         dateKey: toDateKey(),
         profile: {
-          displayName: draft.displayName || "friend",
+          displayName: "friend",
           questStyle: draft.questStyle,
           onboardingCompleted: false,
           createdAt: new Date(0).toISOString(),
@@ -124,12 +139,17 @@ function OnboardingInner() {
         settings: DEFAULT_SETTINGS,
         season: getCurrentSeason().key,
         recentSlugs: [],
-      }),
-    [draft.questStyle, draft.displayName]
+        count: 1,
+      })[0] ?? null,
+    [draft.questStyle]
   );
   const previewVerse = useMemo(() => getDailyVerse(), []);
 
-  function finish() {
+  /**
+   * Complete onboarding. Optionally picks the suggested quest first (a
+   * failed pick never blocks entry) and can land somewhere other than Home.
+   */
+  function finish(opts?: { pickSlug?: string; destination?: string }) {
     const rhythm = draft.dailyRhythm ?? "flexible";
     completeOnboarding(
       {
@@ -142,137 +162,181 @@ function OnboardingInner() {
       },
       { notifications: { ...DEFAULT_SETTINGS.notifications, preferredTime: rhythm } }
     );
-    router.replace("/app");
+    if (opts?.pickSlug) {
+      // Returns false when the day is full or the slug is unknown — either
+      // way the user still lands in the app with a working day.
+      pickQuest(opts.pickSlug);
+    }
+    router.replace(opts?.destination ?? "/app");
   }
 
   return (
-    <div className="relative flex min-h-dvh flex-col bg-parchment px-5 pb-10 pt-safe">
-      {/* Progress — dots, no numbers, no pressure */}
-      <div className="mx-auto flex w-full max-w-md items-center justify-center gap-1.5 pt-8">
-        {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-          <span
-            key={i}
-            className={`h-1.5 rounded-full transition-all duration-500 ${
-              i === step
-                ? "w-6 bg-olive-500"
-                : i < step
-                  ? "w-1.5 bg-olive-300"
-                  : "w-1.5 bg-mist"
-            }`}
-          />
-        ))}
-      </div>
+    <MotionConfig reducedMotion="user">
+      <div className="relative flex min-h-dvh flex-col bg-parchment px-5 pb-10 pt-safe">
+        {/* Progress — dots, no numbers, no pressure */}
+        <div
+          role="progressbar"
+          aria-valuemin={1}
+          aria-valuemax={TOTAL_STEPS}
+          aria-valuenow={step + 1}
+          aria-valuetext={`Step ${step + 1} of ${TOTAL_STEPS}`}
+          className="mx-auto flex w-full max-w-md items-center justify-center gap-1.5 pt-8"
+        >
+          {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+            <span
+              key={i}
+              aria-hidden
+              className={`h-1.5 rounded-full transition-all duration-500 ${
+                i === step
+                  ? "w-6 bg-accent"
+                  : i < step
+                    ? "w-1.5 bg-accent/40"
+                    : "w-1.5 bg-mist"
+              }`}
+            />
+          ))}
+        </div>
 
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-8">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={step}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.35, ease: [0.25, 0.4, 0.25, 1] }}
-          >
-            {step === 0 && (
-              <StepWelcome
-                name={draft.displayName}
-                onName={(displayName) => set({ displayName })}
-                onNext={next}
-              />
-            )}
-            {step === 1 && (
-              <StepChoice
-                title="What brings you here?"
-                hint="This helps shape your first quests. There are no wrong answers."
-                choices={GOALS}
-                value={draft.primaryGoal}
-                onSelect={(primaryGoal) => {
-                  set({ primaryGoal });
-                  next();
-                }}
-              />
-            )}
-            {step === 2 && (
-              <StepChoice
-                title="Your tradition"
-                hint="Optional — it gently tunes the language. You’re welcome here either way."
-                choices={TRADITIONS}
-                value={draft.tradition}
-                onSelect={(tradition) => {
-                  set({ tradition });
-                  next();
-                }}
-              />
-            )}
-            {step === 3 && (
-              <StepChoice
-                title="When do you hope to slow down?"
-                hint="We’ll shape your gentle reminders around this. You can change it anytime."
-                choices={RHYTHMS}
-                value={draft.dailyRhythm}
-                onSelect={(dailyRhythm) => {
-                  set({ dailyRhythm });
-                  next();
-                }}
-              />
-            )}
-            {step === 4 && (
-              <StepChoice
-                title="What kind of quests fit you?"
-                hint="A starting point, not a box. Your quests will still surprise you."
-                choices={STYLES}
-                value={draft.questStyle}
-                onSelect={(questStyle) => {
-                  set({ questStyle });
-                  next();
-                }}
-              />
-            )}
-            {step === 5 && (
-              <StepChoice
-                title="What fills your days?"
-                hint="Optional. It helps quests meet you in real life."
-                choices={CALLINGS}
-                value={draft.calling}
-                onSelect={(calling) => {
-                  set({ calling });
-                  next();
-                }}
-              />
-            )}
-            {step === 6 && (
-              <StepFirstJourney
-                name={draft.displayName || "friend"}
-                verse={previewVerse}
-                quest={previewQuest}
-                onBegin={finish}
-              />
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+        <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-8">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={step}
+              variants={stepTransition}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              onAnimationComplete={(definition) => {
+                if (definition === "center" && hasNavigated.current) {
+                  document.getElementById(STEP_HEADING_ID)?.focus();
+                }
+              }}
+            >
+              {step === 0 && (
+                <StepWelcome
+                  name={draft.displayName}
+                  onName={(displayName) => set({ displayName })}
+                  onNext={next}
+                />
+              )}
+              {step === 1 && (
+                <StepChoice
+                  mascot="map"
+                  title="What brings you here?"
+                  hint="This shapes your first quests. Pick the closest fit."
+                  choices={GOALS}
+                  value={draft.primaryGoal}
+                  onSelect={(primaryGoal) => {
+                    set({ primaryGoal });
+                    next();
+                  }}
+                />
+              )}
+              {step === 2 && (
+                <StepChoice
+                  mascot="scroll"
+                  title="Your tradition"
+                  hint="Optional — it tunes the language. You’re welcome here either way."
+                  choices={TRADITIONS}
+                  value={draft.tradition}
+                  onSelect={(tradition) => {
+                    set({ tradition });
+                    next();
+                  }}
+                />
+              )}
+              {step === 3 && (
+                <StepChoice
+                  mascot="lantern"
+                  title="When’s a good time for your daily quest?"
+                  hint="We’ll time reminders around it. You can change this anytime."
+                  choices={RHYTHMS}
+                  value={draft.dailyRhythm}
+                  onSelect={(dailyRhythm) => {
+                    set({ dailyRhythm });
+                    next();
+                  }}
+                />
+              )}
+              {step === 4 && (
+                <StepChoice
+                  mascot="campfire"
+                  title="What kind of quests fit you?"
+                  hint="A starting point, not a box. Your quests will still surprise you."
+                  choices={STYLES}
+                  value={draft.questStyle}
+                  onSelect={(questStyle) => {
+                    set({ questStyle });
+                    next();
+                  }}
+                />
+              )}
+              {step === 5 && (
+                <StepChoice
+                  mascot="dove"
+                  title="What’s your day-to-day?"
+                  hint="Optional. It helps quests fit your real life."
+                  choices={CALLINGS}
+                  value={draft.calling}
+                  onSelect={(calling) => {
+                    set({ calling });
+                    next();
+                  }}
+                />
+              )}
+              {step === 6 && (
+                <StepFirstQuest
+                  name={draft.displayName.trim() || "friend"}
+                  verse={previewVerse}
+                  quest={suggestedQuest}
+                  onStart={() =>
+                    finish(
+                      suggestedQuest ? { pickSlug: suggestedQuest.slug } : undefined
+                    )
+                  }
+                  onBrowse={() => finish({ destination: "/app/quests" })}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
 
-      {/* Footer nav */}
-      <div className="mx-auto flex w-full max-w-md items-center justify-between">
-        {step > 0 ? (
-          <button
-            onClick={back}
-            className="text-[0.9375rem] text-ash transition-colors hover:text-charcoal"
-          >
-            Back
-          </button>
-        ) : (
-          <span />
-        )}
-        {step > 0 && step < 6 && (
-          <button
-            onClick={next}
-            className="text-[0.9375rem] text-ash transition-colors hover:text-charcoal"
-          >
-            Skip
-          </button>
-        )}
+        {/* Footer nav */}
+        <div className="mx-auto flex w-full max-w-md items-center justify-between">
+          {step > 0 ? (
+            <button
+              onClick={back}
+              className="text-small text-ash transition-colors hover:text-charcoal"
+            >
+              Back
+            </button>
+          ) : (
+            <span />
+          )}
+          {step > 0 && step < 6 && (
+            <button
+              onClick={next}
+              className="text-small text-ash transition-colors hover:text-charcoal"
+            >
+              Skip
+            </button>
+          )}
+        </div>
       </div>
-    </div>
+    </MotionConfig>
+  );
+}
+
+/** One centered mascot per step, always above the heading. */
+function StepMascot({ name, size = 9 }: { name: PixelMascotName; size?: number }) {
+  return (
+    <motion.div
+      variants={riseIn}
+      initial="hidden"
+      animate="visible"
+      className="mb-6"
+    >
+      <PixelMascot name={name} size={size} />
+    </motion.div>
   );
 }
 
@@ -287,21 +351,20 @@ function StepWelcome({
 }) {
   return (
     <div className="text-center">
-      <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-gold-50 ring-1 ring-gold-100">
-        <PixelIcon name="candle" size={7} animate />
-      </div>
-      <h1 className="font-display text-[2rem] leading-tight text-graphite">
+      <StepMascot name="lamb" size={10} />
+      <h1
+        id={STEP_HEADING_ID}
+        tabIndex={-1}
+        className="font-display text-editorial text-graphite outline-none"
+      >
         Welcome to BibleQuest
       </h1>
       <p className="mx-auto mt-3 max-w-xs text-[1.0625rem] leading-relaxed text-charcoal">
         One verse, one prayer, one quest, one step at a time.
       </p>
       <div className="mt-8 text-left">
-        <label
-          htmlFor="name"
-          className="mb-1.5 block text-[0.875rem] text-ash"
-        >
-          What may we call you?
+        <label htmlFor="name" className="mb-1.5 block text-caption text-ash">
+          What should we call you?
         </label>
         <input
           id="name"
@@ -310,11 +373,14 @@ function StepWelcome({
           onKeyDown={(e) => e.key === "Enter" && onNext()}
           placeholder="Your first name"
           autoComplete="given-name"
-          className="w-full rounded-[var(--radius-button)] border border-mist bg-paper px-4 py-3 text-[1rem] text-graphite outline-none transition-colors focus:border-olive-300"
+          className="w-full rounded-[var(--radius-button)] border border-mist bg-paper px-4 py-3 text-body text-graphite outline-none transition-colors focus:border-accent/50"
         />
+        <p className="mt-1.5 text-caption text-ash">
+          Optional — skip it if you like.
+        </p>
       </div>
       <GentleButton
-        variant="dark"
+        variant="primary"
         size="lg"
         fullWidth
         className="mt-6"
@@ -327,12 +393,14 @@ function StepWelcome({
 }
 
 function StepChoice<T extends string>({
+  mascot,
   title,
   hint,
   choices,
   value,
   onSelect,
 }: {
+  mascot: PixelMascotName;
   title: string;
   hint: string;
   choices: Choice<T>[];
@@ -341,19 +409,29 @@ function StepChoice<T extends string>({
 }) {
   return (
     <div>
-      <h2 className="font-display text-[1.625rem] leading-tight text-graphite">
-        {title}
-      </h2>
-      <p className="mt-2 text-[0.9375rem] leading-relaxed text-ash">{hint}</p>
+      <div className="text-center">
+        <StepMascot name={mascot} />
+        <h2
+          id={STEP_HEADING_ID}
+          tabIndex={-1}
+          className="font-display text-editorial text-graphite outline-none"
+        >
+          {title}
+        </h2>
+        <p className="mx-auto mt-2 max-w-sm text-small leading-relaxed text-ash">
+          {hint}
+        </p>
+      </div>
       <div className="mt-6 flex flex-col gap-2.5">
         {choices.map((c) => (
           <button
             key={c.value}
             onClick={() => onSelect(c.value)}
-            className={`rounded-[var(--radius-button)] border px-4 py-3.5 text-left text-[1rem] transition-all duration-300 ${
+            aria-pressed={value === c.value}
+            className={`rounded-[var(--radius-button)] border px-4 py-3.5 text-left text-body transition-all duration-300 ${
               value === c.value
-                ? "border-olive-500 bg-olive-50 text-olive-700"
-                : "border-mist bg-paper text-charcoal hover:border-olive-300 hover:bg-linen"
+                ? "border-accent bg-accent-surface text-accent-ink"
+                : "border-mist bg-paper text-charcoal hover:border-accent/40 hover:bg-linen"
             }`}
           >
             {c.label}
@@ -364,45 +442,64 @@ function StepChoice<T extends string>({
   );
 }
 
-function StepFirstJourney({
+function StepFirstQuest({
   name,
   verse,
   quest,
-  onBegin,
+  onStart,
+  onBrowse,
 }: {
   name: string;
   verse: ReturnType<typeof getDailyVerse>;
-  quest: ReturnType<typeof selectDailyQuest>;
-  onBegin: () => void;
+  quest: QuestTemplate | null;
+  onStart: () => void;
+  onBrowse: () => void;
 }) {
   return (
     <div>
       <div className="text-center">
-        <h2 className="font-display text-[1.75rem] leading-tight text-graphite">
-          Your first journey, {name}
+        <StepMascot name="sprout" />
+        <h2
+          id={STEP_HEADING_ID}
+          tabIndex={-1}
+          className="font-display text-editorial text-graphite outline-none"
+        >
+          You’re set, {name}.
         </h2>
-        <p className="mt-2 text-[0.9375rem] text-ash">
-          Here is today. Begin whenever you’re ready.
+        <p className="mt-2 text-small text-ash">
+          Here’s today’s verse{quest ? " and a suggested first quest" : ""}.
         </p>
       </div>
       <div className="mt-6 space-y-4">
         <VerseCard verse={verse} />
-        {quest && <QuestSlip quest={quest} />}
+        {quest && (
+          <div>
+            <p className="mb-2 text-caption uppercase tracking-[0.14em] text-accent">
+              Suggested first quest
+            </p>
+            <QuestSlip quest={quest} />
+          </div>
+        )}
         <PaperCard variant="quiet" padding="md">
-          <p className="text-[0.9375rem] italic text-charcoal">
+          <p className="text-small italic text-charcoal">
             “{quest?.prayerPrompt ?? "Lord, meet me in this quiet moment."}”
           </p>
         </PaperCard>
       </div>
       <GentleButton
-        variant="dark"
+        variant="primary"
         size="lg"
         fullWidth
         className="mt-6"
-        onClick={onBegin}
+        onClick={onStart}
       >
-        Begin today’s journey
+        {quest ? "Start with this quest" : "Open BibleQuest"}
       </GentleButton>
+      <div className="mt-3 text-center">
+        <GentleButton variant="text" size="sm" onClick={onBrowse}>
+          Or browse all quests
+        </GentleButton>
+      </div>
     </div>
   );
 }
@@ -412,7 +509,7 @@ export function OnboardingFlow() {
     <ClientOnly
       fallback={
         <div className="flex min-h-dvh items-center justify-center bg-parchment">
-          <PixelIcon name="candle" size={8} animate />
+          <PixelMascot name="lantern" size={7} />
         </div>
       }
     >

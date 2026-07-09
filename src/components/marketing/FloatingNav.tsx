@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { GentleLink } from "@/components/design-system/GentleButton";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { IconClose } from "@/components/design-system/icons";
 import { cn } from "@/lib/utils/cn";
 
@@ -26,6 +26,15 @@ export function FloatingNav() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-safe">
       <nav
@@ -36,8 +45,15 @@ export function FloatingNav() {
             : "border-transparent bg-transparent"
         )}
       >
-        <Link href="/" className="flex items-center gap-2">
-          <PixelIcon name="candle" size={4} animate />
+        <Link href="/" className="flex items-center gap-2.5">
+          <Image
+            src="/brand/bq-logo.svg"
+            alt=""
+            width={22}
+            height={28}
+            priority
+            className="h-[26px] w-auto"
+          />
           <span className="font-display text-[1.125rem] text-graphite">
             BibleQuest
           </span>
@@ -48,7 +64,7 @@ export function FloatingNav() {
             <Link
               key={l.href}
               href={l.href}
-              className="text-[0.875rem] text-charcoal transition-colors hover:text-olive-700"
+              className="text-[0.875rem] text-charcoal transition-colors hover:text-accent"
             >
               {l.label}
             </Link>
@@ -56,15 +72,18 @@ export function FloatingNav() {
         </div>
 
         <div className="hidden md:block">
-          <GentleLink variant="dark" size="sm" href="/onboarding">
+          <GentleLink variant="primary" size="sm" href="/onboarding">
             Get BibleQuest
           </GentleLink>
         </div>
 
         <button
-          className="md:hidden"
+          type="button"
+          className="-my-2 -mr-2 flex h-11 w-11 items-center justify-center rounded-full md:hidden"
           onClick={() => setOpen((o) => !o)}
-          aria-label="Menu"
+          aria-expanded={open}
+          aria-controls="marketing-mobile-menu"
+          aria-label={open ? "Close menu" : "Open menu"}
         >
           {open ? (
             <IconClose />
@@ -79,7 +98,10 @@ export function FloatingNav() {
 
       {/* Mobile sheet */}
       {open && (
-        <div className="pointer-events-auto fixed inset-x-4 top-20 rounded-[var(--radius-card-lg)] border border-mist bg-paper p-4 paper-shadow-lg md:hidden">
+        <div
+          id="marketing-mobile-menu"
+          className="pointer-events-auto fixed inset-x-4 top-20 rounded-[var(--radius-card-lg)] border border-mist bg-paper p-4 paper-shadow-lg md:hidden"
+        >
           <div className="flex flex-col gap-1">
             {LINKS.map((l) => (
               <Link
@@ -92,7 +114,7 @@ export function FloatingNav() {
               </Link>
             ))}
             <GentleLink
-              variant="dark"
+              variant="primary"
               size="md"
               href="/onboarding"
               fullWidth

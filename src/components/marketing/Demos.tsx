@@ -1,11 +1,19 @@
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PixelIcon, CATEGORY_SPRITE } from "@/components/design-system/PixelIcon";
 import { IconClock, IconBookmark, IconLeaf } from "@/components/design-system/icons";
-import { formatDuration } from "@/components/quests/QuestSlip";
 import type { QuestTemplate, DailyVerse } from "@/lib/questos/types";
 import { cleanVerseText } from "@/lib/utils/scripture";
 
 /** Presentational (non-interactive) versions of the app cards for marketing. */
+
+/** Local copy of the app's duration formatter — keeps marketing decoupled from app components. */
+function formatDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  if (minutes === 60) return "1 hour";
+  if (minutes === 240) return "Half day";
+  if (minutes === 480) return "Full day";
+  return `${Math.round(minutes / 60)} hours`;
+}
 
 export function VerseDemo({ verse }: { verse: DailyVerse }) {
   return (
@@ -13,7 +21,7 @@ export function VerseDemo({ verse }: { verse: DailyVerse }) {
       <div className="pointer-events-none absolute -right-3 -top-2 opacity-30">
         <IconLeaf className="text-olive-300" size={64} />
       </div>
-      <p className="text-[0.75rem] uppercase tracking-[0.18em] text-olive-500">
+      <p className="text-[0.75rem] uppercase tracking-[0.18em] text-accent">
         Today’s Verse
       </p>
       <blockquote className="verse-text verse-text-lead mt-3">
@@ -41,7 +49,7 @@ export function QuestDemo({ quest }: { quest: QuestTemplate }) {
             <IconClock size={13} />
             {formatDuration(quest.durationMinutes)}
             <span className="text-mist">·</span>
-            <span className="uppercase tracking-wide text-olive-500">
+            <span className="font-pixel text-[0.875rem] uppercase tracking-wide text-accent">
               {quest.category}
             </span>
           </div>
@@ -67,13 +75,13 @@ export function PrayerDemo() {
         <PixelIcon name="candle" size={5} />
         <div>
           <h3 className="font-display text-[1.125rem] text-graphite">
-            For my mother’s healing
+            Before tomorrow’s conversation
           </h3>
           <p className="mt-1 text-[1rem] leading-relaxed text-charcoal">
-            Lord, be near her today. Steady my worry, and let her feel that she
-            is held.
+            Lord, give me the right words tomorrow — and the patience to
+            listen first.
           </p>
-          <p className="mt-2 text-[0.75rem] text-fog">Private · held for you</p>
+          <p className="mt-2 text-[0.75rem] text-ash">Private to you</p>
         </div>
       </div>
     </PaperCard>

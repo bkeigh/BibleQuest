@@ -13,6 +13,7 @@ import { useQuestOS } from "@/lib/questos/store";
 import { seedMilestones } from "@/data/seed/milestones";
 import { PixelIcon, type PixelSpriteName } from "@/components/design-system/PixelIcon";
 import { GentleButton } from "@/components/design-system/GentleButton";
+import { celebrationScale, pixelSparkle } from "@/lib/motion";
 import type { MilestoneSeed } from "@/lib/questos/types";
 
 const byKey = new Map(seedMilestones.map((m) => [m.key, m]));
@@ -112,24 +113,33 @@ function MilestoneDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descId}
-        initial={{ opacity: 0, y: 14, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
+        variants={celebrationScale}
+        initial="hidden"
+        animate="visible"
         exit={{ opacity: 0, y: 8 }}
-        transition={{ duration: 0.5, ease: [0.25, 0.4, 0.25, 1] }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-[var(--radius-card-lg)] border border-mist bg-paper p-8 text-center paper-shadow-lg"
+        className="pixel-frame-gold w-full max-w-sm bg-paper p-8 text-center paper-shadow-lg"
       >
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gold-50 ring-1 ring-gold-100">
+        <motion.div
+          variants={pixelSparkle}
+          initial="hidden"
+          animate="visible"
+          className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gold-500/15 ring-1 ring-gold-500/30"
+        >
           <PixelIcon
             name={(milestone.iconKey as PixelSpriteName) ?? "star"}
             size={7}
             animate
           />
-        </div>
-        <p className="text-[0.75rem] uppercase tracking-[0.18em] text-gold-700">
-          A marker on your journey
+        </motion.div>
+        <p className="flex items-center justify-center gap-2 font-pixel text-[0.875rem] uppercase tracking-[0.12em] text-gilt">
+          <PixelIcon name="star" size={2} /> Milestone reached
+          <PixelIcon name="star" size={2} />
         </p>
-        <h2 id={titleId} className="mt-2 font-display text-[1.5rem] text-graphite">
+        <h2
+          id={titleId}
+          className="mt-2 font-pixel text-[1.5rem] leading-tight text-graphite"
+        >
           {milestone.title}
         </h2>
         <p id={descId} className="mt-2 text-[0.9375rem] leading-relaxed text-charcoal">

@@ -15,7 +15,7 @@ export function MarketingPage({
   return (
     <article className="mx-auto w-full max-w-2xl px-5 pb-24 pt-32 sm:px-8">
       <Eyebrow>{eyebrow}</Eyebrow>
-      <h1 className="font-display text-[2.25rem] leading-[1.1] text-graphite sm:text-[2.75rem]">
+      <h1 className="font-display text-heading text-graphite sm:text-heading-lg">
         {title}
       </h1>
       {intro && (

@@ -33,7 +33,7 @@ export function VerseCard({ verse }: { verse: DailyVerse }) {
       <div className="pointer-events-none absolute -right-3 -top-2 opacity-30">
         <IconLeaf className="text-olive-300" size={64} />
       </div>
-      <p className="text-[0.75rem] uppercase tracking-[0.18em] text-olive-500">
+      <p className="text-[0.75rem] uppercase tracking-[0.18em] text-accent">
         Today’s Verse
       </p>
       <blockquote className="verse-text verse-text-lead mt-3">
@@ -58,7 +58,7 @@ export function VerseCard({ verse }: { verse: DailyVerse }) {
           }}
         >
           {saved ? (
-            <IconBookmarkFilled size={17} className="text-olive-500" />
+            <IconBookmarkFilled size={17} className="text-accent" />
           ) : (
             <IconBookmark size={17} />
           )}

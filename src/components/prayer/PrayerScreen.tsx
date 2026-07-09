@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useQuestOS } from "@/lib/questos/store";
@@ -10,28 +10,70 @@ import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { PixelMascot } from "@/components/design-system/PixelMascot";
+import { Disclosure } from "@/components/design-system/Disclosure";
+import { CATEGORY_LABEL } from "@/components/prayer/PrayerComposer";
 import { IconPlus } from "@/components/design-system/icons";
+import { expander } from "@/lib/motion";
 import { emptyStates } from "@/lib/questos/copy";
 import { formatShortDate } from "@/lib/utils/dates";
-import type { Prayer, PrayerStatus } from "@/lib/questos/types";
+import type { Prayer, PrayerCategory, PrayerStatus } from "@/lib/questos/types";
 import { cn } from "@/lib/utils/cn";
 
 type Tab = "active" | "answered" | "archived";
 const TABS: Tab[] = ["active", "answered", "archived"];
+const TAB_LABEL: Record<Tab, string> = {
+  active: "Active",
+  answered: "Answered",
+  archived: "Archived",
+};
 
 function PrayerScreenInner() {
   const prayers = useQuestOS((s) => s.prayers);
   const [tab, setTab] = useState<Tab>("active");
+  const [category, setCategory] = useState<PrayerCategory | null>(null);
+  const tabRefs = useRef<Map<Tab, HTMLButtonElement>>(new Map());
 
-  const visible = prayers
-    .filter((p) => p.status === tab)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const inTab = useMemo(
+    () =>
+      prayers
+        .filter((p) => p.status === tab)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    [prayers, tab]
+  );
+
+  // Topics present in the current tab — the filter only appears when it
+  // would actually narrow something.
+  const categories = useMemo(() => {
+    const set = new Set<PrayerCategory>();
+    for (const p of inTab) set.add(p.category);
+    return [...set];
+  }, [inTab]);
+
+  // Only apply (and advertise) the topic filter when it exists in this tab.
+  const activeCategory =
+    category && categories.includes(category) ? category : null;
+  const visible = activeCategory
+    ? inTab.filter((p) => p.category === activeCategory)
+    : inTab;
+
+  function onTabKeyDown(e: React.KeyboardEvent) {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const i = TABS.indexOf(tab);
+    const next =
+      e.key === "ArrowRight"
+        ? TABS[(i + 1) % TABS.length]
+        : TABS[(i + TABS.length - 1) % TABS.length];
+    setTab(next);
+    tabRefs.current.get(next)?.focus();
+  }
 
   return (
     <>
       <PageHeader
         title="Prayer"
-        subtitle="A quiet place to bring what you’re carrying."
+        subtitle="What you’re praying for, in one place."
         action={
           <GentleLink variant="outline" size="sm" href="/app/prayer/new">
             <IconPlus size={16} /> New
@@ -39,46 +81,112 @@ function PrayerScreenInner() {
         }
       />
       <PageContainer>
-        <div className="mb-4 flex gap-1 rounded-full border border-mist bg-linen p-1">
+        <div
+          role="tablist"
+          aria-label="Prayer status"
+          onKeyDown={onTabKeyDown}
+          className="mb-4 flex gap-1 rounded-full border border-mist bg-linen p-1"
+        >
           {TABS.map((t) => (
             <button
               key={t}
+              role="tab"
+              id={`prayer-tab-${t}`}
+              aria-selected={tab === t}
+              aria-controls="prayer-tabpanel"
+              tabIndex={tab === t ? 0 : -1}
+              ref={(el) => {
+                if (el) tabRefs.current.set(t, el);
+              }}
               onClick={() => setTab(t)}
               className={cn(
-                "flex-1 rounded-full py-2 text-[0.875rem] capitalize transition-all duration-300",
+                "flex-1 rounded-full py-2 text-[0.875rem] transition-all duration-300",
                 tab === t
                   ? "bg-paper text-graphite paper-shadow"
                   : "text-ash hover:text-charcoal"
               )}
             >
-              {t}
+              {TAB_LABEL[t]}
             </button>
           ))}
         </div>
 
-        {visible.length === 0 ? (
-          <EmptyPrayer tab={tab} />
-        ) : (
-          <div className="space-y-3 pb-6">
-            {visible.map((p) => (
-              <PrayerCard key={p.id} prayer={p} />
-            ))}
-          </div>
+        {categories.length > 1 && (
+          <Disclosure
+            label={
+              <span className="text-[0.875rem] font-normal text-ash">
+                Filter by topic
+              </span>
+            }
+            summary={
+              activeCategory ? (
+                <span className="rounded-full bg-accent-surface px-2 py-0.5 text-[0.8125rem] font-medium text-accent">
+                  {CATEGORY_LABEL[activeCategory]}
+                </span>
+              ) : undefined
+            }
+            className="mb-3"
+          >
+            <div className="flex flex-wrap gap-2">
+              {categories.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  aria-pressed={category === c}
+                  onClick={() => setCategory(category === c ? null : c)}
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-[0.8125rem] transition-all duration-300",
+                    category === c
+                      ? "border-accent bg-accent-surface text-accent"
+                      : "border-mist bg-paper text-ash hover:border-accent/50"
+                  )}
+                >
+                  {CATEGORY_LABEL[c]}
+                </button>
+              ))}
+            </div>
+          </Disclosure>
         )}
+
+        <div
+          role="tabpanel"
+          id="prayer-tabpanel"
+          aria-labelledby={`prayer-tab-${tab}`}
+        >
+          {visible.length === 0 ? (
+            <EmptyPrayer tab={tab} filtered={inTab.length > 0} />
+          ) : (
+            <div className="space-y-3 pb-6">
+              {visible.map((p) => (
+                <PrayerCard key={p.id} prayer={p} />
+              ))}
+            </div>
+          )}
+        </div>
       </PageContainer>
     </>
   );
 }
 
-function EmptyPrayer({ tab }: { tab: Tab }) {
+function EmptyPrayer({ tab, filtered }: { tab: Tab; filtered: boolean }) {
+  // Prayers exist in this tab, but the topic filter excluded them all.
+  if (filtered) {
+    return (
+      <PaperCard variant="quiet" padding="lg" className="text-center">
+        <p className="text-[0.9375rem] text-ash">
+          Nothing under that topic here. Clear the filter to see everything.
+        </p>
+      </PaperCard>
+    );
+  }
   if (tab === "answered") {
     return (
       <PaperCard variant="quiet" padding="lg" className="text-center">
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gold-50">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gold-500/15">
           <PixelIcon name="flower" size={5} />
         </div>
         <p className="text-[0.9375rem] text-ash">
-          Answered prayers will gather here, like pressed flowers.
+          Answered prayers will collect here.
         </p>
       </PaperCard>
     );
@@ -90,20 +198,18 @@ function EmptyPrayer({ tab }: { tab: Tab }) {
           <PixelIcon name="leaf" size={5} />
         </div>
         <p className="text-[0.9375rem] text-ash">
-          Prayers you set aside rest here. You can bring any of them back.
+          Archived prayers stay here. Bring one back anytime.
         </p>
       </PaperCard>
     );
   }
   return (
     <PaperCard variant="atmospheric" padding="lg" className="text-center">
-      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-gold-50 ring-1 ring-gold-100">
-        <PixelIcon name="candle" size={6} animate />
-      </div>
+      <PixelMascot name="dove" size={8} className="mb-4" />
       <p className="mx-auto max-w-xs text-[1rem] leading-relaxed text-charcoal">
         {emptyStates.prayer}
       </p>
-      <GentleLink variant="dark" size="md" href="/app/prayer/new" className="mt-5">
+      <GentleLink variant="primary" size="md" href="/app/prayer/new" className="mt-5">
         Write your first prayer
       </GentleLink>
     </PaperCard>
@@ -119,11 +225,11 @@ const STATUS_ICON: Record<PrayerStatus, "candle" | "flower" | "leaf"> = {
 /** A quiet text button for the inline card actions. */
 function CardAction({
   onClick,
-  tone = "olive",
+  tone = "accent",
   children,
 }: {
   onClick: () => void;
-  tone?: "olive" | "ash" | "rose";
+  tone?: "accent" | "ash" | "rose";
   children: React.ReactNode;
 }) {
   return (
@@ -131,7 +237,7 @@ function CardAction({
       onClick={onClick}
       className={cn(
         "text-[0.875rem] transition-colors",
-        tone === "olive" && "text-olive-700 hover:text-olive-500",
+        tone === "accent" && "text-accent hover:text-accent/80",
         tone === "ash" && "text-ash hover:text-charcoal",
         tone === "rose" && "text-ash hover:text-rose-700"
       )}
@@ -150,6 +256,7 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
   const [answering, setAnswering] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [note, setNote] = useState("");
+  const noteId = `prayer-note-${prayer.id}`;
 
   // The expanders are mutually exclusive; hide the action row while either is open.
   const showActions = !answering && !confirmingDelete;
@@ -170,8 +277,8 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
             {prayer.body}
           </p>
           {prayer.status === "answered" && prayer.answerReflection && (
-            <div className="mt-3 rounded-[var(--radius-button)] bg-gold-50 px-3.5 py-2.5">
-              <p className="text-[0.75rem] uppercase tracking-wide text-gold-700">
+            <div className="mt-3 rounded-[var(--radius-button)] bg-gold-500/12 px-3.5 py-2.5">
+              <p className="text-[0.75rem] uppercase tracking-wide text-gilt">
                 How it was answered
               </p>
               <p className="mt-1 text-[0.9375rem] text-charcoal">
@@ -179,10 +286,12 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
               </p>
             </div>
           )}
-          <p className="mt-2 text-[0.75rem] text-fog">
+          <p className="mt-2 text-[0.75rem] text-ash">
             {prayer.status === "answered" && prayer.answeredAt
               ? `Answered ${formatShortDate(prayer.answeredAt)}`
               : formatShortDate(prayer.createdAt)}
+            {" · "}
+            {CATEGORY_LABEL[prayer.category]}
           </p>
 
           {showActions && (
@@ -195,7 +304,7 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
               {prayer.status !== "archived" && (
                 <Link
                   href={`/app/prayer/new?edit=${prayer.id}`}
-                  className="text-[0.875rem] text-olive-700 transition-colors hover:text-olive-500"
+                  className="text-[0.875rem] text-accent transition-colors hover:text-accent/80"
                 >
                   Edit
                 </Link>
@@ -204,7 +313,7 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
                 <CardAction
                   onClick={() => {
                     unarchivePrayer(prayer.id);
-                    toast("Welcomed back.");
+                    toast("Restored.");
                   }}
                 >
                   Bring back
@@ -214,7 +323,12 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
                   tone="ash"
                   onClick={() => {
                     archivePrayer(prayer.id);
-                    toast("Archived, gently.");
+                    toast("Archived.", {
+                      action: {
+                        label: "Undo",
+                        onClick: () => unarchivePrayer(prayer.id),
+                      },
+                    });
                   }}
                 >
                   Archive
@@ -229,21 +343,26 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
           <AnimatePresence>
             {answering && (
               <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
+                variants={expander}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
                 className="overflow-hidden"
               >
                 <div className="mt-3">
-                  <p className="mb-2 text-[0.875rem] text-charcoal">
+                  <label
+                    htmlFor={noteId}
+                    className="mb-2 block text-[0.875rem] text-charcoal"
+                  >
                     How would you like to remember this? (optional)
-                  </p>
+                  </label>
                   <textarea
+                    id={noteId}
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     rows={3}
                     placeholder="What happened…"
-                    className="w-full resize-none rounded-[var(--radius-button)] border border-mist bg-linen px-3 py-2.5 text-[0.9375rem] outline-none focus:border-olive-300"
+                    className="w-full resize-none rounded-[var(--radius-button)] border border-mist bg-linen px-3 py-2.5 text-[0.9375rem] outline-none focus:border-accent"
                   />
                   <div className="mt-2.5 flex gap-2">
                     <GentleButton
@@ -251,7 +370,7 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
                       size="sm"
                       onClick={() => {
                         markAnswered(prayer.id, note);
-                        toast("Held with gratitude.");
+                        toast("Marked answered.", { variant: "celebrate" });
                         setAnswering(false);
                       }}
                     >
@@ -273,14 +392,15 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
           <AnimatePresence>
             {confirmingDelete && (
               <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
+                variants={expander}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
                 className="overflow-hidden"
               >
                 <div className="mt-3 rounded-[var(--radius-button)] bg-linen px-3.5 py-3">
                   <p className="text-[0.875rem] text-charcoal">
-                    Let this prayer go? This can’t be undone.
+                    Delete this prayer? It can’t be undone.
                   </p>
                   <div className="mt-2.5 flex gap-2">
                     <GentleButton
@@ -288,7 +408,7 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
                       size="sm"
                       onClick={() => {
                         deletePrayer(prayer.id);
-                        toast("Released.");
+                        toast("Deleted.");
                       }}
                     >
                       Delete

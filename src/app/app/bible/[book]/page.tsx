@@ -47,7 +47,7 @@ export default async function BookPage({
           <Link
             key={c}
             href={`/app/bible/${meta.slug}/${c}`}
-            className="flex aspect-square items-center justify-center rounded-[10px] border border-mist bg-paper text-[1rem] text-charcoal transition-all duration-300 hover:border-olive-300 hover:bg-olive-50 hover:text-olive-700"
+            className="flex aspect-square items-center justify-center rounded-[10px] border border-mist bg-paper text-[1rem] text-charcoal transition-all duration-300 hover:border-accent/40 hover:bg-accent-surface hover:text-accent"
           >
             {c}
           </Link>

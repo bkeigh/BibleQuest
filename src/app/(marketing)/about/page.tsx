@@ -18,15 +18,13 @@ export default function AboutPage() {
       intro="BibleQuest exists because spiritual growth is often treated like a content problem, when for many people it is really a direction problem."
     >
       <Prose>
-        Most people don’t lack access to Scripture. They lack rhythm. They lack a
-        clear next step — a gentle daily invitation that helps them move from
-        belief into lived action.
+        Most people don’t lack access to Scripture. They lack rhythm. They lack
+        a clear next step — one they can actually take today.
       </Prose>
       <Prose>
-        So BibleQuest is built around a simple idea: open a beautifully crafted
-        invitation, spend a few meaningful minutes with God, and then close the
-        app and live differently. Read Scripture, pray honestly, reflect deeply,
-        and act with kindness.
+        So BibleQuest is built around a simple idea: open the app, spend a few
+        honest minutes with God, then close it and live differently. Read
+        Scripture, pray plainly, reflect, and act with kindness.
       </Prose>
 
       <ProseHeading>What we measure</ProseHeading>
@@ -45,7 +43,7 @@ export default function AboutPage() {
         reflection are treated as sacred and private.
       </Prose>
 
-      <ProseHeading>How we hold Scripture and AI</ProseHeading>
+      <ProseHeading>On Scripture and AI</ProseHeading>
       <Prose>
         BibleQuest is a Christian product that aims to be humble and broadly
         welcoming — Catholic, Orthodox, Protestant, non-denominational, or simply
