@@ -1,10 +1,10 @@
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PixelIcon, CATEGORY_SPRITE } from "@/components/design-system/PixelIcon";
-import { IconClock, IconBookmark, IconLeaf } from "@/components/design-system/icons";
-import type { QuestTemplate, DailyVerse } from "@/lib/questos/types";
-import { cleanVerseText } from "@/lib/utils/scripture";
+import { IconClock } from "@/components/design-system/icons";
+import type { QuestTemplate } from "@/lib/questos/types";
 
-/** Presentational (non-interactive) versions of the app cards for marketing. */
+/** Presentational (non-interactive) versions of the app cards for marketing.
+ * The verse demo lives in ./VerseDemo.tsx — it's interactive (shuffle). */
 
 /** Local copy of the app's duration formatter — keeps marketing decoupled from app components. */
 function formatDuration(minutes: number): string {
@@ -13,28 +13,6 @@ function formatDuration(minutes: number): string {
   if (minutes === 240) return "Half day";
   if (minutes === 480) return "Full day";
   return `${Math.round(minutes / 60)} hours`;
-}
-
-export function VerseDemo({ verse }: { verse: DailyVerse }) {
-  return (
-    <PaperCard variant="atmospheric" padding="lg" className="relative overflow-hidden">
-      <div className="pointer-events-none absolute -right-3 -top-2 opacity-30">
-        <IconLeaf className="text-olive-300" size={64} />
-      </div>
-      <p className="text-[0.75rem] uppercase tracking-[0.18em] text-accent">
-        Today’s Verse
-      </p>
-      <blockquote className="verse-text verse-text-lead mt-3">
-        “{cleanVerseText(verse.text)}”
-      </blockquote>
-      <cite className="mt-4 block text-[0.9375rem] not-italic text-ash">
-        — {verse.reference}
-      </cite>
-      <div className="mt-5 flex items-center gap-2 text-[0.875rem] text-ash">
-        <IconBookmark size={17} /> Save
-      </div>
-    </PaperCard>
-  );
 }
 
 export function QuestDemo({ quest }: { quest: QuestTemplate }) {

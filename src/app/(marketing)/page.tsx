@@ -7,7 +7,8 @@ import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosu
 import { IconArrowRight } from "@/components/design-system/icons";
 import { SeasonalAtmosphere } from "@/components/design-system/SeasonalAtmosphere";
 import { Reveal } from "@/components/marketing/Reveal";
-import { VerseDemo, QuestDemo, PrayerDemo } from "@/components/marketing/Demos";
+import { QuestDemo, PrayerDemo } from "@/components/marketing/Demos";
+import { VerseDemo } from "@/components/marketing/VerseDemo";
 import { GrowthTree } from "@/components/journey/GrowthTree";
 import { calculateTreeState } from "@/lib/questos/growth-engine";
 import { getDailyVerse } from "@/lib/questos/verse-engine";
