@@ -39,7 +39,7 @@ export function VerseDemo({ verse: initial }: { verse: DailyVerse }) {
         <IconLeaf className="text-olive-300" size={64} />
       </div>
       <div className="flex items-center justify-between gap-3">
-        <h2 className="font-pixel text-[1.25rem] leading-tight uppercase tracking-[0.05em] text-accent">
+        <h2 className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
           {shuffled ? "From the Word" : "Today’s Verse"}
         </h2>
         <GentleButton

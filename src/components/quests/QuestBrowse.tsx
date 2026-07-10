@@ -39,7 +39,7 @@ const ENERGY_LEVELS: { value: EnergyLevel; label: string }[] = [
 
 function ShelfTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="font-pixel text-[1.25rem] leading-tight uppercase tracking-[0.05em] text-accent">
+    <h2 className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
       {children}
     </h2>
   );

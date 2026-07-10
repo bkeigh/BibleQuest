@@ -38,7 +38,7 @@ export function StreakCard({
           <PixelIcon name={candleStage(days)} size={4} animate={lit} />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="font-pixel text-[1.25rem] leading-tight uppercase tracking-[0.05em] text-accent">
+          <h2 className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
             {t.streak.title}
           </h2>
           {days > 0 && (

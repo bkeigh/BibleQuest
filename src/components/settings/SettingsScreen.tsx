@@ -108,7 +108,7 @@ function Toggle({
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="mb-2 mt-7 px-1 font-pixel text-[1.125rem] leading-tight uppercase tracking-[0.05em] text-accent">
+    <h2 className="mb-2 mt-7 px-1 font-pixel text-[1.375rem] leading-tight uppercase tracking-[0.05em] text-accent">
       {children}
     </h2>
   );

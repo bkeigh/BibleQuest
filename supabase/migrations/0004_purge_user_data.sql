@@ -42,4 +42,5 @@ end;
 $$;
 
 revoke execute on function public.purge_user_data() from public;
+revoke execute on function public.purge_user_data() from anon;
 grant execute on function public.purge_user_data() to authenticated;

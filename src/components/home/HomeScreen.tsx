@@ -140,7 +140,7 @@ function HomeInner() {
 
       <PageContainer className="relative pt-safe">
         {/* Greeting — my space: your face (or initial) beside your name */}
-        <header className="flex items-start justify-between gap-4 pt-10 pb-6">
+        <header className="flex items-start justify-between gap-4 pt-8 pb-5">
           <div className="flex min-w-0 items-start gap-3.5">
             <Link
               href="/app/settings"
@@ -174,7 +174,7 @@ function HomeInner() {
           </Link>
         </header>
 
-        <div className="space-y-5 pb-4 sm:space-y-6">
+        <div className="space-y-4 pb-4">
           {/* Today's light — the candle */}
           <StreakCard streak={streak} dayKey={dayKey} />
 
@@ -216,7 +216,7 @@ function HomeInner() {
           <section aria-label={t.home.todaysQuests}>
             {/* The loudest title on the page — the day's work anchors it. */}
             <div className="mb-2.5 flex items-baseline justify-between gap-3">
-              <h2 className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
+              <h2 className="font-pixel text-[1.75rem] leading-tight uppercase tracking-[0.05em] text-accent">
                 {t.home.todaysQuests}
               </h2>
               {pickCount > 0 && !allDone && (
@@ -407,7 +407,7 @@ function SectionLabel({
 }) {
   if (pixel) {
     return (
-      <h2 className="mb-2.5 font-pixel text-[1.25rem] leading-tight uppercase tracking-[0.05em] text-accent">
+      <h2 className="mb-2.5 font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
         {children}
       </h2>
     );

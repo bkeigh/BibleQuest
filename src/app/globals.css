@@ -202,10 +202,15 @@ html.theme-dark ::selection {
   color: var(--color-moon-paper);
 }
 
-/* ---- Larger, more comfortable reading ---- */
-html.text-large body {
-  font-size: 1.0625rem;
+/* ---- Larger, more comfortable reading ----
+   Scaling the ROOT font-size lifts every rem-based size in the app
+   (Tailwind's scale, the type tokens, and inline text-[…rem] utilities
+   alike) — a genuinely noticeable step up for hard-of-reading users,
+   not just a nudge to body copy. Spacing/touch targets scale with it. */
+html.text-large {
+  font-size: 115%;
 }
+/* Scripture gets a little extra on top — it's the primary reading surface. */
 html.text-large .verse-text {
   font-size: 1.1875rem;
   line-height: 1.85;

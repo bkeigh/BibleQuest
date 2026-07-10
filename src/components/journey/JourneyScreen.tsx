@@ -173,7 +173,7 @@ function JourneyScreenInner() {
         {/* Milestones */}
         {(earned.length > 0 || nextMilestones.length > 0) && (
           <section className="mt-6">
-            <h2 className="mb-2.5 font-pixel text-[1.25rem] leading-tight uppercase tracking-[0.05em] text-accent">
+            <h2 className="mb-2.5 font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
               Milestones
             </h2>
             <div className="flex flex-wrap gap-2.5">
@@ -205,7 +205,7 @@ function JourneyScreenInner() {
 
         {/* Timeline */}
         <section className="mt-7">
-          <h2 className="mb-3 font-pixel text-[1.25rem] leading-tight uppercase tracking-[0.05em] text-accent">
+          <h2 className="mb-3 font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
             The road so far
           </h2>
           {timeline.length === 0 ? (
