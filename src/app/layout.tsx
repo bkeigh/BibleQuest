@@ -33,7 +33,7 @@ export const metadata: Metadata = {
     template: "%s — BibleQuest",
   },
   description:
-    "One verse, one prayer, one quest a day. BibleQuest is a calm way to actually live your faith. Not a streak. A pilgrimage.",
+    "Faith, one small step at a time. One verse, one prayer, and a small step you can live out today.",
   applicationName: "BibleQuest",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "BibleQuest — Scripture, prayer, and real-life quests",
     description:
-      "One verse, one prayer, one quest a day. A calm way to actually live your faith. Not a streak. A pilgrimage.",
+      "Faith, one small step at a time. One verse, one prayer, and a small step you can live out today.",
     url: "/",
     siteName: "BibleQuest",
     type: "website",
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "BibleQuest — Scripture, prayer, and real-life quests",
     description:
-      "One verse, one prayer, one quest a day. A calm way to actually live your faith.",
+      "Faith, one small step at a time. One verse, one prayer, and a small step you can live out today.",
     images: ["/og.png"],
   },
   icons: {

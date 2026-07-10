@@ -30,7 +30,7 @@ const FAQ = [
   },
   {
     q: "Is this a streak app?",
-    a: "No. There are no streaks and nothing to protect. Miss a day, a week, a season — you pick up right where you left off. Nothing resets, nothing is lost.",
+    a: "There's a candle that stays lit as you show up each day — but it never guilts you. Miss a day, a week, a season, and nothing is lost: your tree, prayers, and journey stay exactly as you left them. One small step relights the candle.",
   },
   {
     q: "Is this replacing church?",
@@ -71,18 +71,17 @@ export default function LandingPage() {
         <div className="relative mx-auto flex min-h-[88vh] max-w-3xl flex-col items-center justify-center px-5 pb-20 pt-32 text-center sm:px-8">
           <Reveal>
             <span className="inline-flex items-center gap-2 rounded-full border border-mist bg-paper/70 px-3.5 py-1.5 text-[0.8125rem] text-accent backdrop-blur">
-              <PixelIcon name="candle" size={3} animate /> Not a streak. A pilgrimage.
+              <PixelIcon name="candle" size={3} animate /> Your candle is waiting.
             </span>
           </Reveal>
           <Reveal delay={0.08}>
             <h1 className="mt-6 font-display text-heading text-graphite sm:text-display">
-              Closer to God, without the overwhelm.
+              Faith, one small step at a time.
             </h1>
           </Reveal>
           <Reveal delay={0.16}>
             <p className="mx-auto mt-5 max-w-xl text-[1.125rem] leading-relaxed text-charcoal">
-              One verse each morning, a private place to pray, and up to three
-              small quests you choose. Read it, pray it, live it.
+              One verse, one prayer, and a small step you can live out today.
             </p>
           </Reveal>
           <Reveal delay={0.24}>

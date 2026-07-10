@@ -3,7 +3,7 @@
  * BibleQuest voice stays warm, direct, and shame-free.
  *
  * Register: plain and confident, never hushed-precious. Say the thing.
- * Target lines: "Not a streak. A pilgrimage." / "go live it" /
+ * Target lines: "Your candle is waiting." / "go live it" /
  * "How are you, honestly?" No "gently", no "carried", no guilt.
  * See docs/BIBLEQUEST_CODEX.md Vol III §17, Vol VIII, docs/CONTENT_GUIDE.md.
  */

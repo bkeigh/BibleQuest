@@ -7,7 +7,7 @@ import {
 export const metadata = {
   title: "About",
   description:
-    "BibleQuest helps Christians grow closer to God through Scripture, prayer, reflection, and small daily acts of faith — without shame, streaks, or noise.",
+    "BibleQuest helps Christians grow closer to God through Scripture, prayer, reflection, and small daily acts of faith — without shame, pressure, or noise.",
 };
 
 export default function AboutPage() {
@@ -29,10 +29,11 @@ export default function AboutPage() {
 
       <ProseHeading>What we measure</ProseHeading>
       <Prose>
-        Not screen time. Not streak length. The thing worth measuring is whether
-        someone prayed when they otherwise wouldn’t have, forgave when they’d have
-        held resentment, or served someone when they’d have looked away. The best
-        version of BibleQuest helps you leave the app and live your faith.
+        Not screen time. Not how long your candle has burned. The thing worth
+        measuring is whether someone prayed when they otherwise wouldn’t have,
+        forgave when they’d have held resentment, or served someone when they’d
+        have looked away. The best version of BibleQuest helps you leave the app
+        and live your faith.
       </Prose>
 
       <ProseHeading>What we won’t do</ProseHeading>
