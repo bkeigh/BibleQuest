@@ -26,6 +26,7 @@ import { useQuestOS } from "@/lib/questos/store";
 import type { QuestOSSnapshot, SyncTombstones } from "@/lib/questos/types";
 import { useSyncStatus } from "./status";
 import { localDataBelongsToOtherUser, setLastSyncedUserId } from "./last-user";
+import { track } from "@/lib/analytics/events";
 import {
   assignmentToRow,
   bookmarkToRow,
@@ -34,6 +35,7 @@ import {
   growthEventToRow,
   journeyEventToRow,
   milestoneToRow,
+  myQuestToRow,
   prayerToRow,
   profileToRow,
   readingPositionToRow,
@@ -47,6 +49,7 @@ import {
   rowToGrowthEvent,
   rowToJourneyEvent,
   rowToMilestone,
+  rowToMyQuest,
   rowToPrayer,
   rowToProfile,
   rowToReadingPosition,
@@ -57,6 +60,7 @@ type SyncedField =
   | "profile"
   | "settings"
   | "assignments"
+  | "myQuests"
   | "completions"
   | "prayers"
   | "reflections"
@@ -71,6 +75,7 @@ const SYNCED_FIELDS: SyncedField[] = [
   "profile",
   "settings",
   "assignments",
+  "myQuests",
   "completions",
   "prayers",
   "reflections",
@@ -135,14 +140,23 @@ export async function startSync(userId: string) {
   currentUserId = userId;
   const token = ++runToken;
   const isCurrent = () => runToken === token && currentUserId === userId;
+  // Remember whether we're inside a failure streak BEFORE flipping to
+  // "syncing", so retries don't re-count sync_failed every 30s.
+  const wasError = useSyncStatus.getState().state === "error";
   setStatus("syncing");
 
   try {
     await initialSync(createClient(), userId, isCurrent);
     if (!isCurrent()) return; // stopped/restarted mid-sync
     setStatus("idle", true);
+    track("sync_completed", { status: "initial" });
   } catch {
     if (!isCurrent()) return;
+    // One event per failure streak, not one per 30s retry — a long
+    // offline stretch shouldn't flood the queue with identical failures.
+    if (!wasError) {
+      track("sync_failed", { status: "initial" });
+    }
     setStatus("error");
     // NEVER fall through to write-through pushes before a successful pull —
     // a blind push would upsert this device's (possibly default/stale) data
@@ -181,7 +195,8 @@ export async function startSync(userId: string) {
     pending.purgeAccount === userId ||
     pending.prayers.length ||
     pending.reflections.length ||
-    pending.bookmarks.length
+    pending.bookmarks.length ||
+    pending.myQuests.length
   ) {
     schedulePush();
   }
@@ -208,6 +223,7 @@ async function runPush() {
     return;
   }
   pushing = true;
+  const wasError = useSyncStatus.getState().state === "error";
   setStatus("syncing");
   try {
     const supabase = createClient();
@@ -228,6 +244,7 @@ async function runPush() {
       cleared.prayers.length ||
       cleared.reflections.length ||
       cleared.bookmarks.length ||
+      cleared.myQuests.length ||
       cleared.purgeAccount
     ) {
       useQuestOS.getState().clearSyncTombstones(cleared);
@@ -242,6 +259,10 @@ async function runPush() {
     // Push failed (offline, etc.) — mark everything dirty again and retry.
     for (const f of SYNCED_FIELDS) dirty.add(f);
     if (currentUserId === userId) {
+      // One event per failure streak (retries repeat every 30s).
+      if (!wasError) {
+        track("sync_failed", { status: "push" });
+      }
       setStatus("error");
       scheduleRetry();
     }
@@ -302,6 +323,7 @@ function snapshotFromStore(): QuestOSSnapshot {
     profile: s.profile,
     settings: s.settings,
     assignments: s.assignments,
+    myQuests: s.myQuests,
     completions: s.completions,
     prayers: s.prayers,
     reflections: s.reflections,
@@ -317,6 +339,9 @@ function snapshotFromStore(): QuestOSSnapshot {
     // importData resets any omitted field to its default, which would
     // extinguish the candle on every signed-in launch.
     streak: s.streak,
+    // Same deal: device-local nudge bookkeeping must survive merge-apply
+    // or every signed-in launch would forget past dismissals.
+    accountNudge: s.accountNudge,
   };
 }
 
@@ -338,6 +363,7 @@ async function pullAll(
     settingsRes,
     notifRes,
     dailyRes,
+    myQuestsRes,
     completionsRes,
     prayersRes,
     reflectionsRes,
@@ -352,6 +378,7 @@ async function pullAll(
     from("user_settings").maybeSingle(),
     from("notification_preferences").maybeSingle(),
     from("user_daily_quests"),
+    from("user_quests"),
     from("quest_completions"),
     from("prayers"),
     from("reflections"),
@@ -364,9 +391,9 @@ async function pullAll(
   ]);
 
   const all = [
-    profileRes, settingsRes, notifRes, dailyRes, completionsRes, prayersRes,
-    reflectionsRes, bookmarksRes, readingRes, chaptersRes, journeyRes,
-    growthRes, milestonesRes,
+    profileRes, settingsRes, notifRes, dailyRes, myQuestsRes, completionsRes,
+    prayersRes, reflectionsRes, bookmarksRes, readingRes, chaptersRes,
+    journeyRes, growthRes, milestonesRes,
   ];
   for (const res of all) {
     if (res.error) throw res.error;
@@ -378,6 +405,12 @@ async function pullAll(
     (assignments[a.dateKey] ??= []).push(a);
   }
 
+  const myQuests: NonNullable<QuestOSSnapshot["myQuests"]> = {};
+  for (const row of myQuestsRes.data ?? []) {
+    const q = rowToMyQuest(row);
+    myQuests[q.questSlug] = q;
+  }
+
   return {
     profile: profileRes.data ? rowToProfile(profileRes.data) : null,
     settings:
@@ -385,6 +418,7 @@ async function pullAll(
         ? rowsToSettings(settingsRes.data ?? null, notifRes.data ?? null)
         : undefined,
     assignments,
+    myQuests,
     completions: (completionsRes.data ?? []).map(rowToCompletion),
     prayers: (prayersRes.data ?? []).map(rowToPrayer),
     reflections: (reflectionsRes.data ?? []).map(rowToReflection),
@@ -400,6 +434,13 @@ async function pullAll(
 }
 
 function filterByTombstones(remote: RemoteData, t: SyncTombstones): RemoteData {
+  const myQuests = remote.myQuests
+    ? Object.fromEntries(
+        Object.entries(remote.myQuests).filter(
+          ([slug]) => !t.myQuests.includes(slug)
+        )
+      )
+    : remote.myQuests;
   return {
     ...remote,
     prayers: remote.prayers?.filter((p) => !t.prayers.includes(p.id)),
@@ -415,6 +456,7 @@ function filterByTombstones(remote: RemoteData, t: SyncTombstones): RemoteData {
             d.verse === b.verse
         )
     ),
+    myQuests,
   };
 }
 
@@ -457,7 +499,7 @@ export function mergeSnapshots(
     : local.profile ?? remote.profile ?? null;
   // boldText is a device-local accessibility preference (no remote column;
   // like OS-level bold text it shouldn't follow the account across devices).
-  const settings =
+  const baseSettings =
     adoptRemote && remote.settings
       ? {
           ...remote.settings,
@@ -467,6 +509,15 @@ export function mergeSnapshots(
           },
         }
       : local.settings;
+  // Privacy-first exception to local-wins: an analytics opt-out on EITHER
+  // side survives the merge. Without this, launching a signed-in device
+  // that never saw the opt-out would push consent straight back on.
+  const settings = {
+    ...baseSettings,
+    analyticsConsent:
+      local.settings.analyticsConsent &&
+      (remote.settings?.analyticsConsent ?? true),
+  };
 
   // Assignments: per-day pick lists, unioned by questSlug so one device's
   // sync can never destroy another device's picks. Completed always wins
@@ -491,6 +542,36 @@ export function mergeSnapshots(
       );
     }
     assignments[day] = [...bySlug.values()];
+  }
+
+  // Shelf quests: union by slug. On conflict the side touched most
+  // recently wins the row (status, steps, timestamps travel together so a
+  // walk never mixes two devices' step lists) — but the lifetime completion
+  // count and latest completion date are folded in from both sides, so a
+  // completion on one device is never erased by activity on another.
+  const localQuests = local.myQuests ?? {};
+  const myQuests: NonNullable<QuestOSSnapshot["myQuests"]> = {
+    ...(remote.myQuests ?? {}),
+  };
+  for (const [slug, l] of Object.entries(localQuests)) {
+    const r = myQuests[slug];
+    if (!r) {
+      myQuests[slug] = l;
+      continue;
+    }
+    const winner = l.lastActivityAt >= r.lastActivityAt ? l : r;
+    const loser = winner === l ? r : l;
+    myQuests[slug] = {
+      ...winner,
+      timesCompleted: Math.max(l.timesCompleted, r.timesCompleted),
+      completedAt:
+        winner.completedAt && loser.completedAt
+          ? winner.completedAt >= loser.completedAt
+            ? winner.completedAt
+            : loser.completedAt
+          : winner.completedAt ?? loser.completedAt,
+      addedAt: l.addedAt <= r.addedAt ? l.addedAt : r.addedAt,
+    };
   }
 
   // Bookmarks: union by natural key, local wins duplicates.
@@ -541,6 +622,7 @@ export function mergeSnapshots(
     profile,
     settings,
     assignments,
+    myQuests,
     completions: unionById(local.completions, remote.completions),
     prayers: unionById(local.prayers, remote.prayers, newerByUpdatedAt),
     reflections: unionById(local.reflections, remote.reflections, newerByUpdatedAt),
@@ -554,6 +636,7 @@ export function mergeSnapshots(
     pendingMilestones: local.pendingMilestones,
     lastVisitDateKey: local.lastVisitDateKey,
     streak: local.streak,
+    accountNudge: local.accountNudge,
   };
 }
 
@@ -642,6 +725,14 @@ async function propagateTombstones(
       .match({ book_slug: b.bookSlug, chapter: b.chapter, verse: b.verse });
     if (error) throw error;
   }
+  if (t.myQuests.length) {
+    const { error } = await supabase
+      .from("user_quests")
+      .delete()
+      .eq("user_id", userId)
+      .in("quest_slug", t.myQuests);
+    if (error) throw error;
+  }
   return { ...t, purgeAccount: null };
 }
 
@@ -692,6 +783,20 @@ async function pushFields(
             if (ins.error) throw ins.error;
           }
         })()
+      );
+    }
+  }
+  if (fields.has("myQuests")) {
+    const rows = Object.values(snap.myQuests ?? {}).map((q) =>
+      myQuestToRow(uid, q)
+    );
+    if (rows.length) {
+      jobs.push(
+        run(
+          supabase
+            .from("user_quests")
+            .upsert(rows, { onConflict: "user_id,quest_slug" })
+        )
       );
     }
   }

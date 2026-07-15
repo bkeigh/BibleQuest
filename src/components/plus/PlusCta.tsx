@@ -36,8 +36,9 @@ export function PlusCta() {
   if (!configured) {
     return (
       <p className="mt-5 text-[0.8125rem] text-ash">
-        Plus isn’t out yet. We’re planning around $5 a month — no pressure, no
-        countdown timers — and the free app stays complete either way.
+        Plus isn’t out yet. We’re planning $8.99 a month — about 29¢ a day — no
+        pressure, no countdown timers, and the free app stays complete either
+        way.
       </p>
     );
   }

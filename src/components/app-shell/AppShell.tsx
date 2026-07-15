@@ -6,6 +6,7 @@ import { InstallPrompt } from "./InstallPrompt";
 import { LanguageApplier } from "./LanguageApplier";
 import { ToastProvider } from "@/components/design-system/Toast";
 import { useQuestOS } from "@/lib/questos/store";
+import { flushAnalyticsQueue } from "@/lib/analytics/events";
 
 /**
  * AppShell — container for the installed/private app experience.
@@ -26,6 +27,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const t = setTimeout(() => recordVisit(), 400);
     return () => clearTimeout(t);
   }, [recordVisit]);
+
+  useEffect(() => {
+    // Analytics events queued while offline flush when the shell mounts
+    // and whenever the connection returns. Both are no-ops when analytics
+    // is unconfigured or the user has opted out.
+    flushAnalyticsQueue();
+    window.addEventListener("online", flushAnalyticsQueue);
+    return () => window.removeEventListener("online", flushAnalyticsQueue);
+  }, []);
 
   return (
     <ToastProvider>

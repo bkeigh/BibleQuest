@@ -30,7 +30,7 @@ to the member state with a "Manage your membership" link.
 | Offering | `default` (`ofrngb301a56083`), current |
 | Packages | `$rc_monthly`, `$rc_annual`, `$rc_lifetime` (each → its product) |
 | Paywall | `pw6ce54d5f990a44a5` — AI-designed draft, **not yet attached/published** |
-| Test Store | `app56b1627be8` — Monthly $9.99 / Yearly $79.99 / Lifetime $99.99 |
+| Test Store | `app56b1627be8` — Monthly $8.99 / Yearly $74.99 / Lifetime $199.99 (intended prices; set in the dashboard — the MCP API is create-only and can't edit existing Test Store prices) |
 
 ## To activate the designed paywall (dashboard — I can't via API)
 
@@ -59,10 +59,16 @@ Until then the app uses the **fallback**: direct package purchase buttons
 4. Grab the Web Billing **public** key (`rcb_…`) and set
    `NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY=rcb_…` in **Vercel** (swap the `test_` key).
 
-> **Price decision:** Test Store shows **Monthly $9.99**, but the app copy says
-> "**around $5/mo**" (`src/components/plus/PlusContent.tsx`). Reconcile the copy
-> and the real Web Billing price. The UI always shows RevenueCat's formatted
-> price, so nothing is hardcoded.
+> **Price decision (resolved):** Plus is priced **Monthly $8.99 (~29¢/day) /
+> Yearly $74.99 (~30% off) / Lifetime $199.99**. The pre-launch coming-soon copy
+> in `src/components/plus/PlusCta.tsx` now reads "$8.99 a month." The UI always
+> shows RevenueCat's formatted price, so nothing else is hardcoded — set these
+> prices on the Test Store (dashboard) and on the real Web Billing products.
+>
+> **Giving pledge:** the Plus card (`src/components/plus/PlusContent.tsx`) states
+> a pledge that **5% of proceeds goes to churches and nonprofits**. This is a
+> forward-looking commitment — wire up the actual disbursement (an automated
+> giving service) before/when revenue starts, so the claim stays true.
 
 ## Patron tier (later)
 

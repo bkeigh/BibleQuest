@@ -4,11 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { useQuestOS } from "@/lib/questos/store";
+import { useSession } from "@/lib/supabase/useSession";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PixelMascot } from "@/components/design-system/PixelMascot";
 import type { PixelMascotName } from "@/components/design-system/PixelMascot";
+import { SignInMethods } from "@/components/account/SignInMethods";
 import { QuestSlip } from "@/components/quests/QuestSlip";
 import { VerseCard } from "@/components/bible/VerseCard";
 import { getDailyVerse } from "@/lib/questos/verse-engine";
@@ -92,28 +94,44 @@ interface Draft {
   calling?: Calling;
 }
 
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 8;
+/** The final step: the account invitation, reached only after the journey is
+ *  already committed to the device (see commit()). */
+const ACCOUNT_STEP = 7;
 
 /** The one heading rendered per step — focus lands here on step change. */
 const STEP_HEADING_ID = "onboarding-step-heading";
 
 function OnboardingInner() {
   const router = useRouter();
+  const { user, configured } = useSession();
   const completeOnboarding = useQuestOS((s) => s.completeOnboarding);
   const pickQuest = useQuestOS((s) => s.pickQuest);
+  const markAccountNudgeShown = useQuestOS((s) => s.markAccountNudgeShown);
   const alreadyDone = useQuestOS((s) => s.profile?.onboardingCompleted ?? false);
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<Draft>({ displayName: "" });
+  // Where the user lands once they leave onboarding — captured at commit()
+  // (Home vs. the quest browser) so the account step and post-sign-in both
+  // route to the right place.
+  const [pendingDest, setPendingDest] = useState("/app");
   // Only move focus after the user navigates — never on first paint.
   const hasNavigated = useRef(false);
-  // Set inside finish(): completing onboarding flips `alreadyDone`, and
-  // without this guard the redirect effect below would race finish()'s own
-  // router.replace and send "Or browse all quests" users to /app instead.
+  // Set inside commit(): completing onboarding flips `alreadyDone`, and without
+  // this guard the redirect effect below would race commit() and skip the
+  // account step, sending the user straight to the app.
   const finishing = useRef(false);
 
   useEffect(() => {
     if (alreadyDone && !finishing.current) router.replace("/app");
   }, [alreadyDone, router]);
+
+  // Phone OTP verifies in-page (no redirect), so when a sign-in completes while
+  // we're on the account step, move the user into the app ourselves. Magic-link
+  // and Google instead leave the page and return via /auth/callback → /app.
+  useEffect(() => {
+    if (step === ACCOUNT_STEP && user) router.replace(pendingDest);
+  }, [step, user, pendingDest, router]);
 
   useEffect(() => {
     track("onboarding_started");
@@ -150,10 +168,16 @@ function OnboardingInner() {
   const previewVerse = useMemo(() => getDailyVerse(), []);
 
   /**
-   * Complete onboarding. Optionally picks the suggested quest first (a
-   * failed pick never blocks entry) and can land somewhere other than Home.
+   * Commit the journey to this device, then invite an account (the final step).
+   *
+   * "Commit before invite" is load-bearing: the profile and picked quest are
+   * persisted BEFORE any auth round-trip can leave the page, so returning from
+   * Google / a magic link passes the OnboardingGate cleanly and the guest
+   * journey is already on disk, ready for the first sync to push up. Optionally
+   * picks the suggested quest first (a failed pick never blocks entry) and
+   * remembers where to land afterwards.
    */
-  function finish(opts?: { pickSlug?: string; destination?: string }) {
+  function commit(opts?: { pickSlug?: string; destination?: string }) {
     finishing.current = true;
     const rhythm = draft.dailyRhythm ?? "flexible";
     completeOnboarding(
@@ -172,7 +196,29 @@ function OnboardingInner() {
       // way the user still lands in the app with a working day.
       pickQuest(opts.pickSlug);
     }
-    router.replace(opts?.destination ?? "/app");
+    const dest = opts?.destination ?? "/app";
+    setPendingDest(dest);
+    // No account layer on this deployment, or already signed in → skip the
+    // invitation and go straight in.
+    if (!configured || user) {
+      router.replace(dest);
+      return;
+    }
+    hasNavigated.current = true;
+    setStep(ACCOUNT_STEP);
+  }
+
+  /**
+   * Leave onboarding for the app, recording that the account invitation was
+   * already shown so Home's AccountPrompt doesn't immediately repeat it. Used
+   * by "Continue as guest" and by the "Open BibleQuest" exit after a magic
+   * link is sent. Deliberately does NOT call dismissAccountNudge() — that would
+   * open a 14-day quiet period and burn a lifetime dismissal, suppressing the
+   * higher-intent first-quest prompt later.
+   */
+  function proceed() {
+    markAccountNudgeShown("onboarding");
+    router.replace(pendingDest);
   }
 
   return (
@@ -294,20 +340,27 @@ function OnboardingInner() {
                   verse={previewVerse}
                   quest={suggestedQuest}
                   onStart={() =>
-                    finish(
+                    commit(
                       suggestedQuest ? { pickSlug: suggestedQuest.slug } : undefined
                     )
                   }
-                  onBrowse={() => finish({ destination: "/app/quests" })}
+                  onBrowse={() => commit({ destination: "/app/quests" })}
+                />
+              )}
+              {step === ACCOUNT_STEP && (
+                <StepAccount
+                  name={draft.displayName.trim() || "friend"}
+                  onProceed={proceed}
                 />
               )}
             </motion.div>
           </AnimatePresence>
         </div>
 
-        {/* Footer nav */}
+        {/* Footer nav — hidden on the account step: the journey is already
+            committed there, so there's nothing to go back to. */}
         <div className="mx-auto flex w-full max-w-md items-center justify-between">
-          {step > 0 ? (
+          {step > 0 && step < ACCOUNT_STEP ? (
             <button
               onClick={back}
               className="text-small text-ash transition-colors hover:text-charcoal"
@@ -505,6 +558,55 @@ function StepFirstQuest({
           Or browse all quests
         </GentleButton>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The final step: a gentle, skippable invitation to save the journey to an
+ * account. Reached only after commit() has already persisted everything, so
+ * "Continue as guest" and any sign-in both leave with the journey intact. Never
+ * a wall — the full-width escape is always present and equal in weight.
+ */
+function StepAccount({
+  name,
+  onProceed,
+}: {
+  name: string;
+  onProceed: () => void;
+}) {
+  const [emailSent, setEmailSent] = useState(false);
+  return (
+    <div>
+      <div className="text-center">
+        <StepMascot name="key" />
+        <h2
+          id={STEP_HEADING_ID}
+          tabIndex={-1}
+          className="font-display text-editorial text-graphite outline-none"
+        >
+          One last thing, {name}
+        </h2>
+        <p className="mx-auto mt-2 max-w-sm text-small leading-relaxed text-ash">
+          Your journey is saved on this device. A free account keeps it safe
+          across devices — your prayers and reflections stay private, always.
+          Optional, and you can always do it later.
+        </p>
+      </div>
+
+      <PaperCard variant="paper" padding="md" className="mt-6">
+        <SignInMethods source="onboarding" onEmailSent={() => setEmailSent(true)} />
+      </PaperCard>
+
+      <GentleButton
+        variant={emailSent ? "primary" : "outline"}
+        size="lg"
+        fullWidth
+        className="mt-4"
+        onClick={onProceed}
+      >
+        {emailSent ? "Open BibleQuest" : "Continue as guest"}
+      </GentleButton>
     </div>
   );
 }

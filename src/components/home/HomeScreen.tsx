@@ -25,6 +25,8 @@ import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleLink } from "@/components/design-system/GentleButton";
 import { VerseCard } from "@/components/bible/VerseCard";
 import { QuestSlip } from "@/components/quests/QuestSlip";
+import { QuestFeed } from "@/components/quests/QuestFeed";
+import { AccountPrompt } from "@/components/account/AccountPrompt";
 import { GrowthTree } from "@/components/journey/GrowthTree";
 import { SeasonalAtmosphere } from "@/components/design-system/SeasonalAtmosphere";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
@@ -334,6 +336,15 @@ function HomeInner() {
               </motion.div>
             )}
           </section>
+
+          {/* Your quests — the shelf: active walks beyond today, saved for
+              later, and the completed record. Renders nothing when the
+              shelf holds nothing beyond today's picks. */}
+          <QuestFeed />
+
+          {/* A gentle, once-per-context invitation to keep the journey
+              safe across devices. Never a modal; easy to wave off. */}
+          <AccountPrompt />
 
           {/* Snippet rows — prayer, reading, reflection. Each card names
               itself; no extra label chrome (the phone gives us enough). */}

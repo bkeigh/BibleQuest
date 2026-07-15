@@ -76,6 +76,10 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
             </li>
           ))}
         </ul>
+        <p className="mt-4 text-[0.8125rem] leading-relaxed text-charcoal">
+          <span className="text-gilt">Our pledge:</span> 5% of BibleQuest’s
+          proceeds goes to churches and nonprofits.
+        </p>
         <PlusCta />
       </PaperCard>
 

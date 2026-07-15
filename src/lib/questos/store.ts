@@ -19,19 +19,24 @@ import { getDailyVerse } from "./verse-engine";
 import { MAX_DAILY_PICKS } from "./quest-engine";
 import { computeMetrics, checkMilestones } from "./milestone-engine";
 import { toDateKey, daysBetween } from "@/lib/utils/dates";
-import { track } from "@/lib/analytics/events";
+import { track, setAnalyticsConsent } from "@/lib/analytics/events";
 import {
   DEFAULT_SETTINGS,
+  QUEST_STEP_KEYS,
+  type AccountNudgeContext,
+  type AccountNudgeState,
   type DailyQuestAssignment,
   type EarnedMilestone,
   type GrowthEvent,
   type JourneyEvent,
   type JourneyEventType,
   type MilestoneSeed,
+  type MyQuest,
   type Prayer,
   type PrayerCategory,
   type Profile,
   type QuestCompletion,
+  type QuestStepKey,
   type QuestTemplate,
   type ReadingPosition,
   type Reflection,
@@ -44,6 +49,7 @@ import {
   type SyncTombstones,
   type StreakState,
   type VerseRefresh,
+  emptyAccountNudge,
   emptyTombstones,
   emptyStreak,
 } from "./types";
@@ -65,6 +71,13 @@ interface QuestOSState {
   settings: Settings;
   /** Per-day picked quests, up to MAX_DAILY_PICKS per dateKey. */
   assignments: Record<string, DailyQuestAssignment[]>;
+  /**
+   * The persistent quest shelf ("My Quests"), keyed by quest slug. A quest
+   * joins the shelf when picked, begun, or saved for later, and stays —
+   * with its own status and step progress — until the user removes it.
+   * Beginning one quest never displaces another.
+   */
+  myQuests: Record<string, MyQuest>;
   completions: QuestCompletion[];
   prayers: Prayer[];
   reflections: Reflection[];
@@ -86,6 +99,11 @@ interface QuestOSState {
   streak: StreakState;
   /** Same-day "Another verse" count; self-resets when the dateKey rolls. */
   verseRefresh: VerseRefresh | null;
+  /**
+   * Gentle account-invitation bookkeeping. Device-local (like the streak) —
+   * excluded from sync mapping but rides through snapshot/importData.
+   */
+  accountNudge: AccountNudgeState;
   /** Local deletions the sync engine still needs to propagate remotely. */
   tombstones: SyncTombstones;
 
@@ -120,6 +138,29 @@ interface QuestOSState {
   startQuest: (slug: string) => void;
   completeQuestBySlug: (slug: string, reflection?: { body: string; mood?: ReflectionMood }) => { newMilestones: MilestoneSeed[] };
 
+  // -- quest shelf (My Quests — persistent, independent of the day)
+  /** Tuck a quest away for another day. Returns false when it's already
+   *  underway or finished (nothing to save). */
+  saveQuestForLater: (slug: string) => boolean;
+  /** Set an active quest down without losing its steps. */
+  pauseQuest: (slug: string) => void;
+  /** Take a saved or paused quest back up. */
+  resumeQuest: (slug: string) => void;
+  /** Keep the record, out of the main feed. Also frees today's pick. */
+  archiveQuest: (slug: string) => void;
+  /** Take the quest off the shelf entirely (it stays in Browse). */
+  removeQuest: (slug: string) => void;
+  /** Walk a completed (or archived) quest again with fresh steps. */
+  reopenQuest: (slug: string) => void;
+  /** Mark one movement of the walk done/undone (a bookmark, not a duty). */
+  markQuestStep: (slug: string, step: QuestStepKey, done?: boolean) => void;
+
+  // -- account invitations
+  /** Record that a context earned its one gentle invitation. */
+  markAccountNudgeShown: (context: AccountNudgeContext) => void;
+  /** "Maybe later" — starts the quiet period. */
+  dismissAccountNudge: () => void;
+
   // -- prayer
   addPrayer: (data: { title?: string; body: string; category: PrayerCategory }) => Prayer;
   updatePrayer: (prayerId: string, patch: Partial<Pick<Prayer, "title" | "body" | "category">>) => void;
@@ -148,6 +189,63 @@ interface QuestOSState {
   // -- sync bookkeeping
   /** Remove tombstone entries the sync engine has propagated remotely. */
   clearSyncTombstones: (cleared: SyncTombstones) => void;
+}
+
+/**
+ * Seed the quest shelf from pre-shelf history (v5→v6 migration and
+ * restores of pre-v6 exports): completions become completed entries;
+ * unfinished picks from the last week come along as active walks. Older
+ * unfinished picks stay in the past — resurfacing a month-old pick as an
+ * open obligation is exactly the shame the app avoids.
+ */
+function deriveMyQuestsFromHistory(
+  completions: QuestCompletion[],
+  assignments: Record<string, DailyQuestAssignment[]>
+): Record<string, MyQuest> {
+  const myQuests: Record<string, MyQuest> = {};
+  for (const c of completions) {
+    const prev = myQuests[c.questSlug];
+    myQuests[c.questSlug] = {
+      questSlug: c.questSlug,
+      status: "completed",
+      addedAt:
+        prev && prev.addedAt <= c.completedAt ? prev.addedAt : c.completedAt,
+      completedAt:
+        prev?.completedAt && prev.completedAt >= c.completedAt
+          ? prev.completedAt
+          : c.completedAt,
+      lastActivityAt:
+        prev && prev.lastActivityAt >= c.completedAt
+          ? prev.lastActivityAt
+          : c.completedAt,
+      stepsDone: [...QUEST_STEP_KEYS],
+      timesCompleted: (prev?.timesCompleted ?? 0) + 1,
+    };
+  }
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 7);
+  const cutoffKey = toDateKey(cutoff);
+  for (const [dateKey, picks] of Object.entries(assignments)) {
+    if (dateKey < cutoffKey) continue;
+    for (const pick of picks ?? []) {
+      if (pick.status === "completed") continue;
+      if (myQuests[pick.questSlug]?.status === "completed") continue;
+      const at =
+        pick.startedAt ??
+        pick.pickedAt ??
+        new Date(`${dateKey}T12:00:00`).toISOString();
+      myQuests[pick.questSlug] = {
+        questSlug: pick.questSlug,
+        status: "active",
+        addedAt: at,
+        startedAt: pick.startedAt,
+        lastActivityAt: at,
+        stepsDone: [],
+        timesCompleted: 0,
+      };
+    }
+  }
+  return myQuests;
 }
 
 function journeyTitle(type: JourneyEventType, detail?: string): string {
@@ -197,6 +295,8 @@ export const useQuestOS = create<QuestOSState>()(
               occurredAt: now.toISOString(),
             }
           : null;
+        const prevStreak = get().streak;
+        const nextStreak = advanceStreak(prevStreak, journey.dateKey);
         set({
           journeyEvents: [...state.journeyEvents, journey],
           growthEvents: growth
@@ -205,8 +305,15 @@ export const useQuestOS = create<QuestOSState>()(
           // Every meaningful action keeps the candle lit. advanceStreak
           // returns the same reference when today is already counted, so
           // repeat actions don't churn the persisted blob.
-          streak: advanceStreak(get().streak, journey.dateKey),
+          streak: nextStreak,
         });
+        // Milestone days only (never every day) — a count, nothing else.
+        if (
+          nextStreak !== prevStreak &&
+          [3, 7, 14, 30, 100, 365].includes(nextStreak.current)
+        ) {
+          track("streak_milestone", { count: nextStreak.current });
+        }
         return { journey, growth };
       }
 
@@ -243,6 +350,31 @@ export const useQuestOS = create<QuestOSState>()(
           }
         }
         return fresh;
+      }
+
+      /**
+       * Upsert a shelf entry, always refreshing lastActivityAt. `patch` wins
+       * over the existing entry; new entries start from gentle defaults.
+       */
+      function touchMyQuest(
+        slug: string,
+        patch: Partial<Omit<MyQuest, "questSlug">>
+      ): void {
+        const s = get();
+        const now = new Date().toISOString();
+        const existing = s.myQuests[slug];
+        const entry: MyQuest = existing
+          ? { ...existing, ...patch, lastActivityAt: now }
+          : {
+              questSlug: slug,
+              status: "active",
+              addedAt: now,
+              stepsDone: [],
+              timesCompleted: 0,
+              ...patch,
+              lastActivityAt: now,
+            };
+        set({ myQuests: { ...s.myQuests, [slug]: entry } });
       }
 
       function completeQuest(
@@ -317,6 +449,18 @@ export const useQuestOS = create<QuestOSState>()(
           });
         }
 
+        // The shelf entry finishes with the quest — every step done, one
+        // more completion on the record. "Begin without adding" walks land
+        // here too, creating the entry so the feed still remembers them.
+        touchMyQuest(quest.slug, {
+          status: "completed",
+          stepsDone: [...QUEST_STEP_KEYS],
+          completedAt: now.toISOString(),
+          timesCompleted: (get().myQuests[quest.slug]?.timesCompleted ?? 0) + 1,
+          pausedAt: undefined,
+          archivedAt: undefined,
+        });
+
         recordAction("quest_completed", quest.title, quest.growthType);
         track("quest_completed", { category: quest.category });
         return { newMilestones: runMilestoneCheck() };
@@ -326,6 +470,7 @@ export const useQuestOS = create<QuestOSState>()(
         profile: null,
         settings: DEFAULT_SETTINGS,
         assignments: {},
+        myQuests: {},
         completions: [],
         prayers: [],
         reflections: [],
@@ -339,6 +484,7 @@ export const useQuestOS = create<QuestOSState>()(
         lastVisitDateKey: null,
         streak: emptyStreak(),
         verseRefresh: null,
+        accountNudge: emptyAccountNudge(),
         tombstones: emptyTombstones(),
 
         completeOnboarding: (profileData, settingsPatch) => {
@@ -362,6 +508,11 @@ export const useQuestOS = create<QuestOSState>()(
 
         updateSettings: (patch) => {
           set({ settings: { ...get().settings, ...patch } });
+          // Mirror consent to its own storage key so events fired before
+          // the store hydrates still honor the last known choice.
+          if (patch.analyticsConsent != null) {
+            setAnalyticsConsent(patch.analyticsConsent);
+          }
         },
 
         recordVisit: () => {
@@ -373,6 +524,7 @@ export const useQuestOS = create<QuestOSState>()(
             profile: null,
             settings: DEFAULT_SETTINGS,
             assignments: {},
+            myQuests: {},
             completions: [],
             prayers: [],
             reflections: [],
@@ -386,6 +538,7 @@ export const useQuestOS = create<QuestOSState>()(
             lastVisitDateKey: null,
             streak: emptyStreak(),
             verseRefresh: null,
+            accountNudge: emptyAccountNudge(),
             // The purge marker survives the reset (it IS the reset's remote
             // half); it subsumes any pending per-row tombstones.
             tombstones: {
@@ -393,6 +546,9 @@ export const useQuestOS = create<QuestOSState>()(
               purgeAccount: opts?.purgeAccount ?? null,
             },
           });
+          // track() enforces the localStorage mirror, not the store — keep
+          // them in lockstep or the Settings toggle and reality disagree.
+          setAnalyticsConsent(DEFAULT_SETTINGS.analyticsConsent);
         },
 
         importData: (snapshot, opts) => {
@@ -413,6 +569,14 @@ export const useQuestOS = create<QuestOSState>()(
                 }
               : DEFAULT_SETTINGS,
             assignments: snapshot.assignments ?? {},
+            // Pre-v6 exports carry no shelf — seed it from their history
+            // exactly like the storage migration does.
+            myQuests:
+              snapshot.myQuests ??
+              deriveMyQuestsFromHistory(
+                snapshot.completions ?? [],
+                snapshot.assignments ?? {}
+              ),
             completions: snapshot.completions ?? [],
             prayers: snapshot.prayers ?? [],
             reflections: snapshot.reflections ?? [],
@@ -425,6 +589,9 @@ export const useQuestOS = create<QuestOSState>()(
             pendingMilestones: snapshot.pendingMilestones ?? [],
             lastVisitDateKey: snapshot.lastVisitDateKey ?? null,
             streak: snapshot.streak ?? emptyStreak(),
+            // Device-local like the streak: the sync engine's merge-apply
+            // passes the local value through; old exports just reset it.
+            accountNudge: snapshot.accountNudge ?? emptyAccountNudge(),
             // Device-local and day-scoped — survives restores and the sync
             // engine's merge-apply alike; self-resets at the next midnight.
             verseRefresh: get().verseRefresh,
@@ -443,6 +610,9 @@ export const useQuestOS = create<QuestOSState>()(
                 }
               : {}),
           });
+          // Mirror the (possibly imported/merged) consent choice — track()
+          // reads the mirror, so a restored opt-out must land there too.
+          setAnalyticsConsent(get().settings.analyticsConsent);
         },
 
         pickQuest: (slug) => {
@@ -474,6 +644,28 @@ export const useQuestOS = create<QuestOSState>()(
               ],
             },
           });
+          // Picking puts (or wakes) the quest on the shelf. Re-picking a
+          // finished quest is walking it again — fresh steps, the lifetime
+          // count stays. addedAt aligning with pickedAt marks entries born
+          // from this pick, so an immediate unpick can tidy up after itself.
+          const shelfEntry = get().myQuests[slug];
+          if (doneToday) {
+            touchMyQuest(slug, { status: "completed" });
+          } else if (shelfEntry?.status === "completed" || shelfEntry?.status === "archived") {
+            touchMyQuest(slug, {
+              status: "active",
+              stepsDone: [],
+              startedAt: undefined,
+              pausedAt: undefined,
+              archivedAt: undefined,
+            });
+          } else {
+            touchMyQuest(slug, {
+              status: "active",
+              pausedAt: undefined,
+              ...(shelfEntry ? {} : { addedAt: now }),
+            });
+          }
           track("quest_picked");
           return true;
         },
@@ -495,6 +687,36 @@ export const useQuestOS = create<QuestOSState>()(
               [dateKey]: dayPicks.filter((a) => a.questSlug !== slug),
             },
           });
+          // Tidy the shelf: an entry born from this very pick (addedAt ===
+          // pickedAt) that was never begun leaves with it — the person was
+          // browsing, not committing. Removal must tombstone or sync
+          // resurrects the row. Older un-begun entries restore their prior
+          // standing: a re-picked completed quest returns to the completed
+          // record (its walks aren't erased by a change of heart about
+          // today), anything else goes back to saved-for-later. A walk
+          // that's already begun stays active — unpicking only frees the
+          // day, not the journey.
+          const entry = get().myQuests[slug];
+          if (entry && entry.status === "active") {
+            const begun = entry.stepsDone.length > 0 || Boolean(entry.startedAt);
+            const bornFromPick = entry.addedAt === target.pickedAt && !begun;
+            if (bornFromPick) {
+              const rest = { ...get().myQuests };
+              delete rest[slug];
+              const t = get().tombstones;
+              set({
+                myQuests: rest,
+                tombstones: { ...t, myQuests: [...t.myQuests, slug] },
+              });
+            } else if (!begun) {
+              touchMyQuest(slug, {
+                status: entry.timesCompleted > 0 ? "completed" : "saved",
+                ...(entry.timesCompleted > 0
+                  ? { stepsDone: [...QUEST_STEP_KEYS] }
+                  : {}),
+              });
+            }
+          }
           track("quest_unpicked");
         },
 
@@ -514,6 +736,13 @@ export const useQuestOS = create<QuestOSState>()(
               ),
             },
           });
+          touchMyQuest(slug, {
+            status: "active",
+            pausedAt: undefined,
+            ...(get().myQuests[slug]?.startedAt
+              ? {}
+              : { startedAt: new Date().toISOString() }),
+          });
           track("quest_started");
         },
 
@@ -521,6 +750,174 @@ export const useQuestOS = create<QuestOSState>()(
           const quest = questBySlug.get(slug);
           if (!quest) return { newMilestones: [] };
           return completeQuest(quest, reflection);
+        },
+
+        saveQuestForLater: (slug) => {
+          if (!questBySlug.has(slug)) return false;
+          const entry = get().myQuests[slug];
+          // Underway or finished walks have nothing to "save" — resume,
+          // pause, or reopen are their moves.
+          if (
+            entry &&
+            (entry.status === "completed" ||
+              entry.status === "archived" ||
+              (entry.status === "active" &&
+                (entry.stepsDone.length > 0 || entry.startedAt)))
+          ) {
+            return false;
+          }
+          if (entry?.status === "saved") return false;
+          touchMyQuest(slug, { status: "saved", pausedAt: undefined });
+          track("quest_saved");
+          return true;
+        },
+
+        pauseQuest: (slug) => {
+          const entry = get().myQuests[slug];
+          if (!entry || entry.status !== "active") return;
+          touchMyQuest(slug, {
+            status: "paused",
+            pausedAt: new Date().toISOString(),
+          });
+          track("quest_paused");
+        },
+
+        resumeQuest: (slug) => {
+          const entry = get().myQuests[slug];
+          if (!entry || (entry.status !== "paused" && entry.status !== "saved"))
+            return;
+          touchMyQuest(slug, { status: "active", pausedAt: undefined });
+          track("quest_resumed");
+        },
+
+        archiveQuest: (slug) => {
+          const s = get();
+          const entry = s.myQuests[slug];
+          if (!entry || entry.status === "archived") return;
+          touchMyQuest(slug, {
+            status: "archived",
+            archivedAt: new Date().toISOString(),
+            pausedAt: undefined,
+          });
+          // Free today's pick — an archived quest shouldn't keep holding
+          // one of the day's three places. Completed picks are history.
+          const dateKey = toDateKey();
+          const dayPicks = s.assignments[dateKey];
+          if (
+            dayPicks?.some(
+              (a) => a.questSlug === slug && a.status !== "completed"
+            )
+          ) {
+            set({
+              assignments: {
+                ...get().assignments,
+                [dateKey]: dayPicks.filter(
+                  (a) => a.questSlug !== slug || a.status === "completed"
+                ),
+              },
+            });
+          }
+          track("quest_archived");
+        },
+
+        removeQuest: (slug) => {
+          const s = get();
+          if (!s.myQuests[slug]) return;
+          const rest = { ...s.myQuests };
+          delete rest[slug];
+          set({
+            myQuests: rest,
+            // Tombstone the slug or the account copy resurrects it on the
+            // next merge. The quest itself stays in Browse, always.
+            tombstones: {
+              ...s.tombstones,
+              myQuests: [...s.tombstones.myQuests, slug],
+            },
+          });
+          // Also free today's uncompleted pick of the same quest.
+          const dateKey = toDateKey();
+          const dayPicks = get().assignments[dateKey];
+          if (
+            dayPicks?.some(
+              (a) => a.questSlug === slug && a.status !== "completed"
+            )
+          ) {
+            set({
+              assignments: {
+                ...get().assignments,
+                [dateKey]: dayPicks.filter(
+                  (a) => a.questSlug !== slug || a.status === "completed"
+                ),
+              },
+            });
+          }
+          track("quest_removed");
+        },
+
+        reopenQuest: (slug) => {
+          const entry = get().myQuests[slug];
+          if (
+            !entry ||
+            (entry.status !== "completed" && entry.status !== "archived")
+          )
+            return;
+          touchMyQuest(slug, {
+            status: "active",
+            stepsDone: [],
+            startedAt: undefined,
+            pausedAt: undefined,
+            archivedAt: undefined,
+            // completedAt and timesCompleted stay — the record of past
+            // walks is part of the journey, not something a reopen erases.
+          });
+          track("quest_reopened");
+        },
+
+        markQuestStep: (slug, step, done = true) => {
+          if (!questBySlug.has(slug)) return;
+          const entry = get().myQuests[slug];
+          // Finished walks don't un-tick; reopen starts a fresh one.
+          if (entry?.status === "completed" || entry?.status === "archived")
+            return;
+          if (!entry && !done) return;
+          const current = new Set(entry?.stepsDone ?? []);
+          if (entry && done === current.has(step)) return;
+          if (done) current.add(step);
+          else current.delete(step);
+          // Ordered by the canonical walk, not tap order, so progress
+          // renders steadily.
+          const stepsDone = QUEST_STEP_KEYS.filter((k) => current.has(k));
+          touchMyQuest(slug, {
+            status: "active",
+            pausedAt: undefined,
+            stepsDone,
+            ...(entry?.startedAt || stepsDone.length === 0
+              ? {}
+              : { startedAt: new Date().toISOString() }),
+          });
+          if (done) track("quest_step_completed", { step });
+        },
+
+        markAccountNudgeShown: (context) => {
+          const nudge = get().accountNudge;
+          if (nudge.shownContexts.includes(context)) return;
+          set({
+            accountNudge: {
+              ...nudge,
+              shownContexts: [...nudge.shownContexts, context],
+            },
+          });
+        },
+
+        dismissAccountNudge: () => {
+          const nudge = get().accountNudge;
+          set({
+            accountNudge: {
+              ...nudge,
+              lastDismissedAt: new Date().toISOString(),
+              dismissCount: nudge.dismissCount + 1,
+            },
+          });
         },
 
         addPrayer: (data) => {
@@ -743,6 +1140,7 @@ export const useQuestOS = create<QuestOSState>()(
             !cleared.prayers.length &&
             !cleared.reflections.length &&
             !cleared.bookmarks.length &&
+            !cleared.myQuests.length &&
             !cleared.purgeAccount
           ) {
             return;
@@ -763,6 +1161,9 @@ export const useQuestOS = create<QuestOSState>()(
                       c.verse === b.verse
                   )
               ),
+              myQuests: t.myQuests.filter(
+                (slug) => !cleared.myQuests.includes(slug)
+              ),
               // Only the exact purge that propagated clears — a marker for a
               // different account stays pending until that user signs in.
               purgeAccount:
@@ -777,7 +1178,7 @@ export const useQuestOS = create<QuestOSState>()(
     {
       name: "biblequest:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 5,
+      version: 6,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
@@ -823,6 +1224,29 @@ export const useQuestOS = create<QuestOSState>()(
             settings.appearance.boldText = false;
           }
         }
+        if (version < 6) {
+          // v6: the quest shelf (My Quests), account-nudge bookkeeping,
+          // shelf tombstones, and the analytics-consent setting.
+          state.accountNudge = emptyAccountNudge();
+          state.tombstones = {
+            ...emptyTombstones(),
+            ...(state.tombstones as Partial<SyncTombstones> | undefined),
+            myQuests: [],
+          };
+          const settings = state.settings as
+            | { analyticsConsent?: boolean }
+            | undefined;
+          if (settings && settings.analyticsConsent == null) {
+            settings.analyticsConsent = true;
+          }
+
+          // Seed the shelf from history so existing journeys arrive with a
+          // living feed instead of an empty one.
+          state.myQuests = deriveMyQuestsFromHistory(
+            (state.completions ?? []) as QuestCompletion[],
+            (state.assignments ?? {}) as Record<string, DailyQuestAssignment[]>
+          );
+        }
         return state as unknown as QuestOSState;
       },
     }
@@ -862,6 +1286,19 @@ export function selectTodayPickCount(s: QuestOSState): number {
 /** The candle. Stable reference — the stored object itself. */
 export function selectStreak(s: QuestOSState): StreakState {
   return s.streak;
+}
+
+/**
+ * The quest shelf. Stable reference — the stored map itself. Derive
+ * ordering/sections with buildQuestFeed inside useMemo (never here).
+ */
+export function selectMyQuests(s: QuestOSState): Record<string, MyQuest> {
+  return s.myQuests;
+}
+
+/** Account-nudge bookkeeping. Stable reference — the stored object. */
+export function selectAccountNudge(s: QuestOSState): AccountNudgeState {
+  return s.accountNudge;
 }
 
 /** Today's "Another verse" count (primitive — render-safe). */

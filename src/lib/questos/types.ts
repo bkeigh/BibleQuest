@@ -123,6 +123,56 @@ export interface QuestCompletion {
 }
 
 // ---------------------------------------------------------------------------
+// My Quests — the persistent quest shelf
+// ---------------------------------------------------------------------------
+
+/**
+ * Every quest walks the same four gentle movements, derived from the
+ * template's own content (scripture → invitation → reflection → prayer).
+ * See quest-steps.ts. Steps are an aid to picking back up mid-quest,
+ * never an obligation — completing a quest completes them all.
+ */
+export const QUEST_STEP_KEYS = ["scripture", "live", "reflect", "pray"] as const;
+export type QuestStepKey = (typeof QUEST_STEP_KEYS)[number];
+
+/**
+ * Lifecycle of a quest on the user's shelf. Unlike a daily pick (which
+ * belongs to a single day), a MyQuest entry persists until the user
+ * removes it — so beginning one quest never displaces another.
+ *
+ *  - "saved":     tucked away for another day, never begun (or reset)
+ *  - "active":    on the journey now — picked for a day or begun
+ *  - "paused":    deliberately set down; waits without expiring
+ *  - "completed": finished (repeatable — reopening starts a fresh walk)
+ *  - "archived":  kept for the record, out of the main feed
+ */
+export type MyQuestStatus =
+  | "saved"
+  | "active"
+  | "paused"
+  | "completed"
+  | "archived";
+
+export interface MyQuest {
+  questSlug: string;
+  status: MyQuestStatus;
+  /** When the quest first joined the shelf. */
+  addedAt: string;
+  /** First time the user began this walk (cleared on reopen). */
+  startedAt?: string;
+  pausedAt?: string;
+  /** Most recent completion. */
+  completedAt?: string;
+  archivedAt?: string;
+  /** Any interaction — drives feed ordering and sync conflict resolution. */
+  lastActivityAt: string;
+  /** Steps finished on the CURRENT walk (reset when reopened). */
+  stepsDone: QuestStepKey[];
+  /** Lifetime completions across reopenings. */
+  timesCompleted: number;
+}
+
+// ---------------------------------------------------------------------------
 // Scripture
 // ---------------------------------------------------------------------------
 
@@ -438,6 +488,11 @@ export interface Settings {
   questCategoryPreference: QuestCategory[];
   /** UI-chrome language code (see src/lib/i18n). Scripture stays English (WEB). */
   language: string;
+  /**
+   * Anonymous usage analytics opt-in/out (see src/lib/analytics/events.ts).
+   * Counts taps and screens only — never prayer, reflection, or note text.
+   */
+  analyticsConsent: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -457,16 +512,19 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   questDurationPreference: [],
   questCategoryPreference: [],
+  analyticsConsent: true,
 };
 
 /**
  * Local deletions the sync engine still needs to propagate to the account.
- * Prayers/reflections are tracked by id; bookmarks by their natural key.
+ * Prayers/reflections are tracked by id; bookmarks by their natural key;
+ * removed shelf quests by their slug.
  */
 export interface SyncTombstones {
   prayers: string[];
   reflections: string[];
   bookmarks: Array<{ bookSlug: string; chapter: number; verse: number }>;
+  myQuests: string[];
   /**
    * User id whose ENTIRE account copy must be deleted before the next push.
    * Set when the user clears or restores-over their data while signed in —
@@ -478,7 +536,38 @@ export interface SyncTombstones {
 }
 
 export function emptyTombstones(): SyncTombstones {
-  return { prayers: [], reflections: [], bookmarks: [], purgeAccount: null };
+  return {
+    prayers: [],
+    reflections: [],
+    bookmarks: [],
+    myQuests: [],
+    purgeAccount: null,
+  };
+}
+
+/**
+ * Gentle, non-repeating account invitations. Device-local (like the streak):
+ * each device decides for itself when a nudge is welcome, and dismissals on
+ * one device shouldn't silence another. Excluded from the sync mapping but
+ * must ride through snapshot/importData or every merge-apply would reset it.
+ */
+export type AccountNudgeContext =
+  | "onboarding"
+  | "first_quest_completed"
+  | "first_reflection"
+  | "milestone_reached";
+
+export interface AccountNudgeState {
+  /** Contexts already shown once — each fires at most one invitation. */
+  shownContexts: AccountNudgeContext[];
+  /** Most recent "Maybe later", starts the quiet period. */
+  lastDismissedAt: string | null;
+  /** After enough dismissals we stop asking altogether. */
+  dismissCount: number;
+}
+
+export function emptyAccountNudge(): AccountNudgeState {
+  return { shownContexts: [], lastDismissedAt: null, dismissCount: 0 };
 }
 
 /**
@@ -490,6 +579,8 @@ export interface QuestOSSnapshot {
   settings: Settings;
   /** Per-day picked quests (up to MAX_DAILY_PICKS per dateKey). */
   assignments: Record<string, DailyQuestAssignment[]>;
+  /** The persistent quest shelf, keyed by quest slug. */
+  myQuests?: Record<string, MyQuest>;
   completions: QuestCompletion[];
   prayers: Prayer[];
   reflections: Reflection[];
@@ -503,6 +594,8 @@ export interface QuestOSSnapshot {
   lastVisitDateKey: string | null;
   /** Optional — exports from before the candle streak omit it. */
   streak?: StreakState;
+  /** Optional & device-local — rides through restores like the streak. */
+  accountNudge?: AccountNudgeState;
 }
 
 export function emptyStreak(): StreakState {

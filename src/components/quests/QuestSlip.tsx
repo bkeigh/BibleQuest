@@ -2,7 +2,11 @@ import Link from "next/link";
 import type { QuestCategory, QuestTemplate } from "@/lib/questos/types";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PixelIcon, CATEGORY_SPRITE } from "@/components/design-system/PixelIcon";
-import { IconClock, IconCheck } from "@/components/design-system/icons";
+import {
+  IconClock,
+  IconCheck,
+  IconBookmark,
+} from "@/components/design-system/icons";
 import { cn } from "@/lib/utils/cn";
 
 export function formatDuration(minutes: number): string {
@@ -45,6 +49,8 @@ interface QuestSlipProps {
   picked?: boolean;
   /** This quest was completed today — done chip. */
   completed?: boolean;
+  /** This quest is saved for later on the shelf — quiet bookmark chip. */
+  saved?: boolean;
   /**
    * Compact: sprite chip, title, meta row, and badges only — the invitation
    * and scripture wait on the quest page. For suggestion shelves, where the
@@ -63,6 +69,7 @@ export function QuestSlip({
   action,
   picked,
   completed,
+  saved,
   compact,
 }: QuestSlipProps) {
   const badge = completed ? (
@@ -72,6 +79,10 @@ export function QuestSlip({
   ) : picked ? (
     <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-surface px-2 py-0.5 font-pixel text-[0.875rem] text-accent">
       <IconCheck size={12} /> Picked
+    </span>
+  ) : saved ? (
+    <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-linen px-2 py-0.5 font-pixel text-[0.875rem] text-charcoal ring-1 ring-mist">
+      <IconBookmark size={12} /> Saved
     </span>
   ) : null;
 

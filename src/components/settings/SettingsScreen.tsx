@@ -491,6 +491,23 @@ function SettingsInner() {
               they’re stored only for you. We never sell your data, and analytics
               never include prayer or journal text.
             </p>
+            <div className="mt-4 flex items-start justify-between gap-4 border-t border-mist/70 pt-4">
+              <div className="min-w-0">
+                <p className="text-[0.9375rem] text-graphite">
+                  {t.settings.analyticsToggle}
+                </p>
+                <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-ash">
+                  {t.settings.analyticsNote}
+                </p>
+              </div>
+              <Toggle
+                label={t.settings.analyticsToggle}
+                on={settings.analyticsConsent}
+                onChange={(analyticsConsent) =>
+                  updateSettings({ analyticsConsent })
+                }
+              />
+            </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <GentleButton variant="outline" size="sm" onClick={exportData}>
                 {t.settings.exportData}

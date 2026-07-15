@@ -4,7 +4,11 @@ import { useMemo, useState } from "react";
 import { seedQuests, questBySlug } from "@/data/seed/quests";
 import { filterQuests, selectSuggestedQuests } from "@/lib/questos/quest-engine";
 import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
-import { useQuestOS, selectTodayPicks } from "@/lib/questos/store";
+import {
+  useQuestOS,
+  selectMyQuests,
+  selectTodayPicks,
+} from "@/lib/questos/store";
 import {
   QUEST_CATEGORIES,
   type EnergyLevel,
@@ -22,7 +26,11 @@ import {
 import { Disclosure } from "@/components/design-system/Disclosure";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { useToast } from "@/components/design-system/Toast";
-import { IconPlus, IconClose } from "@/components/design-system/icons";
+import {
+  IconPlus,
+  IconClose,
+  IconBookmark,
+} from "@/components/design-system/icons";
 import { useStrings, fmt } from "@/lib/i18n";
 import { toDateKey } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils/cn";
@@ -50,7 +58,9 @@ function QuestBrowseInner() {
   const t = useStrings();
   const pickQuest = useQuestOS((s) => s.pickQuest);
   const unpickQuest = useQuestOS((s) => s.unpickQuest);
+  const saveQuestForLater = useQuestOS((s) => s.saveQuestForLater);
   const picks = useQuestOS(selectTodayPicks);
+  const myQuests = useQuestOS(selectMyQuests);
   const completions = useQuestOS((s) => s.completions);
   const profile = useQuestOS((s) => s.profile);
   const settings = useQuestOS((s) => s.settings);
@@ -142,10 +152,20 @@ function QuestBrowseInner() {
     toast(t.quests.removed);
   }
 
-  /** A browse-list slip: picked/done state + an add-to-today control. */
+  function handleSave(quest: QuestTemplate) {
+    if (saveQuestForLater(quest.slug)) {
+      toast(t.myQuests.savedToast, { variant: "success" });
+    }
+  }
+
+  /** A browse-list slip: shelf state + add-to-today / save-for-later. */
   function browseSlip(quest: QuestTemplate, compact = false) {
     const done = completedToday.has(quest.slug);
     const isPicked = pickedSlugs.has(quest.slug);
+    const shelfStatus = myQuests[quest.slug]?.status;
+    const isSaved = shelfStatus === "saved" || shelfStatus === "paused";
+    // Saving makes sense only for quests not already underway or done.
+    const canSave = !isPicked && !done && !shelfStatus;
     return (
       <QuestSlip
         key={quest.slug}
@@ -153,18 +173,32 @@ function QuestBrowseInner() {
         href={`/app/quests/${quest.slug}`}
         picked={isPicked}
         completed={done}
+        saved={!isPicked && !done && isSaved}
         compact={compact}
         action={
           !isPicked && !done ? (
-            <button
-              type="button"
-              aria-label={t.quests.addToToday}
-              title={t.quests.addToToday}
-              onClick={() => handleAdd(quest)}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-accent/50 bg-paper text-accent transition-colors duration-300 hover:bg-accent-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
-              <IconPlus size={17} />
-            </button>
+            <div className="flex flex-col items-center gap-2">
+              <button
+                type="button"
+                aria-label={t.quests.addToToday}
+                title={t.quests.addToToday}
+                onClick={() => handleAdd(quest)}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-accent/50 bg-paper text-accent transition-colors duration-300 hover:bg-accent-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                <IconPlus size={17} />
+              </button>
+              {canSave && !compact && (
+                <button
+                  type="button"
+                  aria-label={t.myQuests.saveForLater}
+                  title={t.myQuests.saveForLater}
+                  onClick={() => handleSave(quest)}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-mist bg-paper text-ash transition-colors duration-300 hover:border-accent/40 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  <IconBookmark size={16} />
+                </button>
+              )}
+            </div>
           ) : undefined
         }
       />
@@ -177,7 +211,7 @@ function QuestBrowseInner() {
     <>
       <PageHeader
         title={t.nav.quests}
-        subtitle="Small acts of faith. Pick up to three a day."
+        subtitle="Small acts of faith. Walk up to three a day — save the rest for later."
       />
       <PageContainer>
         {/* Today's picks — the day you chose, pinned above everything */}

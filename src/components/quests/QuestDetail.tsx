@@ -4,7 +4,14 @@ import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import type { QuestTemplate, ReflectionMood } from "@/lib/questos/types";
-import { useQuestOS, selectTodayPicks } from "@/lib/questos/store";
+import {
+  useQuestOS,
+  selectMyQuests,
+  selectTodayPicks,
+  MAX_DAILY_PICKS,
+} from "@/lib/questos/store";
+import { QUEST_STEP_KEYS, hasBegun } from "@/lib/questos/quest-steps";
+import { stepLabels } from "@/components/quests/QuestAccordionCard";
 import { useToast } from "@/components/design-system/Toast";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageContainer } from "@/components/app-shell/PageHeader";
@@ -46,7 +53,11 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
   const completeQuestBySlug = useQuestOS((s) => s.completeQuestBySlug);
   const pickQuest = useQuestOS((s) => s.pickQuest);
   const startQuest = useQuestOS((s) => s.startQuest);
+  const saveQuestForLater = useQuestOS((s) => s.saveQuestForLater);
+  const resumeQuest = useQuestOS((s) => s.resumeQuest);
+  const markQuestStep = useQuestOS((s) => s.markQuestStep);
   const picks = useQuestOS(selectTodayPicks);
+  const myQuests = useQuestOS(selectMyQuests);
   const completions = useQuestOS((s) => s.completions);
 
   const [phase, setPhase] = useState<Phase>("detail");
@@ -55,6 +66,12 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
   const reflectionFieldId = useId();
 
   const todayPick = picks.find((a) => a.questSlug === quest.slug);
+  const entry = myQuests[quest.slug];
+  // Mid-walk from another day (or paused): the shelf remembers.
+  const walking =
+    entry &&
+    (entry.status === "active" || entry.status === "paused") &&
+    hasBegun(entry);
   const alreadyCompletedToday = completions.some(
     (c) => c.questSlug === quest.slug && c.dateKey === toDateKey()
   );
@@ -62,6 +79,10 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
   useEffect(() => {
     track("quest_viewed", { category: quest.category });
   }, [quest.slug, quest.category]);
+
+  useEffect(() => {
+    if (phase === "reflect") track("reflection_started", { source: "quest" });
+  }, [phase]);
 
   function addToToday() {
     if (pickQuest(quest.slug)) {
@@ -71,8 +92,28 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
     }
   }
 
+  function saveForLater() {
+    if (saveQuestForLater(quest.slug)) {
+      toast(t.myQuests.savedToast, { variant: "success" });
+    }
+  }
+
   function begin() {
     startQuest(quest.slug);
+    setPhase("reflect");
+  }
+
+  /**
+   * Pick up a walk begun on another day. Joining today's picks (when the
+   * day has room) keeps the daily rhythm honest — continuing a quest IS
+   * today's quest work — but a full day never blocks continuing.
+   */
+  function continueWalk() {
+    if (entry?.status === "paused") resumeQuest(quest.slug);
+    if (!todayPick && picks.length < MAX_DAILY_PICKS) {
+      pickQuest(quest.slug);
+      startQuest(quest.slug);
+    }
     setPhase("reflect");
   }
 
@@ -178,6 +219,52 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
               </p>
             </PaperCard>
 
+            {/* Your walk so far — a bookmark, never homework. Appears once
+                the quest is underway so a first visit stays uncluttered. */}
+            {walking && !alreadyCompletedToday && (
+              <PaperCard variant="quiet" padding="md" className="mt-5">
+                <p className="text-[0.75rem] uppercase tracking-wide text-accent">
+                  Your walk so far
+                </p>
+                <ul className="mt-2.5 space-y-2">
+                  {QUEST_STEP_KEYS.map((key) => {
+                    const done = entry.stepsDone.includes(key);
+                    return (
+                      <li key={key}>
+                        <button
+                          type="button"
+                          role="checkbox"
+                          aria-checked={done}
+                          onClick={() => markQuestStep(quest.slug, key, !done)}
+                          className="flex w-full items-center gap-3 rounded-[var(--radius-button)] px-1 py-1.5 text-left transition-colors hover:bg-linen focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] ring-1 transition-colors ${
+                              done
+                                ? "bg-accent text-[#fdfbf3] ring-accent"
+                                : "bg-paper ring-mist"
+                            }`}
+                          >
+                            {done && <IconCheck size={13} />}
+                          </span>
+                          <span
+                            className={`text-small ${
+                              done
+                                ? "text-ash line-through decoration-mist"
+                                : "text-charcoal"
+                            }`}
+                          >
+                            {stepLabels(t)[key]}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </PaperCard>
+            )}
+
             <div className="mt-6">
               {alreadyCompletedToday ? (
                 <PaperCard variant="quiet" padding="md" className="text-center">
@@ -188,7 +275,18 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
                 </PaperCard>
               ) : todayPick ? (
                 <GentleButton variant="primary" size="lg" fullWidth onClick={begin}>
-                  Begin quest
+                  {walking ? t.myQuests.continueCta : "Begin quest"}
+                </GentleButton>
+              ) : walking ? (
+                <GentleButton
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  onClick={continueWalk}
+                >
+                  {entry.status === "paused"
+                    ? t.myQuests.resumeCta
+                    : t.myQuests.continueCta}
                 </GentleButton>
               ) : (
                 <div className="space-y-2.5">
@@ -200,13 +298,24 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
                   >
                     <IconPlus size={18} /> Add to today
                   </GentleButton>
-                  <button
-                    type="button"
-                    onClick={() => setPhase("reflect")}
-                    className="w-full py-2 text-center text-small text-ash transition-colors hover:text-charcoal"
-                  >
-                    Begin without adding
-                  </button>
+                  <div className="flex items-center justify-center gap-5">
+                    {!entry && (
+                      <button
+                        type="button"
+                        onClick={saveForLater}
+                        className="py-2 text-center text-small text-accent transition-colors hover:text-accent/80"
+                      >
+                        {t.myQuests.saveForLater}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setPhase("reflect")}
+                      className="py-2 text-center text-small text-ash transition-colors hover:text-charcoal"
+                    >
+                      Begin without adding
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

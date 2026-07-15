@@ -19,11 +19,14 @@ import type {
   JourneyEvent,
   JourneyEventType,
   EarnedMilestone,
+  MyQuest,
+  MyQuestStatus,
   Prayer,
   PrayerCategory,
   PrayerStatus,
   Profile,
   QuestCompletion,
+  QuestStepKey,
   ReadingPosition,
   Reflection,
   ReflectionMood,
@@ -77,6 +80,20 @@ export interface DailyQuestRow {
   rerolls: number;
   started_at: string | null;
   completed_at: string | null;
+}
+
+export interface UserQuestRow {
+  user_id: string;
+  quest_slug: string;
+  status: string;
+  steps_done: string[];
+  times_completed: number;
+  added_at: string;
+  started_at: string | null;
+  paused_at: string | null;
+  completed_at: string | null;
+  archived_at: string | null;
+  last_activity_at: string;
 }
 
 export interface BookmarkRow {
@@ -150,6 +167,7 @@ export interface UserSettingsRow {
   quest_duration_pref: number[];
   quest_category_pref: string[];
   language: string;
+  analytics_consent: boolean;
 }
 
 export interface NotificationPrefsRow {
@@ -216,6 +234,22 @@ export function assignmentToRow(
     rerolls: a.rerolls,
     started_at: a.startedAt ?? null,
     completed_at: a.completedAt ?? null,
+  };
+}
+
+export function myQuestToRow(uid: string, q: MyQuest): UserQuestRow {
+  return {
+    user_id: uid,
+    quest_slug: q.questSlug,
+    status: q.status,
+    steps_done: q.stepsDone,
+    times_completed: q.timesCompleted,
+    added_at: q.addedAt,
+    started_at: q.startedAt ?? null,
+    paused_at: q.pausedAt ?? null,
+    completed_at: q.completedAt ?? null,
+    archived_at: q.archivedAt ?? null,
+    last_activity_at: q.lastActivityAt,
   };
 }
 
@@ -308,6 +342,7 @@ export function settingsToRows(
       quest_duration_pref: s.questDurationPreference,
       quest_category_pref: s.questCategoryPreference,
       language: s.language,
+      analytics_consent: s.analyticsConsent,
     },
     notifications: {
       user_id: uid,
@@ -369,6 +404,21 @@ export function rowToAssignment(row: DailyQuestRow): DailyQuestAssignment {
     rerolls: row.rerolls,
     startedAt: row.started_at ?? undefined,
     completedAt: row.completed_at ?? undefined,
+  };
+}
+
+export function rowToMyQuest(row: UserQuestRow): MyQuest {
+  return {
+    questSlug: row.quest_slug,
+    status: row.status as MyQuestStatus,
+    stepsDone: (row.steps_done ?? []) as QuestStepKey[],
+    timesCompleted: row.times_completed,
+    addedAt: row.added_at,
+    startedAt: row.started_at ?? undefined,
+    pausedAt: row.paused_at ?? undefined,
+    completedAt: row.completed_at ?? undefined,
+    archivedAt: row.archived_at ?? undefined,
+    lastActivityAt: row.last_activity_at,
   };
 }
 
@@ -466,5 +516,6 @@ export function rowsToSettings(
     questCategoryPreference: (settings?.quest_category_pref ??
       d.questCategoryPreference) as Settings["questCategoryPreference"],
     language: settings?.language ?? d.language,
+    analyticsConsent: settings?.analytics_consent ?? d.analyticsConsent,
   };
 }

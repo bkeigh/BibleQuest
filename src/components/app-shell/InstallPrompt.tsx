@@ -6,7 +6,7 @@
  * Add-to-Home-Screen instructions after a short delay. Never nags:
  * dismissed once, gone.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { GentleButton } from "@/components/design-system/GentleButton";
@@ -21,14 +21,31 @@ interface BIPEvent extends Event {
 
 const DISMISS_KEY = "biblequest:install-dismissed";
 
+/** True once the user has dismissed the prompt in this browser. Wrapped so a
+ *  throwing localStorage (Safari private mode) degrades to "not dismissed"
+ *  rather than crashing the shell. */
+function isDismissed(): boolean {
+  try {
+    return Boolean(window.localStorage.getItem(DISMISS_KEY));
+  } catch {
+    return false;
+  }
+}
+
 export function InstallPrompt() {
   const [show, setShow] = useState(false);
   const [deferred, setDeferred] = useState<BIPEvent | null>(null);
   const [isIOS, setIsIOS] = useState(false);
+  // This component lives in the persistent /app layout and never unmounts on
+  // soft navigation. Chrome, however, re-dispatches `beforeinstallprompt` on
+  // later navigations while the app is still uninstalled — so the mount-time
+  // localStorage guard alone can't keep a dismissed prompt down. This ref is
+  // the in-session latch the re-fire path checks, so "Not now" actually sticks.
+  const dismissedRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (localStorage.getItem(DISMISS_KEY)) return;
+    if (isDismissed()) return;
 
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
@@ -37,11 +54,19 @@ export function InstallPrompt() {
     if (standalone) return;
 
     const ua = window.navigator.userAgent;
-    const ios = /iphone|ipad|ipod/i.test(ua) && !/crios|fxios/i.test(ua);
+    // iPadOS 13+ masquerades as "Macintosh"; a touch-capable Mac UA is really
+    // an iPad, which also needs the Add-to-Home-Screen hint (no BIP event).
+    const iPadOS =
+      /Macintosh/.test(ua) && (window.navigator.maxTouchPoints ?? 0) > 1;
+    const ios =
+      (/iphone|ipad|ipod/i.test(ua) || iPadOS) && !/crios|fxios/i.test(ua);
 
     const onBIP = (e: Event) => {
       e.preventDefault();
       setDeferred(e as BIPEvent);
+      // Re-check on every dispatch — the user may already have dismissed, and
+      // the browser fires this again on later navigations.
+      if (dismissedRef.current || isDismissed()) return;
       setShow(true);
       track("pwa_install_prompt_viewed");
     };
@@ -51,6 +76,7 @@ export function InstallPrompt() {
     let iosTimer: ReturnType<typeof setTimeout> | undefined;
     if (ios) {
       iosTimer = setTimeout(() => {
+        if (dismissedRef.current || isDismissed()) return;
         setIsIOS(true);
         setShow(true);
         track("pwa_install_prompt_viewed");
@@ -64,6 +90,7 @@ export function InstallPrompt() {
   }, []);
 
   function dismiss() {
+    dismissedRef.current = true;
     setShow(false);
     try {
       localStorage.setItem(DISMISS_KEY, "1");
@@ -73,7 +100,10 @@ export function InstallPrompt() {
   async function install() {
     if (!deferred) return;
     await deferred.prompt();
-    await deferred.userChoice;
+    const { outcome } = await deferred.userChoice;
+    track(
+      outcome === "accepted" ? "pwa_install_accepted" : "pwa_install_dismissed"
+    );
     dismiss();
   }
 

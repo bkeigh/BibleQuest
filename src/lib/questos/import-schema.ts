@@ -40,6 +40,15 @@ const isAssignment = (o: unknown) => isObj(o) && str(o.dateKey) && str(o.questSl
 const isStreak = (o: unknown) =>
   isObj(o) && num(o.current) && num(o.longest) &&
   (str(o.lastActiveDateKey) || o.lastActiveDateKey === null);
+const isMyQuest = (o: unknown) =>
+  isObj(o) &&
+  str(o.questSlug) &&
+  str(o.status) &&
+  str(o.addedAt) &&
+  str(o.lastActivityAt) &&
+  Array.isArray(o.stepsDone) &&
+  o.stepsDone.every(str) &&
+  num(o.timesCompleted);
 
 // field name -> element guard. Elements failing the guard are dropped.
 const ARRAY_GUARDS: Record<string, (o: unknown) => boolean> = {
@@ -58,6 +67,7 @@ const ALL_KEYS: string[] = [
   "pendingMilestones",
   "settings",
   "assignments",
+  "myQuests",
   "profile",
   "readingPosition",
   "lastVisitDateKey",
@@ -113,6 +123,21 @@ export function parseSnapshot(rawText: string): ParseResult {
       }
     }
     out.assignments = clean;
+  }
+  // Quest shelf: keyed by slug. Validate each entry individually — rather than
+  // requiring the whole object well-formed — so one corrupted entry can't
+  // discard the rest of the shelf. A present-but-invalid entry is dropped; a
+  // genuinely ABSENT field (pre-v6 export) is left unset so store.ts's
+  // importData falls back to deriving the shelf from history, exactly as
+  // before. Previously this field was silently dropped entirely, forcing
+  // every restore through that fallback and discarding real saved/paused/
+  // archived entries and in-progress steps.
+  if (isObj(src.myQuests)) {
+    const clean: Record<string, unknown> = {};
+    for (const [slug, entry] of Object.entries(src.myQuests)) {
+      if (isMyQuest(entry)) clean[slug] = entry;
+    }
+    out.myQuests = clean;
   }
   // Settings: pass through if an object (importData deep-merges over defaults);
   // drop a non-object appearance so the merge can't spread a primitive.
