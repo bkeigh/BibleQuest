@@ -32,19 +32,6 @@ export const riseIn: Variants = {
 };
 
 /**
- * Settle-in: fade + a slight drop from above, like paper coming to rest.
- * For headers, toasts-from-above, and elements that "land" rather than rise.
- */
-export const settleIn: Variants = {
-  hidden: { opacity: 0, y: -6 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.55, ease: gentleEase },
-  },
-};
-
-/**
  * Height/opacity expander for disclosure-style content (inline confirms,
  * "mark as answered" notes, expanding rows). Pair with `overflow-hidden`
  * on the same element and `AnimatePresence` for exit:

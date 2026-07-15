@@ -34,14 +34,6 @@ export function timeOfDay(date: Date = new Date()): TimeOfDay {
   return "night";
 }
 
-export function formatFriendlyDate(dateKey: string): string {
-  return fromDateKey(dateKey).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-}
-
 export function formatShortDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", {
     month: "short",

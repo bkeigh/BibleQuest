@@ -43,6 +43,9 @@ export const it: UIStrings = {
     quickPrayer: "Preghiera breve",
     openSettings: "Impostazioni",
     anotherVerse: "Un altro versetto",
+    share: "Condividi",
+    shareCopied: "Copiato. Incollalo dove vuoi.",
+    shareCopyFailed: "Impossibile copiare su questo dispositivo.",
     reflectionHint: "Qualche riga sincera sulla giornata di oggi.",
   },
   streak: {

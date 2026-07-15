@@ -44,6 +44,9 @@ export const el: UIStrings = {
     quickPrayer: "Σύντομη προσευχή",
     openSettings: "Ρυθμίσεις",
     anotherVerse: "Άλλος ένας στίχος",
+    share: "Κοινοποίηση",
+    shareCopied: "Αντιγράφηκε. Επικολλήστε το οπουδήποτε.",
+    shareCopyFailed: "Δεν ήταν δυνατή η αντιγραφή σε αυτήν τη συσκευή.",
     reflectionHint: "Λίγες ειλικρινείς γραμμές για τη σημερινή μέρα.",
   },
   streak: {

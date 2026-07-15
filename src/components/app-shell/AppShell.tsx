@@ -11,7 +11,7 @@ import { flushAnalyticsQueue } from "@/lib/analytics/events";
 /**
  * AppShell — container for the installed/private app experience.
  * Parchment canvas, safe-area aware, bottom navigation.
- * Also records the daily visit (drives warm return copy — never shame).
+ * Also records the daily visit (feeds Journey's has-visited state).
  *
  * First paint is never blank: screens hydrate behind ClientOnly, whose
  * default fallback is the ShellSkeleton, so <main> renders immediately.
@@ -20,10 +20,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const recordVisit = useQuestOS((s) => s.recordVisit);
 
   useEffect(() => {
-    // LOAD-BEARING TIMING: record the visit *after* the current render has
-    // read `lastVisitDateKey`. Home's greeting compares today against the
-    // previous visit — recording synchronously would overwrite it before the
-    // greeting reads it. The 400ms delay is deliberate; do not remove.
+    // Deferred so the first paint isn't competing with a store write. The
+    // original beneficiary (Home's welcome-back line, which snapshotted
+    // lastVisitDateKey at mount) is gone; today's only reader is Journey's
+    // null-check, which doesn't care about ordering.
     const t = setTimeout(() => recordVisit(), 400);
     return () => clearTimeout(t);
   }, [recordVisit]);

@@ -15,7 +15,3 @@ export function getBookMeta(slug: string): BibleBookMeta | undefined {
 
 export const oldTestament = bibleBooks.filter((b) => b.testament === "old");
 export const newTestament = bibleBooks.filter((b) => b.testament === "new");
-
-export function bookDisplayName(meta: BibleBookMeta): string {
-  return meta.name;
-}

@@ -44,6 +44,9 @@ export const ar: UIStrings = {
     quickPrayer: "صلاة قصيرة",
     openSettings: "الإعدادات",
     anotherVerse: "آية أخرى",
+    share: "مشاركة",
+    shareCopied: "تم النسخ. الصقه أينما شئت.",
+    shareCopyFailed: "تعذّر النسخ على هذا الجهاز.",
     reflectionHint: "بضعة أسطر صادقة عن يومك.",
   },
   streak: {

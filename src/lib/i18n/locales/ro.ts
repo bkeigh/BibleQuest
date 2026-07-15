@@ -44,6 +44,9 @@ export const ro: UIStrings = {
     quickPrayer: "Rugăciune scurtă",
     openSettings: "Setări",
     anotherVerse: "Alt verset",
+    share: "Distribuie",
+    shareCopied: "Copiat. Lipește oriunde.",
+    shareCopyFailed: "Nu s-a putut copia pe acest dispozitiv.",
     reflectionHint: "Câteva rânduri sincere despre ziua de azi.",
   },
   streak: {

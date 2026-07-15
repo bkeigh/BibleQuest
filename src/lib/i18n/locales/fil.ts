@@ -44,6 +44,9 @@ export const fil: UIStrings = {
     quickPrayer: "Maikling panalangin",
     openSettings: "Mga Setting",
     anotherVerse: "Isa pang talata",
+    share: "Ibahagi",
+    shareCopied: "Nakopya. I-paste kahit saan.",
+    shareCopyFailed: "Hindi makopya sa device na ito.",
     reflectionHint: "Ilang tapat na linya tungkol sa araw na ito.",
   },
   streak: {

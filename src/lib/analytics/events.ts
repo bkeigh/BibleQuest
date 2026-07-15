@@ -48,6 +48,7 @@ export type AnalyticsEvent =
   // scripture
   | "bible_chapter_opened"
   | "verse_bookmarked"
+  | "verse_shared"
   // journey & habit
   | "journey_viewed"
   | "streak_milestone"

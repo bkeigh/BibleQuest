@@ -44,6 +44,9 @@ export const la: UIStrings = {
     quickPrayer: "Oratio brevis",
     openSettings: "Optiones",
     anotherVerse: "Alius versiculus",
+    share: "Communica",
+    shareCopied: "Exscriptum. Ubivis conglutina.",
+    shareCopyFailed: "In hoc instrumento exscribi non potuit.",
     reflectionHint: "Pauca verba sincera de die hodierno.",
   },
   streak: {

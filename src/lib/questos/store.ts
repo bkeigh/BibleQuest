@@ -18,7 +18,7 @@ import { seedMilestones } from "@/data/seed/milestones";
 import { getDailyVerse } from "./verse-engine";
 import { MAX_DAILY_PICKS } from "./quest-engine";
 import { computeMetrics, checkMilestones } from "./milestone-engine";
-import { toDateKey, daysBetween } from "@/lib/utils/dates";
+import { toDateKey } from "@/lib/utils/dates";
 import { track, setAnalyticsConsent } from "@/lib/analytics/events";
 import {
   DEFAULT_SETTINGS,
@@ -1260,14 +1260,9 @@ export const useQuestOS = create<QuestOSState>()(
 // (primitive or an unchanged object). Anything that builds a new object/array
 // each call (e.g. calculateTreeState, sorted timelines) must be derived with
 // useMemo in the component over the raw state slice — never inside a selector,
-// or zustand's getSnapshot loops. selectDaysAway is safe because it returns a
-// primitive.
+// or zustand's getSnapshot loops. selectVerseRefreshCount is safe because it
+// returns a primitive.
 // ---------------------------------------------------------------------------
-
-export function selectDaysAway(s: QuestOSState): number | null {
-  if (!s.lastVisitDateKey) return null;
-  return daysBetween(s.lastVisitDateKey, toDateKey());
-}
 
 // Shared empty array so the selector returns a stable reference on days
 // with no picks (a fresh [] every call would loop zustand's getSnapshot).
@@ -1276,11 +1271,6 @@ const NO_PICKS: DailyQuestAssignment[] = [];
 /** Today's picked quests, in pick order. Stable reference — render-safe. */
 export function selectTodayPicks(s: QuestOSState): DailyQuestAssignment[] {
   return s.assignments[toDateKey()] ?? NO_PICKS;
-}
-
-/** How many quests the user has picked today (0..MAX_DAILY_PICKS). */
-export function selectTodayPickCount(s: QuestOSState): number {
-  return s.assignments[toDateKey()]?.length ?? 0;
 }
 
 /** The candle. Stable reference — the stored object itself. */

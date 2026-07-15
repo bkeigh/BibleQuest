@@ -61,6 +61,12 @@ export interface UIStrings {
     openSettings: string;
     /** The gentle verse-refresh control. */
     anotherVerse: string;
+    /** Share button on the verse card (native share sheet / copy fallback). */
+    share: string;
+    /** Toast after the clipboard fallback copies the verse. */
+    shareCopied: string;
+    /** Toast when the clipboard fallback fails. */
+    shareCopyFailed: string;
     /** Subtitle on the Reflection quick-row. */
     reflectionHint: string;
   };

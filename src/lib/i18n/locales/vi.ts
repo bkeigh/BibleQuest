@@ -44,6 +44,9 @@ export const vi: UIStrings = {
     quickPrayer: "Lời nguyện ngắn",
     openSettings: "Cài đặt",
     anotherVerse: "Một câu khác",
+    share: "Chia sẻ",
+    shareCopied: "Đã sao chép. Dán ở bất cứ đâu.",
+    shareCopyFailed: "Không thể sao chép trên thiết bị này.",
     reflectionHint: "Vài dòng chân thật về ngày hôm nay.",
   },
   streak: {

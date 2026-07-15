@@ -309,7 +309,7 @@ export function SignInMethods({ source, onEmailSent }: SignInMethodsProps) {
 
 function Divider() {
   return (
-    <div className="my-5 flex items-center gap-3 text-caption text-ash">
+    <div className="my-3.5 flex items-center gap-3 text-caption text-ash">
       <span className="h-px flex-1 bg-mist" />
       or
       <span className="h-px flex-1 bg-mist" />

@@ -38,14 +38,6 @@ export function nextStep(
   return null;
 }
 
-/** 0..1 progress for the current walk. Completed entries read as 1. */
-export function stepProgress(
-  entry: Pick<MyQuest, "stepsDone" | "status">
-): number {
-  if (entry.status === "completed") return 1;
-  return stepsDoneCount(entry) / questStepCount();
-}
-
 /** True once the walk has begun in any visible way. */
 export function hasBegun(
   entry: Pick<MyQuest, "stepsDone" | "startedAt">

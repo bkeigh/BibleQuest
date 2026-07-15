@@ -44,6 +44,9 @@ export const sw: UIStrings = {
     quickPrayer: "Ombi fupi",
     openSettings: "Mipangilio",
     anotherVerse: "Mstari mwingine",
+    share: "Shiriki",
+    shareCopied: "Imenakiliwa. Bandika popote.",
+    shareCopyFailed: "Imeshindwa kunakili kwenye kifaa hiki.",
     reflectionHint: "Maneno machache ya kweli kuhusu siku ya leo.",
   },
   streak: {

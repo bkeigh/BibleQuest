@@ -13,10 +13,8 @@ template in [`../.env.example`](../.env.example).
 | `NEXT_PUBLIC_ANALYTICS_ENABLED` | Optional | `true` to enable privacy-first analytics. |
 | `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | Optional | Plausible domain, if used. |
 | `SENTRY_DSN` | Optional | Error monitoring (scrub sensitive fields). |
-| `STRIPE_SECRET_KEY` | Optional | Payments scaffold (nothing spiritual is gated). |
-| `STRIPE_WEBHOOK_SECRET` | Optional | Verify Stripe webhooks. |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Optional | Client Stripe key. |
-| `STRIPE_PLUS_PRICE_ID` / `STRIPE_PATRON_PRICE_ID` | Optional | Plus / Patron prices. |
+| `NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY` | Optional | RevenueCat public key — Test Store (`test_…`) in dev, Web Billing (`rcb_…`) in prod. |
+| `NEXT_PUBLIC_REVENUECAT_PLUS_ENTITLEMENT` | Optional | Only if the entitlement is renamed in the RevenueCat dashboard. |
 | `RESEND_API_KEY` | Optional | Lifecycle email (later). |
 | `ANTHROPIC_API_KEY` | Future | AI Guide (scaffold-only in V1). |
 

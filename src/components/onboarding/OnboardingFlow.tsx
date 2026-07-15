@@ -223,7 +223,7 @@ function OnboardingInner() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="relative flex min-h-dvh flex-col bg-parchment px-5 pb-10 pt-safe">
+      <div className="relative flex min-h-dvh flex-col bg-parchment px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-safe">
         {/* Progress — dots, no numbers, no pressure */}
         <div
           role="progressbar"
@@ -231,7 +231,7 @@ function OnboardingInner() {
           aria-valuemax={TOTAL_STEPS}
           aria-valuenow={step + 1}
           aria-valuetext={`Step ${step + 1} of ${TOTAL_STEPS}`}
-          className="mx-auto flex w-full max-w-md items-center justify-center gap-1.5 pt-8"
+          className="mx-auto flex w-full max-w-md items-center justify-center gap-1.5 pt-6"
         >
           {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
             <span
@@ -248,7 +248,7 @@ function OnboardingInner() {
           ))}
         </div>
 
-        <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-8">
+        <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-5">
           <AnimatePresence mode="wait">
             <motion.div
               key={step}
@@ -391,7 +391,7 @@ function StepMascot({ name, size = 9 }: { name: PixelMascotName; size?: number }
       variants={riseIn}
       initial="hidden"
       animate="visible"
-      className="mb-6"
+      className="mb-4"
     >
       <PixelMascot name={name} size={size} />
     </motion.div>
@@ -516,44 +516,45 @@ function StepFirstQuest({
   return (
     <div>
       <div className="text-center">
-        <StepMascot name="sprout" />
+        <StepMascot name="sprout" size={7} />
         <h2
           id={STEP_HEADING_ID}
           tabIndex={-1}
-          className="font-display text-editorial text-graphite outline-none"
+          className="font-display text-[1.375rem] leading-snug text-graphite outline-none"
         >
           You’re set, {name}.
         </h2>
-        <p className="mt-2 text-small text-ash">
+        <p className="mt-1.5 text-small text-ash">
           Here’s today’s verse{quest ? " and a suggested first quest" : ""}.
         </p>
       </div>
-      <div className="mt-6 space-y-4">
-        <VerseCard verse={verse} />
+      <div className="mt-4 space-y-3">
+        {/* preview: display-only — the card's Save/Reflect actions lead into
+            /app, and OnboardingGate would bounce back here, restarting the
+            flow and losing every answer. */}
+        <VerseCard verse={verse} preview />
         {quest && (
           <div>
-            <p className="mb-2 text-caption uppercase tracking-[0.14em] text-accent">
+            <p className="mb-1.5 text-caption uppercase tracking-[0.14em] text-accent">
               Suggested first quest
             </p>
-            <QuestSlip quest={quest} />
+            {/* compact + no prayer card: the quest page itself carries the
+                invitation and prayer prompt — this step just has to fit a
+                phone screen without scrolling. */}
+            <QuestSlip quest={quest} compact />
           </div>
         )}
-        <PaperCard variant="quiet" padding="md">
-          <p className="text-small italic text-charcoal">
-            “{quest?.prayerPrompt ?? "Lord, meet me in this quiet moment."}”
-          </p>
-        </PaperCard>
       </div>
       <GentleButton
         variant="primary"
         size="lg"
         fullWidth
-        className="mt-6"
+        className="mt-5"
         onClick={onStart}
       >
         {quest ? "Start with this quest" : "Open BibleQuest"}
       </GentleButton>
-      <div className="mt-3 text-center">
+      <div className="mt-2.5 text-center">
         <GentleButton variant="text" size="sm" onClick={onBrowse}>
           Or browse all quests
         </GentleButton>
@@ -579,22 +580,22 @@ function StepAccount({
   return (
     <div>
       <div className="text-center">
-        <StepMascot name="key" />
+        <StepMascot name="key" size={7} />
         <h2
           id={STEP_HEADING_ID}
           tabIndex={-1}
-          className="font-display text-editorial text-graphite outline-none"
+          className="font-display text-[1.375rem] leading-snug text-graphite outline-none"
         >
           One last thing, {name}
         </h2>
-        <p className="mx-auto mt-2 max-w-sm text-small leading-relaxed text-ash">
+        <p className="mx-auto mt-1.5 max-w-sm text-caption leading-relaxed text-ash">
           Your journey is saved on this device. A free account keeps it safe
           across devices — your prayers and reflections stay private, always.
           Optional, and you can always do it later.
         </p>
       </div>
 
-      <PaperCard variant="paper" padding="md" className="mt-6">
+      <PaperCard variant="paper" padding="md" className="mt-4">
         <SignInMethods source="onboarding" onEmailSent={() => setEmailSent(true)} />
       </PaperCard>
 
@@ -602,7 +603,7 @@ function StepAccount({
         variant={emailSent ? "primary" : "outline"}
         size="lg"
         fullWidth
-        className="mt-4"
+        className="mt-3"
         onClick={onProceed}
       >
         {emailSent ? "Open BibleQuest" : "Continue as guest"}

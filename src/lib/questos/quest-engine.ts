@@ -81,7 +81,7 @@ const STYLE_CATEGORY_AFFINITY: Record<string, QuestCategory[]> = {
  * so the same quest greets the user all day — unless they gently ask for
  * another.
  */
-export function selectDailyQuest(options: {
+function selectDailyQuest(options: {
   quests: QuestTemplate[];
   dateKey: string;
   profile: Profile | null;

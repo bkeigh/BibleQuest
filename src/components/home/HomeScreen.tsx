@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   useQuestOS,
-  selectDaysAway,
   selectStreak,
   selectTodayPicks,
   selectVerseRefreshCount,
@@ -15,7 +14,6 @@ import { calculateTreeState, stageProgress } from "@/lib/questos/growth-engine";
 import { selectSuggestedQuests } from "@/lib/questos/quest-engine";
 import { getDailyVerse } from "@/lib/questos/verse-engine";
 import { timeOfDay, toDateKey } from "@/lib/utils/dates";
-import { returnLine } from "@/lib/questos/copy";
 import { useStrings, fmt } from "@/lib/i18n";
 import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
 import { firstName } from "@/lib/utils/name";
@@ -43,10 +41,6 @@ import { seedQuests, questBySlug } from "@/data/seed/quests";
 
 function HomeInner() {
   const profile = useQuestOS((s) => s.profile);
-  // Snapshot how long they've been away ONCE, at mount — before AppShell's
-  // recordVisit() overwrites lastVisitDateKey to today. A reactive read would
-  // flip the warm "welcome back" line to same-day copy ~400ms in.
-  const [daysAway] = useState(() => selectDaysAway(useQuestOS.getState()));
   const settings = useQuestOS((s) => s.settings);
   const growthEvents = useQuestOS((s) => s.growthEvents);
   const readingPosition = useQuestOS((s) => s.readingPosition);
@@ -142,12 +136,12 @@ function HomeInner() {
 
       <PageContainer className="relative pt-safe">
         {/* Greeting — my space: your face (or initial) beside your name */}
-        <header className="flex items-start justify-between gap-4 pt-8 pb-5">
-          <div className="flex min-w-0 items-start gap-3.5">
+        <header className="flex items-center justify-between gap-4 pt-8 pb-5">
+          <div className="flex min-w-0 items-center gap-3.5">
             <Link
               href="/app/settings"
               aria-label={t.home.openSettings}
-              className="mt-1.5 shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <Avatar
                 name={profile?.displayName}
@@ -161,16 +155,15 @@ function HomeInner() {
               <p className="text-caption uppercase tracking-[0.16em] text-accent">
                 {season.label}
               </p>
-              <h1 className="mt-2 font-display text-editorial text-graphite">
+              <h1 className="mt-1 font-display text-editorial text-graphite">
                 {hello}
               </h1>
-              <p className="mt-1 text-body text-ash">{returnLine(daysAway)}</p>
             </div>
           </div>
           <Link
             href="/app/settings"
             aria-label={t.home.openSettings}
-            className="mt-8 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ash transition-colors duration-300 hover:bg-linen hover:text-charcoal"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ash transition-colors duration-300 hover:bg-linen hover:text-charcoal"
           >
             <IconSettings size={21} />
           </Link>
@@ -182,37 +175,6 @@ function HomeInner() {
 
           {/* Today's verse */}
           <VerseCard verse={verse} onAnotherVerse={refreshVerse} />
-
-          {/* Growth preview — the journey, one glance */}
-          <Link href="/app/journey" className="block">
-            <PaperCard interactive padding="md" className="flex items-center gap-4">
-              <GrowthTree state={tree} size={92} showGround={false} />
-              <div className="min-w-0 flex-1">
-                <SectionLabel pixel>{t.home.yourGrowth}</SectionLabel>
-                <p className="font-display text-subheading text-graphite">
-                  {tree.stageLabel}
-                </p>
-                {/* Gentle progression bar — the caption carries the meaning. */}
-                <div
-                  aria-hidden="true"
-                  className="mt-2 h-1.5 overflow-hidden rounded-full bg-mist/60"
-                >
-                  <div
-                    className="h-full rounded-full bg-accent"
-                    style={{ width: `${(progress?.fraction ?? 1) * 100}%` }}
-                  />
-                </div>
-                <p className="mt-1.5 text-caption text-ash">
-                  {tree.toNextStage != null
-                    ? tree.toNextStage === 1
-                      ? t.journey.toNextOne
-                      : fmt(t.journey.toNext, { n: tree.toNextStage })
-                    : t.journey.fullGrown}
-                </p>
-              </div>
-              <IconChevronRight className="text-fog" />
-            </PaperCard>
-          </Link>
 
           {/* Today's quests — empty, picked (1-3), or day complete */}
           <section aria-label={t.home.todaysQuests}>
@@ -336,6 +298,37 @@ function HomeInner() {
               </motion.div>
             )}
           </section>
+
+          {/* Growth preview — the journey, one glance */}
+          <Link href="/app/journey" className="block">
+            <PaperCard interactive padding="md" className="flex items-center gap-4">
+              <GrowthTree state={tree} size={92} showGround={false} />
+              <div className="min-w-0 flex-1">
+                <SectionLabel pixel>{t.home.yourGrowth}</SectionLabel>
+                <p className="font-display text-subheading text-graphite">
+                  {tree.stageLabel}
+                </p>
+                {/* Gentle progression bar — the caption carries the meaning. */}
+                <div
+                  aria-hidden="true"
+                  className="mt-2 h-1.5 overflow-hidden rounded-full bg-mist/60"
+                >
+                  <div
+                    className="h-full rounded-full bg-accent"
+                    style={{ width: `${(progress?.fraction ?? 1) * 100}%` }}
+                  />
+                </div>
+                <p className="mt-1.5 text-caption text-ash">
+                  {tree.toNextStage != null
+                    ? tree.toNextStage === 1
+                      ? t.journey.toNextOne
+                      : fmt(t.journey.toNext, { n: tree.toNextStage })
+                    : t.journey.fullGrown}
+                </p>
+              </div>
+              <IconChevronRight className="text-fog" />
+            </PaperCard>
+          </Link>
 
           {/* Your quests — the shelf: active walks beyond today, saved for
               later, and the completed record. Renders nothing when the

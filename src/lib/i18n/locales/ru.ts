@@ -44,6 +44,9 @@ export const ru: UIStrings = {
     quickPrayer: "Краткая молитва",
     openSettings: "Настройки",
     anotherVerse: "Другой стих",
+    share: "Поделиться",
+    shareCopied: "Скопировано. Вставьте куда угодно.",
+    shareCopyFailed: "Не удалось скопировать на этом устройстве.",
     reflectionHint: "Несколько честных строк о сегодняшнем дне.",
   },
   streak: {

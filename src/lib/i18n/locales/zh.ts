@@ -44,6 +44,9 @@ export const zh: UIStrings = {
     quickPrayer: "简短祷告",
     openSettings: "设置",
     anotherVerse: "换一节经文",
+    share: "分享",
+    shareCopied: "已复制，随处粘贴。",
+    shareCopyFailed: "无法在此设备上复制。",
     reflectionHint: "关于今天的几句真心话。",
   },
   streak: {

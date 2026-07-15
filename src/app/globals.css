@@ -298,10 +298,6 @@ body {
   letter-spacing: -0.01em;
 }
 
-@utility paper-edge {
-  border: 1px solid var(--color-mist);
-}
-
 @utility paper-shadow {
   box-shadow:
     0 1px 2px rgb(30 51 41 / 0.04),
@@ -326,13 +322,6 @@ body {
 @utility pt-safe {
   padding-top: env(safe-area-inset-top);
 }
-@utility mb-safe {
-  margin-bottom: env(safe-area-inset-bottom);
-}
-@utility h-safe-bottom {
-  height: env(safe-area-inset-bottom);
-}
-
 /* Comfortable reading measure for Scripture and journals */
 @utility measure-reading {
   max-width: 42rem;
@@ -372,14 +361,6 @@ body {
   border: 2px solid var(--color-gold-500);
   border-radius: 6px;
   box-shadow: 3px 3px 0 0 color-mix(in srgb, var(--color-gold-500) 30%, transparent);
-}
-
-/* Hide scrollbars on filter rows without killing scroll */
-@utility scrollbar-none {
-  scrollbar-width: none;
-  &::-webkit-scrollbar {
-    display: none;
-  }
 }
 
 /* ============================================================

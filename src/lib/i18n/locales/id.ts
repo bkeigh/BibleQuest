@@ -44,6 +44,9 @@ export const id: UIStrings = {
     quickPrayer: "Doa singkat",
     openSettings: "Pengaturan",
     anotherVerse: "Ayat lain",
+    share: "Bagikan",
+    shareCopied: "Disalin. Tempel di mana saja.",
+    shareCopyFailed: "Tidak dapat menyalin di perangkat ini.",
     reflectionHint: "Beberapa baris jujur tentang hari ini.",
   },
   streak: {

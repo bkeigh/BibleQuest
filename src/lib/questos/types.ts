@@ -7,22 +7,6 @@
  */
 
 // ---------------------------------------------------------------------------
-// Faith provider
-// ---------------------------------------------------------------------------
-
-export interface FaithProvider {
-  key: string;
-  name: string;
-  canonicalTextLabel: string;
-}
-
-export const BIBLEQUEST_PROVIDER: FaithProvider = {
-  key: "christianity",
-  name: "BibleQuest",
-  canonicalTextLabel: "Bible",
-};
-
-// ---------------------------------------------------------------------------
 // Quests
 // ---------------------------------------------------------------------------
 
@@ -607,18 +591,3 @@ export function emptyStreak(): StreakState {
 // ---------------------------------------------------------------------------
 
 export type PlanKey = "free" | "plus" | "patron";
-
-export type FeatureKey =
-  | "ai_guide"
-  | "personalized_quests"
-  | "advanced_reading_plans"
-  | "premium_themes"
-  | "voice_journaling"
-  | "reflection_insights"
-  | "year_in_review"
-  | "family_groups";
-
-export interface SubscriptionState {
-  plan: PlanKey;
-  status: "none" | "active" | "canceled";
-}

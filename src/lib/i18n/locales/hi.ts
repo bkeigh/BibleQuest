@@ -44,6 +44,9 @@ export const hi: UIStrings = {
     quickPrayer: "छोटी प्रार्थना",
     openSettings: "सेटिंग्स",
     anotherVerse: "एक और वचन",
+    share: "साझा करें",
+    shareCopied: "कॉपी हो गया। कहीं भी पेस्ट करें।",
+    shareCopyFailed: "इस डिवाइस पर कॉपी नहीं हो सका।",
     reflectionHint: "आज के बारे में कुछ सच्ची पंक्तियाँ।",
   },
   streak: {

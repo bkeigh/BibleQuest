@@ -44,6 +44,9 @@ export const ko: UIStrings = {
     quickPrayer: "짧은 기도",
     openSettings: "설정",
     anotherVerse: "다른 말씀 보기",
+    share: "공유",
+    shareCopied: "복사되었습니다. 어디든 붙여넣으세요.",
+    shareCopyFailed: "이 기기에서는 복사할 수 없습니다.",
     reflectionHint: "오늘 하루를 솔직하게 몇 줄 적어 보세요.",
   },
   streak: {

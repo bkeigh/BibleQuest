@@ -143,7 +143,3 @@ export function getCurrentSeason(now: Date = new Date()): SeasonInfo {
 
   return SEASONS.ordinary_time;
 }
-
-export function getSeasonInfo(key: SeasonKey): SeasonInfo {
-  return SEASONS[key];
-}

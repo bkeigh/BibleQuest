@@ -66,13 +66,3 @@ export function buildQuestFeed(
 
   return { journey, saved, completed, archived };
 }
-
-/** Anything at all on the shelf? Drives the feed's empty state. */
-export function feedIsEmpty(sections: QuestFeedSections): boolean {
-  return (
-    sections.journey.length === 0 &&
-    sections.saved.length === 0 &&
-    sections.completed.length === 0 &&
-    sections.archived.length === 0
-  );
-}
