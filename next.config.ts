@@ -59,7 +59,9 @@ const contentSecurityPolicy = [
   "object-src 'none'", // no <object>/<embed>/<applet>
   "base-uri 'self'", // lock <base> to same origin
   "form-action 'self'", // forms may only submit to same origin
-  "frame-ancestors 'none'", // clickjacking protection (pairs with X-Frame-Options)
+  // Keep framing locked down to BibleQuest itself and Winterhill's two canonical
+  // hostnames so the studio portfolio can offer an interactive project preview.
+  "frame-ancestors 'self' https://winterhill.studio https://www.winterhill.studio",
   "upgrade-insecure-requests",
 ].join("; ");
 
@@ -84,7 +86,8 @@ const permissionsPolicy = [
 
 const securityHeaders = [
   { key: "Content-Security-Policy", value: contentSecurityPolicy },
-  { key: "X-Frame-Options", value: "DENY" },
+  // CSP frame-ancestors above provides the allowlist. X-Frame-Options cannot
+  // express multiple approved origins and would override the portfolio embed.
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: permissionsPolicy },
