@@ -6,7 +6,10 @@ import { InstallPrompt } from "./InstallPrompt";
 import { LanguageApplier } from "./LanguageApplier";
 import { ToastProvider } from "@/components/design-system/Toast";
 import { useQuestOS } from "@/lib/questos/store";
-import { flushAnalyticsQueue } from "@/lib/analytics/events";
+import {
+  flushAnalyticsQueue,
+  subscribeToAnalyticsConsent,
+} from "@/lib/analytics/events";
 
 /**
  * AppShell — container for the installed/private app experience.
@@ -36,6 +39,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     window.addEventListener("online", flushAnalyticsQueue);
     return () => window.removeEventListener("online", flushAnalyticsQueue);
   }, []);
+
+  useEffect(
+    () =>
+      subscribeToAnalyticsConsent((analyticsConsent) => {
+        // Storage events do not update Zustand automatically. Keep the toggle
+        // honest when another tab changes the explicit consent record.
+        const state = useQuestOS.getState();
+        if (state.settings.analyticsConsent !== analyticsConsent) {
+          useQuestOS.setState({
+            settings: { ...state.settings, analyticsConsent },
+          });
+        }
+      }),
+    []
+  );
 
   return (
     <ToastProvider>

@@ -31,6 +31,10 @@ export async function updateSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );
+          // Service workers cannot reliably inspect Set-Cookie because Fetch
+          // filters it in browser response headers. Make the same response
+          // explicitly uncacheable so auth refreshes never enter Cache Storage.
+          response.headers.set("Cache-Control", "private, no-store");
         },
       },
     }

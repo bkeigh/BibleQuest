@@ -1,39 +1,26 @@
 "use client";
 
-// Note: purchases-js@1.47 injects its own paywall/checkout styles at runtime —
-// there is no separate stylesheet to import (the "./styles" export is stale).
 import { useState } from "react";
-import type { Package } from "@revenuecat/purchases-js";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { usePlus } from "@/lib/revenuecat/usePlus";
 
 const REASSURANCE = "Cancel anytime — the free app stays complete either way.";
 
-/**
- * The footer of the Plus card. Until RevenueCat is configured this renders the
- * exact "coming soon" copy the app ships with today. Once the public key is set
- * it prefers the RevenueCat-designed paywall (presentPaywall) when one is
- * published, and otherwise falls back to direct package purchase — so it works
- * on the Test Store immediately and upgrades to the paywall with no code change.
- * See docs/REVENUECAT.md.
- */
+/** Purchase and membership controls for the dashboard-selected Plus paywall. */
 export function PlusCta() {
   const {
-    configured,
-    loading,
+    status,
     isPlus,
-    hasPaywall,
-    packages,
+    canPurchase,
     managementURL,
     error,
     presentPaywall,
-    purchase,
     openCustomerCenter,
+    refresh,
   } = usePlus();
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"paywall" | "refresh" | null>(null);
 
-  // Not wired yet → today's behavior, unchanged.
-  if (!configured) {
+  if (status === "coming-soon") {
     return (
       <p className="mt-5 text-[0.8125rem] text-ash">
         Plus isn’t out yet. We’re planning $8.99 a month — about 29¢ a day — no
@@ -43,11 +30,67 @@ export function PlusCta() {
     );
   }
 
-  if (loading) {
-    return <p className="mt-5 text-[0.8125rem] text-ash">Loading membership options…</p>;
+  if (status === "unconfigured") {
+    return (
+      <p className="mt-5 text-[0.8125rem] text-ash">
+        Membership isn’t available right now. The free app stays complete while
+        we finish setup.
+      </p>
+    );
   }
 
-  // Member → thank-you + the web Customer Center (RevenueCat management page).
+  if (status === "loading") {
+    return (
+      <p className="mt-5 text-[0.8125rem] text-ash">
+        Loading membership options…
+      </p>
+    );
+  }
+
+  const retryRefresh = async () => {
+    setBusy("refresh");
+    try {
+      await refresh();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (status === "error") {
+    return (
+      <div className="mt-5 space-y-2">
+        <p className="text-[0.8125rem] text-rose-700">{error}</p>
+        <GentleButton
+          variant="text"
+          size="sm"
+          onClick={retryRefresh}
+          disabled={busy !== null}
+        >
+          Try again{busy === "refresh" ? " …" : ""}
+        </GentleButton>
+      </div>
+    );
+  }
+
+  if (isPlus && status === "management-unavailable") {
+    return (
+      <div className="mt-5 space-y-2">
+        <p className="text-[0.8125rem] leading-relaxed text-charcoal">
+          You’re a Plus member. Membership management is temporarily
+          unavailable, but your access is still active.
+        </p>
+        <GentleButton
+          variant="text"
+          size="sm"
+          onClick={retryRefresh}
+          disabled={busy !== null}
+        >
+          Refresh membership{busy === "refresh" ? " …" : ""}
+        </GentleButton>
+      </div>
+    );
+  }
+
   if (isPlus) {
     return (
       <div className="mt-5 space-y-2">
@@ -67,6 +110,18 @@ export function PlusCta() {
     );
   }
 
+  // A key or a package list is not enough. The current offering must have a
+  // published paywall and at least one package before any purchase control is
+  // rendered.
+  if (!canPurchase) {
+    return (
+      <p className="mt-5 text-[0.8125rem] text-ash">
+        Membership options aren’t ready yet — the free app stays complete either
+        way.
+      </p>
+    );
+  }
+
   const openPaywall = async () => {
     setBusy("paywall");
     try {
@@ -76,70 +131,25 @@ export function PlusCta() {
     }
   };
 
-  const buy = async (pkg: Package) => {
-    setBusy(pkg.identifier);
-    try {
-      await purchase(pkg);
-    } catch {
-      // Surfaced via `error`; nothing more to do here.
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  // Preferred: the RevenueCat-designed paywall (one button, RC runs checkout).
-  if (hasPaywall) {
-    return (
-      <div className="mt-5 space-y-3">
-        <GentleButton
-          variant="gold"
-          size="md"
-          onClick={openPaywall}
-          disabled={busy !== null}
-          aria-busy={busy === "paywall"}
-        >
-          Support with BibleQuest Plus{busy === "paywall" ? " …" : ""}
-        </GentleButton>
-        {error && <p className="text-[0.8125rem] text-rose-700">{error}</p>}
-        <p className="text-[0.75rem] text-ash">{REASSURANCE}</p>
-      </div>
-    );
-  }
-
-  // Fallback (no paywall published yet): buy a package directly. Fully working
-  // on the Test Store; the empty case stays calm rather than dumping a wall.
-  if (packages.length === 0) {
-    return (
-      <p className="mt-5 text-[0.8125rem] text-ash">
-        {error ??
-          "Membership options aren’t available right now — the free app stays complete either way."}
-      </p>
-    );
-  }
-
   return (
     <div className="mt-5 space-y-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-        {packages.map((pkg) => {
-          const price =
-            pkg.webBillingProduct.price?.formattedPrice ??
-            pkg.webBillingProduct.currentPrice.formattedPrice;
-          return (
-            <GentleButton
-              key={pkg.identifier}
-              variant="gold"
-              size="sm"
-              onClick={() => buy(pkg)}
-              disabled={busy !== null}
-              aria-busy={busy === pkg.identifier}
-            >
-              {pkg.webBillingProduct.title} · {price}
-              {busy === pkg.identifier ? " …" : ""}
-            </GentleButton>
-          );
-        })}
-      </div>
-      {error && <p className="text-[0.8125rem] text-rose-700">{error}</p>}
+      <GentleButton
+        variant="gold"
+        size="md"
+        onClick={openPaywall}
+        disabled={busy !== null}
+        aria-busy={busy === "paywall"}
+      >
+        Support with BibleQuest Plus{busy === "paywall" ? " …" : ""}
+      </GentleButton>
+      {status === "purchase-cancelled" && (
+        <p className="text-[0.8125rem] text-ash">
+          No changes were made. You can come back whenever you’re ready.
+        </p>
+      )}
+      {status === "purchase-failed" && error && (
+        <p className="text-[0.8125rem] text-rose-700">{error}</p>
+      )}
       <p className="text-[0.75rem] text-ash">{REASSURANCE}</p>
     </div>
   );

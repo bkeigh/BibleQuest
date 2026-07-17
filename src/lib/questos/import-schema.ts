@@ -10,19 +10,46 @@
  * PRIVACY: this never logs the file and never echoes any of its contents in an
  * error message — prayer & reflection text must not leave the device.
  */
-import type { QuestOSSnapshot } from "./types";
+import {
+  PRAYER_CATEGORIES,
+  QUEST_STEP_KEYS,
+  REFLECTION_MOODS,
+  type AccountNudgeContext,
+  type QuestOSSnapshot,
+} from "./types";
 
 function isObj(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 const str = (v: unknown): v is string => typeof v === "string";
 const num = (v: unknown): v is number => typeof v === "number";
+const PRAYER_CATEGORY_SET = new Set<string>(PRAYER_CATEGORIES);
+const QUEST_STEP_SET = new Set<string>(QUEST_STEP_KEYS);
+const REFLECTION_MOOD_SET = new Set<string>(REFLECTION_MOODS);
+const MY_QUEST_STATUSES = new Set([
+  "saved",
+  "active",
+  "paused",
+  "completed",
+  "archived",
+]);
+const ASSIGNMENT_STATUSES = new Set(["assigned", "started", "completed"]);
+const PRAYER_STATUSES = new Set(["active", "answered", "archived"]);
+const ACCOUNT_NUDGE_CONTEXTS = new Set<AccountNudgeContext>([
+  "onboarding",
+  "first_quest_completed",
+  "first_reflection",
+  "milestone_reached",
+]);
 
 // Element guards — assert the fields the app dereferences without a guard.
 const isPrayer = (o: unknown) =>
-  isObj(o) && str(o.id) && str(o.body) && str(o.status) && str(o.category) && str(o.createdAt) && str(o.updatedAt);
+  isObj(o) && str(o.id) && str(o.body) && str(o.status) &&
+  PRAYER_STATUSES.has(o.status) && str(o.category) &&
+  PRAYER_CATEGORY_SET.has(o.category) && str(o.createdAt) && str(o.updatedAt);
 const isReflection = (o: unknown) =>
-  isObj(o) && str(o.id) && str(o.body) && str(o.createdAt) && str(o.updatedAt);
+  isObj(o) && str(o.id) && str(o.body) && str(o.createdAt) && str(o.updatedAt) &&
+  (o.mood === undefined || (str(o.mood) && REFLECTION_MOOD_SET.has(o.mood)));
 const isGrowthEvent = (o: unknown) => isObj(o) && str(o.growthType) && num(o.amount);
 const isCompletion = (o: unknown) =>
   isObj(o) && str(o.id) && str(o.questSlug) && str(o.dateKey) && str(o.completedAt);
@@ -36,7 +63,9 @@ const isProfile = (o: unknown) =>
   isObj(o) && str(o.displayName) && typeof o.onboardingCompleted === "boolean" && str(o.createdAt);
 const isReadingPosition = (o: unknown) =>
   isObj(o) && str(o.bookSlug) && str(o.bookName) && num(o.chapter);
-const isAssignment = (o: unknown) => isObj(o) && str(o.dateKey) && str(o.questSlug) && str(o.status);
+const isAssignment = (o: unknown) =>
+  isObj(o) && str(o.dateKey) && str(o.questSlug) && str(o.status) &&
+  ASSIGNMENT_STATUSES.has(o.status) && num(o.rerolls);
 const isStreak = (o: unknown) =>
   isObj(o) && num(o.current) && num(o.longest) &&
   (str(o.lastActiveDateKey) || o.lastActiveDateKey === null);
@@ -44,11 +73,20 @@ const isMyQuest = (o: unknown) =>
   isObj(o) &&
   str(o.questSlug) &&
   str(o.status) &&
+  MY_QUEST_STATUSES.has(o.status) &&
   str(o.addedAt) &&
   str(o.lastActivityAt) &&
   Array.isArray(o.stepsDone) &&
-  o.stepsDone.every(str) &&
+  o.stepsDone.every((step) => str(step) && QUEST_STEP_SET.has(step)) &&
   num(o.timesCompleted);
+const isAccountNudge = (o: unknown) =>
+  isObj(o) &&
+  Array.isArray(o.shownContexts) &&
+  o.shownContexts.every(
+    (context) => str(context) && ACCOUNT_NUDGE_CONTEXTS.has(context as AccountNudgeContext)
+  ) &&
+  (str(o.lastDismissedAt) || o.lastDismissedAt === null) &&
+  num(o.dismissCount);
 
 // field name -> element guard. Elements failing the guard are dropped.
 const ARRAY_GUARDS: Record<string, (o: unknown) => boolean> = {
@@ -72,6 +110,7 @@ const ALL_KEYS: string[] = [
   "readingPosition",
   "lastVisitDateKey",
   "streak",
+  "accountNudge",
 ];
 
 export type ParseResult =
@@ -141,15 +180,19 @@ export function parseSnapshot(rawText: string): ParseResult {
   }
   // Settings: pass through if an object (importData deep-merges over defaults);
   // drop a non-object appearance so the merge can't spread a primitive.
+  // Consent is intentionally never restored from a file: importing a journey
+  // is not an explicit choice to enable analytics on this browser.
   if (isObj(src.settings)) {
     const s = { ...src.settings };
     if ("appearance" in s && !isObj(s.appearance)) delete s.appearance;
+    delete s.analyticsConsent;
     out.settings = s;
   }
   // Nullable objects: keep only when well-formed, else drop to the default (null).
   if (isProfile(src.profile)) out.profile = src.profile;
   if (isStreak(src.streak)) out.streak = src.streak;
   if (isReadingPosition(src.readingPosition)) out.readingPosition = src.readingPosition;
+  if (isAccountNudge(src.accountNudge)) out.accountNudge = src.accountNudge;
   if (str(src.lastVisitDateKey) || src.lastVisitDateKey === null) {
     out.lastVisitDateKey = src.lastVisitDateKey;
   }

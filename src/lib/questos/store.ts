@@ -1178,7 +1178,7 @@ export const useQuestOS = create<QuestOSState>()(
     {
       name: "biblequest:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 6,
+      version: 7,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
@@ -1247,7 +1247,21 @@ export const useQuestOS = create<QuestOSState>()(
             (state.assignments ?? {}) as Record<string, DailyQuestAssignment[]>
           );
         }
+        if (version < 7) {
+          // Earlier releases treated a missing consent record as permission.
+          // Because an existing `true` cannot be distinguished from that old
+          // default, require every user to make a fresh explicit choice.
+          const settings = state.settings as
+            | { analyticsConsent?: boolean }
+            | undefined;
+          if (settings) settings.analyticsConsent = false;
+        }
         return state as unknown as QuestOSState;
+      },
+      onRehydrateStorage: () => (state, error) => {
+        // A failed or incomplete hydration is not consent. Mirroring here also
+        // prevents events fired early in app startup from seeing stale state.
+        setAnalyticsConsent(!error && state?.settings.analyticsConsent === true);
       },
     }
   )

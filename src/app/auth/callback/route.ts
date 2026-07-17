@@ -4,6 +4,7 @@ import {
   createServerSupabase,
   isSupabaseConfigured,
 } from "@/lib/supabase/server";
+import { safeNextPath } from "@/lib/auth/redirect";
 
 /**
  * Email OTP types we accept on the token_hash path. An allow-list, not a cast:
@@ -23,41 +24,6 @@ function asEmailOtpType(value: string | null): EmailOtpType | null {
   return value && EMAIL_OTP_TYPES.has(value as EmailOtpType)
     ? (value as EmailOtpType)
     : null;
-}
-
-/** Safe post-login home route used when `next` is missing or untrusted. */
-const DEFAULT_NEXT = "/app";
-
-/**
- * Returns a safe, same-origin redirect path derived from an untrusted `next`
- * query param. Accepts ONLY plain internal paths and falls back to
- * {@link DEFAULT_NEXT} for anything that could escape the app's origin.
- *
- * A value is accepted only when it:
- *  - starts with a single "/" (not "//", which is protocol-relative), and
- *  - contains no backslash (browsers treat "\" like "/", so "/\evil.com" and
- *    "/\/evil.com" would resolve off-origin), and
- *  - contains no tab/newline/carriage-return (browsers strip these before
- *    parsing, which can smuggle a "//host" prefix past the checks above).
- *
- * Because an accepted value always begins with "/", it can never be parsed as
- * having a URL scheme (http:, https:, mailto:, javascript:, ...), so absolute
- * URLs are rejected implicitly. Valid internal paths keep their query/hash,
- * e.g. "/app/prayer?filter=answered".
- */
-function safeNextPath(next: string | null): string {
-  if (
-    !next ||
-    !next.startsWith("/") ||
-    next.startsWith("//") ||
-    next.includes("\\") ||
-    next.includes("\t") ||
-    next.includes("\n") ||
-    next.includes("\r")
-  ) {
-    return DEFAULT_NEXT;
-  }
-  return next;
 }
 
 /**

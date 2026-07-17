@@ -14,6 +14,7 @@ import { Avatar } from "@/components/profile/Avatar";
 import { applyAppearance } from "@/lib/theme";
 import { saveAvatar, clearAvatar } from "@/lib/utils/avatar";
 import { parseSnapshot } from "@/lib/questos/import-schema";
+import { createExportSnapshot } from "@/lib/questos/snapshot";
 import { clearLastSyncedUserId } from "@/lib/sync/last-user";
 import { useSession } from "@/lib/supabase/useSession";
 import type { QuestOSSnapshot } from "@/lib/questos/types";
@@ -245,7 +246,7 @@ function SettingsInner() {
   }
 
   function exportData() {
-    const data = store.getState();
+    const data = createExportSnapshot(store.getState());
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: "application/json",
     });
@@ -488,8 +489,8 @@ function SettingsInner() {
           <Disclosure variant="card" label="Privacy & data">
             <p className="text-[0.9375rem] leading-relaxed text-charcoal">
               Your prayers and reflections are private by default. On this device
-              they’re stored only for you. We never sell your data, and analytics
-              never include prayer or journal text.
+              they’re stored only for you. Analytics are off until you choose to
+              share limited usage counts, and never include prayer or journal text.
             </p>
             <div className="mt-4 flex items-start justify-between gap-4 border-t border-mist/70 pt-4">
               <div className="min-w-0">

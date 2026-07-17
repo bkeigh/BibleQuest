@@ -496,7 +496,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   questDurationPreference: [],
   questCategoryPreference: [],
-  analyticsConsent: true,
+  analyticsConsent: false,
 };
 
 /**

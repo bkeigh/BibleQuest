@@ -22,10 +22,21 @@ export default function PrivacyPage() {
 
       <ProseHeading>What we never do</ProseHeading>
       <Prose>
-        We never sell your personal data. Analytics — if enabled — count actions
-        like “a reflection was written,” never the words you wrote. The text of
-        your prayers and reflections is never sent to analytics or logs, and is
+        We never sell your personal data. Analytics are off by default and run
+        only after you choose to share limited usage counts in Settings. They
+        never include prayer, reflection, note, or verse text; email, phone,
+        user or record IDs; auth tokens; URL queries or hashes; or anything else
+        you write. Your private text is never sent to analytics or logs, and is
         never used to train or prompt AI without your explicit action and consent.
+      </Prose>
+
+      <ProseHeading>If you enable analytics</ProseHeading>
+      <Prose>
+        BibleQuest sends allowlisted event names and small bounded values directly
+        to Plausible. URLs are reduced to safe route shapes and requests send no
+        referrer. Offline retries are capped and sanitized. Turning analytics off
+        clears pending events immediately and keeps them off across tabs and future
+        sessions. Browser Do Not Track and Global Privacy Control are respected.
       </Prose>
 
       <ProseHeading>If you create an account later</ProseHeading>

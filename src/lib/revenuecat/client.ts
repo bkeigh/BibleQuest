@@ -1,91 +1,234 @@
 /**
- * RevenueCat — browser client scaffold (Test Store today, Web Billing in prod).
+ * RevenueCat browser client.
  *
- * Mirrors the Supabase pattern (src/lib/supabase/client.ts): the whole
- * integration NO-OPS until NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY is set, so
- * production stays exactly as it is today (guest mode, Plus "coming soon")
- * until the key is wired. See docs/REVENUECAT.md for the activation checklist.
- *
- * The public key is either the Test Store key (`test_…`, for development —
- * simulated purchases, no Stripe needed) or the Web Billing key (`rcb_…`, for
- * real money). Both are browser-safe PUBLIC keys; no secret key belongs here.
- *
- * NON-NEGOTIABLE (Codex, Volume V §4): nothing here may gate Bible reading,
- * prayer, reflection, basic quests, or the journey. Plus is depth; Patron is
- * support — see subscription-engine.ts.
+ * Billing is explicitly activated through a mode + matching public SDK key.
+ * The default coming-soon mode never imports or configures RevenueCat. Secret
+ * keys are rejected by the configuration parser and must never reach client
+ * code.
  */
 import type { Purchases } from "@revenuecat/purchases-js";
+import {
+  parseRevenueCatConfiguration,
+  type RevenueCatConfigurationStatus,
+} from "./config";
 
-/** RevenueCat public SDK key (browser-safe). Unset in guest mode. */
-const PUBLIC_API_KEY = process.env.NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY;
+const runtimeConfiguration = parseRevenueCatConfiguration(
+  process.env.NEXT_PUBLIC_REVENUECAT_BILLING_MODE,
+  process.env.NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY,
+);
 
-/**
- * The entitlement that unlocks Plus. Matches the RevenueCat entitlement
- * identifier ("BibleQuest Plus"); override via env if the dashboard renames it.
- */
+const configuredEntitlement =
+  process.env.NEXT_PUBLIC_REVENUECAT_PLUS_ENTITLEMENT?.trim();
+
 export const PLUS_ENTITLEMENT_ID =
-  process.env.NEXT_PUBLIC_REVENUECAT_PLUS_ENTITLEMENT ?? "BibleQuest Plus";
+  configuredEntitlement || "BibleQuest Plus";
+
+export interface RevenueCatAvailability {
+  status: RevenueCatConfigurationStatus;
+  configured: boolean;
+}
+export function getRevenueCatAvailability(): RevenueCatAvailability {
+  return {
+    status: runtimeConfiguration.status,
+    configured: runtimeConfiguration.configured,
+  };
+}
 
 export function isRevenueCatConfigured(): boolean {
-  return Boolean(PUBLIC_API_KEY);
+  return runtimeConfiguration.configured;
 }
 
-/** Persisted so a guest keeps the same RevenueCat identity across reloads. */
-const ANON_ID_KEY = "biblequest:rc-anon-id";
+export const REVENUECAT_ANONYMOUS_ID_KEY = "biblequest:rc-anon-id";
 
-/**
- * A stable app user id for RevenueCat. Prefer the signed-in Supabase user id
- * (durable across devices); otherwise reuse a RevenueCat anonymous id kept in
- * localStorage so a guest's membership survives a reload on this device.
- */
-function resolveAppUserId(
-  sdk: typeof Purchases,
-  supabaseUserId: string | null,
-): string {
-  if (supabaseUserId) return supabaseUserId;
-  if (typeof window === "undefined") {
-    // Unreachable — configure() only runs client-side — but keeps this pure.
-    return sdk.generateRevenueCatAnonymousAppUserId();
-  }
-  let id = window.localStorage.getItem(ANON_ID_KEY);
-  if (!id) {
-    id = sdk.generateRevenueCatAnonymousAppUserId();
-    window.localStorage.setItem(ANON_ID_KEY, id);
-  }
-  return id;
+type StorageAdapter = Pick<Storage, "getItem" | "setItem">;
+
+export interface IdentityPurchases {
+  getAppUserId(): string;
+  changeUser(appUserId: string): Promise<unknown>;
+  identifyUser(appUserId: string): Promise<unknown>;
 }
 
-let instance: Purchases | null = null;
-let configuredFor: string | null = null;
+export interface RevenueCatSdkAdapter<T extends IdentityPurchases> {
+  configure(options: { apiKey: string; appUserId: string }): T;
+  getSharedInstance(): T;
+  isConfigured(): boolean;
+  generateRevenueCatAnonymousAppUserId(): string;
+}
+
+type Identity =
+  | { kind: "anonymous"; appUserId: string }
+  | { kind: "signed-in"; appUserId: string };
+
+function identityFromAppUserId(appUserId: string): Identity {
+  return {
+    kind: appUserId.startsWith("$RCAnonymousID:")
+      ? "anonymous"
+      : "signed-in",
+    appUserId,
+  };
+}
 
 /**
- * Lazily import + configure the SDK exactly once. Returns null when RevenueCat
- * isn't configured or when called on the server. The dynamic import keeps the
- * browser-only SDK out of the server bundle. If the app user id changes (e.g. a
- * guest signs in), the SDK is moved to the new identity via changeUser.
+ * Serializes configuration, identity transitions, and customer operations.
+ * This prevents an account switch from racing an entitlement fetch for the
+ * previous account.
  */
-export async function getPurchases(
-  supabaseUserId: string | null,
-): Promise<Purchases | null> {
-  if (!PUBLIC_API_KEY || typeof window === "undefined") return null;
+export class RevenueCatClientManager<
+  T extends IdentityPurchases = Purchases,
+> {
+  private instance: T | null = null;
+  private identity: Identity | null = null;
+  private anonymousIdInMemory: string | null = null;
+  private queue: Promise<void> = Promise.resolve();
 
-  const { Purchases: sdk } = await import("@revenuecat/purchases-js");
-  const appUserId = resolveAppUserId(sdk, supabaseUserId);
+  constructor(
+    private readonly apiKey: string,
+    private readonly sdk: RevenueCatSdkAdapter<T>,
+    private readonly storage: StorageAdapter | null,
+  ) {}
 
-  if (!instance) {
-    try {
-      instance = sdk.configure({ apiKey: PUBLIC_API_KEY, appUserId });
-    } catch {
-      // Already configured (e.g. after a dev hot-reload) — reuse the singleton.
-      instance = sdk.getSharedInstance();
+  runForUser<R>(
+    signedInUserId: string | null,
+    operation: (purchases: T) => Promise<R>,
+  ): Promise<R> {
+    const pending = this.queue.then(async () => {
+      const purchases = await this.prepareForUser(signedInUserId);
+      return operation(purchases);
+    });
+    this.queue = pending.then(
+      () => undefined,
+      () => undefined,
+    );
+    return pending;
+  }
+
+  private async prepareForUser(signedInUserId: string | null): Promise<T> {
+    if (!this.instance) {
+      if (this.sdk.isConfigured()) {
+        this.instance = this.sdk.getSharedInstance();
+        this.identity = identityFromAppUserId(this.instance.getAppUserId());
+      } else {
+        const initialIdentity = signedInUserId
+          ? ({ kind: "signed-in", appUserId: signedInUserId } as const)
+          : ({
+              kind: "anonymous",
+              appUserId: this.getOrCreateAnonymousId(),
+            } as const);
+        this.instance = this.sdk.configure({
+          apiKey: this.apiKey,
+          appUserId: initialIdentity.appUserId,
+        });
+        this.identity = initialIdentity;
+      }
     }
-    configuredFor = appUserId;
-    return instance;
+
+    if (!this.identity) {
+      this.identity = identityFromAppUserId(this.instance.getAppUserId());
+    }
+
+    if (signedInUserId) {
+      await this.moveToSignedInUser(signedInUserId);
+    } else {
+      await this.moveToAnonymousUser();
+    }
+
+    return this.instance;
   }
 
-  if (configuredFor !== appUserId) {
-    await instance.changeUser(appUserId);
-    configuredFor = appUserId;
+  private async moveToSignedInUser(appUserId: string): Promise<void> {
+    if (!this.instance || !this.identity) return;
+    if (
+      this.identity.kind === "signed-in" &&
+      this.identity.appUserId === appUserId
+    ) {
+      return;
+    }
+
+    if (this.identity.kind === "anonymous") {
+      // Preserve a legitimate guest purchase by aliasing it to the account.
+      // Immediately reserve a fresh guest ID so signing out cannot return to
+      // the newly aliased identity and expose this account's entitlement.
+      await this.instance.identifyUser(appUserId);
+      this.createFreshAnonymousId();
+    } else {
+      // Account A -> account B must never merge or transfer entitlements.
+      await this.instance.changeUser(appUserId);
+    }
+    this.identity = { kind: "signed-in", appUserId };
   }
-  return instance;
+
+  private async moveToAnonymousUser(): Promise<void> {
+    if (!this.instance || !this.identity) return;
+
+    if (this.identity.kind === "signed-in") {
+      // Always create a new guest after sign-out. Reusing an anonymous alias
+      // could leak the signed-in customer's entitlement on a shared device.
+      const appUserId = this.createFreshAnonymousId();
+      await this.instance.changeUser(appUserId);
+      this.identity = { kind: "anonymous", appUserId };
+      return;
+    }
+
+    const appUserId = this.getOrCreateAnonymousId();
+    if (this.identity.appUserId !== appUserId) {
+      await this.instance.changeUser(appUserId);
+      this.identity = { kind: "anonymous", appUserId };
+    }
+  }
+
+  private getOrCreateAnonymousId(): string {
+    if (this.anonymousIdInMemory) return this.anonymousIdInMemory;
+
+    try {
+      const stored = this.storage?.getItem(REVENUECAT_ANONYMOUS_ID_KEY);
+      if (stored?.startsWith("$RCAnonymousID:")) {
+        this.anonymousIdInMemory = stored;
+        return stored;
+      }
+    } catch {
+      // Private browsing/storage denial still gets a stable in-memory identity.
+    }
+
+    return this.createFreshAnonymousId();
+  }
+
+  private createFreshAnonymousId(): string {
+    const appUserId = this.sdk.generateRevenueCatAnonymousAppUserId();
+    this.anonymousIdInMemory = appUserId;
+    try {
+      this.storage?.setItem(REVENUECAT_ANONYMOUS_ID_KEY, appUserId);
+    } catch {
+      // The in-memory value remains stable for this page lifecycle.
+    }
+    return appUserId;
+  }
+}
+
+let managerPromise: Promise<RevenueCatClientManager> | null = null;
+
+async function getManager(): Promise<RevenueCatClientManager | null> {
+  if (!runtimeConfiguration.configured || !runtimeConfiguration.apiKey) {
+    return null;
+  }
+  if (!managerPromise) {
+    managerPromise = import("@revenuecat/purchases-js").then(
+      ({ Purchases: sdk }) =>
+        new RevenueCatClientManager(
+          runtimeConfiguration.apiKey!,
+          sdk,
+          typeof window === "undefined" ? null : window.localStorage,
+        ),
+    );
+  }
+  return managerPromise;
+}
+
+/** Run an SDK operation under a serialized, verified RevenueCat identity. */
+export async function runRevenueCatOperation<R>(
+  signedInUserId: string | null,
+  operation: (purchases: Purchases) => Promise<R>,
+): Promise<R | null> {
+  if (typeof window === "undefined") return null;
+  const manager = await getManager();
+  return manager ? manager.runForUser(signedInUserId, operation) : null;
 }
