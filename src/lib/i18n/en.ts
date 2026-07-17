@@ -177,6 +177,6 @@ export const en: UIStrings = {
     privacy: "Privacy",
     analyticsToggle: "Share anonymous usage",
     analyticsNote:
-      "Counts taps and screens so we can make BibleQuest better. Never your prayers, reflections, or anything you write.",
+      "Off until you choose to share. Counts limited actions so we can improve BibleQuest—never prayers, reflections, identifiers, or anything you write.",
   },
 };

@@ -2,11 +2,21 @@
   "name": "biblequest",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.10.0",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:analytics": "vitest run tests/analytics.test.ts",
+    "test:headers": "NEXT_PUBLIC_SUPABASE_URL=https://header-fixture.supabase.co NEXT_PUBLIC_REVENUECAT_BILLING_MODE=live NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY=rcb_headerfixture pnpm build && pnpm test:headers:built",
+    "test:headers:built": "node --test tests/security-headers.integration.test.mjs",
+    "test:service-worker": "vitest run tests/service-worker.test.ts",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@revenuecat/purchases-js": "^1.47.1",
@@ -28,6 +38,7 @@
     "png-to-ico": "^3.0.2",
     "sharp": "^0.35.3",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "4.1.10"
   }
 }

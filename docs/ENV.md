@@ -10,9 +10,11 @@ template in [`../.env.example`](../.env.example).
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Optional | Publishable client key (safe in browser). |
 | `SUPABASE_SERVICE_ROLE_KEY` | Optional | **Server-only.** Bypasses RLS — never expose to the client. |
 | `DATABASE_URL` | Optional | Direct Postgres connection for migrations/tooling. |
-| `NEXT_PUBLIC_ANALYTICS_ENABLED` | Optional | `true` to enable privacy-first analytics. |
-| `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | Optional | Plausible domain, if used. |
+| `NEXT_PUBLIC_ANALYTICS_ENABLED` | Optional | Must be exactly `true`; otherwise analytics is a silent no-op. |
+| `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | Optional | Plausible site domain. Required when analytics is enabled. |
+| `NEXT_PUBLIC_PLAUSIBLE_HOST` | Optional | HTTPS Plausible API origin; defaults to `https://plausible.io`. Paths, credentials, query strings, hashes, and HTTP are rejected. |
 | `SENTRY_DSN` | Optional | Error monitoring (scrub sensitive fields). |
+| `NEXT_PUBLIC_REVENUECAT_BILLING_MODE` | Recommended | `coming-soon` (default/off), `sandbox` (Test Store), or `live` (real billing after release gates). |
 | `NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY` | Optional | RevenueCat public key — Test Store (`test_…`) in dev, Web Billing (`rcb_…`) in prod. |
 | `NEXT_PUBLIC_REVENUECAT_PLUS_ENTITLEMENT` | Optional | Only if the entitlement is renamed in the RevenueCat dashboard. |
 | `RESEND_API_KEY` | Optional | Lifecycle email (later). |
@@ -24,3 +26,19 @@ template in [`../.env.example`](../.env.example).
 - `SUPABASE_SERVICE_ROLE_KEY` is server-only. If a build ever needs it in
   `NEXT_PUBLIC_*`, that's a bug — see [`../SECURITY.md`](../SECURITY.md).
 - Never commit real values. Only `.env.example` (placeholders) is committed.
+- A RevenueCat key alone never activates billing. The mode must match its
+  documented public-key type; unknown modes, secret keys, and mismatches fail
+  closed. Keep Vercel production on `coming-soon` until every gate in
+  [`REVENUECAT.md`](REVENUECAT.md) passes.
+
+## Analytics configuration
+
+Analytics remains off unless the enable flag and a valid domain are present at
+build time **and** the user explicitly opts in on that browser. Missing or
+malformed configuration, missing/unreadable consent, Do Not Track, and Global
+Privacy Control all produce a silent no-op. Do not add a Plausible script tag:
+the direct Events API is the single supported transport.
+
+The CSP permits the validated Plausible HTTPS origin only when analytics is
+fully configured. See [`ANALYTICS.md`](ANALYTICS.md) for the complete event and
+property allowlist, queue rules, consent migration, and example payload.

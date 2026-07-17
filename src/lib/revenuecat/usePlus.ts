@@ -1,196 +1,309 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import type { Offering, Package } from "@revenuecat/purchases-js";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Offering } from "@revenuecat/purchases-js";
 import { useSession } from "@/lib/supabase/useSession";
-import { planFromActiveEntitlements } from "@/lib/questos/subscription-engine";
 import type { PlanKey } from "@/lib/questos/types";
-import { getPurchases, isRevenueCatConfigured } from "./client";
+import {
+  getRevenueCatAvailability,
+  runRevenueCatOperation,
+} from "./client";
+import {
+  presentCurrentPaywall,
+  snapshotFromCustomer,
+  snapshotFromRevenueCat,
+  statusFromSnapshot,
+  type PlusSnapshot,
+  type PlusStatus,
+} from "./model";
 
-/** ErrorCode.UserCancelledError — closing the paywall/checkout is not an error. */
-const USER_CANCELLED = 1;
+const LOAD_ERROR =
+  "Membership status couldn’t be refreshed. Your free experience is unaffected.";
+const PURCHASE_ERROR =
+  "The purchase couldn’t be completed. No charge was confirmed; please try again.";
 
-interface PlusSnapshot {
-  offering: Offering | null;
-  hasPaywall: boolean;
-  plan: PlanKey;
-  managementURL: string | null;
+interface StoredPlusState extends PlusSnapshot {
+  subjectKey: string;
+  status: PlusStatus;
+  error: string | null;
 }
 
-/**
- * Fetch offerings + entitlement state from RevenueCat. Returns null when the
- * SDK isn't configured. Kept outside the component (and free of setState) so
- * the effect can drive it via .then/.catch — the same shape as useSession,
- * which keeps react-hooks/set-state-in-effect happy.
- */
-async function fetchPlusSnapshot(
-  supabaseUserId: string | null,
-): Promise<PlusSnapshot | null> {
-  const purchases = await getPurchases(supabaseUserId);
-  if (!purchases) return null;
-  const [offerings, info] = await Promise.all([
-    purchases.getOfferings(),
-    purchases.getCustomerInfo(),
-  ]);
-  const offering = offerings.current ?? null;
+function emptySnapshot(): PlusSnapshot {
   return {
-    offering,
-    hasPaywall: offering?.hasPaywall ?? false,
-    plan: planFromActiveEntitlements(Object.keys(info.entitlements.active)),
-    managementURL: info.managementURL,
+    offering: null,
+    canPurchase: false,
+    plan: "free",
+    managementURL: null,
   };
 }
 
+function initialState(
+  subjectKey: string,
+  status: PlusStatus,
+): StoredPlusState {
+  return { subjectKey, status, error: null, ...emptySnapshot() };
+}
+
+function stateFromSnapshot(
+  subjectKey: string,
+  snapshot: PlusSnapshot,
+): StoredPlusState {
+  return {
+    subjectKey,
+    status: statusFromSnapshot(snapshot),
+    error: null,
+    ...snapshot,
+  };
+}
+
+async function fetchPlusSnapshot(
+  signedInUserId: string | null,
+): Promise<PlusSnapshot | null> {
+  return runRevenueCatOperation(signedInUserId, async (purchases) => {
+    // The identity controller holds this entire operation in one serialized
+    // lane, so an account change cannot split these two reads across users.
+    const [offerings, customerInfo] = await Promise.all([
+      purchases.getOfferings(),
+      purchases.getCustomerInfo(),
+    ]);
+    return snapshotFromRevenueCat(offerings, customerInfo);
+  });
+}
+
 export interface PlusState {
-  /** RevenueCat is wired (public key present). False = today's guest mode. */
   configured: boolean;
+  status: PlusStatus;
   loading: boolean;
   plan: PlanKey;
   isPlus: boolean;
   offering: Offering | null;
-  packages: Package[];
-  /** True once a paywall is attached + published to the current offering. */
-  hasPaywall: boolean;
-  /** RevenueCat-hosted management page — the web "Customer Center". */
+  /** True only for a non-empty current offering with a published paywall. */
+  canPurchase: boolean;
   managementURL: string | null;
   error: string | null;
-  /** Preferred: present the RevenueCat-designed paywall (needs hasPaywall). */
-  presentPaywall: () => Promise<void>;
-  /** Fallback: buy a single package directly (works before a paywall exists). */
-  purchase: (pkg: Package) => Promise<void>;
-  /** Open the RevenueCat management page (cancel / update payment). */
-  openCustomerCenter: () => void;
+  presentPaywall: () => Promise<"completed" | "cancelled" | "failed" | "unavailable">;
+  openCustomerCenter: () => boolean;
   refresh: () => Promise<void>;
 }
 
 /**
- * Live Plus status via RevenueCat. When RevenueCat isn't configured this
- * settles immediately to a stable free/unconfigured state, so the Plus
- * surfaces render their "coming soon" copy with no network calls.
+ * RevenueCat state for the active Supabase identity (or a persisted guest).
+ * Until auth has settled, and during every identity change, the visible state
+ * is loading + free so a prior user's entitlement can never flash or leak.
  */
 export function usePlus(): PlusState {
-  const configured = isRevenueCatConfigured();
-  const { user } = useSession();
-  const supabaseUserId = user?.id ?? null;
+  const availability = getRevenueCatAvailability();
+  const session = useSession();
+  const sessionPending = session.configured && session.loading;
+  const signedInUserId = session.user?.id ?? null;
+  const subjectKey = sessionPending
+    ? "session:pending"
+    : signedInUserId
+      ? `user:${signedInUserId}`
+      : "guest";
+  const inactiveStatus: PlusStatus =
+    availability.status === "coming-soon" ? "coming-soon" : "unconfigured";
+  const fallbackStatus: PlusStatus = availability.configured
+    ? "loading"
+    : inactiveStatus;
 
-  const [loading, setLoading] = useState(configured);
-  const [plan, setPlan] = useState<PlanKey>("free");
-  const [offering, setOffering] = useState<Offering | null>(null);
-  const [hasPaywall, setHasPaywall] = useState(false);
-  const [managementURL, setManagementURL] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [stored, setStored] = useState<StoredPlusState>(() =>
+    initialState(subjectKey, fallbackStatus),
+  );
+  const requestSequence = useRef(0);
+  const currentSubject = useRef(subjectKey);
 
   useEffect(() => {
-    if (!configured) return;
-    let cancelled = false;
-    fetchPlusSnapshot(supabaseUserId)
-      .then((snapshot) => {
-        if (cancelled) return;
-        if (snapshot) {
-          setOffering(snapshot.offering);
-          setHasPaywall(snapshot.hasPaywall);
-          setPlan(snapshot.plan);
-          setManagementURL(snapshot.managementURL);
-          setError(null);
+    currentSubject.current = subjectKey;
+    return () => {
+      requestSequence.current += 1;
+    };
+  }, [subjectKey]);
+
+  const visible =
+    stored.subjectKey === subjectKey
+      ? stored
+      : initialState(subjectKey, fallbackStatus);
+
+  const loadSnapshot = useCallback(
+    async (showLoading: boolean) => {
+      if (!availability.configured || sessionPending) return;
+      const request = ++requestSequence.current;
+
+      if (showLoading) {
+        setStored(initialState(subjectKey, "loading"));
+      }
+
+      try {
+        const snapshot = await fetchPlusSnapshot(signedInUserId);
+        if (
+          !snapshot ||
+          request !== requestSequence.current ||
+          currentSubject.current !== subjectKey
+        ) {
+          return;
         }
-        setLoading(false);
+        setStored(stateFromSnapshot(subjectKey, snapshot));
+      } catch {
+        if (
+          request !== requestSequence.current ||
+          currentSubject.current !== subjectKey
+        ) {
+          return;
+        }
+        setStored({
+          ...initialState(subjectKey, "error"),
+          error: LOAD_ERROR,
+        });
+      }
+    }, [
+      availability.configured,
+      sessionPending,
+      signedInUserId,
+      subjectKey,
+    ]);
+
+  useEffect(() => {
+    if (!availability.configured || sessionPending) return;
+    const request = ++requestSequence.current;
+    fetchPlusSnapshot(signedInUserId)
+      .then((snapshot) => {
+        if (
+          !snapshot ||
+          request !== requestSequence.current ||
+          currentSubject.current !== subjectKey
+        ) {
+          return;
+        }
+        setStored(stateFromSnapshot(subjectKey, snapshot));
       })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        setError(e instanceof Error ? e.message : "Couldn’t load membership options.");
-        setLoading(false);
+      .catch(() => {
+        if (
+          request !== requestSequence.current ||
+          currentSubject.current !== subjectKey
+        ) {
+          return;
+        }
+        setStored({
+          ...initialState(subjectKey, "error"),
+          error: LOAD_ERROR,
+        });
       });
     return () => {
-      cancelled = true;
+      requestSequence.current += 1;
     };
-  }, [configured, supabaseUserId]);
+  }, [
+    availability.configured,
+    sessionPending,
+    signedInUserId,
+    subjectKey,
+  ]);
 
-  const refresh = useCallback(async () => {
-    if (!configured) return;
-    setLoading(true);
-    try {
-      const snapshot = await fetchPlusSnapshot(supabaseUserId);
-      if (snapshot) {
-        setOffering(snapshot.offering);
-        setHasPaywall(snapshot.hasPaywall);
-        setPlan(snapshot.plan);
-        setManagementURL(snapshot.managementURL);
-        setError(null);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn’t load membership options.");
-    } finally {
-      setLoading(false);
-    }
-  }, [configured, supabaseUserId]);
+  // presentPaywall resolves when control returns. These browser lifecycle
+  // events cover tab-based checkout, bfcache restores, reconnects, and customer
+  // portal returns so entitlement/management state is fetched again.
+  useEffect(() => {
+    if (!availability.configured || sessionPending) return;
+    const refreshOnReturn = () => void loadSnapshot(false);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refreshOnReturn();
+    };
 
-  const openCustomerCenter = useCallback(() => {
-    if (managementURL) {
-      window.open(managementURL, "_blank", "noopener,noreferrer");
-    }
-  }, [managementURL]);
+    window.addEventListener("focus", refreshOnReturn);
+    window.addEventListener("pageshow", refreshOnReturn);
+    window.addEventListener("online", refreshOnReturn);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.removeEventListener("focus", refreshOnReturn);
+      window.removeEventListener("pageshow", refreshOnReturn);
+      window.removeEventListener("online", refreshOnReturn);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [availability.configured, sessionPending, loadSnapshot]);
 
-  // Preferred, modern path: RevenueCat renders the dashboard-designed paywall
-  // as a full-screen overlay and runs the whole checkout; we just react to the
-  // result. Web has no native Customer Center, so its link routes to the
-  // hosted management page.
-  const presentPaywall = useCallback(async () => {
-    const purchases = await getPurchases(supabaseUserId);
-    if (!purchases) return;
-    setError(null);
-    try {
-      const result = await purchases.presentPaywall({
-        ...(offering ? { offering } : {}),
-        onVisitCustomerCenter: () => {
-          if (managementURL) {
-            window.open(managementURL, "_blank", "noopener,noreferrer");
-          }
-        },
-      });
-      setPlan(
-        planFromActiveEntitlements(
-          Object.keys(result.customerInfo.entitlements.active),
-        ),
-      );
-      setManagementURL(result.customerInfo.managementURL);
-    } catch (e) {
-      if ((e as { errorCode?: number })?.errorCode === USER_CANCELLED) return;
-      setError(e instanceof Error ? e.message : "The paywall couldn’t be opened.");
-    }
-  }, [supabaseUserId, offering, managementURL]);
-
-  const purchase = useCallback(
-    async (pkg: Package) => {
-      const purchases = await getPurchases(supabaseUserId);
-      if (!purchases) return;
-      setError(null);
-      try {
-        const { customerInfo } = await purchases.purchase({ rcPackage: pkg });
-        setPlan(
-          planFromActiveEntitlements(Object.keys(customerInfo.entitlements.active)),
-        );
-        setManagementURL(customerInfo.managementURL);
-      } catch (e) {
-        if ((e as { errorCode?: number })?.errorCode === USER_CANCELLED) return;
-        setError(e instanceof Error ? e.message : "Purchase couldn’t be completed.");
-        throw e;
-      }
-    },
-    [supabaseUserId],
+  const refresh = useCallback(
+    async () => loadSnapshot(true),
+    [loadSnapshot],
   );
 
+  const openCustomerCenter = useCallback(() => {
+    if (!visible.managementURL) return false;
+    window.open(visible.managementURL, "_blank", "noopener,noreferrer");
+    return true;
+  }, [visible.managementURL]);
+
+  const presentPaywall = useCallback(async () => {
+    if (
+      !availability.configured ||
+      sessionPending ||
+      !visible.canPurchase ||
+      !visible.offering
+    ) {
+      return "unavailable" as const;
+    }
+
+    const capturedSubject = subjectKey;
+    setStored({ ...visible, error: null });
+    const outcome = await runRevenueCatOperation(
+      signedInUserId,
+      (purchases) => presentCurrentPaywall(purchases, visible.offering),
+    );
+
+    if (!outcome || currentSubject.current !== capturedSubject) {
+      return "unavailable" as const;
+    }
+
+    if (outcome.kind === "cancelled") {
+      setStored({
+        ...visible,
+        subjectKey: capturedSubject,
+        status: "purchase-cancelled",
+        error: null,
+      });
+      return "cancelled" as const;
+    }
+
+    if (outcome.kind === "failed") {
+      setStored({
+        ...visible,
+        subjectKey: capturedSubject,
+        status: "purchase-failed",
+        error: PURCHASE_ERROR,
+      });
+      return "failed" as const;
+    }
+
+    if (outcome.kind === "unavailable") {
+      return "unavailable" as const;
+    }
+
+    const snapshot = snapshotFromCustomer(
+      visible.offering,
+      outcome.customerInfo,
+    );
+    setStored(stateFromSnapshot(capturedSubject, snapshot));
+    await loadSnapshot(false);
+    return "completed" as const;
+  }, [
+    availability.configured,
+    loadSnapshot,
+    sessionPending,
+    signedInUserId,
+    subjectKey,
+    visible,
+  ]);
+
   return {
-    configured,
-    loading,
-    plan,
-    isPlus: plan === "plus",
-    offering,
-    packages: offering?.availablePackages ?? [],
-    hasPaywall,
-    managementURL,
-    error,
+    configured: availability.configured,
+    status: visible.status,
+    loading: visible.status === "loading",
+    plan: visible.plan,
+    isPlus: visible.plan === "plus",
+    offering: visible.offering,
+    canPurchase: visible.canPurchase,
+    managementURL: visible.managementURL,
+    error: visible.error,
     presentPaywall,
-    purchase,
     openCustomerCenter,
     refresh,
   };

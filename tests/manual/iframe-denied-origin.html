@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BibleQuest denied-origin iframe check</title>
+    <style>
+      body { font: 16px/1.5 system-ui, sans-serif; margin: 2rem; }
+      iframe { border: 1px solid #888; height: 70vh; width: 100%; }
+    </style>
+  </head>
+  <body>
+    <h1>Denied-origin iframe check</h1>
+    <p>
+      Serve this fixture from a controlled HTTPS origin that is not on the
+      ancestor allowlist. Pass the release-candidate URL as
+      <code>?target=https%3A%2F%2Fexample.test</code>. BibleQuest must refuse to
+      render below while continuing to open directly.
+    </p>
+    <p id="target"></p>
+    <iframe id="frame" title="BibleQuest denied-origin check"></iframe>
+    <script>
+      const candidate = new URLSearchParams(window.location.search).get("target");
+      const target = candidate || "http://localhost:3000/";
+      document.querySelector("#target").textContent = `Target: ${target}`;
+      document.querySelector("#frame").src = target;
+    </script>
+  </body>
+</html>

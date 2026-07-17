@@ -70,6 +70,7 @@ you're ready to wire up Supabase, analytics, or payments.
 | `pnpm build` | Production build |
 | `pnpm start` | Serve the production build |
 | `pnpm lint` | ESLint |
+| `pnpm test` | Noninteractive unit tests |
 | `node scripts/import-bible.mjs` | Re-import the WEB Bible → `src/data/bible/` |
 | `node scripts/build-seed.mjs <json>` | Rebuild typed seed content |
 | `node scripts/build-icons.mjs` | Rebuild the icon set, favicon, + OG image from the brand art |
@@ -121,9 +122,11 @@ docs/                   # Codex + setup/deployment/security/content/QA guides
 - [`docs/SETUP.md`](docs/SETUP.md) — Supabase, auth, migrations, seeding
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Vercel + domain
 - [`docs/ENV.md`](docs/ENV.md) — environment variables
+- [`docs/REVENUECAT.md`](docs/REVENUECAT.md) — Plus identity, sandbox QA, and production gates
 - [`SECURITY.md`](SECURITY.md) — RLS, sensitive data, disclosure
 - [`docs/CONTENT_GUIDE.md`](docs/CONTENT_GUIDE.md) — quest/prayer/theology rules
 - [`docs/QA.md`](docs/QA.md) — manual QA checklist
+- [`docs/CI.md`](docs/CI.md) — pull request checks and branch protection
 
 ---
 

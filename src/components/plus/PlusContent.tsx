@@ -2,7 +2,7 @@ import { PaperCard } from "@/components/design-system/PaperCard";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { IconCheck, IconSparkle } from "@/components/design-system/icons";
 import { PlusCta } from "@/components/plus/PlusCta";
-import { isRevenueCatConfigured } from "@/lib/revenuecat/client";
+import { getRevenueCatAvailability } from "@/lib/revenuecat/client";
 
 const FREE_INCLUDES = [
   "Daily verse, prayer, and quests",
@@ -29,6 +29,8 @@ const PLUS_FEATURES = [
  * Plus page. Free is presented first and fully; Plus is depth, not a wall.
  */
 export function PlusContent({ compact = false }: { compact?: boolean }) {
+  const revenueCat = getRevenueCatAvailability();
+
   return (
     <div className={compact ? "space-y-5" : "space-y-6"}>
       {/* The free promise, stated plainly and first */}
@@ -60,7 +62,7 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-gold-500/45 bg-gold-500/15 px-3 py-1 text-[0.75rem] text-gilt">
           <IconSparkle size={14} /> BibleQuest Plus
-          {isRevenueCatConfigured() ? "" : " — coming soon"}
+          {revenueCat.configured ? "" : " — coming soon"}
         </span>
         <h3 className="mt-3 font-display text-[1.5rem] text-graphite">
           Go deeper, when you’re ready

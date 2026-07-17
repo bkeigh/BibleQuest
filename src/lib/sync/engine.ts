@@ -433,7 +433,10 @@ async function pullAll(
   };
 }
 
-function filterByTombstones(remote: RemoteData, t: SyncTombstones): RemoteData {
+export function filterByTombstones(
+  remote: RemoteData,
+  t: SyncTombstones
+): RemoteData {
   const myQuests = remote.myQuests
     ? Object.fromEntries(
         Object.entries(remote.myQuests).filter(
@@ -509,14 +512,13 @@ export function mergeSnapshots(
           },
         }
       : local.settings;
-  // Privacy-first exception to local-wins: an analytics opt-out on EITHER
-  // side survives the merge. Without this, launching a signed-in device
-  // that never saw the opt-out would push consent straight back on.
+  // Privacy-first exception to local-wins: consent must be explicit on BOTH
+  // sides. A missing remote setting is ambiguous and therefore remains off.
   const settings = {
     ...baseSettings,
     analyticsConsent:
       local.settings.analyticsConsent &&
-      (remote.settings?.analyticsConsent ?? true),
+      (remote.settings?.analyticsConsent ?? false),
   };
 
   // Assignments: per-day pick lists, unioned by questSlug so one device's

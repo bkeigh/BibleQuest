@@ -1,26 +1,212 @@
-/* BibleQuest service worker — quiet, offline-friendly, honest about limits.
+/* BibleQuest service worker — offline-friendly without caching private state.
  *
- * Strategy:
- *  - Precache the app shell + offline fallback on install.
- *  - Navigations: network-first, falling back to cache, then to /offline.
- *  - Static assets & Bible chapter pages: stale-while-revalidate, so
- *    recently visited Scripture stays available offline (Codex, Vol IV §18).
- *  - Never caches API routes.
+ * Cache Storage contains only a small, explicit navigation surface plus
+ * validated build assets. Prayers, reflections, and other user data continue
+ * to live in the persisted Zustand store; this worker never handles that data.
  */
-const VERSION = "biblequest-v3";
-const SHELL = `${VERSION}-shell`;
-const RUNTIME = `${VERSION}-runtime`;
+const CACHE_VERSION = "biblequest-v4";
+const CACHE_OWNER_PREFIX = "biblequest-";
+const SHELL_CACHE = `${CACHE_VERSION}-shell`;
+const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
+const CURRENT_CACHES = [SHELL_CACHE, RUNTIME_CACHE];
 
-const PRECACHE = ["/app", "/offline", "/manifest.webmanifest"];
+// These are generic, client-rendered shells. Fetch without credentials during
+// install so an authenticated response can never become a shared offline shell.
+const PRECACHE_PATHS = [
+  "/offline",
+  "/app",
+  "/onboarding",
+  "/manifest.webmanifest",
+];
+
+const OFFLINE_PATH = "/offline";
+
+// Default-deny navigation policy. Dynamic entries below are limited to known,
+// public-content route families; account, billing, auth, and marketing routes
+// are intentionally absent.
+const OFFLINE_SAFE_NAVIGATION_PATHS = new Set([
+  "/app",
+  "/onboarding",
+  "/app/prayer",
+  "/app/prayer/new",
+  "/app/reflection",
+  "/app/reflection/new",
+  "/app/journey",
+  "/app/quests",
+  "/app/bible",
+  "/app/bible/saved",
+  "/app/settings",
+]);
+
+const OFFLINE_SAFE_NAVIGATION_PATTERNS = [
+  /^\/app\/quests\/[^/]+$/,
+  /^\/app\/bible\/[^/]+$/,
+  /^\/app\/bible\/[^/]+\/[1-9]\d*$/,
+];
+
+function isPathWithin(pathname, root) {
+  return pathname === root || pathname.startsWith(`${root}/`);
+}
+
+function isForbiddenPath(pathname) {
+  return (
+    isPathWithin(pathname, "/auth") ||
+    isPathWithin(pathname, "/app/account") ||
+    isPathWithin(pathname, "/api")
+  );
+}
+
+function isRequestCacheCandidate(request, url = new URL(request.url)) {
+  return (
+    request.method === "GET" &&
+    url.origin === self.location.origin &&
+    url.search === "" &&
+    !isForbiddenPath(url.pathname)
+  );
+}
+
+function isOfflineSafeNavigationPath(pathname) {
+  return (
+    OFFLINE_SAFE_NAVIGATION_PATHS.has(pathname) ||
+    OFFLINE_SAFE_NAVIGATION_PATTERNS.some((pattern) => pattern.test(pathname))
+  );
+}
+
+function isOfflineSafeNavigationRequest(request, url = new URL(request.url)) {
+  return (
+    request.mode === "navigate" &&
+    isRequestCacheCandidate(request, url) &&
+    isOfflineSafeNavigationPath(url.pathname)
+  );
+}
+
+function isImmutableStaticRequest(request, url = new URL(request.url)) {
+  return (
+    isRequestCacheCandidate(request, url) &&
+    url.pathname.startsWith("/_next/static/")
+  );
+}
+
+function isResponseCacheable(response) {
+  if (
+    !response ||
+    !response.ok ||
+    response.redirected ||
+    response.type === "opaque" ||
+    response.type === "opaqueredirect"
+  ) {
+    return false;
+  }
+
+  const cacheControl = response.headers.get("cache-control") || "";
+  if (/\b(?:no-store|private)\b/i.test(cacheControl)) return false;
+
+  // Set-Cookie is a forbidden response header in some browser contexts, so
+  // the app also marks every cookie-writing middleware response private/no-store.
+  if (response.headers.has("set-cookie")) return false;
+
+  return true;
+}
+
+function absoluteUrl(pathname) {
+  return new URL(pathname, self.location.origin).href;
+}
+
+async function precacheShell() {
+  const cache = await caches.open(SHELL_CACHE);
+  await Promise.all(
+    PRECACHE_PATHS.map(async (pathname) => {
+      try {
+        const request = new Request(absoluteUrl(pathname), {
+          cache: "reload",
+          credentials: "omit",
+        });
+        const response = await fetch(request);
+        if (isResponseCacheable(response)) {
+          await cache.put(request, response.clone());
+        }
+      } catch {
+        // A partial install is still useful. Runtime navigation will retry the
+        // network and the fallback below remains honest if precaching failed.
+      }
+    })
+  );
+}
+
+async function cachedOfflineResponse() {
+  const shell = await caches.open(SHELL_CACHE);
+  const cached = await shell.match(absoluteUrl(OFFLINE_PATH));
+  return (
+    cached ||
+    new Response("BibleQuest is offline.", {
+      status: 503,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    })
+  );
+}
+
+async function cachedNavigation(request) {
+  const runtime = await caches.open(RUNTIME_CACHE);
+  const runtimeMatch = await runtime.match(request);
+  if (runtimeMatch) return runtimeMatch;
+
+  const shell = await caches.open(SHELL_CACHE);
+  return shell.match(request);
+}
+
+async function handleNavigation(request) {
+  const url = new URL(request.url);
+  const mayCache = isOfflineSafeNavigationRequest(request, url);
+
+  let response;
+  try {
+    response = await fetch(request);
+  } catch {
+    if (mayCache) {
+      const cached = await cachedNavigation(request);
+      if (cached) return cached;
+    }
+    return cachedOfflineResponse();
+  }
+
+  // A resolved 4xx/5xx or redirect is returned as-is. Cache fallback is only
+  // for an actual fetch failure, so the worker cannot hide live server errors.
+  if (mayCache && isResponseCacheable(response)) {
+    try {
+      const runtime = await caches.open(RUNTIME_CACHE);
+      // Query-bearing requests never reach this point, so this exact request
+      // key cannot alias a sensitive query to a queryless URL.
+      await runtime.put(request, response.clone());
+    } catch {
+      // Cache writes are best-effort and must not replace a valid network reply.
+    }
+  }
+
+  return response;
+}
+
+function staleWhileRevalidate(event, request) {
+  const runtime = caches.open(RUNTIME_CACHE);
+  const network = runtime.then(async (cache) => {
+    const response = await fetch(request);
+    if (isResponseCacheable(response)) {
+      try {
+        await cache.put(request, response.clone());
+      } catch {
+        // A failed cache write does not change the network result.
+      }
+    }
+    return response;
+  });
+
+  // Extend the fetch event synchronously. Calling waitUntil only after an
+  // awaited cache lookup can be too late once the event dispatch has ended.
+  event.waitUntil(network.then(() => undefined).catch(() => undefined));
+  return runtime.then(async (cache) => (await cache.match(request)) || network);
+}
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(SHELL)
-      .then((cache) => cache.addAll(PRECACHE))
-      .catch(() => {})
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil(precacheShell().then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (event) => {
@@ -30,60 +216,50 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((k) => !k.startsWith(VERSION))
-            .map((k) => caches.delete(k))
+            .filter(
+              (key) =>
+                key.startsWith(CACHE_OWNER_PREFIX) &&
+                !CURRENT_CACHES.includes(key)
+            )
+            .map((key) => caches.delete(key))
         )
       )
       .then(() => self.clients.claim())
   );
 });
 
-function isStaticAsset(url) {
-  return (
-    url.pathname.startsWith("/_next/static/") ||
-    url.pathname.startsWith("/icons/") ||
-    /\.(?:css|js|woff2?|png|jpg|jpeg|svg|webp|ico)$/.test(url.pathname)
-  );
-}
-
 self.addEventListener("fetch", (event) => {
   const { request } = event;
-  if (request.method !== "GET") return;
-
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith("/api/")) return;
 
-  // Navigations — network first, fall back to cache, then offline page.
+  if (request.method !== "GET" || url.origin !== self.location.origin) return;
+
   if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(RUNTIME).then((c) => c.put(request, copy)).catch(() => {});
-          return res;
-        })
-        .catch(async () => {
-          const cached = await caches.match(request);
-          return cached || caches.match("/offline");
-        })
-    );
+    event.respondWith(handleNavigation(request));
     return;
   }
 
-  // Static & other GETs — stale-while-revalidate.
-  if (isStaticAsset(url)) {
-    event.respondWith(
-      caches.match(request).then((cached) => {
-        const network = fetch(request)
-          .then((res) => {
-            const copy = res.clone();
-            caches.open(RUNTIME).then((c) => c.put(request, copy)).catch(() => {});
-            return res;
-          })
-          .catch(() => cached);
-        return cached || network;
-      })
-    );
+  if (isImmutableStaticRequest(request, url)) {
+    event.respondWith(staleWhileRevalidate(event, request));
   }
 });
+
+// The production worker never defines this flag. Tests set it before loading
+// this exact file so policy predicates and version constants stay deterministic.
+if (self.__BIBLEQUEST_SW_TESTING__) {
+  self.__BIBLEQUEST_SW_TESTING__ = Object.freeze({
+    CACHE_VERSION,
+    CACHE_OWNER_PREFIX,
+    SHELL_CACHE,
+    RUNTIME_CACHE,
+    CURRENT_CACHES,
+    PRECACHE_PATHS,
+    OFFLINE_SAFE_NAVIGATION_PATHS,
+    isForbiddenPath,
+    isRequestCacheCandidate,
+    isOfflineSafeNavigationPath,
+    isOfflineSafeNavigationRequest,
+    isImmutableStaticRequest,
+    isResponseCacheable,
+  });
+}

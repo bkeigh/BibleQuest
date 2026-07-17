@@ -15,13 +15,40 @@ stored locally and privately in the browser.
 
 ## 2. Enable Supabase (optional)
 
+### Local account-sync stack
+
+The committed `supabase/config.toml` configures the local API, database, seed,
+Auth site URL, and exact localhost callback URLs. Start the standard local stack
+with:
+
+```bash
+supabase start
+supabase db reset
+supabase status
+```
+
+For database/Auth/API verification without optional Studio, Storage, Realtime,
+or analytics containers:
+
+```bash
+supabase start --exclude edge-runtime,imgproxy,logflare,postgres-meta,realtime,storage-api,studio,supavisor,vector
+```
+
+Use the local `API_URL` and `ANON_KEY` reported by `supabase status` as
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in your private
+`.env.local`. Never expose the reported service-role or secret key to the
+browser, and do not commit local keys.
+
+### Hosted project
+
 1. Create a project at [supabase.com](https://supabase.com).
-2. In the SQL editor, run, in order:
-   - every file in `supabase/migrations/`, in filename order
-     (`0001_init.sql` first)
-   - `supabase/policies.sql`
-   - `supabase/seed.sql` (regenerate with
-     `node scripts/build-supabase-seed.mjs <seed-result.json>` if content changes)
+2. Apply every file in `supabase/migrations/` in filename order using the
+   Supabase CLI. Do not run `supabase/policies.sql`; it is a compatibility
+   pointer with no DDL. See
+   [`SUPABASE_SECURITY_ROLLOUT.md`](SUPABASE_SECURITY_ROLLOUT.md) for the exact
+   local reset, migration-history checks, staging rollout, and rollback gates.
+   Seed separately with `supabase/seed.sql` only when intended (regenerate with
+   `node scripts/build-supabase-seed.mjs <seed-result.json>` if content changes).
 3. Copy your keys into `.env.local`:
    ```
    NEXT_PUBLIC_SUPABASE_URL=...
@@ -36,12 +63,14 @@ trigger.
 
 ### Verify RLS
 
-```sql
-select tablename, rowsecurity from pg_tables where schemaname = 'public';
+```bash
+docker exec -i supabase_db_BibleQuest \
+  psql -U postgres -d postgres -v ON_ERROR_STOP=1 -P pager=off \
+  < supabase/evidence/rls_policy_report.sql
 ```
 
-Every user-owned table must show `rowsecurity = true`. See
-[`../SECURITY.md`](../SECURITY.md).
+All 26 public tables must show `rowsecurity = true`; verify policy roles and
+expressions in the same report. See [`../SECURITY.md`](../SECURITY.md).
 
 ## 3. Bible content
 

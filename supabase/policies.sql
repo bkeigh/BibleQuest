@@ -1,8 +1,9 @@
--- MOVED — do not edit here.
+-- MOVED — do not run policy DDL from this compatibility file.
 --
--- BibleQuest's Row Level Security is now a numbered migration:
---     supabase/migrations/0002_rls_policies.sql
+-- BibleQuest's current Row Level Security reconciliation is the forward-only
+-- numbered migration:
+--     supabase/migrations/0008_reassert_rls_and_purge.sql
 --
--- This keeps a single source of truth so `supabase db reset` reproduces the
--- deployed RLS state. This file is retained only so old references don't 404;
--- it is intentionally empty of runnable DDL. Delete it once nothing points here.
+-- Earlier numbered migrations are preserved because they may already be in a
+-- database's migration history. This file remains only so old references do
+-- not 404; it is intentionally empty of runnable DDL.
