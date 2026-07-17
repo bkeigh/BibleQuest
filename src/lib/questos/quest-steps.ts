@@ -11,7 +11,9 @@
 import {
   QUEST_STEP_KEYS,
   type MyQuest,
+  type QuestChecklistItem,
   type QuestStepKey,
+  type QuestTemplate,
 } from "./types";
 
 export { QUEST_STEP_KEYS };
@@ -25,6 +27,29 @@ export function questStepCount(): number {
 /** Steps finished on the current walk, capped and de-duplicated. */
 export function stepsDoneCount(entry: Pick<MyQuest, "stepsDone">): number {
   return new Set(entry.stepsDone).size;
+}
+
+/**
+ * The explicitly required checklist for this quest. Generic walk steps are
+ * intentionally not inferred here: quests without a checklist stay gentle
+ * and completable, while checklist quests name their requirements in content.
+ */
+export function checklistItemsForQuest(
+  quest: Pick<QuestTemplate, "checklist">
+): readonly QuestChecklistItem[] {
+  return quest.checklist ?? [];
+}
+
+/** Whether every quest-specific required checkpoint has been marked. */
+export function isQuestChecklistComplete(
+  quest: Pick<QuestTemplate, "checklist">,
+  entry?: Pick<MyQuest, "stepsDone"> | null
+): boolean {
+  const checklist = checklistItemsForQuest(quest);
+  if (checklist.length === 0) return true;
+  if (!entry) return false;
+  const done = new Set(entry.stepsDone);
+  return checklist.every((item) => done.has(item.key));
 }
 
 /** The first movement not yet made, in canonical order. Null when done. */

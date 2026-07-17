@@ -443,7 +443,7 @@ describe("service-worker lifecycle and upgrades", () => {
     await event.done();
 
     const shell = await harness.caches.open(harness.policy.SHELL_CACHE);
-    expect(harness.policy.CACHE_VERSION).toBe("biblequest-v7");
+    expect(harness.policy.CACHE_VERSION).toBe("biblequest-v8");
     expect(shell.entries.size).toBe(harness.policy.PRECACHE_PATHS.length - 1);
     expect(await shell.match(`${ORIGIN}/onboarding`)).toBeUndefined();
     expect(
@@ -470,8 +470,8 @@ describe("service-worker lifecycle and upgrades", () => {
     ]);
     expect((await harness.caches.keys()).sort()).toEqual([
       "another-app-runtime",
-      "biblequest-v7-runtime",
-      "biblequest-v7-shell",
+      "biblequest-v8-runtime",
+      "biblequest-v8-shell",
     ]);
     expect(harness.state.claimed).toBe(true);
   });

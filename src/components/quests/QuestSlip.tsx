@@ -1,5 +1,9 @@
 import Link from "next/link";
-import type { QuestCategory, QuestTemplate } from "@/lib/questos/types";
+import type {
+  DailyQuestStatus,
+  QuestCategory,
+  QuestTemplate,
+} from "@/lib/questos/types";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PixelIcon, CATEGORY_SPRITE } from "@/components/design-system/PixelIcon";
 import {
@@ -52,6 +56,8 @@ interface QuestSlipProps {
   completed?: boolean;
   /** This quest is saved for later on the shelf — quiet bookmark chip. */
   saved?: boolean;
+  /** Rolling-window state, used to distinguish ready from in-progress. */
+  assignmentStatus?: DailyQuestStatus;
   /** End of the rolling 24-hour slot occupied by this quest. */
   expiresAt?: string;
   /**
@@ -73,16 +79,22 @@ export function QuestSlip({
   picked,
   completed,
   saved,
+  assignmentStatus,
   expiresAt,
   compact,
 }: QuestSlipProps) {
-  const badge = completed ? (
+  const displayStatus = completed ? "completed" : assignmentStatus;
+  const badge = displayStatus === "completed" ? (
     <span className="pixel-frame ml-auto inline-flex shrink-0 items-center gap-1 bg-accent-surface px-2 py-0.5 font-pixel text-[0.875rem] text-accent-ink">
       <IconCheck size={12} /> Done
     </span>
-  ) : picked ? (
+  ) : displayStatus === "started" ? (
+    <span className="ml-auto inline-flex shrink-0 items-center rounded-full bg-accent-surface px-2 py-0.5 font-pixel text-[0.875rem] text-accent-ink">
+      In progress
+    </span>
+  ) : displayStatus === "assigned" || picked ? (
     <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-surface px-2 py-0.5 font-pixel text-[0.875rem] text-accent">
-      <IconCheck size={12} /> Picked
+      Ready
     </span>
   ) : saved ? (
     <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-linen px-2 py-0.5 font-pixel text-[0.875rem] text-charcoal ring-1 ring-mist">
@@ -96,7 +108,7 @@ export function QuestSlip({
       padding="md"
       className={cn(
         "group h-full",
-        (picked || completed) && "ring-1 ring-accent/35",
+        (picked || completed || assignmentStatus) && "ring-1 ring-accent/35",
         className
       )}
     >
@@ -129,6 +141,11 @@ export function QuestSlip({
                 ? `Slot resets · ${formatQuestWindowRemaining(expiresAt)}`
                 : `${formatQuestWindowRemaining(expiresAt).replace(" left", " to complete")}`}
             </time>
+          )}
+          {displayStatus === "started" && (
+            <span className="mt-1 block text-[0.75rem] font-medium text-accent">
+              Open to continue
+            </span>
           )}
           {!compact && (
             <>

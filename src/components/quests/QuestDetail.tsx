@@ -7,8 +7,13 @@
  */
 import { useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import type { QuestTemplate, ReflectionMood } from "@/lib/questos/types";
+import type {
+  QuestStepKey,
+  QuestTemplate,
+  ReflectionMood,
+} from "@/lib/questos/types";
 import {
   useQuestOS,
   selectMyQuests,
@@ -18,8 +23,12 @@ import {
   formatQuestWindowRemaining,
   nextQuestSlotAt,
 } from "@/lib/questos/quest-engine";
-import { QUEST_STEP_KEYS, hasBegun } from "@/lib/questos/quest-steps";
-import { stepLabels } from "@/components/quests/QuestAccordionCard";
+import {
+  QUEST_STEP_KEYS,
+  checklistItemsForQuest,
+  hasBegun,
+  isQuestChecklistComplete,
+} from "@/lib/questos/quest-steps";
 import { useToast } from "@/components/design-system/Toast";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageContainer } from "@/components/app-shell/PageHeader";
@@ -58,6 +67,7 @@ function Meta({ label, value }: { label: string; value: string }) {
 
 function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
   const { toast } = useToast();
+  const router = useRouter();
   const t = useStrings();
   const completeQuestBySlug = useQuestOS((s) => s.completeQuestBySlug);
   const pickQuest = useQuestOS((s) => s.pickQuest);
@@ -87,6 +97,7 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
   const [reflection, setReflection] = useState("");
   const [mood, setMood] = useState<ReflectionMood | undefined>();
   const reflectionFieldId = useId();
+  const completionHelpId = useId();
 
   const todayPick = picks.find((a) => a.questSlug === quest.slug);
   const entry = myQuests[quest.slug];
@@ -97,6 +108,26 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
     hasBegun(entry);
   const completedInWindow = todayPick?.status === "completed";
   const nextSlot = nextQuestSlotAt(assignments, isPlus, now);
+  const checklistItems = checklistItemsForQuest(quest);
+  const genericStepLabels: Record<QuestStepKey, string> = {
+    scripture: t.myQuests.stepScripture,
+    live: t.myQuests.stepLive,
+    reflect: t.myQuests.stepReflect,
+    pray: t.myQuests.stepPray,
+  };
+  const displayedSteps =
+    checklistItems.length > 0
+      ? checklistItems
+      : QUEST_STEP_KEYS.map((key) => ({
+          key,
+          label: genericStepLabels[key],
+        }));
+  const hasRequiredChecklist = checklistItems.length > 0;
+  const checklistComplete = isQuestChecklistComplete(quest, entry);
+  const checklistRemaining = checklistItems.filter(
+    (item) => !entry?.stepsDone.includes(item.key)
+  ).length;
+  const inProgress = todayPick?.status === "started" || Boolean(walking);
 
   useEffect(() => {
     track("quest_viewed", { category: quest.category });
@@ -126,7 +157,10 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
 
   function begin() {
     if (startQuest(quest.slug, isPlus)) {
-      setPhase("reflect");
+      toast("Quest started. Return whenever you’re ready.", {
+        variant: "success",
+      });
+      router.push("/app#active-quests");
       return;
     }
     toast(
@@ -151,8 +185,19 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
       hasText ? { body: reflection, mood } : undefined
     );
     if (!result.completed) {
-      toast("That 24-hour window ended. Choose the quest again to finish it.");
-      setPhase("detail");
+      if (result.reason === "checklist_incomplete") {
+        toast("Finish the quest checklist before marking it complete.");
+      } else if (result.reason === "already_completed") {
+        toast("This quest is already complete.");
+      } else if (result.reason === "unknown_quest") {
+        toast("This quest is no longer available.");
+      } else if (result.reason === "not_started") {
+        toast("Start this quest before marking it complete.");
+        setPhase("detail");
+      } else {
+        toast("That 24-hour window ended. Choose the quest again to finish it.");
+        setPhase("detail");
+      }
       return;
     }
     toast(hasText ? "Done. Reflection saved." : "Quest complete.", {
@@ -170,10 +215,10 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
     <PageContainer className="pt-safe">
       <div className="pt-6">
         <Link
-          href="/app/quests"
+          href={inProgress ? "/app#active-quests" : "/app/quests"}
           className="inline-flex items-center gap-1.5 text-[0.875rem] text-ash transition-colors hover:text-charcoal"
         >
-          <IconArrowLeft size={16} /> Quests
+          <IconArrowLeft size={16} /> {inProgress ? "Active quests" : "Quests"}
         </Link>
       </div>
 
@@ -263,23 +308,34 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
               </p>
             )}
 
-            {/* Your walk so far — a bookmark, never homework. Appears once
-                the quest is underway so a first visit stays uncluttered. */}
-            {walking && !completedInWindow && (
+            {/* Quest-specific checklists gate completion. Quests without one
+                keep the original four optional movements as resumable
+                bookmarks, so this workflow does not erase existing progress. */}
+            {inProgress && entry && !completedInWindow && (
               <PaperCard variant="quiet" padding="md" className="mt-5">
                 <p className="text-[0.75rem] uppercase tracking-wide text-accent">
-                  Your walk so far
+                  {hasRequiredChecklist
+                    ? "Quest checklist"
+                    : "Your walk so far"}
                 </p>
+                {!hasRequiredChecklist && (
+                  <p className="mt-1 text-caption text-ash">
+                    These movements are optional. Use them to remember where
+                    you left off.
+                  </p>
+                )}
                 <ul className="mt-2.5 space-y-2">
-                  {QUEST_STEP_KEYS.map((key) => {
-                    const done = entry.stepsDone.includes(key);
+                  {displayedSteps.map((item) => {
+                    const done = entry.stepsDone.includes(item.key);
                     return (
-                      <li key={key}>
+                      <li key={item.key}>
                         <button
                           type="button"
                           role="checkbox"
                           aria-checked={done}
-                          onClick={() => markQuestStep(quest.slug, key, !done)}
+                          onClick={() =>
+                            markQuestStep(quest.slug, item.key, !done)
+                          }
                           className="flex w-full items-center gap-3 rounded-[var(--radius-button)] px-1 py-1.5 text-left transition-colors hover:bg-linen focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                         >
                           <span
@@ -299,7 +355,7 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
                                 : "text-charcoal"
                             }`}
                           >
-                            {stepLabels(t)[key]}
+                            {item.label}
                           </span>
                         </button>
                       </li>
@@ -319,6 +375,39 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
                     See your journey
                   </GentleLink>
                 </PaperCard>
+              ) : todayPick?.status === "started" ? (
+                <div className="space-y-2.5">
+                  <GentleButton
+                    variant="primary"
+                    size="lg"
+                    fullWidth
+                    disabled={!checklistComplete}
+                    aria-describedby={
+                      checklistComplete ? undefined : completionHelpId
+                    }
+                    onClick={() => setPhase("reflect")}
+                  >
+                    <IconCheck size={18} /> Complete quest
+                  </GentleButton>
+                  {!checklistComplete && (
+                    <p
+                      id={completionHelpId}
+                      className="text-center text-caption text-ash"
+                    >
+                      {checklistRemaining === 1
+                        ? "1 checklist item remains."
+                        : `${checklistRemaining} checklist items remain.`}
+                    </p>
+                  )}
+                  <GentleLink
+                    variant="text"
+                    size="sm"
+                    href="/app#active-quests"
+                    className="flex"
+                  >
+                    Back to active quests
+                  </GentleLink>
+                </div>
               ) : todayPick ? (
                 <GentleButton variant="primary" size="lg" fullWidth onClick={begin}>
                   {walking ? t.myQuests.continueCta : "Begin quest"}
@@ -415,16 +504,25 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
                 variant="primary"
                 size="lg"
                 fullWidth
+                disabled={!checklistComplete}
                 onClick={() => finish(true)}
               >
                 <IconCheck size={18} /> Complete quest
               </GentleButton>
               <button
                 type="button"
+                disabled={!checklistComplete}
                 onClick={() => finish(false)}
-                className="w-full py-2 text-center text-small text-ash transition-colors hover:text-charcoal"
+                className="w-full py-2 text-center text-small text-ash transition-colors hover:text-charcoal disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Complete without writing
+              </button>
+              <button
+                type="button"
+                onClick={() => setPhase("detail")}
+                className="w-full py-2 text-center text-small text-accent transition-colors hover:text-accent/80"
+              >
+                Back to quest
               </button>
             </div>
           </motion.div>

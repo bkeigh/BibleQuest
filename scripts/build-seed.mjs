@@ -131,8 +131,9 @@ writeFileSync(
   banner("Quest templates") +
     `import type { QuestTemplate } from "@/lib/questos/types";\n\n` +
     `import { questExpansion } from "./quest-expansion";\n\n` +
+    `import { withQuestChecklist } from "./quest-checklists";\n\n` +
     `const coreSeedQuests: QuestTemplate[] = ${JSON.stringify(quests, null, 2)};\n\n` +
-    `export const seedQuests: QuestTemplate[] = [...coreSeedQuests, ...questExpansion];\n\n` +
+    `export const seedQuests: QuestTemplate[] = [...coreSeedQuests, ...questExpansion].map(withQuestChecklist);\n\n` +
     `export const questBySlug = new Map(seedQuests.map((q) => [q.slug, q]));\n`
 );
 

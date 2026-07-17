@@ -5,6 +5,7 @@
 
 import type { QuestTemplate } from "@/lib/questos/types";
 import { questExpansion } from "./quest-expansion";
+import { withQuestChecklist } from "./quest-checklists";
 
 const coreSeedQuests: QuestTemplate[] = [
   {
@@ -2617,6 +2618,6 @@ const coreSeedQuests: QuestTemplate[] = [
 export const seedQuests: QuestTemplate[] = [
   ...coreSeedQuests,
   ...questExpansion,
-];
+].map(withQuestChecklist);
 
 export const questBySlug = new Map(seedQuests.map((q) => [q.slug, q]));

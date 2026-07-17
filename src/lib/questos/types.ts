@@ -55,6 +55,16 @@ export type SeasonKey =
   | "easter"
   | "pentecost";
 
+/**
+ * One required checkpoint in a quest-specific checklist. The key reuses the
+ * four persisted walk movements, so checklist progress syncs through the
+ * existing `MyQuest.stepsDone` field without a second source of truth.
+ */
+export interface QuestChecklistItem {
+  key: QuestStepKey;
+  label: string;
+}
+
 export interface QuestTemplate {
   slug: string;
   title: string;
@@ -77,6 +87,11 @@ export interface QuestTemplate {
   traditionTags: string[];
   sensitivityTags: string[];
   isPremium: boolean;
+  /**
+   * Required completion checkpoints for this quest. Omitted or empty means
+   * the generic walk movements remain optional and completion is not gated.
+   */
+  checklist?: QuestChecklistItem[];
 }
 
 export type DailyQuestStatus =
@@ -111,6 +126,21 @@ export interface QuestCompletion {
   completedAt: string;
   reflectionId?: string;
 }
+
+export type QuestCompletionFailureReason =
+  | "unknown_quest"
+  | "window_closed"
+  | "already_completed"
+  | "not_started"
+  | "checklist_incomplete";
+
+export type QuestCompletionResult =
+  | { completed: true; newMilestones: MilestoneSeed[] }
+  | {
+      completed: false;
+      newMilestones: MilestoneSeed[];
+      reason: QuestCompletionFailureReason;
+    };
 
 // ---------------------------------------------------------------------------
 // My Quests — the persistent quest shelf

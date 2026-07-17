@@ -19,8 +19,8 @@ import type { MyQuest, QuestStepKey, QuestTemplate } from "@/lib/questos/types";
 import { useQuestOS } from "@/lib/questos/store";
 import {
   QUEST_STEP_KEYS,
+  checklistItemsForQuest,
   hasBegun,
-  nextStep,
 } from "@/lib/questos/quest-steps";
 import { useToast } from "@/components/design-system/Toast";
 import { PaperCard } from "@/components/design-system/PaperCard";
@@ -39,8 +39,8 @@ import { track } from "@/lib/analytics/events";
 import { cn } from "@/lib/utils/cn";
 import { usePlus } from "@/lib/revenuecat/usePlus";
 
-/** The one place step keys become words — shared with QuestDetail. */
-export function stepLabels(t: UIStrings): Record<QuestStepKey, string> {
+/** The generic movement labels used when a quest has no required checklist. */
+function stepLabels(t: UIStrings): Record<QuestStepKey, string> {
   return {
     scripture: t.myQuests.stepScripture,
     live: t.myQuests.stepLive,
@@ -87,8 +87,15 @@ export function QuestAccordionCard({
   const contentId = `${baseId}-content`;
 
   const begun = hasBegun(entry);
-  const next = nextStep(entry);
   const labels = stepLabels(t);
+  const checklistItems = checklistItemsForQuest(quest);
+  const displayedSteps =
+    checklistItems.length > 0
+      ? checklistItems
+      : QUEST_STEP_KEYS.map((key) => ({ key, label: labels[key] }));
+  const nextDisplayedStep = displayedSteps.find(
+    (item) => !entry.stepsDone.includes(item.key)
+  );
   const detailHref = `/app/quests/${quest.slug}`;
 
   function toggle() {
@@ -160,7 +167,7 @@ export function QuestAccordionCard({
           </span>
           <span className="mt-1.5 block">
             {begun && entry.status !== "completed" ? (
-              <QuestProgressIndicator entry={entry} />
+              <QuestProgressIndicator entry={entry} quest={quest} />
             ) : (
               <span className="text-[0.8125rem] italic text-ash">
                 {quest.scriptureReference}
@@ -195,17 +202,19 @@ export function QuestAccordionCard({
 
             {entry.status !== "completed" && entry.status !== "archived" && (
               <div>
-                {next && begun && (
+                {nextDisplayedStep && begun && (
                   <p className="mb-2 text-caption text-accent">
-                    {fmt(t.myQuests.nextStep, { step: labels[next] })}
+                    {fmt(t.myQuests.nextStep, {
+                      step: nextDisplayedStep.label,
+                    })}
                   </p>
                 )}
                 <ul className="space-y-1.5">
-                  {QUEST_STEP_KEYS.map((key) => {
-                    const done = entry.stepsDone.includes(key);
+                  {displayedSteps.map((item) => {
+                    const done = entry.stepsDone.includes(item.key);
                     return (
                       <li
-                        key={key}
+                        key={item.key}
                         className="flex items-center gap-2.5 text-small"
                       >
                         <span
@@ -224,7 +233,7 @@ export function QuestAccordionCard({
                             done ? "text-ash line-through decoration-mist" : "text-charcoal"
                           )}
                         >
-                          {labels[key]}
+                          {item.label}
                         </span>
                         <span className="sr-only">
                           {done ? t.common.done : ""}

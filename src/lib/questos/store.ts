@@ -44,6 +44,7 @@ import {
   type PrayerCategory,
   type Profile,
   type QuestCompletion,
+  type QuestCompletionResult,
   type QuestStepKey,
   type QuestTemplate,
   type ReadingPosition,
@@ -63,6 +64,7 @@ import {
   emptyStreak,
 } from "./types";
 import { advanceStreak } from "./streak-engine";
+import { isQuestChecklistComplete } from "./quest-steps";
 
 function id(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -150,7 +152,7 @@ interface QuestOSState {
   completeQuestBySlug: (
     slug: string,
     reflection?: { body: string; mood?: ReflectionMood }
-  ) => { completed: boolean; newMilestones: MilestoneSeed[] };
+  ) => QuestCompletionResult;
 
   // -- quest shelf (My Quests — persistent, independent of the day)
   /** Tuck a quest away for another day. Returns false when it's already
@@ -498,7 +500,7 @@ export const useQuestOS = create<QuestOSState>()(
       function completeQuest(
         quest: QuestTemplate,
         reflection?: { body: string; mood?: ReflectionMood }
-      ): { completed: boolean; newMilestones: MilestoneSeed[] } {
+      ): QuestCompletionResult {
         const s = get();
         const now = new Date();
         const dateKey = toDateKey(now);
@@ -507,8 +509,19 @@ export const useQuestOS = create<QuestOSState>()(
         // UI begin path atomically opens one first, which keeps the free limit
         // a domain rule instead of a presentation-only suggestion.
         const openPick = findOpenAssignment(s.assignments, quest.slug, now);
-        if (!openPick || openPick.assignment.status === "completed") {
-          return { completed: false, newMilestones: [] };
+        if (!openPick) {
+          return {
+            completed: false,
+            newMilestones: [],
+            reason: "window_closed",
+          };
+        }
+        if (openPick.assignment.status === "completed") {
+          return {
+            completed: false,
+            newMilestones: [],
+            reason: "already_completed",
+          };
         }
 
         // Legacy/imported histories may contain a completion without a matching
@@ -521,7 +534,32 @@ export const useQuestOS = create<QuestOSState>()(
               c.completedAt < openPick.assignment.expiresAt,
           )
         ) {
-          return { completed: false, newMilestones: [] };
+          return {
+            completed: false,
+            newMilestones: [],
+            reason: "already_completed",
+          };
+        }
+
+        // Completion is a transition from an underway quest, never directly
+        // from a merely assigned card. This also closes non-UI bypasses.
+        if (openPick.assignment.status !== "started") {
+          return {
+            completed: false,
+            newMilestones: [],
+            reason: "not_started",
+          };
+        }
+
+        // The disabled button is guidance; this domain guard is authority.
+        // Generic steps stay optional unless content explicitly supplies a
+        // checklist for this quest.
+        if (!isQuestChecklistComplete(quest, s.myQuests[quest.slug])) {
+          return {
+            completed: false,
+            newMilestones: [],
+            reason: "checklist_incomplete",
+          };
         }
 
         let reflectionId: string | undefined;
@@ -899,7 +937,13 @@ export const useQuestOS = create<QuestOSState>()(
 
         completeQuestBySlug: (slug, reflection) => {
           const quest = questBySlug.get(slug);
-          if (!quest) return { completed: false, newMilestones: [] };
+          if (!quest) {
+            return {
+              completed: false,
+              newMilestones: [],
+              reason: "unknown_quest",
+            };
+          }
           return completeQuest(quest, reflection);
         },
 

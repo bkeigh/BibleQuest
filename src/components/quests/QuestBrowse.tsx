@@ -123,10 +123,18 @@ function QuestBrowseInner() {
       ),
     [completions, todayKey]
   );
-  const pickedSlugs = useMemo(
-    () => new Set(picks.map((a) => a.questSlug)),
+  const pickedBySlug = useMemo(
+    () => new Map(picks.map((assignment) => [assignment.questSlug, assignment])),
     [picks]
   );
+  const activePicks = picks.filter((pick) => pick.status === "started");
+  const readyPicks = picks.filter((pick) => pick.status === "assigned");
+  const donePicks = picks.filter((pick) => pick.status === "completed");
+  const pickGroups = [
+    { key: "active", label: "Active quests", items: activePicks },
+    { key: "ready", label: "Ready to begin", items: readyPicks },
+    { key: "done", label: "Completed", items: donePicks },
+  ].filter((group) => group.items.length > 0);
 
   const activeFilterCount =
     (duration ? 1 : 0) +
@@ -212,7 +220,8 @@ function QuestBrowseInner() {
   /** A browse-list slip: shelf state + add-to-today / save-for-later. */
   function browseSlip(quest: QuestTemplate, compact = false) {
     const done = completedToday.has(quest.slug);
-    const isPicked = pickedSlugs.has(quest.slug);
+    const assignment = pickedBySlug.get(quest.slug);
+    const isPicked = Boolean(assignment);
     const shelfStatus = myQuests[quest.slug]?.status;
     const isSaved = shelfStatus === "saved" || shelfStatus === "paused";
     // Saving makes sense only for quests not already underway or done.
@@ -222,7 +231,7 @@ function QuestBrowseInner() {
         key={quest.slug}
         quest={quest}
         href={`/app/quests/${quest.slug}`}
-        picked={isPicked}
+        assignmentStatus={assignment?.status}
         completed={done}
         saved={!isPicked && !done && isSaved}
         compact={compact}
@@ -275,8 +284,10 @@ function QuestBrowseInner() {
             <ShelfTitle>{t.quests.today}</ShelfTitle>
             <p aria-live="polite" className="text-caption text-ash">
               {isPlus
-                ? `${picks.length} active · Unlimited`
-                : `${picks.length} shown · ${reservedSlots}/3 slots${
+                ? `${activePicks.length} active · ${readyPicks.length} ready · Unlimited`
+                : `${activePicks.length} active · ${readyPicks.length} ready${
+                    donePicks.length > 0 ? ` · ${donePicks.length} done` : ""
+                  } · ${reservedSlots}/3 slots${
                     Number.isFinite(slotsRemaining) && slotsRemaining > 0
                       ? ` · ${slotsRemaining} open`
                       : ""
@@ -292,36 +303,46 @@ function QuestBrowseInner() {
               </p>
             </PaperCard>
           ) : (
-            <div className="mt-2 space-y-3">
-              {picks.map((pick) => {
-                const quest = questBySlug.get(pick.questSlug);
-                if (!quest) return null;
-                const done =
-                  pick.status === "completed" ||
-                  completedToday.has(pick.questSlug);
-                return (
-                  <QuestSlip
-                    key={pick.questSlug}
-                    quest={quest}
-                    href={`/app/quests/${quest.slug}`}
-                    completed={done}
-                    expiresAt={pick.expiresAt}
-                    action={
-                      done ? undefined : (
-                        <button
-                          type="button"
-                          aria-label={`Remove ${quest.title} from today`}
-                          title="Remove from today"
-                          onClick={() => handleRemove(quest)}
-                          className="flex h-9 w-9 items-center justify-center rounded-full border border-mist bg-paper text-ash transition-colors duration-300 hover:border-accent/40 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                        >
-                          <IconClose size={16} />
-                        </button>
-                      )
-                    }
-                  />
-                );
-              })}
+            <div className="mt-3 space-y-4">
+              {pickGroups.map((group) => (
+                <div key={group.key}>
+                  <h3 className="mb-2 text-caption uppercase tracking-[0.16em] text-ash">
+                    {group.label}
+                  </h3>
+                  <div className="space-y-3">
+                    {group.items.map((pick) => {
+                      const quest = questBySlug.get(pick.questSlug);
+                      if (!quest) return null;
+                      const done =
+                        pick.status === "completed" ||
+                        completedToday.has(pick.questSlug);
+                      return (
+                        <QuestSlip
+                          key={pick.questSlug}
+                          quest={quest}
+                          href={`/app/quests/${quest.slug}`}
+                          assignmentStatus={pick.status}
+                          completed={done}
+                          expiresAt={pick.expiresAt}
+                          action={
+                            done ? undefined : (
+                              <button
+                                type="button"
+                                aria-label={`Remove ${quest.title} from today`}
+                                title="Remove from today"
+                                onClick={() => handleRemove(quest)}
+                                className="flex h-9 w-9 items-center justify-center rounded-full border border-mist bg-paper text-ash transition-colors duration-300 hover:border-accent/40 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                              >
+                                <IconClose size={16} />
+                              </button>
+                            )
+                          }
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </section>

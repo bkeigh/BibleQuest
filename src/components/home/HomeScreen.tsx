@@ -163,6 +163,32 @@ function HomeInner() {
   const completedCount = pickedQuests.filter(
     ({ pick }) => pick.status === "completed"
   ).length;
+  const activePickedQuests = pickedQuests.filter(
+    ({ pick }) => pick.status === "started"
+  );
+  const readyPickedQuests = pickedQuests.filter(
+    ({ pick }) => pick.status === "assigned"
+  );
+  const completedPickedQuests = pickedQuests.filter(
+    ({ pick }) => pick.status === "completed"
+  );
+  const questGroups = [
+    {
+      key: "active",
+      label: "Active quests",
+      items: activePickedQuests,
+    },
+    {
+      key: "ready",
+      label: "Ready to begin",
+      items: readyPickedQuests,
+    },
+    {
+      key: "done",
+      label: "Completed",
+      items: completedPickedQuests,
+    },
+  ].filter((group) => group.items.length > 0);
   const allDone = pickCount >= 1 && completedCount === pickCount;
   const useCompactQuestRail = pickCount > MAX_DAILY_PICKS;
   const hiddenReservationCount = Math.max(
@@ -244,7 +270,12 @@ function HomeInner() {
           <VerseCard verse={verse} onAnotherVerse={refreshVerse} />
 
           {/* Today's quests — empty, picked (1-3), or day complete */}
-          <section aria-label={t.home.todaysQuests}>
+          <section
+            id="active-quests"
+            aria-label={t.home.todaysQuests}
+            tabIndex={-1}
+            className="scroll-mt-6 outline-none"
+          >
             {/* The loudest title on the page — the day's work anchors it. */}
             <div className="mb-2.5 flex items-center justify-between gap-3 px-1">
               <h2 className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent min-[380px]:text-[1.75rem]">
@@ -260,9 +291,15 @@ function HomeInner() {
                 )
               ) : (
                 <p className="text-caption text-ash">
-                  {completedCount > 0
-                    ? `${completedCount}/${pickCount} done`
-                    : fmt(t.quests.picked, { n: pickCount })}
+                  {activePickedQuests.length > 0
+                    ? `${activePickedQuests.length} active${
+                        readyPickedQuests.length > 0
+                          ? ` · ${readyPickedQuests.length} ready`
+                          : ""
+                      }${completedCount > 0 ? ` · ${completedCount} done` : ""}`
+                    : completedCount > 0
+                      ? `${completedCount}/${pickCount} done`
+                      : `${readyPickedQuests.length} ready`}
                 </p>
               )}
             </div>
@@ -310,37 +347,43 @@ function HomeInner() {
                 <p className="mb-2.5 px-1 text-caption text-ash">
                   Each quest stays open for 24 hours. Countdown times appear on every quest.
                 </p>
-                <ul
-                  aria-label={useCompactQuestRail ? "Your open quest windows" : undefined}
-                  className={
-                    useCompactQuestRail
-                      ? "-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-8 sm:px-8"
-                      : "space-y-3"
-                  }
-                >
-                  {pickedQuests.map(({ pick, quest }) => {
-                    const done = pick.status === "completed";
-                    return (
-                      <li
-                        key={`${pick.pickedAt}:${quest.slug}`}
+                <div className="space-y-4">
+                  {questGroups.map((group) => (
+                    <div key={group.key}>
+                      <h3 className="mb-2 px-1 text-caption uppercase tracking-[0.16em] text-ash">
+                        {group.label}
+                      </h3>
+                      <ul
+                        aria-label={group.label}
                         className={
                           useCompactQuestRail
-                            ? "w-[min(84vw,20rem)] shrink-0 snap-start"
-                            : undefined
+                            ? "-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-8 sm:px-8"
+                            : "space-y-3"
                         }
                       >
-                        <QuestSlip
-                          quest={quest}
-                          href={`/app/quests/${quest.slug}`}
-                          picked={!done}
-                          completed={done}
-                          expiresAt={pick.expiresAt}
-                          compact={useCompactQuestRail}
-                        />
-                      </li>
-                    );
-                  })}
-                </ul>
+                        {group.items.map(({ pick, quest }) => (
+                          <li
+                            key={`${pick.pickedAt}:${quest.slug}`}
+                            className={
+                              useCompactQuestRail
+                                ? "w-[min(84vw,20rem)] shrink-0 snap-start"
+                                : undefined
+                            }
+                          >
+                            <QuestSlip
+                              quest={quest}
+                              href={`/app/quests/${quest.slug}`}
+                              assignmentStatus={pick.status}
+                              completed={pick.status === "completed"}
+                              expiresAt={pick.expiresAt}
+                              compact={useCompactQuestRail}
+                            />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
                 {useCompactQuestRail && (
                   <p className="mt-1 px-1 text-caption text-ash">
                     Swipe sideways to review every open quest.
