@@ -1,16 +1,12 @@
 /**
- * pixel-assets — the single registry for every pixel sprite and mascot.
+ * BibleQuest pixel art registry.
  *
- * Each asset is either a hand-placed character grid (rendered as crisp
- * SVG <rect>s by PixelIcon / PixelMascot) or a pre-drawn PNG dropped
- * into public/pixel/. Consumers only ever reference assets by name, so
- * swapping art means flipping one entry here — never a call site:
- *
- *   "candle-halo": { kind: "png", src: "/pixel/candle-halo.png", cols: 10, rows: 14 }
- *
- * `cols`/`rows` keep the logical grid, so `size` still means px per
- * cell and rendered dimensions never change. Rules and the PNG
- * replacement workflow live in docs/PIXEL_SYSTEM.md.
+ * The artwork is deterministic and transparent by construction: every sprite
+ * is rasterised from integer-aligned shapes into a character grid, then drawn
+ * as crisp SVG rectangles by PixelIcon / PixelMascot. Small icons and the
+ * living journey tree use true 32x32 authored canvases. Older 16x16 shape
+ * recipes are doubled onto that grid before rasterisation, so call sites keep
+ * their historic proportions while gaining a consistent one-pixel art grid.
  */
 
 export type PixelAsset =
@@ -18,645 +14,607 @@ export type PixelAsset =
       kind: "grid";
       rows: string[];
       palette: Record<string, string>;
-      /** Optional per-cell animation class for living details. */
+      /** Multiplies the caller's historic cell-size prop before snapping. */
+      cellScale?: number;
       ambient?: { chars: string; className: string };
     }
   | {
       kind: "png";
-      /** Path under public/, e.g. "/pixel/candle-halo.png". */
       src: string;
-      /** Logical grid width/height in cells — keeps `size` = px per cell. */
       cols: number;
       rows: number;
-      /** Whole-image animation fallback (PNGs can't animate per cell). */
+      cellScale?: number;
       ambientClassName?: string;
     };
 
-/** Keeps literal keys for the name unions while typing values as PixelAsset. */
 const defineAssets = <K extends string>(assets: Record<K, PixelAsset>) => assets;
 
-const T = "transparent";
-
-// Shared warm tones (tokens mirrored so sprites read against parchment).
-const INK = "#3f4d31";
-const OLIVE = "#6f8155";
-const OLIVE_L = "#a8b98c";
-const GOLD = "#e7c563";
-const GOLD_B = "#d3a336"; // brand gold — solid sacred objects
-const GOLD_D = "#b68b2f";
-const EVERGREEN = "#0e533c"; // brand green — doors, banners, ink
-const EVERGREEN_L = "#2f7c58";
-const FLAME = "#f2b24a";
-const FLAME_D = "#e8913f"; // deep flame orange — wick glow, flame roots
-const WHITE = "#fffaf0";
-const WARM_WHITE = "#fffdf7"; // mascot wool and pages
-const PARCHMENT = "#efe4cf";
-const ROSE = "#e5a8a1";
-const ROSE_D = "#b9645d";
-const BLUE = "#8fb9d4";
-const BROWN = "#7a5a3a";
-const BARK = "#6b4f34";
-const STONE = "#c9c3b4";
-const TWILIGHT = "#1e3329"; // deep-green outline for mascots + feature sprites
-const FACE = "#8a6844"; // mascot face/limb brown
-const TAN = "#cfa878"; // light tan (lamb muzzle)
-const SKIN = "#e8cba8"; // warm skin tone (hands sprite)
-const BIRD_EYE = "#2c2c2c";
-
-/* ---- Feature-sprite palettes (candle streak set, journey tree set) ---- */
-
-// The five streak candles share one body; only the flame grows.
-const CANDLE_PALETTE = {
-  k: TWILIGHT, // outline + wick
-  c: WHITE, // wax
-  s: PARCHMENT, // wax shade (lower right)
-  h: GOLD, // wax highlight (upper left)
-  b: GOLD_B, // holder
-  d: GOLD_D, // holder shade
-  f: FLAME, // flame
-  y: GOLD, // flame core
-  o: FLAME_D, // flame root
-  g: GOLD, // floating sparks
-  a: GOLD, // halo arc
-  ".": T,
+type RectShape = {
+  kind: "rect";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
 };
-const CANDLE_FLICKER = {
-  chars: "fyog",
-  className: "origin-bottom [animation:var(--animate-flicker)]",
+type EllipseShape = {
+  kind: "ellipse";
+  cx: number;
+  cy: number;
+  rx: number;
+  ry: number;
+  color: string;
 };
-// Shared 10x14 candle body — wick/flame rows are prepended per state.
-const CANDLE_BODY = [
-  "..kkkkkk..",
-  "..khhcsk..",
-  "..khccsk..",
-  "..kcccsk..",
-  "..kccssk..",
-  ".kbbbbbdk.",
-  ".kddddddk.",
-  ".kkkkkkkk.",
-];
+type LineShape = {
+  kind: "line";
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  color: string;
+  thickness?: number;
+};
+type PixelShape = RectShape | EllipseShape | LineShape;
 
-/* ============================================================
-   Small sprites + feature sprites (PixelIcon)
-   ============================================================ */
+const rect = (
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  color: string
+): RectShape => ({ kind: "rect", x, y, width, height, color });
+const ellipse = (
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  color: string
+): EllipseShape => ({ kind: "ellipse", cx, cy, rx, ry, color });
+const line = (
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  color: string,
+  thickness = 1
+): LineShape => ({ kind: "line", x1, y1, x2, y2, color, thickness });
+
+function rasterise(width: number, height: number, shapes: PixelShape[]): string[] {
+  const cells = Array.from({ length: height }, () => Array(width).fill("."));
+  const paint = (x: number, y: number, color: string) => {
+    if (x >= 0 && x < width && y >= 0 && y < height) cells[y][x] = color;
+  };
+
+  for (const shape of shapes) {
+    if (shape.kind === "rect") {
+      for (let y = shape.y; y < shape.y + shape.height; y += 1) {
+        for (let x = shape.x; x < shape.x + shape.width; x += 1) {
+          paint(x, y, shape.color);
+        }
+      }
+      continue;
+    }
+
+    if (shape.kind === "ellipse") {
+      const minX = Math.floor(shape.cx - shape.rx);
+      const maxX = Math.ceil(shape.cx + shape.rx);
+      const minY = Math.floor(shape.cy - shape.ry);
+      const maxY = Math.ceil(shape.cy + shape.ry);
+      for (let y = minY; y <= maxY; y += 1) {
+        for (let x = minX; x <= maxX; x += 1) {
+          const dx = (x + 0.5 - shape.cx) / shape.rx;
+          const dy = (y + 0.5 - shape.cy) / shape.ry;
+          if (dx * dx + dy * dy <= 1) paint(x, y, shape.color);
+        }
+      }
+      continue;
+    }
+
+    let x = shape.x1;
+    let y = shape.y1;
+    const dx = Math.abs(shape.x2 - shape.x1);
+    const sx = shape.x1 < shape.x2 ? 1 : -1;
+    const dy = -Math.abs(shape.y2 - shape.y1);
+    const sy = shape.y1 < shape.y2 ? 1 : -1;
+    let error = dx + dy;
+    const thickness = Math.max(1, shape.thickness ?? 1);
+    const low = -Math.floor((thickness - 1) / 2);
+    const high = Math.floor(thickness / 2);
+    while (true) {
+      for (let oy = low; oy <= high; oy += 1) {
+        for (let ox = low; ox <= high; ox += 1) paint(x + ox, y + oy, shape.color);
+      }
+      if (x === shape.x2 && y === shape.y2) break;
+      const nextError = 2 * error;
+      if (nextError >= dy) {
+        error += dy;
+        x += sx;
+      }
+      if (nextError <= dx) {
+        error += dx;
+        y += sy;
+      }
+    }
+  }
+
+  return cells.map((row) => row.join(""));
+}
+
+// Reference-board palette. Dark green replaces pure black throughout.
+const TRANSPARENT = "transparent";
+const OUTLINE = "#1e3329";
+const INK = "#2c2c2c";
+const GREEN_DARK = "#0a3f2e";
+const GREEN = "#0e533c";
+const MOSS = "#6f8155";
+const MOSS_LIGHT = "#a8b98c";
+const GOLD_DARK = "#6f531d";
+const GOLD = "#d3a336";
+const GOLD_LIGHT = "#f2cf63";
+const LEATHER_DARK = "#5d3b24";
+const LEATHER = "#8b5e34";
+const LEATHER_LIGHT = "#b7834b";
+const PARCHMENT_DARK = "#d9c49b";
+const PARCHMENT = "#f6e9d1";
+const WARM_WHITE = "#fffaf0";
+const BLUE_DARK = "#295470";
+const BLUE = "#4f7e9e";
+const BLUE_LIGHT = "#91b8cd";
+const ROSE_DARK = "#9f514b";
+const ROSE = "#d9897d";
+const ROSE_LIGHT = "#f0b1a2";
+const FLAME = "#e8872d";
+const FLAME_LIGHT = "#ffd45a";
+const STONE_DARK = "#817b6d";
+const STONE = "#bdb49f";
+const STONE_LIGHT = "#e1d8c4";
+const SKIN_DARK = "#9b633c";
+const SKIN = "#d49b68";
+const SKIN_LIGHT = "#f1c79b";
+
+const PALETTE = {
+  k: OUTLINE,
+  i: INK,
+  e: GREEN_DARK,
+  E: GREEN,
+  m: MOSS,
+  M: MOSS_LIGHT,
+  d: GOLD_DARK,
+  g: GOLD,
+  G: GOLD_LIGHT,
+  q: LEATHER_DARK,
+  b: LEATHER,
+  B: LEATHER_LIGHT,
+  p: PARCHMENT_DARK,
+  P: PARCHMENT,
+  w: WARM_WHITE,
+  u: BLUE_DARK,
+  U: BLUE,
+  V: BLUE_LIGHT,
+  r: ROSE_DARK,
+  R: ROSE,
+  h: ROSE_LIGHT,
+  o: FLAME,
+  O: FLAME_LIGHT,
+  s: STONE_DARK,
+  S: STONE,
+  H: STONE_LIGHT,
+  t: SKIN_DARK,
+  T: SKIN,
+  L: SKIN_LIGHT,
+  ".": TRANSPARENT,
+};
+
+function art(
+  width: number,
+  height: number,
+  shapes: PixelShape[],
+  options: Pick<Extract<PixelAsset, { kind: "grid" }>, "cellScale" | "ambient"> = {}
+): PixelAsset {
+  return { kind: "grid", rows: rasterise(width, height, shapes), palette: PALETTE, ...options };
+}
+
+function scaleShape(shape: PixelShape, factor: number): PixelShape {
+  if (shape.kind === "rect") {
+    return rect(
+      shape.x * factor,
+      shape.y * factor,
+      shape.width * factor,
+      shape.height * factor,
+      shape.color
+    );
+  }
+  if (shape.kind === "ellipse") {
+    return ellipse(
+      shape.cx * factor,
+      shape.cy * factor,
+      shape.rx * factor,
+      shape.ry * factor,
+      shape.color
+    );
+  }
+  return line(
+    shape.x1 * factor,
+    shape.y1 * factor,
+    shape.x2 * factor,
+    shape.y2 * factor,
+    shape.color,
+    (shape.thickness ?? 1) * factor
+  );
+}
+
+const icon = (
+  shapes: PixelShape[],
+  ambient?: Extract<PixelAsset, { kind: "grid" }>["ambient"]
+) => art(32, 32, shapes.map((shape) => scaleShape(shape, 2)), { cellScale: 0.2, ambient });
+
+/** A directly authored 32x32 icon for silhouettes that need single-pixel detail. */
+const icon32 = (
+  shapes: PixelShape[],
+  ambient?: Extract<PixelAsset, { kind: "grid" }>["ambient"]
+) => art(32, 32, shapes, { cellScale: 0.2, ambient });
+
+const flameAmbient = { chars: "oOgG", className: "origin-bottom [animation:var(--animate-flicker)]" };
+const twinkleAmbient = { chars: "gG", className: "[animation:var(--animate-twinkle)]" };
 
 export const PIXEL_SPRITES = defineAssets({
-  candle: {
-    kind: "grid",
-    palette: { f: FLAME, o: FLAME_D, c: WHITE, s: PARCHMENT, b: GOLD_D, ".": T },
-    rows: [
-      "..f..",
-      ".fff.",
-      "..o..",
-      ".ccc.",
-      ".ccs.",
-      ".css.",
-      ".bbb.",
-    ],
-    ambient: { chars: "fo", className: "origin-bottom [animation:var(--animate-flicker)]" },
-  },
-  leaf: {
-    kind: "grid",
-    palette: { g: OLIVE, l: OLIVE_L, v: INK, ".": T },
-    rows: [
-      "...ll",
-      "..llg",
-      ".llgg",
-      "llggv",
-      "lgggv",
-      ".gggv",
-      "...vv",
-    ],
-  },
-  star: {
-    kind: "grid",
-    palette: { s: GOLD, w: WHITE, ".": T },
-    rows: [
-      "..w..",
-      "..s..",
-      "wsssw",
-      "..s..",
-      ".s.s.",
-    ],
-    ambient: { chars: "sw", className: "[animation:var(--animate-twinkle)]" },
-  },
-  bird: {
-    kind: "grid",
-    palette: { b: OLIVE, d: INK, e: BIRD_EYE, ".": T },
-    rows: [
-      "........",
-      "..bbb...",
-      ".bbbbbb.",
-      "bbbbbbe.",
-      ".dbbbb..",
-      "...d.d..",
-    ],
-  },
-  flower: {
-    kind: "grid",
-    palette: { p: ROSE, d: ROSE_D, c: GOLD, g: OLIVE, ".": T },
-    rows: [
-      ".p.p.",
-      "pdpdp",
-      ".pcp.",
-      "..g..",
-      ".gg..",
-      "..g..",
-    ],
-  },
-  chapel: {
-    kind: "grid",
-    palette: { r: ROSE_D, w: STONE, d: BARK, c: INK, y: GOLD, ".": T },
-    rows: [
-      "..c..",
-      "..c..",
-      ".rrr.",
-      "rrrrr",
-      "wwwww",
-      "wwyww",
-      "wwyww",
-    ],
-  },
-  book: {
-    kind: "grid",
-    palette: { c: BARK, p: WHITE, l: OLIVE, b: GOLD, ".": T },
-    rows: [
-      "ccccc",
-      "cpppc",
-      "cplpb",
-      "cpppc",
-      "cplpc",
-      "ccccc",
-    ],
-  },
-  bookmark: {
-    kind: "grid",
-    palette: { r: ROSE_D, l: ROSE, ".": T },
-    rows: [
-      "rrr",
-      "rlr",
-      "rlr",
-      "rlr",
-      "r.r",
-    ],
-  },
-  lantern: {
-    kind: "grid",
-    palette: { m: INK, g: GOLD, f: FLAME, ".": T },
-    rows: [
-      "..m..",
-      ".mmm.",
-      "mgfgm",
-      "mgfgm",
-      "mgggm",
-      ".mmm.",
-    ],
-    ambient: { chars: "f", className: "[animation:var(--animate-flicker)]" },
-  },
-  path: {
-    kind: "grid",
-    palette: { s: STONE, d: OLIVE_L, ".": T },
-    rows: [
-      ".s.d.",
-      "d.s.s",
-      ".d.s.",
-      "s.d.d",
-      ".s.d.",
-    ],
-  },
-  tree: {
-    kind: "grid",
-    palette: { g: OLIVE, l: OLIVE_L, b: BARK, ".": T },
-    rows: [
-      ".lgl.",
-      "lgggl",
-      "gglgg",
-      "lgggl",
-      "..b..",
-      "..b..",
-    ],
-    ambient: { chars: "gl", className: "origin-bottom [animation:var(--animate-sway-slow)]" },
-  },
-  sun: {
-    kind: "grid",
-    palette: { y: GOLD, o: FLAME, ".": T },
-    rows: [
-      "y.y.y",
-      ".ooo.",
-      "yoooy",
-      ".ooo.",
-      "y.y.y",
-    ],
-  },
-  heart: {
-    kind: "grid",
-    palette: { r: ROSE_D, l: ROSE, ".": T },
-    rows: [
-      ".r.r.",
-      "rlrlr",
-      "rlllr",
-      ".rlr.",
-      "..r..",
-    ],
-  },
-  hands: {
-    kind: "grid",
-    palette: { s: SKIN, d: BROWN, ".": T },
-    rows: [
-      "s...s",
-      "ss.ss",
-      "sssss",
-      "ddddd",
-      ".ddd.",
-    ],
-  },
-  wheat: {
-    kind: "grid",
-    palette: { g: GOLD, d: GOLD_D, s: OLIVE, ".": T },
-    rows: [
-      "g.g.g",
-      "dgdgd",
-      ".dsd.",
-      "..s..",
-      "..s..",
-    ],
-  },
-  dove: {
-    kind: "grid",
-    palette: { w: WHITE, g: STONE, b: BLUE, ".": T },
-    rows: [
-      "..www..",
-      ".wwwwg.",
-      "wwwwwwb",
-      ".gwww..",
-      "...g.g.",
-    ],
-  },
-  cross: {
-    kind: "grid",
-    palette: { g: GOLD_B, d: GOLD_D, ".": T },
-    rows: [
-      "..g..",
-      "..g..",
-      "ggggg",
-      "..g..",
-      "..g..",
-      "..d..",
-      "..d..",
-    ],
-  },
-  door: {
-    kind: "grid",
-    palette: { s: STONE, e: EVERGREEN, l: EVERGREEN_L, g: GOLD_B, ".": T },
-    rows: [
-      ".sss.",
-      "seles",
-      "seees",
-      "seege",
-      "seees",
-      "seees",
-      "sssss",
-    ],
-  },
-  key: {
-    kind: "grid",
-    palette: { g: GOLD_B, d: GOLD_D, ".": T },
-    rows: [
-      "ggg..",
-      "g.g..",
-      "ggg..",
-      ".d...",
-      ".d.d.",
-      ".ddd.",
-    ],
-  },
-  scroll: {
-    kind: "grid",
-    palette: { g: GOLD_B, w: WHITE, e: EVERGREEN, ".": T },
-    rows: [
-      "ggggg",
-      "wwwww",
-      "weeww",
-      "wwwww",
-      "weeew",
-      "wwwww",
-      "ggggg",
-    ],
-  },
-  compass: {
-    kind: "grid",
-    palette: { s: STONE, w: WHITE, e: EVERGREEN_L, r: ROSE_D, ".": T },
-    rows: [
-      "..s..",
-      ".sws.",
-      "swrws",
-      ".sws.",
-      "..e..",
-    ],
-  },
-  crown: {
-    kind: "grid",
-    palette: { g: GOLD_B, d: GOLD_D, e: EVERGREEN_L, ".": T },
-    rows: [
-      "g.g.g",
-      "ggggg",
-      "gegeg",
-      "ddddd",
-    ],
-  },
-  mountain: {
-    kind: "grid",
-    palette: { e: EVERGREEN, l: EVERGREEN_L, w: WHITE, ".": T },
-    rows: [
-      "...w...",
-      "..wew..",
-      ".eelee.",
-      ".elele.",
-      "eeleele",
-      "leeeeel",
-    ],
-  },
+  candle: icon([
+    ellipse(8, 14, 5, 1.5, "k"), ellipse(8, 13.5, 4, 1, "d"),
+    rect(5, 5, 6, 8, "k"), rect(6, 6, 4, 6, "P"), rect(6, 6, 1, 5, "w"), rect(9, 7, 1, 5, "p"),
+    rect(7, 3, 2, 3, "k"), ellipse(8, 3, 2, 2.5, "o"), ellipse(7.5, 2.5, 0.8, 1.5, "O"),
+  ], flameAmbient),
+  leaf: icon([
+    line(4, 13, 11, 3, "k", 3), line(4, 13, 11, 3, "e"),
+    ellipse(6, 8, 4, 2.5, "k"), ellipse(6, 8, 3, 1.6, "m"), ellipse(5, 7, 1.2, 0.7, "M"),
+    ellipse(10.5, 5, 3.5, 2.3, "k"), ellipse(10.5, 5, 2.5, 1.4, "E"), ellipse(9.5, 4.2, 1, 0.6, "M"),
+  ]),
+  star: icon32([
+    line(16, 2, 16, 29, "k", 5), line(2, 16, 29, 16, "k", 5),
+    line(8, 8, 24, 24, "k", 3), line(24, 8, 8, 24, "k", 3),
+    line(16, 4, 16, 27, "g", 2), line(4, 16, 27, 16, "g", 2),
+    line(9, 9, 23, 23, "g"), line(23, 9, 9, 23, "g"),
+    ellipse(14.5, 14.5, 4, 4, "G"), rect(12, 11, 4, 3, "w"),
+  ], twinkleAmbient),
+  bird: icon([
+    ellipse(8, 9, 5, 3.5, "k"), ellipse(8, 8.5, 4, 2.5, "P"),
+    ellipse(10.5, 6, 2.5, 2.5, "k"), ellipse(10.5, 6, 1.5, 1.5, "w"), rect(11, 5, 1, 1, "i"),
+    line(5, 9, 2, 6, "k", 2), line(5, 10, 2, 12, "k", 2), line(7, 9, 10, 11, "p", 2),
+    line(12, 7, 15, 8, "g", 2), line(7, 12, 6, 14, "k"), line(9, 12, 10, 14, "k"),
+  ]),
+  flower: icon([
+    line(8, 8, 8, 15, "k", 3), line(8, 8, 8, 15, "e"),
+    ellipse(8, 7, 2, 2, "g"), ellipse(8, 3.8, 2.3, 2.6, "r"), ellipse(11.2, 6.2, 2.5, 2.2, "r"),
+    ellipse(8, 9.2, 2.3, 2.5, "r"), ellipse(4.8, 6.2, 2.5, 2.2, "r"),
+    ellipse(8, 3.8, 1.4, 1.7, "h"), ellipse(11, 6, 1.5, 1.3, "R"), ellipse(8, 6.2, 1.2, 1.2, "G"),
+  ]),
+  chapel: icon([
+    line(3, 7, 8, 2, "k", 3), line(8, 2, 13, 7, "k", 3), rect(3, 7, 10, 8, "k"),
+    line(4, 7, 8, 3, "r", 2), line(8, 3, 12, 7, "r", 2), rect(4, 8, 8, 6, "P"),
+    rect(7, 10, 3, 4, "e"), rect(8, 11, 1, 1, "g"), line(8, 0, 8, 4, "g"), line(6, 1, 10, 1, "g"),
+  ]),
+  book: icon([
+    rect(2, 2, 12, 13, "k"), rect(3, 3, 10, 11, "e"), rect(4, 4, 8, 9, "P"),
+    rect(4, 4, 1, 8, "w"), rect(11, 5, 1, 8, "p"), rect(7, 6, 2, 6, "g"), rect(5, 8, 6, 2, "g"),
+    rect(6, 14, 4, 2, "d"), rect(7, 14, 2, 2, "g"),
+  ]),
+  "open-book": icon([
+    line(1, 4, 7, 3, "k", 2), line(7, 3, 8, 14, "k", 2), line(8, 14, 15, 4, "k", 2),
+    rect(2, 4, 5, 9, "P"), rect(9, 4, 5, 9, "P"), rect(3, 4, 3, 1, "w"), rect(10, 4, 3, 1, "w"),
+    line(3, 7, 6, 7, "b"), line(3, 9, 6, 9, "b"), line(10, 7, 13, 7, "b"), line(10, 9, 13, 9, "b"),
+    line(2, 14, 7, 14, "e", 2), line(9, 14, 14, 14, "e", 2),
+  ]),
+  bookmark: icon([
+    rect(4, 1, 8, 14, "k"), rect(5, 2, 6, 11, "e"),
+    line(5, 12, 8, 15, "k", 2), line(11, 12, 8, 15, "k", 2),
+    line(5, 11, 8, 14, "e"), line(10, 11, 8, 14, "e"), rect(7, 4, 2, 5, "g"), rect(5, 6, 6, 2, "g"),
+  ]),
+  lantern: icon([
+    line(5, 4, 5, 1, "k", 2), line(5, 1, 11, 1, "k", 2), line(11, 1, 11, 4, "k", 2),
+    rect(3, 4, 10, 10, "k"), rect(4, 5, 8, 8, "g"), rect(5, 6, 6, 6, "e"),
+    ellipse(8, 9, 2.3, 3, "o"), ellipse(7.5, 8, 1, 2, "O"), rect(5, 14, 6, 2, "d"),
+  ], flameAmbient),
+  path: icon([
+    ellipse(5, 13, 4, 2, "k"), ellipse(5, 13, 3, 1.2, "S"),
+    ellipse(10.5, 9, 3.5, 2, "k"), ellipse(10.5, 9, 2.5, 1.2, "H"),
+    ellipse(7, 5, 3, 1.8, "k"), ellipse(7, 5, 2, 1, "S"),
+    ellipse(11, 2, 2, 1.3, "k"), ellipse(11, 2, 1.2, 0.7, "H"),
+  ]),
+  tree: icon([
+    line(8, 14, 8, 7, "k", 4), line(8, 14, 8, 7, "b", 2), line(8, 9, 5, 6, "k", 2), line(8, 9, 11, 6, "k", 2),
+    ellipse(5, 5, 4, 3.5, "k"), ellipse(11, 5, 4, 3.5, "k"), ellipse(8, 3.5, 4, 3.5, "k"),
+    ellipse(5, 5, 3, 2.5, "m"), ellipse(11, 5, 3, 2.5, "E"), ellipse(8, 3.5, 3, 2.5, "M"),
+    line(4, 14, 12, 14, "k", 2),
+  ]),
+  sun: icon([
+    ellipse(8, 8, 5, 5, "k"), ellipse(8, 8, 4, 4, "g"), ellipse(7, 7, 2, 2, "G"),
+    line(8, 0, 8, 2, "g", 2), line(8, 14, 8, 15, "g", 2), line(0, 8, 2, 8, "g", 2), line(14, 8, 15, 8, "g", 2),
+    line(2, 2, 4, 4, "g"), line(12, 12, 14, 14, "g"), line(14, 2, 12, 4, "g"), line(4, 12, 2, 14, "g"),
+  ], twinkleAmbient),
+  heart: icon([
+    ellipse(5.2, 5.5, 4, 4, "k"), ellipse(10.8, 5.5, 4, 4, "k"),
+    line(2, 6, 8, 14, "k", 4), line(14, 6, 8, 14, "k", 4),
+    ellipse(5.4, 5.5, 3, 3, "R"), ellipse(10.6, 5.5, 3, 3, "r"),
+    line(3, 6, 8, 13, "R", 3), line(13, 6, 8, 13, "r", 3), ellipse(4.5, 4.5, 1, 1, "h"),
+  ]),
+  hands: icon32([
+    rect(2, 23, 9, 7, "k"), rect(21, 23, 9, 7, "k"),
+    rect(3, 24, 8, 5, "e"), rect(21, 24, 8, 5, "m"),
+    line(4, 20, 11, 24, "k", 7), line(28, 20, 21, 24, "k", 7),
+    line(4, 20, 11, 24, "L", 4), line(28, 20, 21, 24, "T", 4),
+    ellipse(10, 20, 7, 4.5, "k"), ellipse(22, 20, 7, 4.5, "k"),
+    ellipse(10.5, 19.5, 5.5, 3, "L"), ellipse(21.5, 19.5, 5.5, 3, "T"),
+    line(6, 17, 13, 21, "L", 2), line(26, 17, 19, 21, "T", 2),
+    ellipse(12.5, 11.5, 4.5, 4.5, "k"), ellipse(19.5, 11.5, 4.5, 4.5, "k"),
+    line(9, 12, 16, 21, "k", 5), line(23, 12, 16, 21, "k", 5),
+    ellipse(12.5, 11.5, 3, 3, "R"), ellipse(19.5, 11.5, 3, 3, "r"),
+    line(10, 12, 16, 20, "R", 3), line(22, 12, 16, 20, "r", 3),
+    rect(11, 9, 3, 2, "h"),
+  ]),
+  "praying-hands": icon32([
+    rect(6, 24, 9, 7, "k"), rect(17, 24, 9, 7, "k"),
+    rect(7, 25, 8, 6, "e"), rect(17, 25, 8, 6, "m"),
+    ellipse(13, 17, 5, 9, "k"), ellipse(19, 17, 5, 9, "k"),
+    ellipse(13, 16.5, 3.5, 7.5, "L"), ellipse(19, 16.5, 3.5, 7.5, "T"),
+    ellipse(13.5, 6.5, 3.5, 5.5, "k"), ellipse(18.5, 6.5, 3.5, 5.5, "k"),
+    ellipse(13.5, 6.5, 2, 4.5, "L"), ellipse(18.5, 6.5, 2, 4.5, "T"),
+    line(10, 20, 15, 15, "k", 4), line(22, 20, 17, 15, "k", 4),
+    line(10, 20, 15, 15, "L", 2), line(22, 20, 17, 15, "T", 2),
+    rect(15, 4, 2, 19, "k"), rect(16, 5, 1, 17, "p"),
+  ]),
+  wheat: icon32([
+    line(16, 30, 16, 6, "k", 5), line(16, 30, 16, 6, "E", 2),
+    ellipse(12, 8, 5, 3, "k"), ellipse(12, 8, 3.5, 1.5, "G"),
+    ellipse(20, 11, 5, 3, "k"), ellipse(20, 11, 3.5, 1.5, "g"),
+    ellipse(12, 14, 5, 3, "k"), ellipse(12, 14, 3.5, 1.5, "g"),
+    ellipse(20, 17, 5, 3, "k"), ellipse(20, 17, 3.5, 1.5, "d"),
+    ellipse(12, 20, 5, 3, "k"), ellipse(12, 20, 3.5, 1.5, "g"),
+    ellipse(16, 4, 3.5, 5, "k"), ellipse(15.5, 4, 2, 3.5, "G"),
+    line(16, 25, 7, 19, "k", 3), line(16, 25, 8, 20, "m"),
+  ]),
+  dove: icon([
+    ellipse(9, 9, 5, 3.5, "k"), ellipse(9, 8.5, 4, 2.5, "w"),
+    ellipse(12, 5.5, 2.5, 2.5, "k"), ellipse(12, 5.5, 1.5, 1.5, "w"), rect(12, 5, 1, 1, "i"),
+    line(7, 9, 2, 3, "k", 3), line(7, 8, 3, 4, "P", 2),
+    line(6, 10, 2, 13, "k", 2), line(7, 11, 4, 14, "k", 2), line(14, 6, 15, 7, "g", 2),
+  ]),
+  cross: icon([
+    rect(6, 1, 4, 14, "k"), rect(2, 5, 12, 4, "k"),
+    rect(7, 2, 2, 12, "g"), rect(3, 6, 10, 2, "g"), rect(7, 2, 1, 4, "G"),
+  ]),
+  door: icon([
+    line(3, 15, 3, 6, "k", 3), line(13, 15, 13, 6, "k", 3), ellipse(8, 6, 6, 5, "k"),
+    rect(4, 6, 8, 9, "e"), ellipse(8, 6, 4, 3.5, "e"), rect(5, 7, 1, 7, "E"),
+    rect(10, 10, 2, 2, "g"), rect(2, 14, 12, 2, "k"),
+  ]),
+  key: icon([
+    ellipse(5, 5, 4.5, 4.5, "k"), ellipse(5, 5, 2.5, 2.5, "P"), ellipse(5, 5, 1.2, 1.2, "e"),
+    line(8, 8, 14, 14, "k", 4), line(8, 8, 14, 14, "g", 2),
+    line(11, 11, 14, 9, "k", 2), line(13, 13, 15, 11, "k", 2),
+  ]),
+  scroll: icon([
+    rect(3, 2, 10, 12, "k"), rect(4, 3, 8, 10, "P"),
+    ellipse(4, 3, 3, 2, "k"), ellipse(12, 13, 3, 2, "k"), ellipse(4, 3, 2, 1, "G"), ellipse(12, 13, 2, 1, "d"),
+    line(6, 6, 10, 6, "b"), line(6, 8, 11, 8, "b"), line(5, 10, 9, 10, "b"),
+  ]),
+  compass: icon([
+    ellipse(8, 8, 7, 7, "k"), ellipse(8, 8, 5.5, 5.5, "P"), ellipse(8, 8, 1.2, 1.2, "g"),
+    line(8, 3, 9, 8, "r", 2), line(8, 13, 7, 8, "e", 2), line(3, 8, 13, 8, "S"),
+  ]),
+  crown: icon([
+    line(2, 5, 4, 11, "k", 3), line(4, 11, 12, 11, "k", 3), line(12, 11, 14, 5, "k", 3),
+    line(2, 5, 6, 8, "k", 3), line(6, 8, 8, 3, "k", 3), line(8, 3, 10, 8, "k", 3), line(10, 8, 14, 5, "k", 3),
+    line(3, 6, 6, 9, "g", 2), line(6, 9, 8, 4, "G", 2), line(8, 4, 10, 9, "g", 2), line(10, 9, 13, 6, "d", 2),
+    rect(4, 11, 8, 3, "g"), rect(5, 12, 6, 1, "G"),
+  ]),
+  mountain: icon([
+    line(1, 14, 7, 3, "k", 3), line(7, 3, 12, 11, "k", 3), line(10, 9, 13, 6, "k", 3), line(13, 6, 16, 14, "k", 3),
+    line(2, 14, 7, 4, "e", 2), line(7, 4, 12, 12, "E", 2), line(11, 10, 13, 7, "m", 2), line(13, 7, 15, 14, "m", 2),
+    line(5, 7, 7, 4, "w", 2), line(7, 4, 9, 7, "P", 2), rect(2, 14, 13, 2, "k"),
+  ]),
+  moon: icon([
+    ellipse(8, 8, 7, 7, "k"), ellipse(8, 8, 5.5, 5.5, "U"), ellipse(11, 5, 5, 5, "."),
+    rect(5, 4, 2, 2, "V"), rect(4, 8, 1, 2, "u"), rect(7, 12, 2, 1, "u"),
+  ]),
+  "service-basket": icon32([
+    ellipse(16, 11, 10, 9, "k"), ellipse(16, 12, 7, 6, "."),
+    ellipse(12.5, 13, 3.5, 3.5, "k"), ellipse(19.5, 13, 3.5, 3.5, "k"),
+    line(9, 14, 16, 22, "k", 5), line(23, 14, 16, 22, "k", 5),
+    ellipse(12.5, 13, 2.2, 2.2, "R"), ellipse(19.5, 13, 2.2, 2.2, "r"),
+    line(10, 14, 16, 21, "R", 3), line(22, 14, 16, 21, "r", 3),
+    line(5, 16, 8, 29, "k", 4), line(27, 16, 24, 29, "k", 4),
+    line(7, 29, 25, 29, "k", 4), rect(7, 17, 18, 11, "b"),
+    line(6, 18, 26, 18, "k", 3), line(8, 22, 24, 22, "q", 2),
+    line(9, 26, 23, 26, "B", 2), line(11, 18, 11, 28, "q", 2),
+    line(16, 18, 16, 28, "B", 2), line(21, 18, 21, 28, "q", 2),
+  ]),
+  links: icon([
+    ellipse(5, 10, 4, 3, "k"), ellipse(5, 10, 2.5, 1.5, "P"),
+    ellipse(11, 6, 4, 3, "k"), ellipse(11, 6, 2.5, 1.5, "P"),
+    line(6, 9, 10, 7, "g", 3), line(2, 13, 5, 15, "e", 2), line(12, 3, 15, 1, "e", 2),
+  ]),
+  people: icon([
+    ellipse(5, 5, 3, 3, "k"), ellipse(11, 5, 3, 3, "k"), ellipse(5, 5, 2, 2, "L"), ellipse(11, 5, 2, 2, "T"),
+    ellipse(5, 12, 4.5, 4, "k"), ellipse(11, 12, 4.5, 4, "k"), ellipse(5, 12, 3.3, 3, "e"), ellipse(11, 12, 3.3, 3, "g"),
+    rect(7, 12, 2, 4, "k"),
+  ]),
+  fountain: icon32([
+    ellipse(16, 23, 15, 8, "k"), ellipse(16, 22.5, 13, 6, "u"),
+    ellipse(16, 21.5, 10.5, 4, "U"), ellipse(15, 20.5, 7, 2.2, "V"),
+    rect(13, 12, 6, 9, "k"), rect(15, 12, 3, 8, "S"),
+    ellipse(16, 11, 6, 5.5, "k"), ellipse(15, 10, 4, 3.8, "S"),
+    ellipse(14, 8.5, 2, 1.5, "H"),
+    rect(5, 26, 22, 3, "k"), rect(7, 26, 18, 1, "V"),
+  ]),
 
-  /* ---- Streak candles (10x14) — the flame grows with the rhythm ---- */
-  "candle-unlit": {
-    kind: "grid",
-    palette: CANDLE_PALETTE,
-    rows: [
-      "..........",
-      "..........",
-      "..........",
-      "..........",
-      "....k.....",
-      "....k.....",
-      ...CANDLE_BODY,
-    ],
-  },
-  "candle-small": {
-    kind: "grid",
-    palette: CANDLE_PALETTE,
-    rows: [
-      "..........",
-      "..........",
-      "..........",
-      "....ff....",
-      "...fyyf...",
-      "....oo....",
-      ...CANDLE_BODY,
-    ],
-    ambient: CANDLE_FLICKER,
-  },
-  "candle-steady": {
-    kind: "grid",
-    palette: CANDLE_PALETTE,
-    rows: [
-      "..........",
-      "....ff....",
-      "...ffff...",
-      "...fyyf...",
-      "...fyyf...",
-      "....oo....",
-      ...CANDLE_BODY,
-    ],
-    ambient: CANDLE_FLICKER,
-  },
-  "candle-sparks": {
-    kind: "grid",
-    palette: CANDLE_PALETTE,
-    rows: [
-      "..g.ff....",
-      "...ffff...",
-      "...fyyf.g.",
-      "...fyyf...",
-      ".g.ffff...",
-      "....oo....",
-      ...CANDLE_BODY,
-    ],
-    ambient: CANDLE_FLICKER,
-  },
-  "candle-halo": {
-    kind: "grid",
-    palette: CANDLE_PALETTE,
-    rows: [
-      "...a..a...",
-      ".a..ff..a.",
-      "...ffff...",
-      "..gfyyf...",
-      "...fyyf.g.",
-      "....oo....",
-      ...CANDLE_BODY,
-    ],
-    ambient: CANDLE_FLICKER,
-  },
+  "candle-unlit": makeCandle(0),
+  "candle-small": makeCandle(1),
+  "candle-steady": makeCandle(2),
+  "candle-sparks": makeCandle(3),
+  "candle-halo": makeCandle(4),
 
-  /* ---- Journey tree stages (28x28) — the living tree, drawn in pixels.
-     Lobed canopies lit from the upper left, curved two-tone trunks with
-     root flare, gold fruit at the canopy's lower edge. ---- */
-  // Journey tree stages — PixelLab-generated PNGs (48x48) in public/pixel/.
-  // Regenerate or hand-replace by dropping a new 48x48 PNG at the same path.
-  "tree-stage-0": {
-    kind: "png",
-    src: "/pixel/tree-stage-0.png",
-    cols: 48,
-    rows: 48,
-  },
-  "tree-stage-1": {
-    kind: "png",
-    src: "/pixel/tree-stage-1.png",
-    cols: 48,
-    rows: 48,
-  },
-  "tree-stage-2": {
-    kind: "png",
-    src: "/pixel/tree-stage-2.png",
-    cols: 48,
-    rows: 48,
-  },
-  "tree-stage-3": {
-    kind: "png",
-    src: "/pixel/tree-stage-3.png",
-    cols: 48,
-    rows: 48,
-  },
-  "tree-stage-4": {
-    kind: "png",
-    src: "/pixel/tree-stage-4.png",
-    cols: 48,
-    rows: 48,
-  },
-  "tree-stage-5": {
-    kind: "png",
-    src: "/pixel/tree-stage-5.png",
-    cols: 48,
-    rows: 48,
-  },
+  "tree-stage-0": makeTreeStage(0),
+  "tree-stage-1": makeTreeStage(1),
+  "tree-stage-2": makeTreeStage(2),
+  "tree-stage-3": makeTreeStage(3),
+  "tree-stage-4": makeTreeStage(4),
+  "tree-stage-5": makeTreeStage(5),
 });
+
+function makeCandle(stage: 0 | 1 | 2 | 3 | 4): PixelAsset {
+  const shapes: PixelShape[] = [
+    ellipse(8, 16, 6, 1.8, "k"), ellipse(8, 15.5, 5, 1.2, "d"),
+    rect(4, 6, 8, 9, "k"), rect(5, 7, 6, 7, "P"), rect(5, 7, 2, 6, "w"), rect(10, 8, 1, 6, "p"),
+    rect(7, 4, 2, 3, "k"),
+  ];
+  if (stage > 0) {
+    const flameRy = stage >= 2 ? 3.5 : 2.5;
+    shapes.push(ellipse(8, 4, stage >= 3 ? 2.7 : 2.2, flameRy, "o"));
+    shapes.push(ellipse(7.5, 3.2, 1, stage >= 2 ? 2.2 : 1.5, "O"));
+  }
+  if (stage >= 3) shapes.push(rect(2, 3, 1, 1, "g"), rect(13, 5, 1, 1, "G"));
+  if (stage >= 4) {
+    shapes.push(line(3, 2, 5, 0, "g"), line(11, 0, 13, 2, "g"), rect(1, 7, 1, 1, "G"), rect(14, 8, 1, 1, "g"));
+  }
+  return art(16, 18, shapes, { cellScale: 0.75, ambient: stage > 0 ? flameAmbient : undefined });
+}
+
+function addSoil(shapes: PixelShape[], radius: number) {
+  shapes.push(ellipse(16, 28.5, radius, 2.8, "k"));
+  shapes.push(ellipse(15, 27.8, radius - 1.5, 1.7, "q"));
+  shapes.push(rect(Math.max(3, 16 - radius + 3), 27, 4, 1, "B"));
+  shapes.push(rect(Math.min(26, 16 + radius - 6), 29, 3, 1, "b"));
+}
+
+function addCanopyLobe(
+  shapes: PixelShape[],
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  fill: "e" | "E" | "m" | "M"
+) {
+  shapes.push(ellipse(cx, cy, rx + 1, ry + 1, "k"));
+  shapes.push(ellipse(cx, cy, rx, ry, fill));
+  shapes.push(ellipse(cx - rx * 0.35, cy - ry * 0.35, Math.max(1, rx * 0.28), Math.max(1, ry * 0.24), "M"));
+}
+
+function makeTreeStage(stage: 0 | 1 | 2 | 3 | 4 | 5): PixelAsset {
+  const shapes: PixelShape[] = [];
+
+  if (stage === 0) {
+    addSoil(shapes, 7);
+    shapes.push(ellipse(16, 25, 2.4, 2, "q"), ellipse(15.5, 24.5, 1.2, 1, "B"));
+    shapes.push(line(16, 26, 16, 18, "k", 3), line(16, 25, 16, 18, "E"));
+    shapes.push(line(16, 21, 11, 18, "k", 2), line(16, 21, 11, 18, "m"));
+    shapes.push(line(16, 20, 21, 16, "k", 2), line(16, 20, 21, 16, "M"));
+    shapes.push(ellipse(11, 17.5, 4, 2.5, "k"), ellipse(10.5, 17, 2.7, 1.4, "m"));
+    shapes.push(ellipse(21, 15.5, 4, 2.5, "k"), ellipse(20.5, 15, 2.7, 1.4, "M"));
+    return art(32, 32, shapes);
+  }
+
+  if (stage === 1) {
+    addSoil(shapes, 9);
+    shapes.push(line(16, 28, 16, 9, "k", 4), line(15, 27, 16, 9, "b", 2));
+    shapes.push(line(16, 20, 10, 15, "k", 3), line(16, 20, 10, 15, "B"));
+    shapes.push(line(16, 17, 23, 12, "k", 3), line(16, 17, 23, 12, "b"));
+    for (const [cx, cy, fill] of [
+      [10, 14, "m"], [13, 10, "M"], [17, 7, "m"], [22, 11, "M"], [23, 15, "E"], [11, 18, "E"],
+    ] as const) {
+      shapes.push(ellipse(cx, cy, 3.5, 2.7, "k"), ellipse(cx - 0.4, cy - 0.4, 2.3, 1.6, fill));
+    }
+    return art(32, 32, shapes);
+  }
+
+  addSoil(shapes, stage === 2 ? 11 : stage === 3 ? 13 : 15);
+
+  const trunkWidth = stage === 2 ? 5 : stage === 3 ? 6 : 7;
+  shapes.push(line(16, 26, 16, stage === 2 ? 12 : 11, "k", trunkWidth + 2));
+  shapes.push(line(15, 26, 16, stage === 2 ? 12 : 11, "b", trunkWidth));
+  shapes.push(line(14, 27, 9, 29, "k", 3), line(18, 27, 24, 29, "k", 3));
+  shapes.push(line(14, 25, 9, 17, "k", 4), line(14, 24, 9, 17, "b", 2));
+  shapes.push(line(18, 23, 24, 15, "k", 4), line(18, 22, 24, 15, "B", 2));
+
+  const lobesByStage: Record<2 | 3 | 4 | 5, Array<[number, number, number, number, "e" | "E" | "m" | "M"]>> = {
+    2: [[9, 14, 5, 4, "m"], [15, 9, 6, 5, "M"], [23, 13, 5, 4, "E"], [16, 16, 6, 4, "m"]],
+    3: [[7, 15, 5, 5, "m"], [11, 10, 6, 5, "M"], [17, 7, 6, 5, "m"], [23, 10, 6, 5, "E"], [25, 15, 4, 4, "e"], [16, 15, 7, 5, "E"]],
+    4: [[6, 16, 4, 4, "m"], [9, 11, 6, 5, "M"], [15, 7, 6, 5, "m"], [21, 9, 5, 5, "M"], [26, 14, 4, 4, "E"], [23, 17, 5, 4, "e"], [16, 15, 7, 5, "E"]],
+    5: [[7, 14, 5, 4, "m"], [8, 10, 6, 4, "M"], [14, 9, 7, 4, "m"], [20, 9, 7, 4, "M"], [25, 11, 5, 4, "E"], [25, 15, 5, 4, "e"], [19, 15, 9, 4, "E"], [11, 15, 8, 4, "m"]],
+  };
+
+  for (const [cx, cy, rx, ry, fill] of lobesByStage[stage]) {
+    addCanopyLobe(shapes, cx, cy, rx, ry, fill);
+  }
+
+  // Re-establish a visible fork and trunk after the clustered foliage. It is
+  // the consistent species cue that keeps the mature stages from becoming a blob.
+  shapes.push(line(16, 26, 16, 18, "k", trunkWidth + 1));
+  shapes.push(line(15, 26, 16, 18, "b", trunkWidth - 1));
+  shapes.push(line(15, 20, 11, 16, "q", 2), line(18, 20, 22, 16, "B", 2));
+
+  if (stage === 4) {
+    for (const [x, y] of [[8, 14], [14, 11], [21, 10], [26, 15]] as const) {
+      shapes.push(ellipse(x, y, 1.5, 1.5, "d"), rect(x - 1, y - 1, 1, 1, "G"));
+    }
+  }
+  if (stage === 5) {
+    for (const [x, y] of [[6, 25], [10, 27], [23, 27], [27, 25]] as const) {
+      shapes.push(line(x, y + 2, x, y, "e"), ellipse(x, y, 1.5, 1.5, "r"), rect(x - 1, y - 1, 1, 1, "G"));
+    }
+  }
+
+  return art(32, 32, shapes, { ambient: stage >= 4 ? twinkleAmbient : undefined });
+}
 
 export type PixelSpriteName = keyof typeof PIXEL_SPRITES;
-
 export const PIXEL_SPRITE_NAMES = Object.keys(PIXEL_SPRITES) as PixelSpriteName[];
 
-/* ============================================================
-   Mascots (PixelMascot) — one shared palette, one twilight outline
-   ============================================================ */
-
-const MASCOT_PALETTE = {
-  k: TWILIGHT, // outline — twilight deep green
-  w: WARM_WHITE, // warm white (wool, pages)
-  W: PARCHMENT, // parchment shade
-  f: FACE, // face/limb brown
-  F: BARK, // dark brown (soil, logs)
-  g: GOLD_B, // brand gold
-  G: GOLD_D, // gold shade
-  y: GOLD, // light gold (glow, flame highlight)
-  o: FLAME_D, // flame orange
-  e: EVERGREEN, // brand evergreen
-  E: EVERGREEN_L, // evergreen light
-  l: OLIVE, // olive leaf
-  L: OLIVE_L, // olive light
-  b: BLUE, // marian blue accent
-  p: ROSE, // rose (cheeks)
-  t: TAN, // light tan (lamb muzzle)
-  ".": T,
-};
-
-const mascot = (rows: string[]): PixelAsset => ({
-  kind: "grid",
-  rows,
-  palette: MASCOT_PALETTE,
-});
+const mascot = (width: number, height: number, shapes: PixelShape[]): PixelAsset =>
+  art(width, height, shapes, { cellScale: 0.75 });
 
 export const PIXEL_MASCOTS = defineAssets({
-  /** Welcome — a small lamb, glad you're here. */
-  lamb: mascot([
-    "...kkkkkkkkk....",
-    "..kwwwwwwwwwk...",
-    ".kwwWwwwwwWwwk..",
-    ".kwwwwwwwwwwwk..",
-    ".kkwwwwwwwwwkk..",
-    "kfkkffffffffkkfk",
-    ".kkkffffffffkkk.",
-    "...kfkffffkfk...",
-    "...kfttttttfk...",
-    "...kpttkkttpk...",
-    "...kttttttttk...",
-    "....kkkkkkkk....",
+  lamb: mascot(20, 16, [
+    ellipse(12, 8, 7.5, 5, "k"), ellipse(12, 7.5, 6.5, 4, "w"),
+    ellipse(5, 9, 4, 4, "k"), ellipse(5, 9, 3, 3, "T"), ellipse(4, 7, 2, 1.5, "w"),
+    ellipse(2, 7, 2, 1.5, "k"), ellipse(2, 7, 1, 0.7, "P"), rect(4, 8, 1, 1, "i"), rect(2, 10, 2, 1, "q"),
+    ellipse(18, 6, 2, 2, "k"), ellipse(18, 6, 1, 1, "w"),
+    rect(8, 11, 3, 5, "k"), rect(14, 11, 3, 5, "k"), rect(9, 11, 1, 4, "b"), rect(15, 11, 1, 4, "b"),
   ]),
-  /** Daily rhythm — a lantern for the path. */
-  lantern: mascot([
-    "......kkkk......",
-    "......k..k......",
-    "....kkkkkkkk....",
-    "...kggggggggk...",
-    "...kg......gk...",
-    "...kg..y...gk...",
-    "...kg.yoy..gk...",
-    "...kg.yoy..gk...",
-    "...kg..o...gk...",
-    "...kg......gk...",
-    "...kggggggggk...",
-    "....kkkkkkkk....",
-    "......kGGk......",
-    "......kkkk......",
+  lantern: mascot(16, 18, [
+    line(4, 5, 4, 1, "k", 2), line(4, 1, 12, 1, "k", 2), line(12, 1, 12, 5, "k", 2),
+    rect(2, 5, 12, 11, "k"), rect(3, 6, 10, 9, "g"), rect(5, 7, 6, 7, "e"),
+    ellipse(8, 10, 2.5, 3.5, "o"), ellipse(7.5, 9, 1, 2.2, "O"), rect(5, 16, 6, 2, "d"),
   ]),
-  /** Scripture — an open scroll. */
-  scroll: mascot([
-    ".kkkkkkkkkkkkkkkk.",
-    "kgggggggggggggggGk",
-    "kGgggggggggggggGGk",
-    ".kkwwwwwwwwwwwwkk.",
-    "..kwwwwwwwwwwwk...",
-    "..kwweeeeewwwwk...",
-    "..kwwwwwwwwwwwk...",
-    "..kwweeeeeeewwk...",
-    "..kwwwwwwwwwwwk...",
-    "..kwweeeewwwwwk...",
-    "..kwwwwwwwwwwwk...",
-    ".kkwwwwwwwwwwwwkk.",
-    "kgggggggggggggggGk",
-    "kGgggggggggggggGGk",
-    ".kkkkkkkkkkkkkkkk.",
+  scroll: mascot(20, 16, [
+    rect(3, 2, 14, 12, "k"), rect(4, 3, 12, 10, "P"),
+    ellipse(4, 3, 4, 2.5, "k"), ellipse(16, 13, 4, 2.5, "k"), ellipse(4, 3, 3, 1.5, "G"), ellipse(16, 13, 3, 1.5, "d"),
+    line(7, 6, 14, 6, "b"), line(6, 8, 13, 8, "b"), line(7, 10, 12, 10, "b"), ellipse(5, 12, 2, 2, "e"),
   ]),
-  /** Prayer — a dove in flight. */
-  dove: mascot([
-    ".........kk.......",
-    "........kWWk......",
-    ".......kWWWk......",
-    "......kWWWWk......",
-    "..kkk.kWWWWk......",
-    ".kwkwkwWWWWwk.....",
-    "kgkwwwwwwwwwwk....",
-    ".kkwwwwwwwwwwkkk..",
-    "...kwwwwwwwwwwwwk.",
-    "...kwwwwwwwwkkk...",
-    "....kwwwwwwk......",
-    ".....kwwwk........",
-    "......kkk.........",
+  dove: mascot(20, 16, [
+    ellipse(11, 10, 6, 4, "k"), ellipse(11, 9.5, 5, 3, "w"), ellipse(15, 6, 3, 3, "k"), ellipse(15, 6, 2, 2, "w"), rect(15, 5, 1, 1, "i"),
+    line(9, 9, 3, 2, "k", 4), line(9, 8, 4, 3, "P", 2), line(7, 11, 2, 15, "k", 3), line(8, 12, 5, 15, "P", 2),
+    line(17, 7, 20, 8, "g", 2), line(18, 8, 20, 6, "e"),
   ]),
-  /** Growth — a two-leaf seedling. */
-  sprout: mascot([
-    "...kk.....kk....",
-    "..kLLk...kLLk...",
-    ".kLlLLk.kLLlLk..",
-    ".kLLLLklkLLLLk..",
-    "..kLLk.l.kLLk...",
-    "...kk.klk.kk....",
-    "......klk.......",
-    "......klk.......",
-    "...kkkFlFkkk....",
-    ".kkFFFFFFFFFkk..",
-    ".kFFfFFFFfFFFk..",
-    "..kkFFFFFFFkk...",
-    "....kkkkkkk.....",
+  sprout: mascot(18, 16, [
+    ellipse(9, 14, 8, 2.5, "k"), ellipse(9, 13.5, 6.5, 1.5, "b"),
+    line(9, 13, 9, 5, "k", 3), line(9, 13, 9, 5, "E"),
+    ellipse(5.5, 6, 4, 2.8, "k"), ellipse(5.5, 6, 3, 1.8, "m"), ellipse(12.5, 4.5, 4, 2.8, "k"), ellipse(12.5, 4.5, 3, 1.8, "M"),
+    ellipse(3, 13, 1.5, 1.5, "G"),
   ]),
-  /** Sign-in — a key: your journey, kept. */
-  key: mascot([
-    "....kkkk........",
-    "...kggggk.......",
-    "..kg....gk......",
-    "..kg.ee.gk......",
-    "..kg.ee.gk......",
-    "..kg....gk......",
-    "...kggggk.......",
-    "....kggk........",
-    "....kggk........",
-    "....kggk........",
-    "....kggkgk......",
-    "....kggkk.......",
-    "....kggkgk......",
-    ".....kkkk.......",
+  key: mascot(16, 18, [
+    ellipse(6, 6, 5, 5, "k"), ellipse(6, 6, 3, 3, "g"), ellipse(6, 6, 1.5, 1.5, "e"),
+    line(9, 9, 14, 15, "k", 5), line(9, 9, 14, 15, "g", 3), line(11, 12, 15, 9, "k", 2), line(13, 14, 16, 11, "k", 2),
   ]),
-  /** Quests — a map with a trail to follow. */
-  map: mascot([
-    ".kkkkkkkkkkkkkkkk.",
-    "kwWwwwwwwwwwwwwWwk",
-    "kwwwwwwwwwwwe.ewwk",
-    "kwwwwwwwwwwwwewwwk",
-    "kwwwwwwwwwgwe.ewwk",
-    "kwwwwwwwwwwwwwwwwk",
-    "kwwwwwwwgwwwwwwwwk",
-    "kwwwwwgwwwwwwwwwwk",
-    "kwwwgwwwwwwwwwwwwk",
-    "kwegwwwwwwwwwwwwwk",
-    "kwWwwwwwwwwwwwwWwk",
-    ".kkkkkkkkkkkkkkkk.",
+  map: mascot(20, 16, [
+    rect(1, 2, 18, 12, "k"), rect(2, 3, 16, 10, "P"), line(7, 3, 7, 13, "p"), line(13, 3, 13, 13, "p"),
+    line(3, 11, 6, 9, "g", 2), line(6, 9, 10, 7, "g", 2), line(10, 7, 15, 4, "g", 2), ellipse(3, 11, 1.5, 1.5, "e"),
+    line(15, 3, 17, 5, "e", 2), line(17, 3, 15, 5, "e", 2), rect(2, 3, 2, 2, "w"), rect(16, 11, 2, 2, "w"),
   ]),
-  /** Reflection — a campfire to rest beside. */
-  campfire: mascot([
-    "................",
-    ".......y........",
-    "......yoy.......",
-    ".....yooy.......",
-    ".....yogoy......",
-    "....yogggoy.....",
-    "....yoggoy......",
-    ".....yooy.......",
-    "..kFFkkkkFFk....",
-    ".kFfFFFFFFfFk...",
-    "..kkFFFFFFkk....",
-    "....kkkkkk......",
+  campfire: mascot(18, 16, [
+    line(2, 13, 15, 13, "k", 4), line(3, 12, 14, 14, "b", 3), line(4, 14, 15, 12, "q", 3),
+    ellipse(9, 9, 4, 6, "k"), ellipse(9, 9, 3, 5, "o"), ellipse(8.5, 9, 1.5, 3.5, "O"), ellipse(10, 11, 1, 2, "g"),
+    rect(4, 4, 1, 1, "G"), rect(13, 5, 1, 1, "g"),
   ]),
 });
 
 export type PixelMascotName = keyof typeof PIXEL_MASCOTS;
-
 export const PIXEL_MASCOT_NAMES = Object.keys(PIXEL_MASCOTS) as PixelMascotName[];

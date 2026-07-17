@@ -7,8 +7,8 @@
  * Scripture the branches, kindness the leaves, service the fruit, reflection
  * the light, gratitude the flowers. It is an illustration, not a chart.
  *
- * Drawn in the app's own pixel language: each stage is a 48x48 PixelLab
- * sprite from the pixel-asset registry (public/pixel/tree-stage-N.png),
+ * Drawn in the app's own pixel language: each stage is a deterministic 32x32
+ * transparent sprite from the pixel-asset registry,
  * scaled in whole cells so every pixel stays crisp (the box snaps to the
  * nearest cell multiple of `size` and then holds still, so surrounding
  * layout never shifts). Around the sprite the scene stays quiet — a
@@ -33,8 +33,8 @@ const STAGE_SPRITE: Record<TreeStage, PixelSpriteName> = {
   sheltering: "tree-stage-5",
 };
 
-/** All tree-stage sprites share one 48x48 logical grid (see the registry). */
-const GRID = 48;
+/** All tree-stage sprites share one true 32x32 logical grid. */
+const GRID = 32;
 
 interface GrowthTreeProps {
   state: GrowthTreeState;
@@ -147,16 +147,28 @@ export function GrowthTree({
           {Array.from({ length: fruitCount }, (_, i) => (
             <motion.span
               key={`fruit-${i}`}
-              className="rounded-[1px]"
+              className="relative block"
               style={{
-                width: mini * 2,
-                height: mini * 2,
-                background: "var(--color-gold-500)",
+                width: mini * 3,
+                height: mini * 3,
               }}
               initial={still ? false : { scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 0.9 }}
               transition={still ? { duration: 0 } : grow}
-            />
+            >
+              <span
+                className="absolute bg-evergreen-900"
+                style={{ left: 0, top: mini, width: mini * 3, height: mini * 2 }}
+              />
+              <span
+                className="absolute bg-gold-500"
+                style={{ left: mini, top: mini, width: mini * 2, height: mini }}
+              />
+              <span
+                className="absolute bg-olive-700"
+                style={{ right: 0, top: 0, width: mini, height: mini }}
+              />
+            </motion.span>
           ))}
         </div>
       )}

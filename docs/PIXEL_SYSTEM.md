@@ -8,9 +8,9 @@ rationed on purpose: when everything is pixelated, nothing is special.
 
 | Instrument | Component / utility | Scale | Use |
 |---|---|---|---|
-| Small sprites | `PixelIcon` (`design-system/PixelIcon.tsx`) | 5–8 cell grids, 4–8px cells | Quest category glyphs, milestone marks, tiny decorations |
-| Feature sprites | `PixelIcon` (same component) | 10–28 cell grids, 3–6px cells | The streak candle set, the journey tree stages |
-| Mascots | `PixelMascot` (`design-system/PixelMascot.tsx`) | 12–18 cell grids, 8–11px cells | One per onboarding / sign-in page, big empty states |
+| Small sprites | `PixelIcon` (`design-system/PixelIcon.tsx`) | True 32×32 authored canvas, normally shown at 1× / 32px | Quest category glyphs, milestone marks, tiny decorations |
+| Feature sprites | `PixelIcon` (same component) | 16×18 candles; true 32×32 tree stages | The streak candle set, the journey tree stages |
+| Mascots | `PixelMascot` (`design-system/PixelMascot.tsx`) | 16–20 cell canvases, 4–7px rendered cells | One per onboarding / sign-in page, big empty states |
 
 Plus the accent font: `font-pixel` utility (Ithaca, SIL OFL), 14px minimum —
 short labels only (badges, quest tags, tiny decorative headings). And two
@@ -21,7 +21,13 @@ hard offset shadow) for achievement-style cards only.
 
 Every sprite and mascot lives in one registry file. Components are thin
 resolvers: consumers reference assets by name and never know how the art is
-stored. Each entry is one of two kinds:
+stored. Production art is generated deterministically from integer-aligned
+rectangles, ellipses, and lines into transparent character grids. Legacy icon
+recipes are doubled onto the shared 32×32 grid before rasterisation; key
+silhouettes use direct 32×32 recipes for one-pixel details and negative space.
+This avoids background-removal halos, antialiasing artifacts, and inconsistent
+generated pixel sizes. The registry still accepts a PNG for a deliberately
+hand-drawn replacement:
 
 ```ts
 { kind: "grid", rows, palette, ambient? }         // hand-placed characters
@@ -32,8 +38,13 @@ stored. Each entry is one of two kinds:
 - The `size` prop always means **px per cell**. A png entry declares its
   logical grid (`cols`/`rows`), so rendered dimensions are identical to the
   grid it replaces — no call site ever changes.
-- Palette colors come only from the named constants at the top of the file
-  (mirrors of the `@theme` tokens). No raw hex inside a sprite definition.
+- `cellScale` preserves historic component sizing while snapping every final
+  cell to a whole CSS pixel. Small icons normally resolve to exactly 32×32.
+- Palette colors come only from the named constants at the top of the file:
+  live-token dark outline (`#1e3329`), evergreen (`#0e533c`), olive, brand
+  gold (`#d3a336`), leather, parchment, charcoal, and restrained prayer blue,
+  rose, stone, skin, and flame ramps. Lighter and darker material ramps are
+  intentional pixel-art shades of those live brand anchors.
 
 ### Replacing a grid with a PNG (PixelLab workflow)
 
@@ -59,9 +70,9 @@ file stay untouched.
 - Every sprite lives on a whole-cell grid rendered as SVG `<rect>`s with
   `image-rendering: pixelated` (`pixelated` utility). Never scale to
   fractional cell sizes; never blur, never rotate.
-- **Mascots and feature sprites** carry a single 1-cell outline in twilight
-  (`#1e3329`). **Small sprites** are flat (no outline) — they read as
-  marks, not characters.
+- Every silhouette carries a single dark-green outline. Small icons keep it
+  sparse; mascots and feature sprites use it continuously so they remain
+  recognizable on parchment, linen, and candle-mode surfaces.
 - Light comes from the **upper left**: highlights top-left, shade
   lower-right, 2–3 shade levels per material, minimal dithering.
 - Small sprites: max ~6 colors. Feature sprites may use up to ~10 (outline,
@@ -72,19 +83,21 @@ file stay untouched.
 
 ## Current inventory
 
-- **Small sprites (23)**: candle, leaf, star, bird, flower, chapel, book,
-  bookmark, lantern, path, tree, sun, heart, hands, wheat, dove, cross,
-  door, key, scroll, compass, crown, mountain.
-- **Streak candles (5, 10×14)**: `candle-unlit` → `candle-small` →
+- **Small sprites (30)**: candle, leaf, star, bird, flower, chapel, closed
+  book, open book, bookmark, lantern, path, tree, sun, heart, hands, praying
+  hands, wheat, dove, cross, door, key, scroll, compass, crown, mountain,
+  moon, service basket, forgiveness links, community people, and fountain.
+- **Streak candles (5, 16×18)**: `candle-unlit` → `candle-small` →
   `candle-steady` → `candle-sparks` → `candle-halo`. One shared body; only
-  the flame grows (see `candleStage` in `lib/questos/streak-engine.ts`).
-  Flame cells flicker via `ambient`. Drawn to read at size 3 (30×42px).
-- **Journey tree stages (6, 28×28)**: `tree-stage-0` (seed + sprout) →
-  `tree-stage-5` (sheltering, fruit + roses + gold crown). Lobed canopies
-  lit from the upper left, curved two-tone trunks with root flare, gold
-  fruit at the canopy's lower edge. Gold glints twinkle via `ambient`.
-  Drawn to read at sizes 4–6 (112–168px).
-- **Mascots (8, 12–18 cells)**: lamb, lantern, scroll, dove, sprout, key,
+  the flame and blessing details grow (see `candleStage` in
+  `lib/questos/streak-engine.ts`). Flame cells flicker via `ambient`.
+- **Journey tree stages (6, true 32×32)**: `tree-stage-0` (two-leaf seedling) →
+  `tree-stage-1` (open sapling) → `tree-stage-2` (young branched tree) →
+  `tree-stage-3` (growing clustered canopy) → `tree-stage-4` (fruit-bearing) →
+  `tree-stage-5` (broad sheltering crown + small flowers). Every stage shares
+  one trunk fork, soil, light direction, outline, and canopy ramp. Canopy lobes
+  keep visible seams so mature trees read as foliage rather than a green blob.
+- **Mascots (8, 16–20 cells)**: lamb, lantern, scroll, dove, sprout, key,
   map, campfire.
 
 ## Where pixel art is allowed

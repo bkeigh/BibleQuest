@@ -87,16 +87,18 @@ export function VerseCard({
   return (
     <PaperCard
       variant="atmospheric"
-      padding={preview ? "md" : "lg"}
+      padding="md"
       className="relative overflow-hidden"
     >
       <div className="pointer-events-none absolute -right-3 -top-2 opacity-30">
         <IconLeaf className="text-olive-300" size={64} />
       </div>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-1.5 min-[380px]:gap-3">
         <h2
           className={`font-pixel leading-tight uppercase tracking-[0.05em] text-accent ${
-            preview ? "text-[1.25rem]" : "text-[1.5rem]"
+            preview
+              ? "text-[1.25rem]"
+              : "text-[1.125rem] min-[380px]:text-[1.5rem]"
           }`}
         >
           {t.home.todaysVerse}
@@ -125,14 +127,14 @@ export function VerseCard({
         >
           <blockquote
             className={
-              preview ? "verse-text mt-2.5" : "verse-text verse-text-lead mt-3"
+              preview ? "verse-text mt-2.5" : "verse-text verse-text-lead mt-2.5"
             }
           >
             “{cleanVerseText(verse.text)}”
           </blockquote>
           <cite
             className={`block text-[0.9375rem] not-italic text-ash ${
-              preview ? "mt-2" : "mt-4"
+              preview ? "mt-2" : "mt-3"
             }`}
           >
             — {verse.reference} <span className="text-fog">·</span> World English Bible
@@ -140,10 +142,11 @@ export function VerseCard({
         </motion.div>
       </div>
       {!preview && (
-        <div className="mt-5 flex flex-wrap items-center gap-2.5">
+        <div className="mt-3 flex flex-wrap items-center gap-1 min-[380px]:mt-4 min-[380px]:gap-2">
           <GentleButton
             variant="ghost"
             size="sm"
+            className="min-h-11 max-[360px]:gap-1 max-[360px]:px-1 max-[360px]:text-[0.875rem]"
             onClick={() => {
               const nowSaved = toggleBookmark({
                 bookSlug: verse.bookSlug,
@@ -162,13 +165,19 @@ export function VerseCard({
             )}
             {saved ? "Saved" : "Save"}
           </GentleButton>
-          <GentleButton variant="ghost" size="sm" onClick={shareVerse}>
+          <GentleButton
+            variant="ghost"
+            size="sm"
+            className="min-h-11 max-[360px]:gap-1 max-[360px]:px-1 max-[360px]:text-[0.875rem]"
+            onClick={shareVerse}
+          >
             <IconShare size={16} />
             {t.home.share}
           </GentleButton>
           <GentleLink
             variant="text"
             href={`/app/reflection/new?verse=${encodeURIComponent(verse.reference)}`}
+            className="min-h-11 max-[360px]:text-[0.875rem]"
           >
             Reflect on this
           </GentleLink>

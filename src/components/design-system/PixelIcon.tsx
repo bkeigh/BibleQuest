@@ -35,12 +35,13 @@ export function PixelIcon({
   if (!asset) return null;
 
   if (asset.kind === "png") {
+    const cell = Math.max(1, Math.round(size * (asset.cellScale ?? 1)));
     return (
       // eslint-disable-next-line @next/next/no-img-element -- tiny local pixel art; next/image would blur and lazy-load it
       <img
         src={asset.src}
-        width={asset.cols * size}
-        height={asset.rows * size}
+        width={asset.cols * cell}
+        height={asset.rows * cell}
         alt={title ?? ""}
         role={title ? "img" : "presentation"}
         aria-hidden={title ? undefined : true}
@@ -56,8 +57,9 @@ export function PixelIcon({
 
   const rows = asset.rows;
   const cols = Math.max(...rows.map((r) => r.length));
-  const width = cols * size;
-  const height = rows.length * size;
+  const cell = Math.max(1, Math.round(size * (asset.cellScale ?? 1)));
+  const width = cols * cell;
+  const height = rows.length * cell;
   const ambientChars = asset.ambient?.chars ?? "";
 
   return (
@@ -65,6 +67,9 @@ export function PixelIcon({
       width={width}
       height={height}
       viewBox={`0 0 ${cols} ${rows.length}`}
+      shapeRendering="crispEdges"
+      preserveAspectRatio="xMidYMid meet"
+      focusable="false"
       className={cn("pixelated shrink-0", animate && "ambient", className)}
       role={title ? "img" : "presentation"}
       aria-label={title}
@@ -94,19 +99,19 @@ export function PixelIcon({
 
 /** Category → sprite, for quest glyphs. Every category gets its own mark. */
 export const CATEGORY_SPRITE: Record<string, PixelSpriteName> = {
-  prayer: "candle",
-  scripture: "book",
-  service: "hands",
+  prayer: "praying-hands",
+  scripture: "open-book",
+  service: "service-basket",
   kindness: "heart",
-  forgiveness: "dove",
+  forgiveness: "links",
   generosity: "wheat",
   discipline: "lantern",
-  gratitude: "flower",
-  silence: "leaf",
+  gratitude: "star",
+  silence: "moon",
   worship: "chapel",
-  family: "sun",
-  community: "door",
-  reflection: "compass",
+  family: "hands",
+  community: "people",
+  reflection: "fountain",
   patience: "tree",
   evangelization: "scroll",
   "self-control": "key",
