@@ -48,6 +48,7 @@ function assertSharedSecurityContract(response, production) {
   assert.equal(response.headers.get("x-frame-options"), null);
 
   assertIncludes(csp, "script-src", [
+    "https://tally.so",
     "https://js.stripe.com",
     "https://*.js.stripe.com",
     "https://checkout.stripe.com",
@@ -62,6 +63,7 @@ function assertSharedSecurityContract(response, production) {
     "https://*.link.com",
   ]);
   assertIncludes(csp, "frame-src", [
+    "https://tally.so",
     "https://js.stripe.com",
     "https://*.js.stripe.com",
     "https://hooks.stripe.com",

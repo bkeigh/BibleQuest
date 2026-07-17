@@ -39,6 +39,15 @@ export default function PrivacyPage() {
         sessions. Browser Do Not Track and Global Privacy Control are respected.
       </Prose>
 
+      <ProseHeading>If you join the waitlist</ProseHeading>
+      <Prose>
+        The name and email address you choose to submit are sent directly to
+        Tally, which hosts our temporary pre-launch form, so we can contact you
+        about BibleQuest. Waitlist details are not included in app analytics,
+        and the form does not ask for prayers, reflections, or other spiritual
+        journal content.
+      </Prose>
+
       <ProseHeading>If you create an account later</ProseHeading>
       <Prose>
         When account sync becomes available, your private content will be

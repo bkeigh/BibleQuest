@@ -76,7 +76,11 @@ export default function LandingPage() {
             </span>
           </Reveal>
           <Reveal delay={0.08}>
-            <h1 className="mt-6 font-display text-heading text-graphite sm:text-display">
+            <h1
+              id="homepage-heading"
+              tabIndex={-1}
+              className="mt-6 font-display text-heading text-graphite outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent sm:text-display"
+            >
               Faith, one small step at a time.
             </h1>
           </Reveal>

@@ -13,6 +13,7 @@ import { parseRevenueCatConfiguration } from "./src/lib/revenuecat/config";
  *   - Plausible Events API       → configured HTTPS origin, when enabled
  *   - RevenueCat SDK/paywall origins → only in explicit sandbox/live mode
  *   - Stripe origins → only in explicit live mode
+ *   - Tally waitlist widget + iframe → exact HTTPS origin during pre-launch
  *   - Fonts (Fraunces, Inter via next/font; Ithaca local) → self (all self-hosted)
  *   - Icons / OG image / next/image (local) → self
  *   - Avatars (URL.createObjectURL) → blob:; noise SVG background → data:
@@ -34,6 +35,7 @@ const liveBillingEnabled = revenueCat.status === "live";
 const scriptSrc = [
   "'self'",
   "'unsafe-inline'",
+  "https://tally.so",
   liveBillingEnabled ? "https://js.stripe.com" : "",
   liveBillingEnabled ? "https://*.js.stripe.com" : "",
   liveBillingEnabled ? "https://checkout.stripe.com" : "",
@@ -128,7 +130,7 @@ const contentSecurityPolicy = [
   }${liveBillingEnabled ? " https://*.stripe.com https://*.link.com" : ""}`,
   `font-src 'self'${revenueCatEnabled ? ` ${revenueCatAssetOrigin}` : ""}`,
   `connect-src ${connectSrc}`,
-  `frame-src 'self'${
+  `frame-src 'self' https://tally.so${
     liveBillingEnabled
       ? " https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://link.com https://*.link.com"
       : ""

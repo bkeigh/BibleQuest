@@ -108,6 +108,7 @@ describe("transport and payment header scope", () => {
     ]);
     expect(csp.get("script-src")).toEqual(
       expect.arrayContaining([
+        "https://tally.so",
         "https://js.stripe.com",
         "https://*.js.stripe.com",
         "https://checkout.stripe.com",
@@ -127,6 +128,7 @@ describe("transport and payment header scope", () => {
     );
     expect(csp.get("frame-src")).toEqual([
       "'self'",
+      "https://tally.so",
       "https://js.stripe.com",
       "https://*.js.stripe.com",
       "https://hooks.stripe.com",
@@ -160,8 +162,12 @@ describe("transport and payment header scope", () => {
     const policies = valuesFor(rules, "Content-Security-Policy");
     const csp = parseCsp(policies[0]);
 
-    expect(csp.get("script-src")).toEqual(["'self'", "'unsafe-inline'"]);
-    expect(csp.get("frame-src")).toEqual(["'self'"]);
+    expect(csp.get("script-src")).toEqual([
+      "'self'",
+      "'unsafe-inline'",
+      "https://tally.so",
+    ]);
+    expect(csp.get("frame-src")).toEqual(["'self'", "https://tally.so"]);
     expect(csp.get("connect-src")).not.toContain("https://api.revenuecat.com");
     expect(csp.get("connect-src")).not.toContain("https://api.stripe.com");
   });
