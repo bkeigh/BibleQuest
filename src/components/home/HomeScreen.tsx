@@ -16,25 +16,27 @@ import { getDailyVerse } from "@/lib/questos/verse-engine";
 import { timeOfDay, toDateKey } from "@/lib/utils/dates";
 import { useStrings, fmt } from "@/lib/i18n";
 import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
-import { firstName } from "@/lib/utils/name";
 import { celebrationScale } from "@/lib/motion";
 import { PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleLink } from "@/components/design-system/GentleButton";
 import { VerseCard } from "@/components/bible/VerseCard";
-import { QuestSlip } from "@/components/quests/QuestSlip";
+import {
+  CATEGORY_LABEL,
+  formatDuration,
+  QuestSlip,
+} from "@/components/quests/QuestSlip";
 import { QuestFeed } from "@/components/quests/QuestFeed";
 import { AccountPrompt } from "@/components/account/AccountPrompt";
 import { GrowthTree } from "@/components/journey/GrowthTree";
 import { SeasonalAtmosphere } from "@/components/design-system/SeasonalAtmosphere";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { CATEGORY_SPRITE, PixelIcon } from "@/components/design-system/PixelIcon";
 import { Avatar } from "@/components/profile/Avatar";
 import { StreakCard } from "@/components/home/StreakCard";
 import {
   IconArrowRight,
   IconCheck,
   IconChevronRight,
-  IconSettings,
 } from "@/components/design-system/icons";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { seedQuests, questBySlug } from "@/data/seed/quests";
@@ -85,10 +87,10 @@ function HomeInner() {
     [dayKey, verseRefreshCount]
   );
   const season = useMemo(() => getCurrentSeason(), []);
-  const name = firstName(profile?.displayName);
+  const name = profile?.displayName?.trim();
   const time = timeOfDay();
   const t = useStrings();
-  const hello = `${t.greeting[time]}${name ? `, ${name}` : ""}.`;
+  const hello = t.greeting[time];
 
   // Resolve picks to their quest templates (drop any unknown slugs safely).
   const pickedQuests = useMemo(
@@ -135,55 +137,52 @@ function HomeInner() {
       </div>
 
       <PageContainer className="relative pt-safe">
-        {/* Greeting — my space: your face (or initial) beside your name */}
-        <header className="flex items-center justify-between gap-4 pt-8 pb-5">
-          <div className="flex min-w-0 items-center gap-3.5">
+        {/* Personal welcome — one framed devotional surface with today's
+            candle, echoing a bookplate rather than a dashboard header. */}
+        <header className="sacred-frame mt-7 mb-5 bg-paper/90 px-5 py-5 max-[360px]:px-4 sm:px-6">
+          <div className="relative z-10 flex min-w-0 items-center gap-3 max-[360px]:gap-2.5 min-[361px]:gap-3.5">
             <Link
               href="/app/settings"
               aria-label={t.home.openSettings}
-              className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="relative shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <Avatar
                 name={profile?.displayName}
                 marker={profile?.avatarUpdatedAt}
-                size="md"
+                size="sm"
               />
             </Link>
-            <div className="min-w-0">
-              {/* Just the liturgical season — the phone already shows the
-                  date and time; we don't duplicate what the OS ships with. */}
-              <p className="text-caption uppercase tracking-[0.16em] text-accent">
-                {season.label}
+            <div className="min-w-0 flex-1">
+              <p className="font-display text-[1rem] leading-tight text-accent">
+                {name ? `${hello},` : season.label}
               </p>
-              <h1 className="mt-1 font-display text-editorial text-graphite">
-                {hello}
+              <h1 className="mt-1 truncate font-display text-[1.5rem] leading-tight text-graphite sm:text-editorial">
+                {name || `${hello}.`}
               </h1>
+              {name && (
+                <p className="mt-1 text-[0.8125rem] uppercase tracking-[0.14em] text-ash">
+                  {season.label}
+                </p>
+              )}
             </div>
+            <StreakCard streak={streak} dayKey={dayKey} />
           </div>
-          <Link
-            href="/app/settings"
-            aria-label={t.home.openSettings}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ash transition-colors duration-300 hover:bg-linen hover:text-charcoal"
-          >
-            <IconSettings size={21} />
-          </Link>
         </header>
 
         <div className="space-y-4 pb-4">
-          {/* Today's light — the candle */}
-          <StreakCard streak={streak} dayKey={dayKey} />
-
           {/* Today's verse */}
           <VerseCard verse={verse} onAnotherVerse={refreshVerse} />
 
           {/* Today's quests — empty, picked (1-3), or day complete */}
           <section aria-label={t.home.todaysQuests}>
             {/* The loudest title on the page — the day's work anchors it. */}
-            <div className="mb-2.5 flex items-baseline justify-between gap-3">
-              <h2 className="font-pixel text-[1.75rem] leading-tight uppercase tracking-[0.05em] text-accent">
+            <div className="mb-2.5 flex items-center justify-between gap-3 px-1">
+              <h2 className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent min-[380px]:text-[1.75rem]">
                 {t.home.todaysQuests}
               </h2>
-              {pickCount > 0 && !allDone && (
+              {pickCount === 0 ? (
+                <PixelIcon name="scroll" size={5} />
+              ) : !allDone && (
                 <p className="text-caption text-ash">
                   {fmt(t.quests.picked, { n: pickCount })}
                 </p>
@@ -201,30 +200,19 @@ function HomeInner() {
 
             {pickCount === 0 && (
               <>
-                <PaperCard variant="outlined" padding="lg" className="text-center">
-                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-accent-surface">
-                    <PixelIcon name="lantern" size={5} animate />
-                  </div>
-                  <h3 className="font-display text-subheading text-graphite">
-                    {t.quests.emptyTitle}
-                  </h3>
-                  <p className="mx-auto mt-1.5 max-w-sm text-small leading-relaxed text-charcoal">
-                    {t.quests.emptyBody}
-                  </p>
-                </PaperCard>
-                {/* The day's suggested quests, ready to be taken up. */}
+                <p className="mb-3 px-1 text-small text-ash">
+                  {t.quests.emptyBody}
+                </p>
                 {suggested.length > 0 && (
-                  <ul className="mt-3 space-y-3">
-                    {suggested.map((quest) => (
+                  <PaperCard variant="linen" padding="sm" className="overflow-hidden !p-2">
+                    <ul className="divide-y divide-mist/75">
+                    {suggested.slice(0, 2).map((quest) => (
                       <li key={quest.slug}>
-                        <QuestSlip
-                          quest={quest}
-                          href={`/app/quests/${quest.slug}`}
-                          compact
-                        />
+                        <QuestSuggestionRow quest={quest} />
                       </li>
                     ))}
-                  </ul>
+                    </ul>
+                  </PaperCard>
                 )}
                 <div className="mt-4 flex justify-center">
                   <GentleLink variant="primary" href="/app/quests">
@@ -301,8 +289,8 @@ function HomeInner() {
 
           {/* Growth preview — the journey, one glance */}
           <Link href="/app/journey" className="block">
-            <PaperCard interactive padding="md" className="flex items-center gap-4">
-              <GrowthTree state={tree} size={92} showGround={false} />
+            <PaperCard interactive variant="linen" padding="md" className="flex items-center gap-3 min-[380px]:gap-4">
+              <GrowthTree state={tree} size={76} showGround={false} />
               <div className="min-w-0 flex-1">
                 <SectionLabel pixel>{t.home.yourGrowth}</SectionLabel>
                 <p className="font-display text-subheading text-graphite">
@@ -326,7 +314,7 @@ function HomeInner() {
                     : t.journey.fullGrown}
                 </p>
               </div>
-              <IconChevronRight className="text-fog" />
+              <IconChevronRight className="shrink-0 text-fog max-[350px]:hidden" />
             </PaperCard>
           </Link>
 
@@ -446,6 +434,28 @@ function QuickRow({
         </div>
         <IconChevronRight className="text-fog" />
       </PaperCard>
+    </Link>
+  );
+}
+
+function QuestSuggestionRow({ quest }: { quest: (typeof seedQuests)[number] }) {
+  return (
+    <Link
+      href={`/app/quests/${quest.slug}`}
+      className="group flex min-h-[4.5rem] items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors duration-300 hover:bg-paper"
+    >
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-paper ring-1 ring-mist">
+        <PixelIcon name={CATEGORY_SPRITE[quest.category] ?? "leaf"} size={5} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block line-clamp-2 font-display text-[1.0625rem] leading-snug text-graphite">
+          {quest.title}
+        </span>
+        <span className="mt-0.5 block text-[0.75rem] text-ash">
+          {formatDuration(quest.durationMinutes)} · {CATEGORY_LABEL[quest.category]}
+        </span>
+      </span>
+      <IconChevronRight className="shrink-0 text-fog transition-transform duration-300 group-hover:translate-x-0.5" />
     </Link>
   );
 }

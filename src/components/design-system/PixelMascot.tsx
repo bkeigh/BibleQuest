@@ -36,12 +36,13 @@ export function PixelMascot({
   if (!asset) return null;
 
   if (asset.kind === "png") {
+    const cell = Math.max(1, Math.round(size * (asset.cellScale ?? 1)));
     return (
       // eslint-disable-next-line @next/next/no-img-element -- tiny local pixel art; next/image would blur and lazy-load it
       <img
         src={asset.src}
-        width={asset.cols * size}
-        height={asset.rows * size}
+        width={asset.cols * cell}
+        height={asset.rows * cell}
         alt={title ?? ""}
         role={title ? "img" : "presentation"}
         aria-hidden={title ? undefined : true}
@@ -52,12 +53,16 @@ export function PixelMascot({
 
   const rows = asset.rows;
   const cols = Math.max(...rows.map((r) => r.length));
+  const cell = Math.max(1, Math.round(size * (asset.cellScale ?? 1)));
 
   return (
     <svg
-      width={cols * size}
-      height={rows.length * size}
+      width={cols * cell}
+      height={rows.length * cell}
       viewBox={`0 0 ${cols} ${rows.length}`}
+      shapeRendering="crispEdges"
+      preserveAspectRatio="xMidYMid meet"
+      focusable="false"
       className={cn("pixelated mx-auto block shrink-0", className)}
       role={title ? "img" : "presentation"}
       aria-label={title}

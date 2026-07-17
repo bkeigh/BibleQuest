@@ -363,6 +363,45 @@ body {
   box-shadow: 3px 3px 0 0 color-mix(in srgb, var(--color-gold-500) 30%, transparent);
 }
 
+/* A quiet, stepped devotional frame for the personal welcome. The clipped
+   corners and inset rule echo a Bible bookplate without turning the whole UI
+   into pixel chrome. */
+.sacred-frame {
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--color-gold-500) 76%, var(--color-mist));
+  clip-path: polygon(
+    8px 0,
+    calc(100% - 8px) 0,
+    calc(100% - 8px) 3px,
+    calc(100% - 3px) 3px,
+    calc(100% - 3px) 8px,
+    100% 8px,
+    100% calc(100% - 8px),
+    calc(100% - 3px) calc(100% - 8px),
+    calc(100% - 3px) calc(100% - 3px),
+    calc(100% - 8px) calc(100% - 3px),
+    calc(100% - 8px) 100%,
+    8px 100%,
+    8px calc(100% - 3px),
+    3px calc(100% - 3px),
+    3px calc(100% - 8px),
+    0 calc(100% - 8px),
+    0 8px,
+    3px 8px,
+    3px 3px,
+    8px 3px
+  );
+  box-shadow: 0 4px 18px rgb(30 51 41 / 0.045);
+}
+.sacred-frame::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--color-gold-500) 48%, transparent);
+  clip-path: inherit;
+}
+
 /* ============================================================
    Scripture text — treated with dignity
    ============================================================ */
@@ -378,8 +417,8 @@ body {
    CSS so the "Large text" setting can scale it — inline text-[…] utilities
    would override the html.text-large rule and defeat the setting. */
 .verse-text-lead {
-  font-size: 1.25rem;
-  line-height: 1.7;
+  font-size: clamp(1.125rem, calc(1rem + 0.7vw), 1.25rem);
+  line-height: 1.65;
 }
 
 .verse-number {
