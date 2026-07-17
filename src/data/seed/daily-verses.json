@@ -1,6 +1,6 @@
 [
  {
-  "id": "dv01",
+  "id": "dv001",
   "reference": "John 3:16",
   "bookSlug": "john",
   "chapter": 3,
@@ -10,7 +10,7 @@
   "theme": "love"
  },
  {
-  "id": "dv02",
+  "id": "dv002",
   "reference": "Psalm 23:1-3",
   "bookSlug": "psalms",
   "chapter": 23,
@@ -20,7 +20,7 @@
   "theme": "rest"
  },
  {
-  "id": "dv03",
+  "id": "dv003",
   "reference": "Psalm 46:10",
   "bookSlug": "psalms",
   "chapter": 46,
@@ -30,7 +30,7 @@
   "theme": "stillness"
  },
  {
-  "id": "dv04",
+  "id": "dv004",
   "reference": "Isaiah 40:31",
   "bookSlug": "isaiah",
   "chapter": 40,
@@ -40,7 +40,7 @@
   "theme": "renewal"
  },
  {
-  "id": "dv05",
+  "id": "dv005",
   "reference": "Isaiah 41:10",
   "bookSlug": "isaiah",
   "chapter": 41,
@@ -50,7 +50,7 @@
   "theme": "courage"
  },
  {
-  "id": "dv06",
+  "id": "dv006",
   "reference": "Isaiah 26:3",
   "bookSlug": "isaiah",
   "chapter": 26,
@@ -60,17 +60,17 @@
   "theme": "peace"
  },
  {
-  "id": "dv07",
+  "id": "dv007",
   "reference": "Jeremiah 29:11",
   "bookSlug": "jeremiah",
   "chapter": 29,
   "verseStart": 11,
   "verseEnd": 11,
-  "text": "For I know the thoughts that I think toward you, thoughts of peace, and not of evil, to give you hope and a future.",
+  "text": "For I know the thoughts that I think toward you,” says Yahweh, “thoughts of peace, and not of evil, to give you hope and a future.",
   "theme": "hope"
  },
  {
-  "id": "dv08",
+  "id": "dv008",
   "reference": "Matthew 5:14-16",
   "bookSlug": "matthew",
   "chapter": 5,
@@ -80,7 +80,7 @@
   "theme": "kindness"
  },
  {
-  "id": "dv09",
+  "id": "dv009",
   "reference": "Matthew 6:33-34",
   "bookSlug": "matthew",
   "chapter": 6,
@@ -90,7 +90,7 @@
   "theme": "trust"
  },
  {
-  "id": "dv10",
+  "id": "dv010",
   "reference": "Matthew 11:28-30",
   "bookSlug": "matthew",
   "chapter": 11,
@@ -100,17 +100,17 @@
   "theme": "rest"
  },
  {
-  "id": "dv11",
+  "id": "dv011",
   "reference": "Matthew 22:37-39",
   "bookSlug": "matthew",
   "chapter": 22,
   "verseStart": 37,
   "verseEnd": 39,
-  "text": "You shall love the Lord your God with all your heart, with all your soul, and with all your mind. This is the first and great commandment. A second likewise is this: You shall love your neighbor as yourself.",
+  "text": "Jesus said to him, “ ‘You shall love the Lord your God with all your heart, with all your soul, and with all your mind.’ This is the first and great commandment. A second likewise is this, ‘You shall love your neighbor as yourself.’",
   "theme": "love"
  },
  {
-  "id": "dv12",
+  "id": "dv012",
   "reference": "Matthew 7:7-8",
   "bookSlug": "matthew",
   "chapter": 7,
@@ -120,7 +120,7 @@
   "theme": "prayer"
  },
  {
-  "id": "dv13",
+  "id": "dv013",
   "reference": "Philippians 4:6-7",
   "bookSlug": "philippians",
   "chapter": 4,
@@ -130,7 +130,7 @@
   "theme": "peace"
  },
  {
-  "id": "dv14",
+  "id": "dv014",
   "reference": "Philippians 4:13",
   "bookSlug": "philippians",
   "chapter": 4,
@@ -140,7 +140,7 @@
   "theme": "courage"
  },
  {
-  "id": "dv15",
+  "id": "dv015",
   "reference": "Romans 8:28",
   "bookSlug": "romans",
   "chapter": 8,
@@ -150,7 +150,7 @@
   "theme": "trust"
  },
  {
-  "id": "dv16",
+  "id": "dv016",
   "reference": "Romans 8:38-39",
   "bookSlug": "romans",
   "chapter": 8,
@@ -160,7 +160,7 @@
   "theme": "love"
  },
  {
-  "id": "dv17",
+  "id": "dv017",
   "reference": "Romans 12:12",
   "bookSlug": "romans",
   "chapter": 12,
@@ -170,7 +170,7 @@
   "theme": "hope"
  },
  {
-  "id": "dv18",
+  "id": "dv018",
   "reference": "Romans 15:13",
   "bookSlug": "romans",
   "chapter": 15,
@@ -180,7 +180,7 @@
   "theme": "hope"
  },
  {
-  "id": "dv19",
+  "id": "dv019",
   "reference": "Joshua 1:9",
   "bookSlug": "joshua",
   "chapter": 1,
@@ -190,7 +190,7 @@
   "theme": "courage"
  },
  {
-  "id": "dv20",
+  "id": "dv020",
   "reference": "Proverbs 3:5-6",
   "bookSlug": "proverbs",
   "chapter": 3,
@@ -200,7 +200,7 @@
   "theme": "trust"
  },
  {
-  "id": "dv21",
+  "id": "dv021",
   "reference": "Proverbs 16:3",
   "bookSlug": "proverbs",
   "chapter": 16,
@@ -210,7 +210,7 @@
   "theme": "work"
  },
  {
-  "id": "dv22",
+  "id": "dv022",
   "reference": "Psalm 118:24",
   "bookSlug": "psalms",
   "chapter": 118,
@@ -220,7 +220,7 @@
   "theme": "gratitude"
  },
  {
-  "id": "dv23",
+  "id": "dv023",
   "reference": "Psalm 121:1-2",
   "bookSlug": "psalms",
   "chapter": 121,
@@ -230,7 +230,7 @@
   "theme": "trust"
  },
  {
-  "id": "dv24",
+  "id": "dv024",
   "reference": "Psalm 139:23-24",
   "bookSlug": "psalms",
   "chapter": 139,
@@ -240,7 +240,7 @@
   "theme": "honesty"
  },
  {
-  "id": "dv25",
+  "id": "dv025",
   "reference": "Lamentations 3:22-23",
   "bookSlug": "lamentations",
   "chapter": 3,
@@ -250,7 +250,7 @@
   "theme": "renewal"
  },
  {
-  "id": "dv26",
+  "id": "dv026",
   "reference": "Micah 6:8",
   "bookSlug": "micah",
   "chapter": 6,
@@ -260,7 +260,7 @@
   "theme": "justice"
  },
  {
-  "id": "dv27",
+  "id": "dv027",
   "reference": "Zephaniah 3:17",
   "bookSlug": "zephaniah",
   "chapter": 3,
@@ -270,7 +270,7 @@
   "theme": "love"
  },
  {
-  "id": "dv28",
+  "id": "dv028",
   "reference": "Galatians 5:22-23",
   "bookSlug": "galatians",
   "chapter": 5,
@@ -280,7 +280,7 @@
   "theme": "growth"
  },
  {
-  "id": "dv29",
+  "id": "dv029",
   "reference": "Galatians 6:9",
   "bookSlug": "galatians",
   "chapter": 6,
@@ -290,7 +290,7 @@
   "theme": "perseverance"
  },
  {
-  "id": "dv30",
+  "id": "dv030",
   "reference": "Ephesians 2:8-10",
   "bookSlug": "ephesians",
   "chapter": 2,
@@ -300,7 +300,7 @@
   "theme": "grace"
  },
  {
-  "id": "dv31",
+  "id": "dv031",
   "reference": "Ephesians 4:32",
   "bookSlug": "ephesians",
   "chapter": 4,
@@ -310,7 +310,7 @@
   "theme": "forgiveness"
  },
  {
-  "id": "dv32",
+  "id": "dv032",
   "reference": "Colossians 3:12",
   "bookSlug": "colossians",
   "chapter": 3,
@@ -320,7 +320,7 @@
   "theme": "kindness"
  },
  {
-  "id": "dv33",
+  "id": "dv033",
   "reference": "Colossians 3:23",
   "bookSlug": "colossians",
   "chapter": 3,
@@ -330,7 +330,7 @@
   "theme": "work"
  },
  {
-  "id": "dv34",
+  "id": "dv034",
   "reference": "1 Thessalonians 5:11",
   "bookSlug": "1-thessalonians",
   "chapter": 5,
@@ -340,7 +340,7 @@
   "theme": "encouragement"
  },
  {
-  "id": "dv35",
+  "id": "dv035",
   "reference": "1 Thessalonians 5:16-18",
   "bookSlug": "1-thessalonians",
   "chapter": 5,
@@ -350,7 +350,7 @@
   "theme": "gratitude"
  },
  {
-  "id": "dv36",
+  "id": "dv036",
   "reference": "Hebrews 10:24-25",
   "bookSlug": "hebrews",
   "chapter": 10,
@@ -360,7 +360,7 @@
   "theme": "community"
  },
  {
-  "id": "dv37",
+  "id": "dv037",
   "reference": "Hebrews 11:1",
   "bookSlug": "hebrews",
   "chapter": 11,
@@ -370,7 +370,7 @@
   "theme": "faith"
  },
  {
-  "id": "dv38",
+  "id": "dv038",
   "reference": "James 1:19",
   "bookSlug": "james",
   "chapter": 1,
@@ -380,7 +380,7 @@
   "theme": "patience"
  },
  {
-  "id": "dv39",
+  "id": "dv039",
   "reference": "James 1:22",
   "bookSlug": "james",
   "chapter": 1,
@@ -390,7 +390,7 @@
   "theme": "action"
  },
  {
-  "id": "dv40",
+  "id": "dv040",
   "reference": "James 4:8",
   "bookSlug": "james",
   "chapter": 4,
@@ -400,7 +400,7 @@
   "theme": "prayer"
  },
  {
-  "id": "dv41",
+  "id": "dv041",
   "reference": "1 Peter 5:7",
   "bookSlug": "1-peter",
   "chapter": 5,
@@ -410,7 +410,7 @@
   "theme": "rest"
  },
  {
-  "id": "dv42",
+  "id": "dv042",
   "reference": "1 John 4:7",
   "bookSlug": "1-john",
   "chapter": 4,
@@ -420,7 +420,7 @@
   "theme": "love"
  },
  {
-  "id": "dv43",
+  "id": "dv043",
   "reference": "1 John 4:19",
   "bookSlug": "1-john",
   "chapter": 4,
@@ -430,7 +430,7 @@
   "theme": "love"
  },
  {
-  "id": "dv44",
+  "id": "dv044",
   "reference": "Psalm 27:1",
   "bookSlug": "psalms",
   "chapter": 27,
@@ -440,7 +440,7 @@
   "theme": "courage"
  },
  {
-  "id": "dv45",
+  "id": "dv045",
   "reference": "Psalm 34:8",
   "bookSlug": "psalms",
   "chapter": 34,
@@ -450,7 +450,7 @@
   "theme": "gratitude"
  },
  {
-  "id": "dv46",
+  "id": "dv046",
   "reference": "Psalm 51:10",
   "bookSlug": "psalms",
   "chapter": 51,
@@ -460,7 +460,7 @@
   "theme": "renewal"
  },
  {
-  "id": "dv47",
+  "id": "dv047",
   "reference": "Psalm 90:12",
   "bookSlug": "psalms",
   "chapter": 90,
@@ -470,7 +470,7 @@
   "theme": "wisdom"
  },
  {
-  "id": "dv48",
+  "id": "dv048",
   "reference": "Psalm 103:2-4",
   "bookSlug": "psalms",
   "chapter": 103,
@@ -480,7 +480,7 @@
   "theme": "gratitude"
  },
  {
-  "id": "dv49",
+  "id": "dv049",
   "reference": "Psalm 19:14",
   "bookSlug": "psalms",
   "chapter": 19,
@@ -490,17 +490,17 @@
   "theme": "prayer"
  },
  {
-  "id": "dv50",
+  "id": "dv050",
   "reference": "Mark 12:30-31",
   "bookSlug": "mark",
   "chapter": 12,
   "verseStart": 30,
   "verseEnd": 31,
-  "text": "You shall love the Lord your God with all your heart, and with all your soul, and with all your mind, and with all your strength. This is the first commandment. The second is like this: You shall love your neighbor as yourself. There is no other commandment greater than these.",
+  "text": "you shall love the Lord your God with all your heart, and with all your soul, and with all your mind, and with all your strength.’ This is the first commandment. The second is like this, ‘You shall love your neighbor as yourself.’ There is no other commandment greater than these.”",
   "theme": "love"
  },
  {
-  "id": "dv51",
+  "id": "dv051",
   "reference": "Luke 6:31",
   "bookSlug": "luke",
   "chapter": 6,
@@ -510,7 +510,7 @@
   "theme": "kindness"
  },
  {
-  "id": "dv52",
+  "id": "dv052",
   "reference": "Luke 12:34",
   "bookSlug": "luke",
   "chapter": 12,
@@ -520,7 +520,7 @@
   "theme": "treasure"
  },
  {
-  "id": "dv53",
+  "id": "dv053",
   "reference": "John 1:5",
   "bookSlug": "john",
   "chapter": 1,
@@ -530,7 +530,7 @@
   "theme": "hope"
  },
  {
-  "id": "dv54",
+  "id": "dv054",
   "reference": "John 13:34-35",
   "bookSlug": "john",
   "chapter": 13,
@@ -540,7 +540,7 @@
   "theme": "love"
  },
  {
-  "id": "dv55",
+  "id": "dv055",
   "reference": "John 14:27",
   "bookSlug": "john",
   "chapter": 14,
@@ -550,7 +550,7 @@
   "theme": "peace"
  },
  {
-  "id": "dv56",
+  "id": "dv056",
   "reference": "John 15:5",
   "bookSlug": "john",
   "chapter": 15,
@@ -560,7 +560,7 @@
   "theme": "growth"
  },
  {
-  "id": "dv57",
+  "id": "dv057",
   "reference": "1 Corinthians 13:4-7",
   "bookSlug": "1-corinthians",
   "chapter": 13,
@@ -570,7 +570,7 @@
   "theme": "love"
  },
  {
-  "id": "dv58",
+  "id": "dv058",
   "reference": "1 Corinthians 16:14",
   "bookSlug": "1-corinthians",
   "chapter": 16,
@@ -580,7 +580,7 @@
   "theme": "love"
  },
  {
-  "id": "dv59",
+  "id": "dv059",
   "reference": "2 Corinthians 5:17",
   "bookSlug": "2-corinthians",
   "chapter": 5,
@@ -590,7 +590,7 @@
   "theme": "renewal"
  },
  {
-  "id": "dv60",
+  "id": "dv060",
   "reference": "Deuteronomy 31:8",
   "bookSlug": "deuteronomy",
   "chapter": 31,
@@ -598,5 +598,1205 @@
   "verseEnd": 8,
   "text": "Yahweh himself is who goes before you. He will be with you. He will not fail you nor forsake you. Don’t be afraid. Don’t be discouraged.”",
   "theme": "courage"
+ },
+ {
+  "id": "dv061",
+  "reference": "Genesis 1:27",
+  "bookSlug": "genesis",
+  "chapter": 1,
+  "verseStart": 27,
+  "verseEnd": 27,
+  "text": "God created man in his own image. In God’s image he created him; male and female he created them.",
+  "theme": "dignity"
+ },
+ {
+  "id": "dv062",
+  "reference": "Genesis 50:20",
+  "bookSlug": "genesis",
+  "chapter": 50,
+  "verseStart": 20,
+  "verseEnd": 20,
+  "text": "As for you, you meant evil against me, but God meant it for good, to save many people alive, as is happening today.",
+  "theme": "providence"
+ },
+ {
+  "id": "dv063",
+  "reference": "Exodus 3:14",
+  "bookSlug": "exodus",
+  "chapter": 3,
+  "verseStart": 14,
+  "verseEnd": 14,
+  "text": "God said to Moses, “I AM WHO I AM,” and he said, “You shall tell the children of Israel this: ‘I AM has sent me to you.’ ”",
+  "theme": "presence"
+ },
+ {
+  "id": "dv064",
+  "reference": "Exodus 33:14",
+  "bookSlug": "exodus",
+  "chapter": 33,
+  "verseStart": 14,
+  "verseEnd": 14,
+  "text": "He said, “My presence will go with you, and I will give you rest.”",
+  "theme": "rest"
+ },
+ {
+  "id": "dv065",
+  "reference": "Leviticus 19:18",
+  "bookSlug": "leviticus",
+  "chapter": 19,
+  "verseStart": 18,
+  "verseEnd": 18,
+  "text": "“ ‘You shall not take vengeance, nor bear any grudge against the children of your people; but you shall love your neighbor as yourself. I am Yahweh.",
+  "theme": "love"
+ },
+ {
+  "id": "dv066",
+  "reference": "Leviticus 19:34",
+  "bookSlug": "leviticus",
+  "chapter": 19,
+  "verseStart": 34,
+  "verseEnd": 34,
+  "text": "The stranger who lives as a foreigner with you shall be to you as the native-born among you, and you shall love him as yourself; for you lived as foreigners in the land of Egypt. I am Yahweh your God.",
+  "theme": "welcome"
+ },
+ {
+  "id": "dv067",
+  "reference": "Numbers 6:24-26",
+  "bookSlug": "numbers",
+  "chapter": 6,
+  "verseStart": 24,
+  "verseEnd": 26,
+  "text": "‘Yahweh bless you, and keep you. Yahweh make his face to shine on you, and be gracious to you. Yahweh lift up his face toward you, and give you peace.’",
+  "theme": "blessing"
+ },
+ {
+  "id": "dv068",
+  "reference": "Numbers 23:19",
+  "bookSlug": "numbers",
+  "chapter": 23,
+  "verseStart": 19,
+  "verseEnd": 19,
+  "text": "God is not a man, that he should lie, nor a son of man, that he should repent. Has he said, and will he not do it? Or has he spoken, and will he not make it good?",
+  "theme": "faithfulness"
+ },
+ {
+  "id": "dv069",
+  "reference": "Deuteronomy 6:5",
+  "bookSlug": "deuteronomy",
+  "chapter": 6,
+  "verseStart": 5,
+  "verseEnd": 5,
+  "text": "You shall love Yahweh your God with all your heart, with all your soul, and with all your might.",
+  "theme": "love"
+ },
+ {
+  "id": "dv070",
+  "reference": "Deuteronomy 30:19-20",
+  "bookSlug": "deuteronomy",
+  "chapter": 30,
+  "verseStart": 19,
+  "verseEnd": 20,
+  "text": "I call heaven and earth to witness against you today that I have set before you life and death, the blessing and the curse. Therefore choose life, that you may live, you and your descendants, to love Yahweh your God, to obey his voice, and to cling to him; for he is your life, and the length of your days, that you may dwell in the land which Yahweh swore to your fathers, to Abraham, to Isaac, and to Jacob, to give them.",
+  "theme": "choice"
+ },
+ {
+  "id": "dv071",
+  "reference": "Joshua 24:15",
+  "bookSlug": "joshua",
+  "chapter": 24,
+  "verseStart": 15,
+  "verseEnd": 15,
+  "text": "If it seems evil to you to serve Yahweh, choose today whom you will serve; whether the gods which your fathers served that were beyond the River, or the gods of the Amorites, in whose land you dwell; but as for me and my house, we will serve Yahweh.”",
+  "theme": "commitment"
+ },
+ {
+  "id": "dv072",
+  "reference": "Joshua 4:24",
+  "bookSlug": "joshua",
+  "chapter": 4,
+  "verseStart": 24,
+  "verseEnd": 24,
+  "text": "that all the peoples of the earth may know that Yahweh’s hand is mighty, and that you may fear Yahweh your God forever.’ ”",
+  "theme": "witness"
+ },
+ {
+  "id": "dv073",
+  "reference": "Judges 6:12",
+  "bookSlug": "judges",
+  "chapter": 6,
+  "verseStart": 12,
+  "verseEnd": 12,
+  "text": "Yahweh’s angel appeared to him, and said to him, “Yahweh is with you, you mighty man of valor!”",
+  "theme": "courage"
+ },
+ {
+  "id": "dv074",
+  "reference": "Judges 8:23",
+  "bookSlug": "judges",
+  "chapter": 8,
+  "verseStart": 23,
+  "verseEnd": 23,
+  "text": "Gideon said to them, “I will not rule over you, neither shall my son rule over you. Yahweh shall rule over you.”",
+  "theme": "humility"
+ },
+ {
+  "id": "dv075",
+  "reference": "Ruth 1:16-17",
+  "bookSlug": "ruth",
+  "chapter": 1,
+  "verseStart": 16,
+  "verseEnd": 17,
+  "text": "Ruth said, “Don’t urge me to leave you, and to return from following you, for where you go, I will go; and where you stay, I will stay. Your people will be my people, and your God my God. Where you die, I will die, and there I will be buried. May Yahweh do so to me, and more also, if anything but death parts you and me.”",
+  "theme": "faithfulness"
+ },
+ {
+  "id": "dv076",
+  "reference": "Ruth 2:12",
+  "bookSlug": "ruth",
+  "chapter": 2,
+  "verseStart": 12,
+  "verseEnd": 12,
+  "text": "May Yahweh repay your work, and a full reward be given to you from Yahweh, the God of Israel, under whose wings you have come to take refuge.”",
+  "theme": "refuge"
+ },
+ {
+  "id": "dv077",
+  "reference": "1 Samuel 3:10",
+  "bookSlug": "1-samuel",
+  "chapter": 3,
+  "verseStart": 10,
+  "verseEnd": 10,
+  "text": "Yahweh came, and stood, and called as at other times, “Samuel! Samuel!” Then Samuel said, “Speak; for your servant hears.”",
+  "theme": "listening"
+ },
+ {
+  "id": "dv078",
+  "reference": "1 Samuel 16:7",
+  "bookSlug": "1-samuel",
+  "chapter": 16,
+  "verseStart": 7,
+  "verseEnd": 7,
+  "text": "But Yahweh said to Samuel, “Don’t look on his face, or on the height of his stature, because I have rejected him; for I don’t see as man sees. For man looks at the outward appearance, but Yahweh looks at the heart.”",
+  "theme": "character"
+ },
+ {
+  "id": "dv079",
+  "reference": "2 Samuel 22:2-3",
+  "bookSlug": "2-samuel",
+  "chapter": 22,
+  "verseStart": 2,
+  "verseEnd": 3,
+  "text": "and he said: “Yahweh is my rock, my fortress, and my deliverer, even mine; God is my rock in whom I take refuge; my shield, and the horn of my salvation, my high tower, and my refuge. My savior, you save me from violence.",
+  "theme": "refuge"
+ },
+ {
+  "id": "dv080",
+  "reference": "2 Samuel 7:22",
+  "bookSlug": "2-samuel",
+  "chapter": 7,
+  "verseStart": 22,
+  "verseEnd": 22,
+  "text": "Therefore you are great, Yahweh God. For there is no one like you, neither is there any God besides you, according to all that we have heard with our ears.",
+  "theme": "worship"
+ },
+ {
+  "id": "dv081",
+  "reference": "1 Kings 8:61",
+  "bookSlug": "1-kings",
+  "chapter": 8,
+  "verseStart": 61,
+  "verseEnd": 61,
+  "text": "“Let your heart therefore be perfect with Yahweh our God, to walk in his statutes, and to keep his commandments, as it is today.”",
+  "theme": "devotion"
+ },
+ {
+  "id": "dv082",
+  "reference": "1 Kings 19:12",
+  "bookSlug": "1-kings",
+  "chapter": 19,
+  "verseStart": 12,
+  "verseEnd": 12,
+  "text": "After the earthquake a fire passed; but Yahweh was not in the fire. After the fire, there was a still small voice.",
+  "theme": "stillness"
+ },
+ {
+  "id": "dv083",
+  "reference": "2 Kings 6:16-17",
+  "bookSlug": "2-kings",
+  "chapter": 6,
+  "verseStart": 16,
+  "verseEnd": 17,
+  "text": "He answered, “Don’t be afraid; for those who are with us are more than those who are with them.” Elisha prayed, and said, “Yahweh, please open his eyes, that he may see.” Yahweh opened the young man’s eyes; and he saw: and behold, the mountain was full of horses and chariots of fire around Elisha.",
+  "theme": "courage"
+ },
+ {
+  "id": "dv084",
+  "reference": "2 Kings 20:5",
+  "bookSlug": "2-kings",
+  "chapter": 20,
+  "verseStart": 5,
+  "verseEnd": 5,
+  "text": "“Turn back, and tell Hezekiah the prince of my people, ‘Yahweh, the God of David your father, says, “I have heard your prayer. I have seen your tears. Behold, I will heal you. On the third day, you will go up to Yahweh’s house.",
+  "theme": "healing"
+ },
+ {
+  "id": "dv085",
+  "reference": "1 Chronicles 16:11",
+  "bookSlug": "1-chronicles",
+  "chapter": 16,
+  "verseStart": 11,
+  "verseEnd": 11,
+  "text": "Seek Yahweh and his strength. Seek his face forever more.",
+  "theme": "prayer"
+ },
+ {
+  "id": "dv086",
+  "reference": "1 Chronicles 16:34",
+  "bookSlug": "1-chronicles",
+  "chapter": 16,
+  "verseStart": 34,
+  "verseEnd": 34,
+  "text": "Oh give thanks to Yahweh, for he is good, for his loving kindness endures forever.",
+  "theme": "gratitude"
+ },
+ {
+  "id": "dv087",
+  "reference": "2 Chronicles 15:7",
+  "bookSlug": "2-chronicles",
+  "chapter": 15,
+  "verseStart": 7,
+  "verseEnd": 7,
+  "text": "But you be strong, and don’t let your hands be slack; for your work will be rewarded.”",
+  "theme": "perseverance"
+ },
+ {
+  "id": "dv088",
+  "reference": "2 Chronicles 20:12",
+  "bookSlug": "2-chronicles",
+  "chapter": 20,
+  "verseStart": 12,
+  "verseEnd": 12,
+  "text": "Our God, will you not judge them? For we have no might against this great company that comes against us. We don’t know what to do, but our eyes are on you.”",
+  "theme": "dependence"
+ },
+ {
+  "id": "dv089",
+  "reference": "Ezra 7:10",
+  "bookSlug": "ezra",
+  "chapter": 7,
+  "verseStart": 10,
+  "verseEnd": 10,
+  "text": "For Ezra had set his heart to seek Yahweh’s law, and to do it, and to teach statutes and ordinances in Israel.",
+  "theme": "scripture"
+ },
+ {
+  "id": "dv090",
+  "reference": "Ezra 10:4",
+  "bookSlug": "ezra",
+  "chapter": 10,
+  "verseStart": 4,
+  "verseEnd": 4,
+  "text": "Arise; for the matter belongs to you, and we are with you. Be courageous, and do it.”",
+  "theme": "courage"
+ },
+ {
+  "id": "dv091",
+  "reference": "Nehemiah 4:14",
+  "bookSlug": "nehemiah",
+  "chapter": 4,
+  "verseStart": 14,
+  "verseEnd": 14,
+  "text": "I looked, and rose up, and said to the nobles, to the rulers, and to the rest of the people, “Don’t be afraid of them! Remember the Lord, who is great and awesome, and fight for your brothers, your sons, your daughters, your wives, and your houses.”",
+  "theme": "courage"
+ },
+ {
+  "id": "dv092",
+  "reference": "Nehemiah 8:10",
+  "bookSlug": "nehemiah",
+  "chapter": 8,
+  "verseStart": 10,
+  "verseEnd": 10,
+  "text": "Then he said to them, “Go your way. Eat the fat, drink the sweet, and send portions to him for whom nothing is prepared, for today is holy to our Lord. Don’t be grieved, for the joy of Yahweh is your strength.”",
+  "theme": "joy"
+ },
+ {
+  "id": "dv093",
+  "reference": "Esther 4:14",
+  "bookSlug": "esther",
+  "chapter": 4,
+  "verseStart": 14,
+  "verseEnd": 14,
+  "text": "For if you remain silent now, then relief and deliverance will come to the Jews from another place, but you and your father’s house will perish. Who knows if you haven’t come to the kingdom for such a time as this?”",
+  "theme": "purpose"
+ },
+ {
+  "id": "dv094",
+  "reference": "Esther 8:16",
+  "bookSlug": "esther",
+  "chapter": 8,
+  "verseStart": 16,
+  "verseEnd": 16,
+  "text": "The Jews had light, gladness, joy, and honor.",
+  "theme": "joy"
+ },
+ {
+  "id": "dv095",
+  "reference": "Job 19:25",
+  "bookSlug": "job",
+  "chapter": 19,
+  "verseStart": 25,
+  "verseEnd": 25,
+  "text": "But as for me, I know that my Redeemer lives. In the end, he will stand upon the earth.",
+  "theme": "hope"
+ },
+ {
+  "id": "dv096",
+  "reference": "Job 28:28",
+  "bookSlug": "job",
+  "chapter": 28,
+  "verseStart": 28,
+  "verseEnd": 28,
+  "text": "To man he said, ‘Behold, the fear of the Lord, that is wisdom. To depart from evil is understanding.’ ”",
+  "theme": "wisdom"
+ },
+ {
+  "id": "dv097",
+  "reference": "Psalm 1:1-3",
+  "bookSlug": "psalms",
+  "chapter": 1,
+  "verseStart": 1,
+  "verseEnd": 3,
+  "text": "Blessed is the man who doesn’t walk in the counsel of the wicked, nor stand on the path of sinners, nor sit in the seat of scoffers; but his delight is in Yahweh’s law. On his law he meditates day and night. He will be like a tree planted by the streams of water, that produces its fruit in its season, whose leaf also does not wither. Whatever he does shall prosper.",
+  "theme": "growth"
+ },
+ {
+  "id": "dv098",
+  "reference": "Psalm 16:11",
+  "bookSlug": "psalms",
+  "chapter": 16,
+  "verseStart": 11,
+  "verseEnd": 11,
+  "text": "You will show me the path of life. In your presence is fullness of joy. In your right hand there are pleasures forever more.",
+  "theme": "joy"
+ },
+ {
+  "id": "dv099",
+  "reference": "Proverbs 4:23",
+  "bookSlug": "proverbs",
+  "chapter": 4,
+  "verseStart": 23,
+  "verseEnd": 23,
+  "text": "Keep your heart with all diligence, for out of it is the wellspring of life.",
+  "theme": "attention"
+ },
+ {
+  "id": "dv100",
+  "reference": "Proverbs 11:25",
+  "bookSlug": "proverbs",
+  "chapter": 11,
+  "verseStart": 25,
+  "verseEnd": 25,
+  "text": "The liberal soul shall be made fat. He who waters shall be watered also himself.",
+  "theme": "generosity"
+ },
+ {
+  "id": "dv101",
+  "reference": "Ecclesiastes 3:1",
+  "bookSlug": "ecclesiastes",
+  "chapter": 3,
+  "verseStart": 1,
+  "verseEnd": 1,
+  "text": "For everything there is a season, and a time for every purpose under heaven:",
+  "theme": "seasons"
+ },
+ {
+  "id": "dv102",
+  "reference": "Ecclesiastes 4:9-10",
+  "bookSlug": "ecclesiastes",
+  "chapter": 4,
+  "verseStart": 9,
+  "verseEnd": 10,
+  "text": "Two are better than one, because they have a good reward for their labor. For if they fall, the one will lift up his fellow; but woe to him who is alone when he falls, and doesn’t have another to lift him up.",
+  "theme": "community"
+ },
+ {
+  "id": "dv103",
+  "reference": "Song of Solomon 2:10-12",
+  "bookSlug": "song-of-solomon",
+  "chapter": 2,
+  "verseStart": 10,
+  "verseEnd": 12,
+  "text": "My beloved spoke, and said to me, “Rise up, my love, my beautiful one, and come away. For behold, the winter is past. The rain is over and gone. The flowers appear on the earth. The time of the singing has come, and the voice of the turtledove is heard in our land.",
+  "theme": "renewal"
+ },
+ {
+  "id": "dv104",
+  "reference": "Song of Solomon 8:6-7",
+  "bookSlug": "song-of-solomon",
+  "chapter": 8,
+  "verseStart": 6,
+  "verseEnd": 7,
+  "text": "Set me as a seal on your heart, as a seal on your arm; for love is strong as death. Jealousy is as cruel as Sheol. Its flashes are flashes of fire, a very flame of Yahweh. Many waters can’t quench love, neither can floods drown it. If a man would give all the wealth of his house for love, he would be utterly scorned.",
+  "theme": "love"
+ },
+ {
+  "id": "dv105",
+  "reference": "Isaiah 6:8",
+  "bookSlug": "isaiah",
+  "chapter": 6,
+  "verseStart": 8,
+  "verseEnd": 8,
+  "text": "I heard the Lord’s voice, saying, “Whom shall I send, and who will go for us?” Then I said, “Here I am. Send me!”",
+  "theme": "calling"
+ },
+ {
+  "id": "dv106",
+  "reference": "Isaiah 58:6-7",
+  "bookSlug": "isaiah",
+  "chapter": 58,
+  "verseStart": 6,
+  "verseEnd": 7,
+  "text": "“Isn’t this the fast that I have chosen: to release the bonds of wickedness, to undo the straps of the yoke, to let the oppressed go free, and that you break every yoke? Isn’t it to distribute your bread to the hungry, and that you bring the poor who are cast out to your house? When you see the naked, that you cover him; and that you not hide yourself from your own flesh?",
+  "theme": "justice"
+ },
+ {
+  "id": "dv107",
+  "reference": "Jeremiah 6:16",
+  "bookSlug": "jeremiah",
+  "chapter": 6,
+  "verseStart": 16,
+  "verseEnd": 16,
+  "text": "Yahweh says, “Stand in the ways and see, and ask for the old paths, ‘Where is the good way?’ and walk in it, and you will find rest for your souls. But they said, ‘We will not walk in it.’",
+  "theme": "wisdom"
+ },
+ {
+  "id": "dv108",
+  "reference": "Jeremiah 31:3",
+  "bookSlug": "jeremiah",
+  "chapter": 31,
+  "verseStart": 3,
+  "verseEnd": 3,
+  "text": "Yahweh appeared of old to me, saying, “Yes, I have loved you with an everlasting love. Therefore I have drawn you with loving kindness.",
+  "theme": "love"
+ },
+ {
+  "id": "dv109",
+  "reference": "Lamentations 3:25-26",
+  "bookSlug": "lamentations",
+  "chapter": 3,
+  "verseStart": 25,
+  "verseEnd": 26,
+  "text": "Yahweh is good to those who wait for him, to the soul who seeks him. It is good that a man should hope and quietly wait for the salvation of Yahweh.",
+  "theme": "patience"
+ },
+ {
+  "id": "dv110",
+  "reference": "Lamentations 5:21",
+  "bookSlug": "lamentations",
+  "chapter": 5,
+  "verseStart": 21,
+  "verseEnd": 21,
+  "text": "Turn us to yourself, Yahweh, and we will be turned. Renew our days as of old.",
+  "theme": "renewal"
+ },
+ {
+  "id": "dv111",
+  "reference": "Ezekiel 11:19",
+  "bookSlug": "ezekiel",
+  "chapter": 11,
+  "verseStart": 19,
+  "verseEnd": 19,
+  "text": "I will give them one heart, and I will put a new spirit within you. I will take the stony heart out of their flesh, and will give them a heart of flesh;",
+  "theme": "renewal"
+ },
+ {
+  "id": "dv112",
+  "reference": "Ezekiel 36:26",
+  "bookSlug": "ezekiel",
+  "chapter": 36,
+  "verseStart": 26,
+  "verseEnd": 26,
+  "text": "I will also give you a new heart, and I will put a new spirit within you. I will take away the stony heart out of your flesh, and I will give you a heart of flesh.",
+  "theme": "renewal"
+ },
+ {
+  "id": "dv113",
+  "reference": "Daniel 3:17-18",
+  "bookSlug": "daniel",
+  "chapter": 3,
+  "verseStart": 17,
+  "verseEnd": 18,
+  "text": "If it happens, our God whom we serve is able to deliver us from the burning fiery furnace; and he will deliver us out of your hand, O king. But if not, let it be known to you, O king, that we will not serve your gods or worship the golden image which you have set up.”",
+  "theme": "courage"
+ },
+ {
+  "id": "dv114",
+  "reference": "Daniel 6:10",
+  "bookSlug": "daniel",
+  "chapter": 6,
+  "verseStart": 10,
+  "verseEnd": 10,
+  "text": "When Daniel knew that the writing was signed, he went into his house (now his windows were open in his room toward Jerusalem) and he kneeled on his knees three times a day, and prayed, and gave thanks before his God, as he did before.",
+  "theme": "prayer"
+ },
+ {
+  "id": "dv115",
+  "reference": "Hosea 6:6",
+  "bookSlug": "hosea",
+  "chapter": 6,
+  "verseStart": 6,
+  "verseEnd": 6,
+  "text": "For I desire mercy, and not sacrifice; and the knowledge of God more than burnt offerings.",
+  "theme": "mercy"
+ },
+ {
+  "id": "dv116",
+  "reference": "Hosea 10:12",
+  "bookSlug": "hosea",
+  "chapter": 10,
+  "verseStart": 12,
+  "verseEnd": 12,
+  "text": "Sow to yourselves in righteousness, reap according to kindness. Break up your fallow ground; for it is time to seek Yahweh, until he comes and rains righteousness on you.",
+  "theme": "renewal"
+ },
+ {
+  "id": "dv117",
+  "reference": "Joel 2:12-13",
+  "bookSlug": "joel",
+  "chapter": 2,
+  "verseStart": 12,
+  "verseEnd": 13,
+  "text": "“Yet even now,” says Yahweh, “turn to me with all your heart, and with fasting, and with weeping, and with mourning.” Tear your heart, and not your garments, and turn to Yahweh, your God; for he is gracious and merciful, slow to anger, and abundant in loving kindness, and relents from sending calamity.",
+  "theme": "repentance"
+ },
+ {
+  "id": "dv118",
+  "reference": "Joel 2:28",
+  "bookSlug": "joel",
+  "chapter": 2,
+  "verseStart": 28,
+  "verseEnd": 28,
+  "text": "“It will happen afterward, that I will pour out my Spirit on all flesh; and your sons and your daughters will prophesy. Your old men will dream dreams. Your young men will see visions.",
+  "theme": "spirit"
+ },
+ {
+  "id": "dv119",
+  "reference": "Amos 5:14",
+  "bookSlug": "amos",
+  "chapter": 5,
+  "verseStart": 14,
+  "verseEnd": 14,
+  "text": "Seek good, and not evil, that you may live; and so Yahweh, the God of Armies, will be with you, as you say.",
+  "theme": "goodness"
+ },
+ {
+  "id": "dv120",
+  "reference": "Amos 5:24",
+  "bookSlug": "amos",
+  "chapter": 5,
+  "verseStart": 24,
+  "verseEnd": 24,
+  "text": "But let justice roll on like rivers, and righteousness like a mighty stream.",
+  "theme": "justice"
+ },
+ {
+  "id": "dv121",
+  "reference": "Obadiah 1:15",
+  "bookSlug": "obadiah",
+  "chapter": 1,
+  "verseStart": 15,
+  "verseEnd": 15,
+  "text": "For the day of Yahweh is near all the nations! As you have done, it will be done to you. Your deeds will return upon your own head.",
+  "theme": "justice"
+ },
+ {
+  "id": "dv122",
+  "reference": "Obadiah 1:17",
+  "bookSlug": "obadiah",
+  "chapter": 1,
+  "verseStart": 17,
+  "verseEnd": 17,
+  "text": "But in Mount Zion, there will be those who escape, and it will be holy. The house of Jacob will possess their possessions.",
+  "theme": "deliverance"
+ },
+ {
+  "id": "dv123",
+  "reference": "Jonah 2:2",
+  "bookSlug": "jonah",
+  "chapter": 2,
+  "verseStart": 2,
+  "verseEnd": 2,
+  "text": "He said, “I called because of my affliction to Yahweh. He answered me. Out of the belly of Sheol I cried. You heard my voice.",
+  "theme": "prayer"
+ },
+ {
+  "id": "dv124",
+  "reference": "Jonah 3:10",
+  "bookSlug": "jonah",
+  "chapter": 3,
+  "verseStart": 10,
+  "verseEnd": 10,
+  "text": "God saw their works, that they turned from their evil way. God relented of the disaster which he said he would do to them, and he didn’t do it.",
+  "theme": "mercy"
+ },
+ {
+  "id": "dv125",
+  "reference": "Micah 4:4",
+  "bookSlug": "micah",
+  "chapter": 4,
+  "verseStart": 4,
+  "verseEnd": 4,
+  "text": "But they will sit every man under his vine and under his fig tree; and no one will make them afraid: For the mouth of Yahweh of Armies has spoken.",
+  "theme": "peace"
+ },
+ {
+  "id": "dv126",
+  "reference": "Micah 7:18",
+  "bookSlug": "micah",
+  "chapter": 7,
+  "verseStart": 18,
+  "verseEnd": 18,
+  "text": "Who is a God like you, who pardons iniquity, and passes over the disobedience of the remnant of his heritage? He doesn’t retain his anger forever, because he delights in loving kindness.",
+  "theme": "mercy"
+ },
+ {
+  "id": "dv127",
+  "reference": "Nahum 1:7",
+  "bookSlug": "nahum",
+  "chapter": 1,
+  "verseStart": 7,
+  "verseEnd": 7,
+  "text": "Yahweh is good, a stronghold in the day of trouble; and he knows those who take refuge in him.",
+  "theme": "refuge"
+ },
+ {
+  "id": "dv128",
+  "reference": "Nahum 2:2",
+  "bookSlug": "nahum",
+  "chapter": 2,
+  "verseStart": 2,
+  "verseEnd": 2,
+  "text": "For Yahweh restores the excellency of Jacob, as the excellency of Israel; for the destroyers have destroyed them, and ruined their vine branches.",
+  "theme": "restoration"
+ },
+ {
+  "id": "dv129",
+  "reference": "Habakkuk 2:4",
+  "bookSlug": "habakkuk",
+  "chapter": 2,
+  "verseStart": 4,
+  "verseEnd": 4,
+  "text": "Behold, his soul is puffed up. It is not upright in him, but the righteous will live by his faith.",
+  "theme": "faith"
+ },
+ {
+  "id": "dv130",
+  "reference": "Habakkuk 3:19",
+  "bookSlug": "habakkuk",
+  "chapter": 3,
+  "verseStart": 19,
+  "verseEnd": 19,
+  "text": "Yahweh, the Lord, is my strength. He makes my feet like deer’s feet, and enables me to go in high places. For the music director, on my stringed instruments.",
+  "theme": "strength"
+ },
+ {
+  "id": "dv131",
+  "reference": "Zephaniah 2:3",
+  "bookSlug": "zephaniah",
+  "chapter": 2,
+  "verseStart": 3,
+  "verseEnd": 3,
+  "text": "Seek Yahweh, all you humble of the land, who have kept his ordinances. Seek righteousness. Seek humility. It may be that you will be hidden in the day of Yahweh’s anger.",
+  "theme": "humility"
+ },
+ {
+  "id": "dv132",
+  "reference": "Zephaniah 3:9",
+  "bookSlug": "zephaniah",
+  "chapter": 3,
+  "verseStart": 9,
+  "verseEnd": 9,
+  "text": "For then I will purify the lips of the peoples, that they may all call on Yahweh’s name, to serve him shoulder to shoulder.",
+  "theme": "worship"
+ },
+ {
+  "id": "dv133",
+  "reference": "Haggai 1:5",
+  "bookSlug": "haggai",
+  "chapter": 1,
+  "verseStart": 5,
+  "verseEnd": 5,
+  "text": "Now therefore this is what Yahweh of Armies says: Consider your ways.",
+  "theme": "reflection"
+ },
+ {
+  "id": "dv134",
+  "reference": "Haggai 2:9",
+  "bookSlug": "haggai",
+  "chapter": 2,
+  "verseStart": 9,
+  "verseEnd": 9,
+  "text": "‘The latter glory of this house will be greater than the former,’ says Yahweh of Armies; ‘and in this place I will give peace,’ says Yahweh of Armies.”",
+  "theme": "peace"
+ },
+ {
+  "id": "dv135",
+  "reference": "Zechariah 4:6",
+  "bookSlug": "zechariah",
+  "chapter": 4,
+  "verseStart": 6,
+  "verseEnd": 6,
+  "text": "Then he answered and spoke to me, saying, “This is Yahweh’s word to Zerubbabel, saying, ‘Not by might, nor by power, but by my Spirit,’ says Yahweh of Armies.",
+  "theme": "spirit"
+ },
+ {
+  "id": "dv136",
+  "reference": "Zechariah 8:16-17",
+  "bookSlug": "zechariah",
+  "chapter": 8,
+  "verseStart": 16,
+  "verseEnd": 17,
+  "text": "These are the things that you shall do: speak every man the truth with his neighbor. Execute the judgment of truth and peace in your gates, and let none of you devise evil in your hearts against his neighbor, and love no false oath: for all these are things that I hate,” says Yahweh.",
+  "theme": "truth"
+ },
+ {
+  "id": "dv137",
+  "reference": "Malachi 3:10",
+  "bookSlug": "malachi",
+  "chapter": 3,
+  "verseStart": 10,
+  "verseEnd": 10,
+  "text": "Bring the whole tithe into the storehouse, that there may be food in my house, and test me now in this,” says Yahweh of Armies, “if I will not open you the windows of heaven, and pour you out a blessing, that there will not be room enough for.",
+  "theme": "trust"
+ },
+ {
+  "id": "dv138",
+  "reference": "Malachi 4:2",
+  "bookSlug": "malachi",
+  "chapter": 4,
+  "verseStart": 2,
+  "verseEnd": 2,
+  "text": "But to you who fear my name shall the sun of righteousness arise with healing in its wings. You will go out, and leap like calves of the stall.",
+  "theme": "healing"
+ },
+ {
+  "id": "dv139",
+  "reference": "Matthew 5:9",
+  "bookSlug": "matthew",
+  "chapter": 5,
+  "verseStart": 9,
+  "verseEnd": 9,
+  "text": "Blessed are the peacemakers, for they shall be called children of God.",
+  "theme": "peacemaking"
+ },
+ {
+  "id": "dv140",
+  "reference": "Matthew 25:40",
+  "bookSlug": "matthew",
+  "chapter": 25,
+  "verseStart": 40,
+  "verseEnd": 40,
+  "text": "“The King will answer them, ‘Most certainly I tell you, because you did it to one of the least of these my brothers, you did it to me.’",
+  "theme": "service"
+ },
+ {
+  "id": "dv141",
+  "reference": "Mark 9:24",
+  "bookSlug": "mark",
+  "chapter": 9,
+  "verseStart": 24,
+  "verseEnd": 24,
+  "text": "Immediately the father of the child cried out with tears, “I believe. Help my unbelief!”",
+  "theme": "faith"
+ },
+ {
+  "id": "dv142",
+  "reference": "Mark 10:45",
+  "bookSlug": "mark",
+  "chapter": 10,
+  "verseStart": 45,
+  "verseEnd": 45,
+  "text": "For the Son of Man also came not to be served, but to serve, and to give his life as a ransom for many.”",
+  "theme": "service"
+ },
+ {
+  "id": "dv143",
+  "reference": "Luke 4:18",
+  "bookSlug": "luke",
+  "chapter": 4,
+  "verseStart": 18,
+  "verseEnd": 18,
+  "text": "“The Spirit of the Lord is on me, because he has anointed me to preach good news to the poor. He has sent me to heal the broken hearted, to proclaim release to the captives, recovering of sight to the blind, to deliver those who are crushed,",
+  "theme": "justice"
+ },
+ {
+  "id": "dv144",
+  "reference": "Luke 10:27",
+  "bookSlug": "luke",
+  "chapter": 10,
+  "verseStart": 27,
+  "verseEnd": 27,
+  "text": "He answered, “You shall love the Lord your God with all your heart, with all your soul, with all your strength, and with all your mind; and your neighbor as yourself.”",
+  "theme": "love"
+ },
+ {
+  "id": "dv145",
+  "reference": "John 8:12",
+  "bookSlug": "john",
+  "chapter": 8,
+  "verseStart": 12,
+  "verseEnd": 12,
+  "text": "Again, therefore, Jesus spoke to them, saying, “I am the light of the world. He who follows me will not walk in the darkness, but will have the light of life.”",
+  "theme": "light"
+ },
+ {
+  "id": "dv146",
+  "reference": "John 10:10",
+  "bookSlug": "john",
+  "chapter": 10,
+  "verseStart": 10,
+  "verseEnd": 10,
+  "text": "The thief only comes to steal, kill, and destroy. I came that they may have life, and may have it abundantly.",
+  "theme": "life"
+ },
+ {
+  "id": "dv147",
+  "reference": "Acts 1:8",
+  "bookSlug": "acts",
+  "chapter": 1,
+  "verseStart": 8,
+  "verseEnd": 8,
+  "text": "But you will receive power when the Holy Spirit has come upon you. You will be witnesses to me in Jerusalem, in all Judea and Samaria, and to the uttermost parts of the earth.”",
+  "theme": "witness"
+ },
+ {
+  "id": "dv148",
+  "reference": "Acts 2:42",
+  "bookSlug": "acts",
+  "chapter": 2,
+  "verseStart": 42,
+  "verseEnd": 42,
+  "text": "They continued steadfastly in the apostles’ teaching and fellowship, in the breaking of bread, and prayer.",
+  "theme": "community"
+ },
+ {
+  "id": "dv149",
+  "reference": "Romans 5:8",
+  "bookSlug": "romans",
+  "chapter": 5,
+  "verseStart": 8,
+  "verseEnd": 8,
+  "text": "But God commends his own love toward us, in that while we were yet sinners, Christ died for us.",
+  "theme": "love"
+ },
+ {
+  "id": "dv150",
+  "reference": "Romans 12:2",
+  "bookSlug": "romans",
+  "chapter": 12,
+  "verseStart": 2,
+  "verseEnd": 2,
+  "text": "Don’t be conformed to this world, but be transformed by the renewing of your mind, so that you may prove what is the good, well-pleasing, and perfect will of God.",
+  "theme": "renewal"
+ },
+ {
+  "id": "dv151",
+  "reference": "1 Corinthians 10:31",
+  "bookSlug": "1-corinthians",
+  "chapter": 10,
+  "verseStart": 31,
+  "verseEnd": 31,
+  "text": "Whether therefore you eat, or drink, or whatever you do, do all to the glory of God.",
+  "theme": "worship"
+ },
+ {
+  "id": "dv152",
+  "reference": "1 Corinthians 12:26",
+  "bookSlug": "1-corinthians",
+  "chapter": 12,
+  "verseStart": 26,
+  "verseEnd": 26,
+  "text": "When one member suffers, all the members suffer with it. When one member is honored, all the members rejoice with it.",
+  "theme": "solidarity"
+ },
+ {
+  "id": "dv153",
+  "reference": "2 Corinthians 4:7-9",
+  "bookSlug": "2-corinthians",
+  "chapter": 4,
+  "verseStart": 7,
+  "verseEnd": 9,
+  "text": "But we have this treasure in clay vessels, that the exceeding greatness of the power may be of God, and not from ourselves. We are pressed on every side, yet not crushed; perplexed, yet not to despair; pursued, yet not forsaken; struck down, yet not destroyed;",
+  "theme": "perseverance"
+ },
+ {
+  "id": "dv154",
+  "reference": "2 Corinthians 12:9",
+  "bookSlug": "2-corinthians",
+  "chapter": 12,
+  "verseStart": 9,
+  "verseEnd": 9,
+  "text": "He has said to me, “My grace is sufficient for you, for my power is made perfect in weakness.” Most gladly therefore I will rather glory in my weaknesses, that the power of Christ may rest on me.",
+  "theme": "grace"
+ },
+ {
+  "id": "dv155",
+  "reference": "Galatians 2:20",
+  "bookSlug": "galatians",
+  "chapter": 2,
+  "verseStart": 20,
+  "verseEnd": 20,
+  "text": "I have been crucified with Christ, and it is no longer I who live, but Christ lives in me. That life which I now live in the flesh, I live by faith in the Son of God, who loved me, and gave himself up for me.",
+  "theme": "faith"
+ },
+ {
+  "id": "dv156",
+  "reference": "Galatians 5:13",
+  "bookSlug": "galatians",
+  "chapter": 5,
+  "verseStart": 13,
+  "verseEnd": 13,
+  "text": "For you, brothers, were called for freedom. Only don’t use your freedom for gain to the flesh, but through love be servants to one another.",
+  "theme": "service"
+ },
+ {
+  "id": "dv157",
+  "reference": "Ephesians 3:20-21",
+  "bookSlug": "ephesians",
+  "chapter": 3,
+  "verseStart": 20,
+  "verseEnd": 21,
+  "text": "Now to him who is able to do exceedingly abundantly above all that we ask or think, according to the power that works in us, to him be the glory in the assembly and in Christ Jesus to all generations forever and ever. Amen.",
+  "theme": "hope"
+ },
+ {
+  "id": "dv158",
+  "reference": "Ephesians 6:10",
+  "bookSlug": "ephesians",
+  "chapter": 6,
+  "verseStart": 10,
+  "verseEnd": 10,
+  "text": "Finally, be strong in the Lord, and in the strength of his might.",
+  "theme": "strength"
+ },
+ {
+  "id": "dv159",
+  "reference": "Philippians 1:6",
+  "bookSlug": "philippians",
+  "chapter": 1,
+  "verseStart": 6,
+  "verseEnd": 6,
+  "text": "being confident of this very thing, that he who began a good work in you will complete it until the day of Jesus Christ.",
+  "theme": "growth"
+ },
+ {
+  "id": "dv160",
+  "reference": "Philippians 2:3-4",
+  "bookSlug": "philippians",
+  "chapter": 2,
+  "verseStart": 3,
+  "verseEnd": 4,
+  "text": "doing nothing through rivalry or through conceit, but in humility, each counting others better than himself; each of you not just looking to his own things, but each of you also to the things of others.",
+  "theme": "humility"
+ },
+ {
+  "id": "dv161",
+  "reference": "Colossians 1:16",
+  "bookSlug": "colossians",
+  "chapter": 1,
+  "verseStart": 16,
+  "verseEnd": 16,
+  "text": "For by him all things were created in the heavens and on the earth, visible things and invisible things, whether thrones or dominions or principalities or powers. All things have been created through him and for him.",
+  "theme": "creation"
+ },
+ {
+  "id": "dv162",
+  "reference": "Colossians 3:15",
+  "bookSlug": "colossians",
+  "chapter": 3,
+  "verseStart": 15,
+  "verseEnd": 15,
+  "text": "And let the peace of God rule in your hearts, to which also you were called in one body, and be thankful.",
+  "theme": "peace"
+ },
+ {
+  "id": "dv163",
+  "reference": "1 Thessalonians 4:11-12",
+  "bookSlug": "1-thessalonians",
+  "chapter": 4,
+  "verseStart": 11,
+  "verseEnd": 12,
+  "text": "and that you make it your ambition to lead a quiet life, and to do your own business, and to work with your own hands, even as we instructed you; that you may walk properly toward those who are outside, and may have need of nothing.",
+  "theme": "work"
+ },
+ {
+  "id": "dv164",
+  "reference": "1 Thessalonians 5:21",
+  "bookSlug": "1-thessalonians",
+  "chapter": 5,
+  "verseStart": 21,
+  "verseEnd": 21,
+  "text": "Test all things, and hold firmly that which is good.",
+  "theme": "discernment"
+ },
+ {
+  "id": "dv165",
+  "reference": "2 Thessalonians 1:3",
+  "bookSlug": "2-thessalonians",
+  "chapter": 1,
+  "verseStart": 3,
+  "verseEnd": 3,
+  "text": "We are bound to always give thanks to God for you, brothers, even as it is appropriate, because your faith grows exceedingly, and the love of each and every one of you toward one another abounds,",
+  "theme": "growth"
+ },
+ {
+  "id": "dv166",
+  "reference": "2 Thessalonians 3:13",
+  "bookSlug": "2-thessalonians",
+  "chapter": 3,
+  "verseStart": 13,
+  "verseEnd": 13,
+  "text": "But you, brothers, don’t be weary in doing what is right.",
+  "theme": "perseverance"
+ },
+ {
+  "id": "dv167",
+  "reference": "1 Timothy 4:12",
+  "bookSlug": "1-timothy",
+  "chapter": 4,
+  "verseStart": 12,
+  "verseEnd": 12,
+  "text": "Let no man despise your youth; but be an example to those who believe, in word, in your way of life, in love, in spirit, in faith, and in purity.",
+  "theme": "example"
+ },
+ {
+  "id": "dv168",
+  "reference": "1 Timothy 6:6",
+  "bookSlug": "1-timothy",
+  "chapter": 6,
+  "verseStart": 6,
+  "verseEnd": 6,
+  "text": "But godliness with contentment is great gain.",
+  "theme": "contentment"
+ },
+ {
+  "id": "dv169",
+  "reference": "2 Timothy 1:7",
+  "bookSlug": "2-timothy",
+  "chapter": 1,
+  "verseStart": 7,
+  "verseEnd": 7,
+  "text": "For God didn’t give us a spirit of fear, but of power, love, and self-control.",
+  "theme": "courage"
+ },
+ {
+  "id": "dv170",
+  "reference": "Titus 3:4-5",
+  "bookSlug": "titus",
+  "chapter": 3,
+  "verseStart": 4,
+  "verseEnd": 5,
+  "text": "But when the kindness of God our Savior and his love toward mankind appeared, not by works of righteousness which we did ourselves, but according to his mercy, he saved us through the washing of regeneration and renewing by the Holy Spirit,",
+  "theme": "grace"
+ },
+ {
+  "id": "dv171",
+  "reference": "Philemon 1:6",
+  "bookSlug": "philemon",
+  "chapter": 1,
+  "verseStart": 6,
+  "verseEnd": 6,
+  "text": "that the fellowship of your faith may become effective in the knowledge of every good thing which is in us in Christ Jesus.",
+  "theme": "faith"
+ },
+ {
+  "id": "dv172",
+  "reference": "Hebrews 4:12",
+  "bookSlug": "hebrews",
+  "chapter": 4,
+  "verseStart": 12,
+  "verseEnd": 12,
+  "text": "For the word of God is living and active, and sharper than any two-edged sword, piercing even to the dividing of soul and spirit, of both joints and marrow, and is able to discern the thoughts and intentions of the heart.",
+  "theme": "scripture"
+ },
+ {
+  "id": "dv173",
+  "reference": "James 3:17",
+  "bookSlug": "james",
+  "chapter": 3,
+  "verseStart": 17,
+  "verseEnd": 17,
+  "text": "But the wisdom that is from above is first pure, then peaceful, gentle, reasonable, full of mercy and good fruits, without partiality, and without hypocrisy.",
+  "theme": "wisdom"
+ },
+ {
+  "id": "dv174",
+  "reference": "1 Peter 2:9",
+  "bookSlug": "1-peter",
+  "chapter": 2,
+  "verseStart": 9,
+  "verseEnd": 9,
+  "text": "But you are a chosen race, a royal priesthood, a holy nation, a people for God’s own possession, that you may proclaim the excellence of him who called you out of darkness into his marvelous light.",
+  "theme": "calling"
+ },
+ {
+  "id": "dv175",
+  "reference": "2 Peter 1:3",
+  "bookSlug": "2-peter",
+  "chapter": 1,
+  "verseStart": 3,
+  "verseEnd": 3,
+  "text": "seeing that his divine power has granted to us all things that pertain to life and godliness, through the knowledge of him who called us by his own glory and virtue,",
+  "theme": "growth"
+ },
+ {
+  "id": "dv176",
+  "reference": "1 John 1:9",
+  "bookSlug": "1-john",
+  "chapter": 1,
+  "verseStart": 9,
+  "verseEnd": 9,
+  "text": "If we confess our sins, he is faithful and righteous to forgive us the sins, and to cleanse us from all unrighteousness.",
+  "theme": "forgiveness"
+ },
+ {
+  "id": "dv177",
+  "reference": "2 John 1:6",
+  "bookSlug": "2-john",
+  "chapter": 1,
+  "verseStart": 6,
+  "verseEnd": 6,
+  "text": "This is love, that we should walk according to his commandments. This is the commandment, even as you heard from the beginning, that you should walk in it.",
+  "theme": "love"
+ },
+ {
+  "id": "dv178",
+  "reference": "3 John 1:4",
+  "bookSlug": "3-john",
+  "chapter": 1,
+  "verseStart": 4,
+  "verseEnd": 4,
+  "text": "I have no greater joy than this: to hear about my children walking in truth.",
+  "theme": "joy"
+ },
+ {
+  "id": "dv179",
+  "reference": "Jude 1:24-25",
+  "bookSlug": "jude",
+  "chapter": 1,
+  "verseStart": 24,
+  "verseEnd": 25,
+  "text": "Now to him who is able to keep them from stumbling, and to present you faultless before the presence of his glory in great joy, to God our Savior, who alone is wise, be glory and majesty, dominion and power, both now and forever. Amen.",
+  "theme": "hope"
+ },
+ {
+  "id": "dv180",
+  "reference": "Revelation 21:4",
+  "bookSlug": "revelation",
+  "chapter": 21,
+  "verseStart": 4,
+  "verseEnd": 4,
+  "text": "He will wipe away every tear from their eyes. Death will be no more; neither will there be mourning, nor crying, nor pain, any more. The first things have passed away.”",
+  "theme": "renewal"
  }
 ]

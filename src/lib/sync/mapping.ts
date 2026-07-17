@@ -27,6 +27,7 @@ import type {
   Profile,
   QuestCompletion,
   QuestStepKey,
+  RecentVerse,
   ReadingPosition,
   Reflection,
   ReflectionMood,
@@ -80,6 +81,20 @@ export interface DailyQuestRow {
   rerolls: number;
   started_at: string | null;
   completed_at: string | null;
+  picked_at: string;
+  expires_at: string;
+}
+
+export interface RecentVerseRow {
+  user_id: string;
+  book_slug: string;
+  book_name: string;
+  chapter: number;
+  verse_start: number;
+  verse_end: number;
+  reference: string;
+  text: string;
+  viewed_at: string;
 }
 
 export interface UserQuestRow {
@@ -234,6 +249,25 @@ export function assignmentToRow(
     rerolls: a.rerolls,
     started_at: a.startedAt ?? null,
     completed_at: a.completedAt ?? null,
+    picked_at: a.pickedAt,
+    expires_at: a.expiresAt,
+  };
+}
+
+export function recentVerseToRow(
+  uid: string,
+  verse: RecentVerse,
+): RecentVerseRow {
+  return {
+    user_id: uid,
+    book_slug: verse.bookSlug,
+    book_name: verse.bookName,
+    chapter: verse.chapter,
+    verse_start: verse.verseStart,
+    verse_end: verse.verseEnd,
+    reference: verse.reference,
+    text: verse.text,
+    viewed_at: verse.viewedAt,
   };
 }
 
@@ -404,6 +438,21 @@ export function rowToAssignment(row: DailyQuestRow): DailyQuestAssignment {
     rerolls: row.rerolls,
     startedAt: row.started_at ?? undefined,
     completedAt: row.completed_at ?? undefined,
+    pickedAt: row.picked_at,
+    expiresAt: row.expires_at,
+  };
+}
+
+export function rowToRecentVerse(row: RecentVerseRow): RecentVerse {
+  return {
+    bookSlug: row.book_slug,
+    bookName: row.book_name,
+    chapter: row.chapter,
+    verseStart: row.verse_start,
+    verseEnd: row.verse_end,
+    reference: row.reference,
+    text: row.text,
+    viewedAt: row.viewed_at,
   };
 }
 

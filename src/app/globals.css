@@ -131,10 +131,10 @@
    Keyframes — motion with meaning, never spectacle
    ============================================================ */
 @keyframes flicker {
-  0%, 100% { opacity: 1; transform: scaleY(1); }
-  38% { opacity: 0.86; transform: scaleY(0.97) translateX(0.2px); }
-  55% { opacity: 0.96; transform: scaleY(1.02); }
-  72% { opacity: 0.9; transform: scaleY(0.985) translateX(-0.2px); }
+  0%, 100% { opacity: 1; }
+  38% { opacity: 0.86; }
+  55% { opacity: 0.96; }
+  72% { opacity: 0.9; }
 }
 @keyframes sway {
   0%, 100% { transform: rotate(-1.6deg); }
@@ -417,8 +417,8 @@ body {
    CSS so the "Large text" setting can scale it — inline text-[…] utilities
    would override the html.text-large rule and defeat the setting. */
 .verse-text-lead {
-  font-size: clamp(1.125rem, calc(1rem + 0.7vw), 1.25rem);
-  line-height: 1.65;
+  font-size: clamp(1.0625rem, calc(1rem + 0.45vw), 1.1875rem);
+  line-height: 1.5;
 }
 
 .verse-number {

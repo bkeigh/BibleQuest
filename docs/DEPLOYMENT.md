@@ -69,8 +69,9 @@ complete the browser matrix as well.
 ## Bible text tracing
 
 The chapter reader loads book JSON server-side. `next.config.ts` includes
-`outputFileTracingIncludes` for `src/data/bible/**` so those files ship with the
-`/app/bible/**` routes. No action needed — just don't remove that config.
+`outputFileTracingIncludes` for `src/data/bible/**` so those files ship with both
+the private `/app/bible/**` reader and public `/verse/**` share routes. No action
+needed — just don't remove that config.
 
 ## Post-deploy checks
 
@@ -80,6 +81,12 @@ The chapter reader loads book JSON server-side. `next.config.ts` includes
 - [ ] `/app` routes a new visitor to onboarding.
 - [ ] Complete the daily loop: quest → reflect → complete → journey/tree update.
 - [ ] Bible chapter renders real WEB text.
+- [ ] A public `/verse/{book}/{chapter}/{verse}` link renders without onboarding,
+      has canonical/social metadata, and its “Open chapter” CTA targets the verse.
+- [ ] `/support` clearly reports whether one-time support is available. If
+      `STRIPE_DONATION_URL` is intentionally configured, verify the same-origin
+      checkout route redirects only to the reviewed live Stripe Payment Link;
+      repeat with the variable absent and confirm it fails closed.
 - [ ] Add to Home Screen on an iPhone; confirm it opens standalone.
 - [ ] Offline: load the app, go offline, confirm the offline fallback appears.
 - [ ] `/api/health` returns `{ "status": "ok" }`.

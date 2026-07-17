@@ -13,9 +13,12 @@ type WorkerPolicy = {
   CACHE_VERSION: string;
   SHELL_CACHE: string;
   RUNTIME_CACHE: string;
+  PRECACHE_PATHS: string[];
+  PIXEL_ASSET_PATHS: string[];
   isRequestCacheCandidate: (request: Request) => boolean;
   isOfflineSafeNavigationRequest: (request: Request) => boolean;
   isImmutableStaticRequest: (request: Request) => boolean;
+  isPixelAssetRequest: (request: Request) => boolean;
   isResponseCacheable: (response: Response) => boolean;
 };
 
@@ -251,6 +254,37 @@ describe("service-worker cache policy", () => {
     ).toBe(false);
   });
 
+  it("caches only the explicit queryless production sprite catalogue", () => {
+    const { policy } = loadWorker();
+    expect(policy.PIXEL_ASSET_PATHS).toHaveLength(63);
+    expect(new Set(policy.PIXEL_ASSET_PATHS).size).toBe(63);
+    expect(
+      policy.isPixelAssetRequest(
+        makeRequest("/pixel/praying-hands.png", { mode: "cors" })
+      )
+    ).toBe(true);
+    expect(
+      policy.isPixelAssetRequest(
+        makeRequest("/pixel/tree-stage-19.png", { mode: "cors" })
+      )
+    ).toBe(true);
+    expect(
+      policy.isPixelAssetRequest(
+        makeRequest("/pixel/tree-stage-20.png", { mode: "cors" })
+      )
+    ).toBe(false);
+    expect(
+      policy.isPixelAssetRequest(
+        makeRequest("/pixel/praying-hands.png?v=2", { mode: "cors" })
+      )
+    ).toBe(false);
+    expect(
+      policy.isPixelAssetRequest(
+        makeRequest("/pixel/private-upload.png", { mode: "cors" })
+      )
+    ).toBe(false);
+  });
+
   it("rejects redirects, errors, opaque, private, no-store, and Set-Cookie responses", () => {
     const { policy } = loadWorker();
     expect(policy.isResponseCacheable(makeResponse("ok"))).toBe(true);
@@ -377,10 +411,25 @@ describe("service-worker fetch behavior", () => {
     await dispatchFetch(harness, assetRequest);
     expect(await (await runtime.match(assetRequest))?.text()).toBe("new asset");
   });
+
+  it("serves a cached production sprite while refreshing it", async () => {
+    const pixelRequest = makeRequest("/pixel/tree-stage-19.png", {
+      mode: "cors",
+    });
+    const harness = loadWorker(async () => makeResponse("refreshed tree"));
+    const runtime = await harness.caches.open(harness.policy.RUNTIME_CACHE);
+    await runtime.put(pixelRequest, makeResponse("offline tree"));
+
+    const result = await dispatchFetch(harness, pixelRequest);
+    expect(await result?.text()).toBe("offline tree");
+    expect(await (await runtime.match(pixelRequest))?.text()).toBe(
+      "refreshed tree"
+    );
+  });
 });
 
 describe("service-worker lifecycle and upgrades", () => {
-  it("installs the v4 shell and omits uncacheable responses", async () => {
+  it("installs the v6 shell and production sprite catalogue, omitting uncacheable responses", async () => {
     const harness = loadWorker(async (fetchRequest) => {
       if (fetchRequest.url.endsWith("/onboarding")) {
         return makeResponse("private", {
@@ -394,16 +443,19 @@ describe("service-worker lifecycle and upgrades", () => {
     await event.done();
 
     const shell = await harness.caches.open(harness.policy.SHELL_CACHE);
-    expect(harness.policy.CACHE_VERSION).toBe("biblequest-v4");
-    expect(shell.entries.size).toBe(3);
+    expect(harness.policy.CACHE_VERSION).toBe("biblequest-v6");
+    expect(shell.entries.size).toBe(harness.policy.PRECACHE_PATHS.length - 1);
     expect(await shell.match(`${ORIGIN}/onboarding`)).toBeUndefined();
+    expect(
+      await shell.match(`${ORIGIN}/pixel/tree-stage-19.png`)
+    ).toBeDefined();
     expect(harness.state.skipped).toBe(true);
   });
 
-  it("deletes only obsolete BibleQuest caches during v4 activation", async () => {
+  it("deletes only obsolete BibleQuest caches during v6 activation", async () => {
     const harness = loadWorker();
-    await harness.caches.open("biblequest-v3-shell");
-    await harness.caches.open("biblequest-v3-runtime");
+    await harness.caches.open("biblequest-v5-shell");
+    await harness.caches.open("biblequest-v5-runtime");
     await harness.caches.open(harness.policy.SHELL_CACHE);
     await harness.caches.open(harness.policy.RUNTIME_CACHE);
     await harness.caches.open("another-app-runtime");
@@ -413,13 +465,13 @@ describe("service-worker lifecycle and upgrades", () => {
     await event.done();
 
     expect(harness.caches.deleted.sort()).toEqual([
-      "biblequest-v3-runtime",
-      "biblequest-v3-shell",
+      "biblequest-v5-runtime",
+      "biblequest-v5-shell",
     ]);
     expect((await harness.caches.keys()).sort()).toEqual([
       "another-app-runtime",
-      "biblequest-v4-runtime",
-      "biblequest-v4-shell",
+      "biblequest-v6-runtime",
+      "biblequest-v6-shell",
     ]);
     expect(harness.state.claimed).toBe(true);
   });

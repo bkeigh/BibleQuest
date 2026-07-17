@@ -8,6 +8,7 @@ import {
   IconBookmark,
 } from "@/components/design-system/icons";
 import { cn } from "@/lib/utils/cn";
+import { formatQuestWindowRemaining } from "@/lib/questos/quest-engine";
 
 export function formatDuration(minutes: number): string {
   if (minutes < 60) return `${minutes} min`;
@@ -51,6 +52,8 @@ interface QuestSlipProps {
   completed?: boolean;
   /** This quest is saved for later on the shelf — quiet bookmark chip. */
   saved?: boolean;
+  /** End of the rolling 24-hour slot occupied by this quest. */
+  expiresAt?: string;
   /**
    * Compact: sprite chip, title, meta row, and badges only — the invitation
    * and scripture wait on the quest page. For suggestion shelves, where the
@@ -70,6 +73,7 @@ export function QuestSlip({
   picked,
   completed,
   saved,
+  expiresAt,
   compact,
 }: QuestSlipProps) {
   const badge = completed ? (
@@ -115,6 +119,17 @@ export function QuestSlip({
           <h3 className="mt-1 font-display text-[1.1875rem] leading-snug text-graphite">
             {quest.title}
           </h3>
+          {expiresAt && (
+            <time
+              dateTime={expiresAt}
+              title={new Date(expiresAt).toLocaleString()}
+              className="mt-1 block text-[0.75rem] font-medium text-accent"
+            >
+              {completed
+                ? `Slot resets · ${formatQuestWindowRemaining(expiresAt)}`
+                : `${formatQuestWindowRemaining(expiresAt).replace(" left", " to complete")}`}
+            </time>
+          )}
           {!compact && (
             <>
               <p className="mt-1.5 text-[0.9375rem] leading-relaxed text-charcoal">

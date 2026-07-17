@@ -37,6 +37,7 @@ import { formatDuration, CATEGORY_LABEL } from "./QuestSlip";
 import { useStrings, fmt, type UIStrings } from "@/lib/i18n";
 import { track } from "@/lib/analytics/events";
 import { cn } from "@/lib/utils/cn";
+import { usePlus } from "@/lib/revenuecat/usePlus";
 
 /** The one place step keys become words — shared with QuestDetail. */
 export function stepLabels(t: UIStrings): Record<QuestStepKey, string> {
@@ -79,6 +80,7 @@ export function QuestAccordionCard({
   const archiveQuest = useQuestOS((s) => s.archiveQuest);
   const removeQuest = useQuestOS((s) => s.removeQuest);
   const reopenQuest = useQuestOS((s) => s.reopenQuest);
+  const { isPlus } = usePlus();
 
   const baseId = useId();
   const triggerId = `${baseId}-trigger`;
@@ -280,7 +282,7 @@ export function QuestAccordionCard({
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        archiveQuest(quest.slug);
+                        archiveQuest(quest.slug, isPlus);
                         toast(t.myQuests.archivedToast);
                         onRelocate?.();
                       }}
@@ -295,7 +297,7 @@ export function QuestAccordionCard({
                 size="sm"
                 className="text-ash hover:text-charcoal"
                 onClick={() => {
-                  removeQuest(quest.slug);
+                  removeQuest(quest.slug, isPlus);
                   toast(t.myQuests.removedToast);
                   onRelocate?.();
                 }}

@@ -1,0 +1,17 @@
+Use case: stylized-concept
+Asset type: production staging atlas for BibleQuest pixel-art mascots
+Input images: Image 1 is the authoritative BibleQuest PixelArtReferenceSheet for the exact visual language, palette, outlines, clustered shading, and sacred storybook tone. Images 2–5 are subject-shape references for the lantern, quest scroll, dove, and sprout only; restyle them to match Image 1 and do not preserve their white backgrounds.
+
+Create ONE perfectly square 3-by-3 atlas of eight isolated game sprites in equal square cells, exact row-major order:
+row 1: gentle cream lamb; glowing antique brass lantern; rolled parchment quest scroll with small green wax seal
+row 2: white dove carrying one olive sprig; two-leaf sprout rooted in a tiny soil mound; antique gold key with a subtle cross-shaped bow
+row 3: folded pilgrimage map with a simple green path and tiny gold destination star; small warm campfire with three brown logs; EMPTY CELL
+The ninth cell must be completely empty.
+
+Backdrop: a perfectly flat, uniform solid #FF00FF chroma-key field across the whole canvas and empty ninth cell. No texture, shadows, gradients, lighting variation, seams, panels, or floor. Do not use #FF00FF inside any sprite.
+
+Style/medium: strict native-grid 32-bit-era pixel sprite art matching Image 1; hard square pixel clusters only. Warm, calm, sacred storybook tone, not cute emoji, not painterly, not vector, not modern clip art.
+Composition: exact 3x3 equal-cell layout, no gutters or visible dividers; one centered subject per occupied cell; consistent baseline, optical weight, and generous internal padding. Each subject should read as a coherent 48x48 logical sprite when reduced, with a dominant visible dimension around 38–42 logical pixels.
+Color palette: one shared restrained BibleQuest palette only—deep green/charcoal outline, Rolex green, moss green, parchment cream, leather brown, warm gold, restrained prayer blue, warm flame rust. Reuse the same colors across every sprite.
+Lighting: one consistent upper-left light source, 2–3 flat shade levels per material, lower-right shadow clusters.
+Constraints: one-pixel deep-green/charcoal outline at final logical scale; crisp silhouette; no antialiasing; no soft edges; no gradients; no glow; no cast shadow; no transparency; no dithering noise; no stray pixels; no labels; no letters; no numbers; no borders; no grid lines; no cell frames; no watermark; no extra subjects; no faces on objects; no halos or angel wings; empty cell stays pure #FF00FF.

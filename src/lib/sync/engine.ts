@@ -39,6 +39,7 @@ import {
   prayerToRow,
   profileToRow,
   readingPositionToRow,
+  recentVerseToRow,
   reflectionToRow,
   rowsToSettings,
   settingsToRows,
@@ -53,6 +54,7 @@ import {
   rowToPrayer,
   rowToProfile,
   rowToReadingPosition,
+  rowToRecentVerse,
   rowToReflection,
 } from "./mapping";
 
@@ -69,7 +71,8 @@ type SyncedField =
   | "earnedMilestones"
   | "bookmarks"
   | "readingPosition"
-  | "chaptersRead";
+  | "chaptersRead"
+  | "recentVerses";
 
 const SYNCED_FIELDS: SyncedField[] = [
   "profile",
@@ -85,6 +88,7 @@ const SYNCED_FIELDS: SyncedField[] = [
   "bookmarks",
   "readingPosition",
   "chaptersRead",
+  "recentVerses",
 ];
 
 const PUSH_DEBOUNCE_MS = 2_500;
@@ -333,6 +337,7 @@ function snapshotFromStore(): QuestOSSnapshot {
     bookmarks: s.bookmarks,
     readingPosition: s.readingPosition,
     chaptersRead: s.chaptersRead,
+    recentVerses: s.recentVerses,
     pendingMilestones: s.pendingMilestones,
     lastVisitDateKey: s.lastVisitDateKey,
     // Device-local; not synced, but MUST ride through the merge-apply —
@@ -370,6 +375,7 @@ async function pullAll(
     bookmarksRes,
     readingRes,
     chaptersRes,
+    recentVersesRes,
     journeyRes,
     growthRes,
     milestonesRes,
@@ -385,6 +391,7 @@ async function pullAll(
     from("verse_bookmarks"),
     from("reading_progress").maybeSingle(),
     from("chapters_read"),
+    from("user_recent_verses"),
     from("journey_events"),
     from("growth_events"),
     from("user_milestones"),
@@ -393,6 +400,7 @@ async function pullAll(
   const all = [
     profileRes, settingsRes, notifRes, dailyRes, myQuestsRes, completionsRes,
     prayersRes, reflectionsRes, bookmarksRes, readingRes, chaptersRes,
+    recentVersesRes,
     journeyRes, growthRes, milestonesRes,
   ];
   for (const res of all) {
@@ -427,6 +435,7 @@ async function pullAll(
       ? rowToReadingPosition(readingRes.data)
       : null,
     chaptersRead: (chaptersRes.data ?? []).map(rowToChapterRead),
+    recentVerses: (recentVersesRes.data ?? []).map(rowToRecentVerse),
     journeyEvents: (journeyRes.data ?? []).map(rowToJourneyEvent),
     growthEvents: (growthRes.data ?? []).map(rowToGrowthEvent),
     earnedMilestones: (milestonesRes.data ?? []).map(rowToMilestone),
@@ -602,6 +611,25 @@ export function mergeSnapshots(
     }
   }
 
+  // Recent verses: de-duplicate by passage, keep the newest visit, and cap
+  // the account-backed history to the same small list used on-device.
+  const recentVerseMap = new Map(
+    (remote.recentVerses ?? []).map((verse) => [
+      `${verse.bookSlug}:${verse.chapter}:${verse.verseStart}:${verse.verseEnd}`,
+      verse,
+    ])
+  );
+  for (const verse of local.recentVerses ?? []) {
+    const key = `${verse.bookSlug}:${verse.chapter}:${verse.verseStart}:${verse.verseEnd}`;
+    const remoteVerse = recentVerseMap.get(key);
+    if (!remoteVerse || verse.viewedAt >= remoteVerse.viewedAt) {
+      recentVerseMap.set(key, verse);
+    }
+  }
+  const recentVerses = [...recentVerseMap.values()]
+    .sort((a, b) => b.viewedAt.localeCompare(a.viewedAt))
+    .slice(0, 20);
+
   // Milestones: union by key, keeping the earliest achievement.
   const milestoneMap = new Map(
     (remote.earnedMilestones ?? []).map((m) => [m.key, m])
@@ -634,6 +662,7 @@ export function mergeSnapshots(
     bookmarks,
     readingPosition,
     chaptersRead,
+    recentVerses,
     // Device-local fields pass through untouched.
     pendingMilestones: local.pendingMilestones,
     lastVisitDateKey: local.lastVisitDateKey,
@@ -887,6 +916,36 @@ async function pushFields(
           { onConflict: "user_id,book_slug,chapter", ignoreDuplicates: true }
         )
       )
+    );
+  }
+  if (fields.has("recentVerses") && (snap.recentVerses?.length ?? 0) > 0) {
+    const verses = [...(snap.recentVerses ?? [])]
+      .sort((a, b) => b.viewedAt.localeCompare(a.viewedAt))
+      .slice(0, 20);
+    jobs.push(
+      (async () => {
+        const upsert = await supabase.from("user_recent_verses").upsert(
+          verses.map((verse) => recentVerseToRow(uid, verse)),
+          {
+            onConflict:
+              "user_id,book_slug,chapter,verse_start,verse_end",
+          }
+        );
+        if (upsert.error) throw upsert.error;
+
+        // The local/account merge keeps the newest twenty. Prune only rows
+        // strictly older than that shared cutoff, so a concurrent newer visit
+        // from another device can never be erased by this write-through.
+        const oldestKeptAt = verses.at(-1)?.viewedAt;
+        if (verses.length === 20 && oldestKeptAt) {
+          const prune = await supabase
+            .from("user_recent_verses")
+            .delete()
+            .eq("user_id", uid)
+            .lt("viewed_at", oldestKeptAt);
+          if (prune.error) throw prune.error;
+        }
+      })()
     );
   }
 

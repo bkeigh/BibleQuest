@@ -13,11 +13,10 @@
  * One card expands at a time — calm, not a wall of open drawers.
  */
 import { useCallback, useMemo, useRef, useState } from "react";
-import type { MyQuest } from "@/lib/questos/types";
+import type { DailyQuestAssignment, MyQuest } from "@/lib/questos/types";
 import {
   useQuestOS,
   selectMyQuests,
-  selectTodayPicks,
 } from "@/lib/questos/store";
 import { buildQuestFeed } from "@/lib/questos/quest-feed";
 import { questBySlug } from "@/data/seed/quests";
@@ -32,10 +31,9 @@ function resolve(entries: MyQuest[]) {
   });
 }
 
-export function QuestFeed() {
+export function QuestFeed({ picks }: { picks: DailyQuestAssignment[] }) {
   const t = useStrings();
   const myQuests = useQuestOS(selectMyQuests);
-  const picks = useQuestOS(selectTodayPicks);
   const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
 
   // When a card action unmounts or relocates the focused card (remove,

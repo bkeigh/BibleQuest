@@ -2,7 +2,13 @@
 
 import { useMemo } from "react";
 import { useQuestOS } from "@/lib/questos/store";
-import { calculateTreeState, stageProgress } from "@/lib/questos/growth-engine";
+import {
+  calculateTreeState,
+  GROWTH_MEANINGS,
+  nextTreeStage,
+  stageProgress,
+} from "@/lib/questos/growth-engine";
+import { computeMetrics } from "@/lib/questos/milestone-engine";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
@@ -10,9 +16,9 @@ import { PixelIcon, type PixelSpriteName } from "@/components/design-system/Pixe
 import { PixelMascot } from "@/components/design-system/PixelMascot";
 import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosure";
 import { GrowthTree } from "@/components/journey/GrowthTree";
-import { GROWTH_MEANINGS } from "@/lib/questos/growth-engine";
 import { treeReturnLine, treeStageLabels, emptyStates } from "@/lib/questos/copy";
 import { seedMilestones } from "@/data/seed/milestones";
+import { questBySlug } from "@/data/seed/quests";
 import { formatShortDate } from "@/lib/utils/dates";
 import { SeasonalAtmosphere } from "@/components/design-system/SeasonalAtmosphere";
 import { useStrings, fmt } from "@/lib/i18n";
@@ -20,7 +26,8 @@ import type {
   GrowthType,
   JourneyEvent,
   JourneyEventType,
-  TreeStage,
+  MilestoneMetric,
+  MilestoneSeed,
 } from "@/lib/questos/types";
 
 const GROWTH_ORDER: GrowthType[] = [
@@ -42,15 +49,6 @@ const EVENT_SPRITE: Record<JourneyEventType, PixelSpriteName> = {
   milestone_reached: "star",
 };
 
-/** The stage that follows each stage — for the progression bar's far label. */
-const NEXT_STAGE: Partial<Record<TreeStage, TreeStage>> = {
-  seed: "sprout",
-  sprout: "young",
-  young: "growing",
-  growing: "fruit-bearing",
-  "fruit-bearing": "sheltering",
-};
-
 /** Sanctuary preview tiles — a quiet promise of personal touches to come.
     Nothing here is purchasable or gated; it simply names what's ahead. */
 const SANCTUARY_TILES: { label: string; sprite: PixelSpriteName; size: number }[] = [
@@ -67,17 +65,139 @@ function monthLabel(iso: string): string {
   });
 }
 
+interface MilestoneView {
+  milestone: MilestoneSeed;
+  current: number;
+  fraction: number;
+  achievedAt?: string;
+}
+
+function metricUnit(metric: MilestoneMetric, count: number): string {
+  const plural = count !== 1;
+  switch (metric) {
+    case "journey_days":
+      return plural ? "days" : "day";
+    case "prayers_created":
+      return plural ? "prayers" : "prayer";
+    case "reflections_created":
+      return plural ? "reflections" : "reflection";
+    case "prayers_answered":
+      return plural ? "answers" : "answer";
+    case "chapters_read":
+      return plural ? "chapters" : "chapter";
+    case "verses_bookmarked":
+      return plural ? "verses" : "verse";
+    default:
+      return plural ? "quests" : "quest";
+  }
+}
+
+function milestoneStatus(view: MilestoneView): string {
+  if (view.achievedAt) return `Reached ${formatShortDate(view.achievedAt)}`;
+  const current = Math.min(view.current, view.milestone.requirementCount);
+  return `${current} of ${view.milestone.requirementCount} ${metricUnit(
+    view.milestone.requirementMetric,
+    view.milestone.requirementCount
+  )}`;
+}
+
+function MilestoneHighlight({ view }: { view: MilestoneView }) {
+  const reached = Boolean(view.achievedAt);
+  const { milestone } = view;
+
+  return (
+    <article
+      className={
+        reached
+          ? "h-full rounded-[var(--radius-card)] border border-gold-500/45 bg-gold-500/10 p-4"
+          : "h-full rounded-[var(--radius-card)] border border-mist bg-linen p-4"
+      }
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className={
+            reached
+              ? "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold-500/15"
+              : "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-paper"
+          }
+        >
+          <PixelIcon name={(milestone.iconKey as PixelSpriteName) ?? "star"} size={4} />
+        </span>
+        <div className="min-w-0">
+          <p className="font-pixel text-[0.875rem] leading-tight text-graphite">
+            {milestone.title}
+          </p>
+          <p className="mt-1 text-[0.75rem] leading-snug text-ash">
+            {milestoneStatus(view)}
+          </p>
+        </div>
+      </div>
+      <p className="mt-3 text-[0.8125rem] leading-snug text-charcoal">
+        {milestone.description}
+      </p>
+      <div
+        className="mt-3 h-1 overflow-hidden rounded-full bg-mist/70"
+        role="progressbar"
+        aria-label={`${milestone.title}: ${milestoneStatus(view)}`}
+        aria-valuemin={0}
+        aria-valuemax={milestone.requirementCount}
+        aria-valuenow={Math.min(view.current, milestone.requirementCount)}
+      >
+        <span
+          className={reached ? "block h-full bg-gold-500" : "block h-full bg-accent"}
+          style={{ width: `${view.fraction * 100}%` }}
+        />
+      </div>
+    </article>
+  );
+}
+
+function MilestoneListRow({ view }: { view: MilestoneView }) {
+  const reached = Boolean(view.achievedAt);
+  const { milestone } = view;
+
+  return (
+    <div className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+      <span
+        className={
+          reached
+            ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold-500/15"
+            : "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-paper"
+        }
+      >
+        <PixelIcon name={(milestone.iconKey as PixelSpriteName) ?? "star"} size={3} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+          <p className="text-[0.9375rem] font-medium text-graphite">{milestone.title}</p>
+          <p className={reached ? "text-[0.75rem] text-gilt" : "text-[0.75rem] text-ash"}>
+            {milestoneStatus(view)}
+          </p>
+        </div>
+        <p className="mt-0.5 text-[0.8125rem] leading-snug text-ash">
+          {milestone.description}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function JourneyScreenInner() {
   const t = useStrings();
   const growthEvents = useQuestOS((s) => s.growthEvents);
   const journeyEvents = useQuestOS((s) => s.journeyEvents);
   const earned = useQuestOS((s) => s.earnedMilestones);
   const lastVisit = useQuestOS((s) => s.lastVisitDateKey);
+  const completions = useQuestOS((s) => s.completions);
+  const prayers = useQuestOS((s) => s.prayers);
+  const reflections = useQuestOS((s) => s.reflections);
+  const chaptersRead = useQuestOS((s) => s.chaptersRead);
+  const bookmarks = useQuestOS((s) => s.bookmarks);
 
   const tree = useMemo(() => calculateTreeState(growthEvents), [growthEvents]);
   // Progress through the current stage — "small steps", never points.
   const progress = stageProgress(tree);
-  const nextStage = NEXT_STAGE[tree.stage];
+  const nextStage = nextTreeStage(tree.stage);
   const timeline = useMemo(
     () => [...journeyEvents].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)),
     [journeyEvents]
@@ -99,10 +219,55 @@ function JourneyScreenInner() {
     return groups;
   }, [timeline]);
 
-  const earnedKeys = useMemo(() => new Set(earned.map((e) => e.key)), [earned]);
-  const nextMilestones = useMemo(
-    () => seedMilestones.filter((m) => !earnedKeys.has(m.key)).slice(0, 3),
-    [earnedKeys]
+  const metrics = useMemo(
+    () =>
+      computeMetrics({
+        completions,
+        prayers,
+        reflections,
+        chaptersRead,
+        bookmarks,
+        journeyEvents,
+        questBySlug,
+      }),
+    [bookmarks, chaptersRead, completions, journeyEvents, prayers, reflections]
+  );
+
+  const milestoneViews = useMemo(() => {
+    const achieved = new Map(earned.map((item) => [item.key, item.achievedAt]));
+    const views = seedMilestones.map<MilestoneView>((milestone) => {
+      const current = Math.max(0, metrics[milestone.requirementMetric] ?? 0);
+      const achievedAt = achieved.get(milestone.key);
+      return {
+        milestone,
+        current: achievedAt ? Math.max(current, milestone.requirementCount) : current,
+        fraction: achievedAt
+          ? 1
+          : Math.min(1, current / milestone.requirementCount),
+        achievedAt,
+      };
+    });
+    const reached = views
+      .filter((view) => view.achievedAt)
+      .sort((a, b) => (b.achievedAt ?? "").localeCompare(a.achievedAt ?? ""));
+    const upcoming = views
+      .filter((view) => !view.achievedAt)
+      .sort(
+        (a, b) =>
+          b.fraction - a.fraction ||
+          a.milestone.requirementCount - a.current -
+            (b.milestone.requirementCount - b.current) ||
+          a.milestone.requirementCount - b.milestone.requirementCount
+      );
+    return { reached, upcoming, all: [...reached, ...upcoming] };
+  }, [earned, metrics]);
+
+  const milestoneHighlights = useMemo(
+    () => [
+      ...milestoneViews.reached.slice(0, 3),
+      ...milestoneViews.upcoming.slice(0, 4),
+    ],
+    [milestoneViews]
   );
 
   const returning = timeline.length > 0 && lastVisit !== null;
@@ -170,38 +335,58 @@ function JourneyScreenInner() {
           )}
         </PaperCard>
 
-        {/* Milestones */}
-        {(earned.length > 0 || nextMilestones.length > 0) && (
-          <section className="mt-6">
-            <h2 className="mb-2.5 font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
-              Milestones
-            </h2>
-            <div className="flex flex-wrap gap-2.5">
-              {earned.map((e) => {
-                const m = seedMilestones.find((x) => x.key === e.key);
-                if (!m) return null;
-                return (
-                  <span
-                    key={e.key}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-gold-500/45 bg-gold-500/15 px-3 py-1.5 font-pixel text-[0.875rem] text-gilt"
-                  >
-                    <PixelIcon name={(m.iconKey as PixelSpriteName) ?? "star"} size={3} />
-                    {m.title}
-                  </span>
-                );
-              })}
-              {nextMilestones.map((m) => (
-                <span
-                  key={m.key}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-mist bg-linen px-3 py-1.5 font-pixel text-[0.875rem] text-ash"
-                >
-                  <PixelIcon name={(m.iconKey as PixelSpriteName) ?? "star"} size={3} />
-                  {m.title}
-                </span>
+        {/* Milestones — a compact side-scroll for the nearest markers, with
+            the complete catalogue tucked into an accessible disclosure. */}
+        <section className="mt-6" aria-labelledby="milestones-heading">
+          <div className="mb-2.5 flex items-end justify-between gap-3">
+            <div>
+              <h2
+                id="milestones-heading"
+                className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent"
+              >
+                Milestones
+              </h2>
+              <p className="mt-1 text-[0.8125rem] text-ash">
+                Markers along the road, never a race.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-accent-surface px-2.5 py-1 text-[0.75rem] font-medium text-accent">
+              {milestoneViews.reached.length} of {seedMilestones.length}
+            </span>
+          </div>
+
+          <ol
+            tabIndex={0}
+            className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain rounded-[var(--radius-button)] px-1 pb-3 [scrollbar-width:thin] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            aria-label="Milestone highlights"
+          >
+            {milestoneHighlights.map((view) => (
+              <li
+                key={view.milestone.key}
+                className="min-w-[15rem] max-w-[15rem] snap-start sm:min-w-[17rem] sm:max-w-[17rem]"
+              >
+                <MilestoneHighlight view={view} />
+              </li>
+            ))}
+          </ol>
+
+          <Disclosure
+            variant="quiet"
+            className="mt-1"
+            label={<span className="text-[0.9375rem]">See every milestone</span>}
+            summary={
+              <span className="text-[0.75rem] font-normal text-ash">
+                {seedMilestones.length} total
+              </span>
+            }
+          >
+            <div className="divide-y divide-mist">
+              {milestoneViews.all.map((view) => (
+                <MilestoneListRow key={view.milestone.key} view={view} />
               ))}
             </div>
-          </section>
-        )}
+          </Disclosure>
+        </section>
 
         {/* Timeline */}
         <section className="mt-7">

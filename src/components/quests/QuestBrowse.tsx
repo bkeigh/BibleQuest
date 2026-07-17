@@ -1,18 +1,25 @@
 "use client";
 
 /**
- * Quest discovery and daily-pick surface. Suggestions are deterministic for a
- * given day and profile, while category filters and the three-pick limit remain
- * presentation concerns layered over the QuestOS quest engine.
+ * Quest discovery and rolling-pick surface. Suggestions are deterministic for
+ * a given day and profile; the three-window free limit lives in QuestOS.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { seedQuests, questBySlug } from "@/data/seed/quests";
-import { filterQuests, selectSuggestedQuests } from "@/lib/questos/quest-engine";
+import {
+  activeQuestAssignments,
+  filterQuests,
+  formatQuestWindowRemaining,
+  nextQuestSlotAt,
+  occupiedQuestAssignments,
+  QUEST_PICK_UNDO_MS,
+  questSlotsRemaining,
+  selectSuggestedQuests,
+} from "@/lib/questos/quest-engine";
 import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
 import {
   useQuestOS,
   selectMyQuests,
-  selectTodayPicks,
 } from "@/lib/questos/store";
 import {
   QUEST_CATEGORIES,
@@ -36,13 +43,13 @@ import {
   IconClose,
   IconBookmark,
 } from "@/components/design-system/icons";
-import { useStrings, fmt } from "@/lib/i18n";
+import { useStrings } from "@/lib/i18n";
 import { toDateKey } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils/cn";
+import { usePlus } from "@/lib/revenuecat/usePlus";
+import { QuestGenerator } from "@/components/quests/QuestGenerator";
 
-// No 480-minute quests exist in the seed catalog, so that tier stays off
-// the filter row until content ships for it.
-const DURATIONS: QuestDuration[] = [5, 10, 15, 30, 60, 240];
+const DURATIONS: QuestDuration[] = [5, 10, 15, 30, 60, 240, 480];
 
 const ENERGY_LEVELS: { value: EnergyLevel; label: string }[] = [
   { value: "low", label: "Low energy" },
@@ -64,11 +71,31 @@ function QuestBrowseInner() {
   const pickQuest = useQuestOS((s) => s.pickQuest);
   const unpickQuest = useQuestOS((s) => s.unpickQuest);
   const saveQuestForLater = useQuestOS((s) => s.saveQuestForLater);
-  const picks = useQuestOS(selectTodayPicks);
+  const assignments = useQuestOS((s) => s.assignments);
   const myQuests = useQuestOS(selectMyQuests);
   const completions = useQuestOS((s) => s.completions);
   const profile = useQuestOS((s) => s.profile);
   const settings = useQuestOS((s) => s.settings);
+  const { isPlus } = usePlus();
+
+  // Rolling windows can expire without another store write. Refresh the
+  // projection gently so a freed slot appears while this page is open.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const refresh = () => setNow(Date.now());
+    const interval = window.setInterval(refresh, 60_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, []);
+  const picks = useMemo(
+    () => activeQuestAssignments(assignments, now),
+    [assignments, now]
+  );
 
   const [duration, setDuration] = useState<QuestDuration | null>(null);
   const [category, setCategory] = useState<QuestCategory | null>(null);
@@ -76,6 +103,13 @@ function QuestBrowseInner() {
   const [company, setCompany] = useState<"solo" | "social" | null>(null);
   const [setting, setSetting] = useState<"indoor" | "outdoor" | null>(null);
   const [search, setSearch] = useState("");
+  const resultKey = [duration, category, energy, company, setting, search].join("|");
+  const [pagination, setPagination] = useState({ key: resultKey, count: 24 });
+  const visibleCount = pagination.key === resultKey ? pagination.count : 24;
+
+  const slotsRemaining = questSlotsRemaining(assignments, isPlus, now);
+  const nextSlot = nextQuestSlotAt(assignments, isPlus, now);
+  const reservedSlots = occupiedQuestAssignments(assignments, now).length;
 
   const season = useMemo(() => getCurrentSeason(), []);
   const todayKey = toDateKey();
@@ -145,16 +179,28 @@ function QuestBrowseInner() {
   );
 
   function handleAdd(quest: QuestTemplate) {
-    if (pickQuest(quest.slug)) {
+    if (pickQuest(quest.slug, isPlus)) {
       toast(t.quests.added, { variant: "success" });
     } else {
-      toast(t.quests.capReached);
+      toast(
+        nextSlot
+          ? `Your next slot opens in ${formatQuestWindowRemaining(nextSlot, now).replace(" left", "")}.`
+          : t.quests.capReached
+      );
     }
   }
 
   function handleRemove(quest: QuestTemplate) {
-    unpickQuest(quest.slug);
-    toast(t.quests.removed);
+    const pick = picks.find((assignment) => assignment.questSlug === quest.slug);
+    const trueUndo =
+      pick?.status === "assigned" &&
+      now - Date.parse(pick.pickedAt) <= QUEST_PICK_UNDO_MS;
+    unpickQuest(quest.slug, isPlus);
+    toast(
+      isPlus || trueUndo
+        ? t.quests.removed
+        : "Removed from your list. This slot resets when its 24-hour window ends."
+    );
   }
 
   function handleSave(quest: QuestTemplate) {
@@ -216,23 +262,33 @@ function QuestBrowseInner() {
     <>
       <PageHeader
         title={t.nav.quests}
-        subtitle="Small acts of faith. Walk up to three a day — save the rest for later."
+        subtitle={
+          isPlus
+            ? "Choose freely. Plus gives you unlimited active quest windows."
+            : "Choose up to three quests at a time. Each window stays open for 24 hours."
+        }
       />
       <PageContainer>
-        {/* Today's picks — the day you chose, pinned above everything */}
+        {/* Today's visible rolling windows, pinned above discovery. */}
         <section aria-label="Today's picks">
           <div className="flex items-baseline justify-between">
             <ShelfTitle>{t.quests.today}</ShelfTitle>
-            {picks.length > 0 && (
-              <p aria-live="polite" className="text-caption text-ash">
-                {fmt(t.quests.picked, { n: picks.length })}
-              </p>
-            )}
+            <p aria-live="polite" className="text-caption text-ash">
+              {isPlus
+                ? `${picks.length} active · Unlimited`
+                : `${picks.length} shown · ${reservedSlots}/3 slots${
+                    Number.isFinite(slotsRemaining) && slotsRemaining > 0
+                      ? ` · ${slotsRemaining} open`
+                      : ""
+                  }`}
+            </p>
           </div>
           {picks.length === 0 ? (
             <PaperCard variant="quiet" padding="sm" className="mt-2">
               <p className="text-small text-charcoal">
-                {t.empty.questsUnpicked}
+                {reservedSlots > 0
+                  ? `${reservedSlots} removed ${reservedSlots === 1 ? "quest still holds a slot" : "quests still hold their slots"} until the 24-hour reset. You can restore ${reservedSlots === 1 ? "it" : "them"} from Browse.`
+                  : t.empty.questsUnpicked}
               </p>
             </PaperCard>
           ) : (
@@ -249,6 +305,7 @@ function QuestBrowseInner() {
                     quest={quest}
                     href={`/app/quests/${quest.slug}`}
                     completed={done}
+                    expiresAt={pick.expiresAt}
                     action={
                       done ? undefined : (
                         <button
@@ -268,6 +325,22 @@ function QuestBrowseInner() {
             </div>
           )}
         </section>
+
+        <Disclosure
+          label="Generate a quest"
+          variant="card"
+          defaultOpen={false}
+          summary={
+            isPlus ? (
+              <span className="rounded-full bg-accent-surface px-2 py-0.5 text-caption text-accent">
+                Plus
+              </span>
+            ) : undefined
+          }
+          className="mt-6"
+        >
+          <QuestGenerator isPlus={isPlus} onAdd={handleAdd} />
+        </Disclosure>
 
         {/* Filters — collapsed by default so browsing stays calm */}
         <Disclosure
@@ -417,7 +490,18 @@ function QuestBrowseInner() {
             </p>
           ) : (
             <div className="space-y-3 pb-6">
-              {results.map((quest) => browseSlip(quest))}
+              {results.slice(0, visibleCount).map((quest) => browseSlip(quest))}
+              {visibleCount < results.length && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPagination({ key: resultKey, count: visibleCount + 24 })
+                  }
+                  className="mx-auto block rounded-full border border-mist bg-paper px-5 py-2.5 text-small font-medium text-accent transition-colors hover:border-accent/40 hover:bg-accent-surface"
+                >
+                  Show 24 more · {results.length - visibleCount} remaining
+                </button>
+              )}
             </div>
           )}
         </section>

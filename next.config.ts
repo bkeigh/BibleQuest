@@ -29,7 +29,7 @@ const liveBillingEnabled = revenueCat.status === "live";
 
 // Next.js App Router streams the RSC payload through inline <script> tags and
 // injects inline <style> (next/font, Tailwind, framer-motion) — both need
-// 'unsafe-inline' unless we wire nonces through middleware (future hardening).
+// 'unsafe-inline' unless we wire nonces through the request proxy (future hardening).
 // 'unsafe-eval' is added ONLY in dev for React Fast Refresh; prod stays strict.
 const scriptSrc = [
   "'self'",
@@ -194,6 +194,10 @@ const privateNoStoreHeader = {
 };
 
 const nextConfig: NextConfig = {
+  // This repository can sit beneath unrelated lockfiles on a workstation.
+  // Pin Turbopack to the actual app root so dev tracing and diagnostics do not
+  // silently widen to a parent directory.
+  turbopack: { root: process.cwd() },
   // Live header tests use an isolated dev output directory so they never stop
   // or overwrite a developer's existing `next dev` process in this checkout.
   ...(process.env.BIBLEQUEST_HEADER_TEST_DIST_DIR
@@ -203,6 +207,7 @@ const nextConfig: NextConfig = {
   // in production without bundling any of it into client code.
   outputFileTracingIncludes: {
     "/app/bible/**": ["./src/data/bible/**"],
+    "/verse/**": ["./src/data/bible/**"],
   },
   async headers() {
     return [

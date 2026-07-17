@@ -1,0 +1,122 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import dailyVerses from "@/data/seed/daily-verses.json";
+import { seedQuests } from "@/data/seed/quests";
+import { seedMilestones } from "@/data/seed/milestones";
+import { QUEST_CATEGORIES } from "@/lib/questos/types";
+import { createReviewedQuestProvider } from "@/lib/quest-generation/provider";
+
+describe("launch content catalog", () => {
+  it("ships exactly 150 unique, reviewed free quests with useful depth", () => {
+    expect(seedQuests).toHaveLength(150);
+    expect(new Set(seedQuests.map((quest) => quest.slug))).toHaveLength(150);
+    expect(seedQuests.every((quest) => quest.isPremium === false)).toBe(true);
+    expect(seedQuests.some((quest) => quest.slug === "pray-for-three-people-by-name")).toBe(true);
+
+    for (const category of QUEST_CATEGORIES) {
+      expect(
+        seedQuests.filter((quest) => quest.category === category).length,
+        category,
+      ).toBeGreaterThanOrEqual(10);
+    }
+    expect(seedQuests.filter((quest) => quest.difficulty === "devoted").length).toBeGreaterThanOrEqual(35);
+    expect(seedQuests.filter((quest) => quest.durationMinutes >= 60).length).toBeGreaterThanOrEqual(55);
+    expect(seedQuests.filter((quest) => quest.durationMinutes === 480).length).toBeGreaterThanOrEqual(4);
+    expect(seedQuests.filter((quest) => quest.energyLevel === "high").length).toBeGreaterThanOrEqual(12);
+    expect(seedQuests.every((quest) => quest.invitation.length >= 45)).toBe(true);
+    expect(seedQuests.every((quest) => quest.whyItMatters.length >= 45)).toBe(true);
+  });
+
+  it("hydrates 180 unique exact WEB passages across all 66 books", () => {
+    expect(dailyVerses).toHaveLength(180);
+    const keys = dailyVerses.map(
+      (verse) =>
+        `${verse.bookSlug}:${verse.chapter}:${verse.verseStart}:${verse.verseEnd}`,
+    );
+    expect(new Set(keys)).toHaveLength(180);
+    expect(new Set(dailyVerses.map((verse) => verse.bookSlug))).toHaveLength(66);
+
+    const cache = new Map<string, { chapters: string[][] }>();
+    for (const verse of dailyVerses) {
+      let book = cache.get(verse.bookSlug);
+      if (!book) {
+        const loaded = JSON.parse(
+          readFileSync(
+            path.join(process.cwd(), "src/data/bible", `${verse.bookSlug}.json`),
+            "utf8",
+          ),
+        ) as { chapters: string[][] };
+        cache.set(verse.bookSlug, loaded);
+        book = loaded;
+      }
+      const exact = book.chapters[verse.chapter - 1]
+        .slice(verse.verseStart - 1, verse.verseEnd)
+        .join(" ")
+        .trim();
+      expect(verse.text, verse.reference).toBe(exact);
+    }
+  });
+
+  it("uses the safe local provider for Plus quest generation", async () => {
+    const provider = createReviewedQuestProvider(seedQuests);
+    const result = await provider.generate({
+      category: "service",
+      duration: 240,
+      focus: "service",
+      variation: 4,
+    });
+    expect(provider.sendsDataOffDevice).toBe(false);
+    expect(result.source).toBe("reviewed_catalog");
+    expect(result.quest.category).toBe("service");
+    expect(result.quest.durationMinutes).toBe(240);
+    expect(seedQuests).toContain(result.quest);
+  });
+
+  it("mirrors current content into an updating, non-null Console seed", () => {
+    const sql = readFileSync(
+      path.join(process.cwd(), "supabase/seed.sql"),
+      "utf8",
+    );
+    const dailySection = sql.slice(
+      sql.indexOf("-- Daily verse pool"),
+      sql.indexOf("-- Quest templates"),
+    );
+    const questSection = sql.slice(sql.indexOf("-- Quest templates"));
+    expect((dailySection.match(/^  \('/gm) ?? [])).toHaveLength(180);
+    expect((questSection.match(/^  \('/gm) ?? [])).toHaveLength(150);
+    expect(sql).toContain(
+      "insert into faith_providers (key, name, description, canonical_text_label, is_active)",
+    );
+    expect(sql).toContain("canonical_text_label = excluded.canonical_text_label,\n  is_active = excluded.is_active;");
+    expect(sql).toContain("on conflict (book_slug, chapter, verse_start, verse_end) do update");
+    expect(sql).toContain("on conflict (slug) do update set");
+    expect(sql).toContain("scripture_text_snapshot = excluded.scripture_text_snapshot");
+    expect(sql).toContain("is_active = excluded.is_active, review_status = excluded.review_status");
+    expect(sql).toContain("is_active = excluded.is_active;");
+    expect(questSection).not.toMatch(/, null, [^\n]+reflection/i);
+    expect(seedMilestones).toHaveLength(38);
+  });
+
+  it("includes rolling-window, recent-verse, uniqueness, RLS, and purge migration", () => {
+    const migration = readFileSync(
+      path.join(
+        process.cwd(),
+        "supabase/migrations/0010_rolling_quest_windows_and_recent_verses.sql",
+      ),
+      "utf8",
+    );
+    expect(migration).toContain("picked_at");
+    expect(migration).toContain("expires_at");
+    expect(migration).toContain("create table if not exists public.user_recent_verses");
+    expect(migration).toContain('create policy "own recent verses: all"');
+    expect(migration).toContain("create trigger keep_newest_recent_verse");
+    expect(migration).toContain("if new.viewed_at <= old.viewed_at then");
+    expect(migration).toContain("return old;");
+    expect(migration).toContain(
+      "revoke execute on function public.keep_newest_recent_verse()",
+    );
+    expect(migration).toContain("daily_verses_passage_key");
+    expect(migration).toContain("delete from public.user_recent_verses");
+  });
+});

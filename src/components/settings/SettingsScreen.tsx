@@ -35,7 +35,7 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-3.5">
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3.5">
       <span className="text-[0.9375rem] text-charcoal">{label}</span>
       {children}
     </div>
@@ -58,15 +58,16 @@ function Segmented<T extends string>({
     <div
       role="group"
       aria-label={label}
-      className="flex gap-1 rounded-full border border-mist bg-linen p-0.5"
+      className="grid w-full grid-flow-col auto-cols-fr gap-1 rounded-[var(--radius-button)] border border-mist bg-linen p-0.5 min-[480px]:w-auto min-[480px]:rounded-full"
     >
       {options.map((o) => (
         <button
           key={o.value}
+          type="button"
           aria-pressed={value === o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            "rounded-full px-3 py-1.5 text-[0.8125rem] transition-all duration-300",
+            "min-h-11 rounded-[7px] px-2 py-1.5 text-center text-[0.75rem] leading-tight transition-all duration-300 min-[360px]:px-3 min-[360px]:text-[0.8125rem] min-[480px]:rounded-full",
             value === o.value
               ? "bg-paper text-graphite paper-shadow"
               : "text-ash hover:text-charcoal"
@@ -91,23 +92,29 @@ function Toggle({
 }) {
   return (
     <button
+      type="button"
       role="switch"
       aria-checked={on}
       aria-label={label}
       onClick={() => onChange(!on)}
-      className={cn(
-        "relative h-6 w-11 rounded-full transition-colors duration-300",
-        on ? "bg-evergreen-600" : "bg-mist"
-      )}
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
     >
-      {/* moon-paper doesn't flip in Candle mode, so the knob stays visible
-          against both the mist off-track and the evergreen on-track. */}
       <span
+        aria-hidden="true"
         className={cn(
-          "absolute top-0.5 h-5 w-5 rounded-full bg-moon-paper paper-shadow transition-all duration-300",
-          on ? "left-[1.375rem]" : "left-0.5"
+          "relative h-6 w-11 rounded-full transition-colors duration-300",
+          on ? "bg-evergreen-600" : "bg-mist"
         )}
-      />
+      >
+        {/* moon-paper doesn't flip in Candle mode, so the knob stays visible
+            against both the mist off-track and the evergreen on-track. */}
+        <span
+          className={cn(
+            "absolute top-0.5 h-5 w-5 rounded-full bg-moon-paper paper-shadow transition-all duration-300",
+            on ? "left-[1.375rem]" : "left-0.5"
+          )}
+        />
+      </span>
     </button>
   );
 }
@@ -600,9 +607,14 @@ function SettingsInner() {
             BibleQuest is free for everything that matters. Plus deepens the
             experience and supports the mission.
           </p>
-          <GentleLink variant="gold" size="sm" href="/app/plus" className="mt-3">
-            Explore Plus
-          </GentleLink>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <GentleLink variant="gold" size="sm" href="/app/plus" className="min-h-11">
+              Explore Plus
+            </GentleLink>
+            <GentleLink variant="outline" size="sm" href="/support" className="min-h-11">
+              Make a one-time donation
+            </GentleLink>
+          </div>
         </PaperCard>
 
         {/* Danger zone — plain, calm, confirmed */}

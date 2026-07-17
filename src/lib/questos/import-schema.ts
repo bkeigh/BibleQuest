@@ -33,7 +33,12 @@ const MY_QUEST_STATUSES = new Set([
   "completed",
   "archived",
 ]);
-const ASSIGNMENT_STATUSES = new Set(["assigned", "started", "completed"]);
+const ASSIGNMENT_STATUSES = new Set([
+  "assigned",
+  "started",
+  "completed",
+  "released",
+]);
 const PRAYER_STATUSES = new Set(["active", "answered", "archived"]);
 const ACCOUNT_NUDGE_CONTEXTS = new Set<AccountNudgeContext>([
   "onboarding",
@@ -58,6 +63,16 @@ const isJourneyEvent = (o: unknown) =>
 const isBookmark = (o: unknown) =>
   isObj(o) && str(o.id) && str(o.bookSlug) && str(o.bookName) && num(o.chapter) && num(o.verse) && str(o.text) && str(o.createdAt);
 const isChapterRead = (o: unknown) => isObj(o) && str(o.bookSlug) && num(o.chapter) && str(o.dateKey);
+const isRecentVerse = (o: unknown) =>
+  isObj(o) &&
+  str(o.bookSlug) &&
+  str(o.bookName) &&
+  num(o.chapter) &&
+  num(o.verseStart) &&
+  num(o.verseEnd) &&
+  str(o.reference) &&
+  str(o.text) &&
+  str(o.viewedAt);
 const isEarnedMilestone = (o: unknown) => isObj(o) && str(o.key) && str(o.achievedAt);
 const isProfile = (o: unknown) =>
   isObj(o) && str(o.displayName) && typeof o.onboardingCompleted === "boolean" && str(o.createdAt);
@@ -65,7 +80,9 @@ const isReadingPosition = (o: unknown) =>
   isObj(o) && str(o.bookSlug) && str(o.bookName) && num(o.chapter);
 const isAssignment = (o: unknown) =>
   isObj(o) && str(o.dateKey) && str(o.questSlug) && str(o.status) &&
-  ASSIGNMENT_STATUSES.has(o.status) && num(o.rerolls);
+  ASSIGNMENT_STATUSES.has(o.status) && num(o.rerolls) &&
+  (o.pickedAt === undefined || str(o.pickedAt)) &&
+  (o.expiresAt === undefined || str(o.expiresAt));
 const isStreak = (o: unknown) =>
   isObj(o) && num(o.current) && num(o.longest) &&
   (str(o.lastActiveDateKey) || o.lastActiveDateKey === null);
@@ -98,6 +115,7 @@ const ARRAY_GUARDS: Record<string, (o: unknown) => boolean> = {
   earnedMilestones: isEarnedMilestone,
   bookmarks: isBookmark,
   chaptersRead: isChapterRead,
+  recentVerses: isRecentVerse,
 };
 
 const ALL_KEYS: string[] = [

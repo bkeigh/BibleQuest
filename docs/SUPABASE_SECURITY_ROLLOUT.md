@@ -1,9 +1,10 @@
 # Supabase migration-history and RLS rollout
 
 This runbook covers the forward-only reconciliation migration
-`0008_reassert_rls_and_purge.sql`. It is deliberately local/staging-first. Do
-not run any linked or remote command until the project reference and exact
-command have been reviewed and explicitly approved.
+`0008_reassert_rls_and_purge.sql` and the rolling quest/recent-verse migration
+`0010_rolling_quest_windows_and_recent_verses.sql`. It is deliberately
+local/staging-first. Do not run any linked or remote command until the project
+reference and exact command have been reviewed and explicitly approved.
 
 ## Why the migration history can diverge
 
@@ -22,6 +23,7 @@ The repository timeline is:
 | 2026-07-14 | `8bad216` | Added numbered RLS as `0002_rls_policies.sql`, renamed the earlier files to `0003` through `0006`, and added `0007_user_quests.sql`. |
 | 2026-07-16 | current change | Adds only `0008_reassert_rls_and_purge.sql`; existing migrations remain unchanged. |
 | 2026-07-16 | later local change | Adds `0009_analytics_consent_opt_in.sql` after the RLS reconciliation. |
+| 2026-07-17 | launch content/lifecycle pass | Adds `0010_rolling_quest_windows_and_recent_verses.sql`: rolling 24-hour quest timestamps, owner-only recent verses, an idempotent daily-passage key, and a complete purge definition. |
 
 If a database recorded an old `0002`, `0003`, or `0004` before the renames,
 the later filenames do not change those recorded versions. Conversely, a
@@ -36,11 +38,12 @@ history rows.
 | Classification | Tables | Intended access |
 | --- | --- | --- |
 | Public content | `faith_providers`, `bible_translations`, `bible_books`, `bible_chapters`, `bible_verses`, `daily_verses`, `quest_templates`, `prayer_prompts`, `reflection_prompts`, `milestones`, `feature_flags` | Anonymous and authenticated `SELECT` only. Reads are limited to active/approved content; disabled feature flags are hidden. No client writes. Prompt tables contain generic seed prompts, not a user's prayer or reflection text. |
-| User-owned | `profiles`, `user_settings`, `user_daily_quests`, `user_quests`, `quest_completions`, `prayers`, `reflections`, `verse_bookmarks`, `reading_progress`, `chapters_read`, `journey_events`, `growth_events`, `user_milestones`, `notification_preferences` | Authenticated owner only. Most tables allow all owner operations; profiles have no client delete, and journey/growth events have no client update. |
+| User-owned | `profiles`, `user_settings`, `user_daily_quests`, `user_quests`, `quest_completions`, `prayers`, `reflections`, `verse_bookmarks`, `user_recent_verses`, `reading_progress`, `chapters_read`, `journey_events`, `growth_events`, `user_milestones`, `notification_preferences` | Authenticated owner only. Most tables allow all owner operations; profiles have no client delete, and journey/growth events have no client update. |
 | Server-owned | `subscriptions` | Authenticated owner `SELECT` only. Inserts, updates, and deletes require trusted service-role/webhook code. |
 | Internal | None in `public`. Supabase-managed schemas are outside this migration. |
 
-RLS is enabled on all 26 tables. Private prayers, reflections, notes, and
+RLS is enabled on all 27 tables. Private prayers, reflections, recent Scripture
+history, notes, and
 journey data have no anonymous policy and every authenticated policy includes
 an `auth.uid()` owner condition.
 
@@ -71,14 +74,17 @@ Expected migration order:
 0007_user_quests.sql
 0008_reassert_rls_and_purge.sql
 0009_analytics_consent_opt_in.sql
+0010_rolling_quest_windows_and_recent_verses.sql
 ```
 
-Evidence must show 26 existing tables with `rowsecurity = true`, only the
+Evidence must show 27 existing tables with `rowsecurity = true`, only the
 documented policy names, no `anon` role on user/server-owned policies, and
 `purge_user_data` as `security_definer = true`, `search_path=""`, anonymous
 execute false, authenticated execute true. Table grants must also match the
 policy commands: anonymous content reads only, authenticated least privilege,
-and service-role administration.
+and service-role administration. The report must also show the enabled
+`keep_newest_recent_verse` trigger and its fixed-search-path, security-invoker
+function with no direct anonymous or authenticated execute privilege.
 
 ## Two-user negative tests
 
@@ -98,7 +104,8 @@ fixtures using the matching owner's session. Then test:
 6. Repeat the cross-owner checks as B against A to catch asymmetric fixtures or tokens.
 7. For `subscriptions`, both users can select only their own row; all client insert/update/delete attempts fail. Create subscription fixtures only with a trusted staging admin/service-role path.
 8. Put unique sentinel text in A and B prayer/reflection bodies. Confirm neither account can retrieve the other's sentinel in any response, error, log, or evidence output.
-9. Call `purge_user_data()` as A. Confirm all 14 A-owned tables are empty for A, B's rows remain, A's auth account remains, and A's server-owned subscription row remains.
+9. Call `purge_user_data()` as A. Confirm all 15 A-owned tables are empty for A, B's rows remain, A's auth account remains, and A's server-owned subscription row remains.
+10. For one A-owned recent passage, write a newer `viewed_at` and exact text from device B, then replay an older upsert for the same passage from device A. Confirm the whole newer row survives; a genuinely later upsert must still replace it.
 
 ## Anonymous-access tests
 
@@ -125,8 +132,8 @@ supabase migration list --linked
 ```
 
 Before the real push, save the `migration list` and dry-run output. The dry run
-must propose only the intended pending migration(s), including `0008` and
-ending in the current highest version (`0009` at the time of writing). If it
+must propose only the intended pending migration(s), including `0008` when it
+is not already present, and end in the current highest version (`0010`). If it
 tries to replay renamed `0002`-`0006`, stop: do not use `--include-all` and do
 not repair history as a shortcut. After the push, run
 `supabase/evidence/rls_policy_report.sql` in the staging SQL editor, then execute

@@ -8,9 +8,9 @@ rationed on purpose: when everything is pixelated, nothing is special.
 
 | Instrument | Component / utility | Scale | Use |
 |---|---|---|---|
-| Small sprites | `PixelIcon` (`design-system/PixelIcon.tsx`) | True 32×32 authored canvas, normally shown at 1× / 32px | Quest category glyphs, milestone marks, tiny decorations |
-| Feature sprites | `PixelIcon` (same component) | 16×18 candles; true 32×32 tree stages | The streak candle set, the journey tree stages |
-| Mascots | `PixelMascot` (`design-system/PixelMascot.tsx`) | 16–20 cell canvases, 4–7px rendered cells | One per onboarding / sign-in page, big empty states |
+| Small sprites | `PixelIcon` (`design-system/PixelIcon.tsx`) | 32×32 logical canvas, normally shown at 32px | Quest category glyphs, milestone marks, tiny decorations |
+| Feature sprites | `PixelIcon` (same component) | 16×18 logical candles; 32×32 logical tree stages | The streak candle set, the twenty-stage journey tree |
+| Mascots | `PixelMascot` (`design-system/PixelMascot.tsx`) | Existing logical canvases, generated at 48×48 source resolution | One per onboarding / sign-in page, big empty states |
 
 Plus the accent font: `font-pixel` utility (Ithaca, SIL OFL), 14px minimum —
 short labels only (badges, quest tags, tiny decorative headings). And two
@@ -21,13 +21,12 @@ hard offset shadow) for achievement-style cards only.
 
 Every sprite and mascot lives in one registry file. Components are thin
 resolvers: consumers reference assets by name and never know how the art is
-stored. Production art is generated deterministically from integer-aligned
-rectangles, ellipses, and lines into transparent character grids. Legacy icon
-recipes are doubled onto the shared 32×32 grid before rasterisation; key
-silhouettes use direct 32×32 recipes for one-pixel details and negative space.
-This avoids background-removal halos, antialiasing artifacts, and inconsistent
-generated pixel sizes. The registry still accepts a PNG for a deliberately
-hand-drawn replacement:
+stored. Production art begins with the approved BibleQuest reference sheet and
+subject anchors, is staged through reference-conditioned image generation, and
+is reconstructed on its native grid by `scripts/process-pixel-sprites.mjs`.
+Only reviewed, normalized PNGs are promoted to `public/pixel/`; image generation
+is not a runtime or build dependency. The deterministic character-grid renderer
+remains supported as a fallback and useful test fixture:
 
 ```ts
 { kind: "grid", rows, palette, ambient? }         // hand-placed characters
@@ -46,40 +45,68 @@ hand-drawn replacement:
   rose, stone, skin, and flame ramps. Lighter and darker material ramps are
   intentional pixel-art shades of those live brand anchors.
 
-### Replacing a grid with a PNG (PixelLab workflow)
+### Staging and registering production PNGs
 
-1. Export the art with a transparent background, sized at an **integer
-   multiple** of the logical grid (e.g. the 10×14 candle at 4× = 40×56px).
-   Fractional scaling smears; the file's pixel grid must map to whole cells.
-2. Drop it in `public/pixel/` named after the registry key:
+1. Use `PixelArtReferenceSheet.png` as the master style/palette reference and
+   the approved subject PNGs in `BibleQuest-Assets/UI-ASSETS/` as shape anchors.
+   Treat each input explicitly as a reference, not a file to resize blindly.
+2. Stage generated or edited source art under
+   `output/imagegen/pixel-v2/sources/`. Green subjects should use a uniform
+   `#ff00ff` removable backdrop. Keep raw sources for traceability; never write
+   model output straight into `public/pixel/`.
+3. Normalize each approved source with the deterministic processor. For example:
+
+   ```sh
+   node scripts/process-pixel-sprites.mjs normalize \
+     output/imagegen/pixel-v2/sources/praying-hands.png \
+     output/imagegen/pixel-v2/staging/praying-hands.png \
+     32 32 alpha nearest
+   ```
+
+   The processor supplies binary alpha, transparent padding, fixed-palette
+   mapping, and nearest-neighbor grid reconstruction. Use `clean-supplied` for
+   the approved opaque UI anchors and `qa-sheet` for a review contact sheet.
+4. Keep every export at an **integer multiple** of its logical grid.
+   Fractional scaling smears; source pixels must map to whole logical cells.
+   Tree files are 64×64 sources registered on a 32×32 logical canvas.
+5. Name files after their registry keys:
    `public/pixel/<name>.png` for sprites, `public/pixel/mascot-<name>.png`
    for mascots (e.g. `candle-halo.png`, `tree-stage-4.png`,
    `mascot-lamb.png`).
-3. Flip the registry entry, keeping the logical grid dims:
-   `{ kind: "png", src: "/pixel/candle-halo.png", cols: 10, rows: 14 }`.
-4. If the grid had `ambient` per-cell motion, set `ambientClassName` to a
+6. Review every staging asset at its actual in-app size and on parchment,
+   linen, and candle surfaces. Reject malformed silhouettes, loose pixels,
+   softened edges, inconsistent outlines, or sequence regressions. Only then
+   copy the approved PNG into `public/pixel/`.
+7. Register the PNG while keeping its logical grid dimensions:
+   `{ kind: "png", src: "/pixel/candle-halo.png", cols: 16, rows: 18 }`.
+8. If the grid had `ambient` per-cell motion, set `ambientClassName` to a
    whole-image fallback (e.g. `"[animation:var(--animate-flicker)]"`), or
    leave it off for stillness. PNGs cannot flicker a single flame cell —
    for living details, grids remain the better medium.
+
+The service worker precaches the explicit 63-file catalogue, so new registry
+filenames must also be added to `PIXEL_ASSET_NAMES` in `public/sw.js`. When
+replacing bytes behind an existing filename, bump the worker cache version so
+installed clients do not retain the rejected art.
 
 Nothing else changes: names, sizes, a11y semantics, and every importing
 file stay untouched.
 
 ## Grid & stroke rules
 
-- Every sprite lives on a whole-cell grid rendered as SVG `<rect>`s with
-  `image-rendering: pixelated` (`pixelated` utility). Never scale to
-  fractional cell sizes; never blur, never rotate.
+- Every sprite uses a whole-cell logical grid and `image-rendering: pixelated`
+  (`pixelated` utility), whether its source is PNG or SVG rectangles. Never
+  scale to fractional cell sizes; never blur, never rotate.
 - Every silhouette carries a single dark-green outline. Small icons keep it
   sparse; mascots and feature sprites use it continuously so they remain
   recognizable on parchment, linen, and candle-mode surfaces.
 - Light comes from the **upper left**: highlights top-left, shade
   lower-right, 2–3 shade levels per material, minimal dithering.
-- Small sprites: max ~6 colors. Feature sprites may use up to ~10 (outline,
-  three canopy greens, two trunk browns, fruit gold pair, rose pair) —
-  always drawn from the shared palette constants: twilight outline, warm
-  white/parchment, brand evergreen `#0e533c`, brand gold `#d3a336` + light
-  gold, olive pair, flame orange, face brown/tan, rose, marian blue.
+- Every shipped sprite uses only colors from the shared production palette in
+  `scripts/process-pixel-sprites.mjs`, with no adaptive per-file palette drift.
+  Use only the colors the subject needs: restrained small sprites, a coherent
+  tree-family ramp, and the same body colors across all five candles. Dithering
+  and partial alpha are forbidden.
 
 ## Current inventory
 
@@ -91,13 +118,16 @@ file stay untouched.
   `candle-steady` → `candle-sparks` → `candle-halo`. One shared body; only
   the flame and blessing details grow (see `candleStage` in
   `lib/questos/streak-engine.ts`). Flame cells flicker via `ambient`.
-- **Journey tree stages (6, true 32×32)**: `tree-stage-0` (two-leaf seedling) →
-  `tree-stage-1` (open sapling) → `tree-stage-2` (young branched tree) →
-  `tree-stage-3` (growing clustered canopy) → `tree-stage-4` (fruit-bearing) →
-  `tree-stage-5` (broad sheltering crown + small flowers). Every stage shares
-  one trunk fork, soil, light direction, outline, and canopy ramp. Canopy lobes
-  keep visible seams so mature trees read as foliage rather than a green blob.
-- **Mascots (8, 16–20 cells)**: lamb, lantern, scroll, dove, sprout, key,
+- **Journey tree stages (20, 64×64 source / 32×32 logical)**:
+  `seed` → `stirring-seed` → `first-root` → `first-shoot` → `sprout` →
+  `rooted-sprout` → `young-sapling` → `branching-sapling` →
+  `leafing-sapling` → `young` → `growing` → `spreading` → `budding` →
+  `flowering` → `first-fruit` → `fruit-bearing` → `flourishing` → `sturdy` →
+  `shade` → `sheltering`. Registry keys remain `tree-stage-0` through
+  `tree-stage-19`. Every stage shares one olive species, soil base, light
+  direction, forked-trunk language, outline, and palette; the silhouette and
+  botanical details advance at every step.
+- **Mascots (8, 48×48 source)**: lamb, lantern, scroll, dove, sprout, key,
   map, campfire.
 
 ## Where pixel art is allowed

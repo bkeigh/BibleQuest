@@ -17,6 +17,7 @@ template in [`../.env.example`](../.env.example).
 | `NEXT_PUBLIC_REVENUECAT_BILLING_MODE` | Recommended | `coming-soon` (default/off), `sandbox` (Test Store), or `live` (real billing after release gates). |
 | `NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY` | Optional | RevenueCat public key — Test Store (`test_…`) in dev, Web Billing (`rcb_…`) in prod. |
 | `NEXT_PUBLIC_REVENUECAT_PLUS_ENTITLEMENT` | Optional | Only if the entitlement is renamed in the RevenueCat dashboard. |
+| `STRIPE_DONATION_URL` | Optional | **Server-only.** Exact `https://buy.stripe.com/...` Payment Link used for one-time support through the validated same-origin redirect. |
 | `RESEND_API_KEY` | Optional | Lifecycle email (later). |
 | `ANTHROPIC_API_KEY` | Future | AI Guide (scaffold-only in V1). |
 
@@ -30,6 +31,10 @@ template in [`../.env.example`](../.env.example).
   documented public-key type; unknown modes, secret keys, and mismatches fail
   closed. Keep Vercel production on `coming-soon` until every gate in
   [`REVENUECAT.md`](REVENUECAT.md) passes.
+- `STRIPE_DONATION_URL` is independent of RevenueCat/Plus. Keep it server-only
+  and use one exact HTTPS Stripe Payment Link with no credentials, query, or
+  fragment. The app rejects every other host/shape, shows an unavailable state
+  when invalid, and never sends a visitor through an unvalidated redirect.
 
 ## Analytics configuration
 

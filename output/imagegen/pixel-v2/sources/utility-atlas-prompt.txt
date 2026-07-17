@@ -1,0 +1,17 @@
+Use case: stylized-concept
+Asset type: production staging atlas for BibleQuest utility pixel icons
+Input images: Image 1 is the authoritative BibleQuest PixelArtReferenceSheet for exact visual language, palette, outline, clustered shading, and sacred storybook tone. The remaining images are supporting subject/material references for the bird/dove treatment, arched architecture, olive foliage, and green/gold object rendering only. Restyle everything to match Image 1 and do not preserve any white backgrounds.
+
+Create ONE landscape 4-by-3 atlas of ten isolated utility sprites in equal square cells, exact row-major order:
+row 1: small humble brown songbird facing right; round antique brass compass with restrained prayer-blue face; plain weathered wooden Christian cross; small humble gold crown without jewels
+row 2: open arched wooden door showing a simple warm parchment interior; one simple five-petal parchment-white flower on a green stem; antique gold key in side profile; one single olive leaf, not a branch
+row 3: green mountain with one clear winding parchment path; rising gold sun half above a low green horizon; EMPTY CELL; EMPTY CELL
+The final two cells must be completely empty.
+
+Backdrop: perfectly flat, uniform solid #FF00FF chroma-key across the whole canvas and both empty cells. No texture, shadows, gradients, lighting variation, seams, panels, floor, or gutters. Never use #FF00FF inside a sprite.
+
+Style/medium: strict native-grid 32-bit-era pixel sprite art matching Image 1; hard square pixel clusters only. Warm, calm, sacred storybook tone; not emoji, painterly, vector, photoreal, or modern clip art.
+Composition: exact 4 columns by 3 rows; equal square cells; no visible dividers; one centered subject per occupied cell; consistent baseline, optical weight, and padding. Each subject must read as a coherent 32x32 logical icon when reduced, dominant visible dimension approximately 24–28 logical pixels.
+Color palette: the same single restrained BibleQuest palette across all icons—deep green/charcoal outline, Rolex green, moss green, parchment cream, leather brown, warm gold, restrained prayer blue, limited warm rust. Reuse identical colors between subjects.
+Lighting: consistent upper-left light, 2–3 flat shade levels per material, lower-right shadow clusters.
+Constraints: one-pixel deep-green/charcoal outline at final logical scale; clear silhouette; no antialiasing; no soft edges; no gradients; no glow; no cast shadow; no transparency; no dithering noise; no stray pixels; no labels; no letters; no numbers; no borders; no grid lines; no frames; no watermark; no extra subjects; no faces; no gemstones; no halo; both empty cells remain pure #FF00FF.

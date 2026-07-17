@@ -4,8 +4,9 @@
 // Scripture text: World English Bible (public domain).
 
 import type { QuestTemplate } from "@/lib/questos/types";
+import { questExpansion } from "./quest-expansion";
 
-export const seedQuests: QuestTemplate[] = [
+const coreSeedQuests: QuestTemplate[] = [
   {
     "slug": "pray-before-you-rise",
     "title": "Pray Before You Rise",
@@ -2610,6 +2611,12 @@ export const seedQuests: QuestTemplate[] = [
     "sensitivityTags": [],
     "isPremium": false
   }
+];
+
+/** 84 stable launch quests plus the reviewed, locally-hydrated expansion. */
+export const seedQuests: QuestTemplate[] = [
+  ...coreSeedQuests,
+  ...questExpansion,
 ];
 
 export const questBySlug = new Map(seedQuests.map((q) => [q.slug, q]));

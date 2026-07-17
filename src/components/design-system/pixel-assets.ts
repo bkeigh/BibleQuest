@@ -257,7 +257,7 @@ const icon32 = (
 const flameAmbient = { chars: "oOgG", className: "origin-bottom [animation:var(--animate-flicker)]" };
 const twinkleAmbient = { chars: "gG", className: "[animation:var(--animate-twinkle)]" };
 
-export const PIXEL_SPRITES = defineAssets({
+const GRID_PIXEL_SPRITES = defineAssets({
   candle: icon([
     ellipse(8, 14, 5, 1.5, "k"), ellipse(8, 13.5, 4, 1, "d"),
     rect(5, 5, 6, 8, "k"), rect(6, 6, 4, 6, "P"), rect(6, 6, 1, 5, "w"), rect(9, 7, 1, 5, "p"),
@@ -460,6 +460,94 @@ export const PIXEL_SPRITES = defineAssets({
   "tree-stage-5": makeTreeStage(5),
 });
 
+/**
+ * Reviewed production PNG art. Source illustrations are conditioned on the
+ * approved BibleQuest reference sheet and anchors, then reconstructed on the
+ * native grid with the deterministic processor. The grid recipes above stay
+ * as an editable fallback/reference language. Source pixels and logical cells
+ * are intentionally separate: small sprites are native 32px; trees use 64px
+ * sources while remaining on the 32-cell layout grid.
+ */
+const pixelPng = (
+  src: string,
+  cols: number,
+  rows: number,
+  cellScale?: number,
+  ambientClassName?: string
+): PixelAsset => ({
+  kind: "png",
+  src,
+  cols,
+  rows,
+  ...(cellScale == null ? {} : { cellScale }),
+  ...(ambientClassName ? { ambientClassName } : {}),
+});
+
+const PRODUCTION_PNG_SPRITES = defineAssets({
+  candle: pixelPng("/pixel/candle.png", 32, 32, 0.2, "[animation:var(--animate-flicker)]"),
+  leaf: pixelPng("/pixel/leaf.png", 32, 32, 0.2),
+  star: pixelPng("/pixel/star.png", 32, 32, 0.2, "[animation:var(--animate-twinkle)]"),
+  bird: pixelPng("/pixel/bird.png", 32, 32, 0.2),
+  flower: pixelPng("/pixel/flower.png", 32, 32, 0.2),
+  chapel: pixelPng("/pixel/chapel.png", 32, 32, 0.2),
+  book: pixelPng("/pixel/book.png", 32, 32, 0.2),
+  "open-book": pixelPng("/pixel/open-book.png", 32, 32, 0.2),
+  bookmark: pixelPng("/pixel/bookmark.png", 32, 32, 0.2),
+  lantern: pixelPng("/pixel/lantern.png", 32, 32, 0.2, "[animation:var(--animate-flicker)]"),
+  path: pixelPng("/pixel/path.png", 32, 32, 0.2),
+  tree: pixelPng("/pixel/tree.png", 32, 32, 0.2),
+  sun: pixelPng("/pixel/sun.png", 32, 32, 0.2, "[animation:var(--animate-twinkle)]"),
+  heart: pixelPng("/pixel/heart.png", 32, 32, 0.2),
+  hands: pixelPng("/pixel/hands.png", 32, 32, 0.2),
+  "praying-hands": pixelPng("/pixel/praying-hands.png", 32, 32, 0.2),
+  wheat: pixelPng("/pixel/wheat.png", 32, 32, 0.2),
+  dove: pixelPng("/pixel/dove.png", 32, 32, 0.2),
+  cross: pixelPng("/pixel/cross.png", 32, 32, 0.2),
+  door: pixelPng("/pixel/door.png", 32, 32, 0.2),
+  key: pixelPng("/pixel/key.png", 32, 32, 0.2),
+  scroll: pixelPng("/pixel/scroll.png", 32, 32, 0.2),
+  compass: pixelPng("/pixel/compass.png", 32, 32, 0.2),
+  crown: pixelPng("/pixel/crown.png", 32, 32, 0.2),
+  mountain: pixelPng("/pixel/mountain.png", 32, 32, 0.2),
+  moon: pixelPng("/pixel/moon.png", 32, 32, 0.2),
+  "service-basket": pixelPng("/pixel/service-basket.png", 32, 32, 0.2),
+  links: pixelPng("/pixel/links.png", 32, 32, 0.2),
+  people: pixelPng("/pixel/people.png", 32, 32, 0.2),
+  fountain: pixelPng("/pixel/fountain.png", 32, 32, 0.2),
+
+  "candle-unlit": pixelPng("/pixel/candle-unlit.png", 16, 18, 0.75),
+  "candle-small": pixelPng("/pixel/candle-small.png", 16, 18, 0.75, "[animation:var(--animate-flicker)]"),
+  "candle-steady": pixelPng("/pixel/candle-steady.png", 16, 18, 0.75, "[animation:var(--animate-flicker)]"),
+  "candle-sparks": pixelPng("/pixel/candle-sparks.png", 16, 18, 0.75, "[animation:var(--animate-flicker)]"),
+  "candle-halo": pixelPng("/pixel/candle-halo.png", 16, 18, 0.75, "[animation:var(--animate-flicker)]"),
+
+  "tree-stage-0": pixelPng("/pixel/tree-stage-0.png", 32, 32),
+  "tree-stage-1": pixelPng("/pixel/tree-stage-1.png", 32, 32),
+  "tree-stage-2": pixelPng("/pixel/tree-stage-2.png", 32, 32),
+  "tree-stage-3": pixelPng("/pixel/tree-stage-3.png", 32, 32),
+  "tree-stage-4": pixelPng("/pixel/tree-stage-4.png", 32, 32),
+  "tree-stage-5": pixelPng("/pixel/tree-stage-5.png", 32, 32),
+  "tree-stage-6": pixelPng("/pixel/tree-stage-6.png", 32, 32),
+  "tree-stage-7": pixelPng("/pixel/tree-stage-7.png", 32, 32),
+  "tree-stage-8": pixelPng("/pixel/tree-stage-8.png", 32, 32),
+  "tree-stage-9": pixelPng("/pixel/tree-stage-9.png", 32, 32),
+  "tree-stage-10": pixelPng("/pixel/tree-stage-10.png", 32, 32),
+  "tree-stage-11": pixelPng("/pixel/tree-stage-11.png", 32, 32),
+  "tree-stage-12": pixelPng("/pixel/tree-stage-12.png", 32, 32),
+  "tree-stage-13": pixelPng("/pixel/tree-stage-13.png", 32, 32),
+  "tree-stage-14": pixelPng("/pixel/tree-stage-14.png", 32, 32),
+  "tree-stage-15": pixelPng("/pixel/tree-stage-15.png", 32, 32),
+  "tree-stage-16": pixelPng("/pixel/tree-stage-16.png", 32, 32),
+  "tree-stage-17": pixelPng("/pixel/tree-stage-17.png", 32, 32),
+  "tree-stage-18": pixelPng("/pixel/tree-stage-18.png", 32, 32),
+  "tree-stage-19": pixelPng("/pixel/tree-stage-19.png", 32, 32),
+});
+
+export const PIXEL_SPRITES = defineAssets({
+  ...GRID_PIXEL_SPRITES,
+  ...PRODUCTION_PNG_SPRITES,
+});
+
 function makeCandle(stage: 0 | 1 | 2 | 3 | 4): PixelAsset {
   const shapes: PixelShape[] = [
     ellipse(8, 16, 6, 1.8, "k"), ellipse(8, 15.5, 5, 1.2, "d"),
@@ -571,7 +659,7 @@ export const PIXEL_SPRITE_NAMES = Object.keys(PIXEL_SPRITES) as PixelSpriteName[
 const mascot = (width: number, height: number, shapes: PixelShape[]): PixelAsset =>
   art(width, height, shapes, { cellScale: 0.75 });
 
-export const PIXEL_MASCOTS = defineAssets({
+const GRID_PIXEL_MASCOTS = defineAssets({
   lamb: mascot(20, 16, [
     ellipse(12, 8, 7.5, 5, "k"), ellipse(12, 7.5, 6.5, 4, "w"),
     ellipse(5, 9, 4, 4, "k"), ellipse(5, 9, 3, 3, "T"), ellipse(4, 7, 2, 1.5, "w"),
@@ -614,6 +702,22 @@ export const PIXEL_MASCOTS = defineAssets({
     ellipse(9, 9, 4, 6, "k"), ellipse(9, 9, 3, 5, "o"), ellipse(8.5, 9, 1.5, 3.5, "O"), ellipse(10, 11, 1, 2, "g"),
     rect(4, 4, 1, 1, "G"), rect(13, 5, 1, 1, "g"),
   ]),
+});
+
+const PRODUCTION_PNG_MASCOTS = defineAssets({
+  lamb: pixelPng("/pixel/mascot-lamb.png", 48, 48, 0.4),
+  lantern: pixelPng("/pixel/mascot-lantern.png", 48, 48, 0.4, "[animation:var(--animate-flicker)]"),
+  scroll: pixelPng("/pixel/mascot-scroll.png", 48, 48, 0.4),
+  dove: pixelPng("/pixel/mascot-dove.png", 48, 48, 0.4),
+  sprout: pixelPng("/pixel/mascot-sprout.png", 48, 48, 0.4),
+  key: pixelPng("/pixel/mascot-key.png", 48, 48, 0.4),
+  map: pixelPng("/pixel/mascot-map.png", 48, 48, 0.4),
+  campfire: pixelPng("/pixel/mascot-campfire.png", 48, 48, 0.4, "[animation:var(--animate-flicker)]"),
+});
+
+export const PIXEL_MASCOTS = defineAssets({
+  ...GRID_PIXEL_MASCOTS,
+  ...PRODUCTION_PNG_MASCOTS,
 });
 
 export type PixelMascotName = keyof typeof PIXEL_MASCOTS;

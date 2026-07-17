@@ -58,22 +58,22 @@ Expected filenames, in order:
 unreviewed preview, or a deployment whose Git SHA does not exactly match the
 frozen release commit.
 
-### Preparation snapshot — July 16, 2026 (not launch sign-off)
+### Preparation snapshot — July 17, 2026 (not launch sign-off)
 
 These current-run results validate the working tree only. They are not evidence
 for the eventual frozen commit and must be rerun at release freeze.
 
 | Check | Current-run result |
 | --- | --- |
-| Active source | `main` at base commit `7cb9d84be289738867b68248adb7dd4dc8d0bf9e`; worktree dirty, so **not releasable** |
+| Active source | `main` at base commit `0d2dc3200554ffc98f0c66da36ec1c8a6ffcc026`; launch changes remain uncommitted, so **not releasable** |
 | Frozen install | PASS — already up to date |
 | Lint / TypeScript | PASS / PASS |
-| Tests | PASS — 9 Vitest files, 64 tests; focused service-worker suite 12/12 |
+| Tests | PASS — 16 Vitest files, 111 tests |
 | Live header integration | PASS — representative live-mode build; 2/2 production/development response tests |
-| Production build | PASS — 177 pages generated; workspace-root and middleware-deprecation warnings remain for triage |
+| Production build | PASS — 243 pages generated with no build warnings |
 | Production dependency audit | PASS — no known vulnerabilities; high/critical threshold also exits 0 |
 | Whitespace / local Markdown targets | PASS / PASS; no repository Markdown linter or external-link script is installed |
-| Local Supabase reset/RLS report | NOT RUN — Supabase CLI is unavailable in this authoring environment |
+| Local Supabase migration/seed/RLS | PASS — migration `0010` applied; 150 active reviewed free quests, 180 active daily passages, 38 active milestones, zero null quest snapshots, 27/27 RLS tables, and clean schema lint |
 | Staging, production, device, legal, monitoring, backup/restore, rollback | NOT RUN — requires named humans and provider/device evidence; no deployment was performed |
 
 ## 2. Roles and authority

@@ -13,22 +13,45 @@ import type {
 } from "./types";
 import { treeStageLabels } from "./copy";
 
-const STAGE_THRESHOLDS: Array<{ stage: TreeStage; min: number }> = [
-  { stage: "sheltering", min: 250 },
-  { stage: "fruit-bearing", min: 100 },
-  { stage: "growing", min: 40 },
-  { stage: "young", min: 15 },
-  { stage: "sprout", min: 5 },
+/**
+ * One ordered source of truth for the tree's twenty visible stages.
+ *
+ * The curve rewards the first few meaningful actions quickly, then opens into
+ * a longer practice without moving the established fully-grown threshold of
+ * 250 actions. Stage keys are deliberately non-numeric: the UI names what is
+ * growing instead of presenting a rank.
+ */
+export const TREE_STAGE_DEFINITIONS: ReadonlyArray<{
+  stage: TreeStage;
+  min: number;
+}> = [
   { stage: "seed", min: 0 },
+  { stage: "stirring-seed", min: 1 },
+  { stage: "first-root", min: 3 },
+  { stage: "first-shoot", min: 5 },
+  { stage: "sprout", min: 8 },
+  { stage: "rooted-sprout", min: 12 },
+  { stage: "young-sapling", min: 17 },
+  { stage: "branching-sapling", min: 23 },
+  { stage: "leafing-sapling", min: 30 },
+  { stage: "young", min: 38 },
+  { stage: "growing", min: 47 },
+  { stage: "spreading", min: 58 },
+  { stage: "budding", min: 70 },
+  { stage: "flowering", min: 84 },
+  { stage: "first-fruit", min: 100 },
+  { stage: "fruit-bearing", min: 120 },
+  { stage: "flourishing", min: 145 },
+  { stage: "sturdy", min: 175 },
+  { stage: "shade", min: 210 },
+  { stage: "sheltering", min: 250 },
 ];
 
-const NEXT_STAGE_MIN: Partial<Record<TreeStage, number>> = {
-  seed: 5,
-  sprout: 15,
-  young: 40,
-  growing: 100,
-  "fruit-bearing": 250,
-};
+/** Return the named stage after `stage`, or null once the tree shelters. */
+export function nextTreeStage(stage: TreeStage): TreeStage | null {
+  const index = TREE_STAGE_DEFINITIONS.findIndex((entry) => entry.stage === stage);
+  return index >= 0 ? TREE_STAGE_DEFINITIONS[index + 1]?.stage ?? null : null;
+}
 
 export function calculateTreeState(events: GrowthEvent[]): GrowthTreeState {
   const byType: Record<GrowthType, number> = {
@@ -41,28 +64,28 @@ export function calculateTreeState(events: GrowthEvent[]): GrowthTreeState {
   };
   let total = 0;
   for (const e of events) {
-    byType[e.growthType] += e.amount;
-    total += e.amount;
+    // Import validation guarantees a number, but old/manual exports can still
+    // contain negative or non-finite values. Growth never runs backwards.
+    const amount = Number.isFinite(e.amount) ? Math.max(0, e.amount) : 0;
+    byType[e.growthType] += amount;
+    total += amount;
   }
-  const { stage } = STAGE_THRESHOLDS.find((s) => total >= s.min)!;
-  const nextMin = NEXT_STAGE_MIN[stage];
+
+  let stageIndex = 0;
+  for (let index = 1; index < TREE_STAGE_DEFINITIONS.length; index += 1) {
+    if (total < TREE_STAGE_DEFINITIONS[index].min) break;
+    stageIndex = index;
+  }
+  const { stage } = TREE_STAGE_DEFINITIONS[stageIndex];
+  const nextMin = TREE_STAGE_DEFINITIONS[stageIndex + 1]?.min;
   return {
     stage,
     stageLabel: treeStageLabels[stage],
     totalActions: total,
-    toNextStage: nextMin != null ? nextMin - total : null,
+    toNextStage: nextMin === undefined ? null : Math.max(0, nextMin - total),
     byType,
   };
 }
-
-const STAGE_FLOOR: Record<TreeStage, number> = {
-  seed: 0,
-  sprout: 5,
-  young: 15,
-  growing: 40,
-  "fruit-bearing": 100,
-  sheltering: 250,
-};
 
 /**
  * Progress through the current stage, for the journey's gentle progression
@@ -72,11 +95,16 @@ const STAGE_FLOOR: Record<TreeStage, number> = {
 export function stageProgress(
   state: GrowthTreeState
 ): { done: number; needed: number; fraction: number } | null {
-  if (state.toNextStage == null) return null;
-  const floor = STAGE_FLOOR[state.stage];
-  const nextMin = state.totalActions + state.toNextStage;
+  const stageIndex = TREE_STAGE_DEFINITIONS.findIndex(
+    (entry) => entry.stage === state.stage
+  );
+  const current = TREE_STAGE_DEFINITIONS[stageIndex];
+  const next = TREE_STAGE_DEFINITIONS[stageIndex + 1];
+  if (!current || !next || state.toNextStage == null) return null;
+  const floor = current.min;
+  const nextMin = next.min;
   const needed = nextMin - floor;
-  const done = state.totalActions - floor;
+  const done = Math.min(needed, Math.max(0, state.totalActions - floor));
   return {
     done,
     needed,

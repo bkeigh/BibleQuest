@@ -79,19 +79,25 @@ export interface QuestTemplate {
   isPremium: boolean;
 }
 
-export type DailyQuestStatus = "assigned" | "started" | "completed";
+export type DailyQuestStatus =
+  | "assigned"
+  | "started"
+  | "completed"
+  /** Hidden from Today's Quests, but its free-tier slot remains reserved. */
+  | "released";
 
 /**
- * One quest the user picked for a given day. Days hold up to
- * MAX_DAILY_PICKS of these (see quest-engine.ts) — picking is the
- * user's move now, not the algorithm's.
+ * One rolling quest window, grouped by its local pick date for persistence.
+ * Free members may hold three concurrent windows; Plus has no slot cap.
  */
 export interface DailyQuestAssignment {
   dateKey: string; // YYYY-MM-DD (local)
   questSlug: string;
   status: DailyQuestStatus;
   /** When the user added this quest to their day. */
-  pickedAt?: string;
+  pickedAt: string;
+  /** Rolling 24-hour window end; independent of local midnight. */
+  expiresAt: string;
   startedAt?: string;
   completedAt?: string;
   /** Legacy (pre-pick model): times the user rerolled the assigned quest. */
@@ -202,6 +208,22 @@ export interface ChapterRead {
   bookSlug: string;
   chapter: number;
   dateKey: string;
+}
+
+/**
+ * A verse the person intentionally viewed or selected. This is navigation
+ * history, not a bookmark: entries are deduplicated by passage and capped by
+ * the store so Home can offer a small, useful "Recent verses" shelf.
+ */
+export interface RecentVerse {
+  bookSlug: string;
+  bookName: string;
+  chapter: number;
+  verseStart: number;
+  verseEnd: number;
+  reference: string;
+  text: string;
+  viewedAt: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -316,10 +338,24 @@ export interface GrowthEvent {
 
 export const TREE_STAGES = [
   "seed",
+  "stirring-seed",
+  "first-root",
+  "first-shoot",
   "sprout",
+  "rooted-sprout",
+  "young-sapling",
+  "branching-sapling",
+  "leafing-sapling",
   "young",
   "growing",
+  "spreading",
+  "budding",
+  "flowering",
+  "first-fruit",
   "fruit-bearing",
+  "flourishing",
+  "sturdy",
+  "shade",
   "sheltering",
 ] as const;
 export type TreeStage = (typeof TREE_STAGES)[number];
@@ -348,6 +384,12 @@ export type MilestoneMetric =
   | "quests_silence"
   | "quests_family"
   | "quests_community"
+  | "quests_forgiveness"
+  | "quests_generosity"
+  | "quests_discipline"
+  | "quests_worship"
+  | "quests_reflection"
+  | "quests_patience"
   | "journey_days";
 
 export interface MilestoneSeed {
@@ -561,7 +603,7 @@ export function emptyAccountNudge(): AccountNudgeState {
 export interface QuestOSSnapshot {
   profile: Profile | null;
   settings: Settings;
-  /** Per-day picked quests (up to MAX_DAILY_PICKS per dateKey). */
+  /** Rolling quest windows grouped by local pick date. */
   assignments: Record<string, DailyQuestAssignment[]>;
   /** The persistent quest shelf, keyed by quest slug. */
   myQuests?: Record<string, MyQuest>;
@@ -574,6 +616,8 @@ export interface QuestOSSnapshot {
   bookmarks: VerseBookmark[];
   readingPosition: ReadingPosition | null;
   chaptersRead: ChapterRead[];
+  /** Optional for exports created before rolling quest windows/recent verses. */
+  recentVerses?: RecentVerse[];
   pendingMilestones: string[];
   lastVisitDateKey: string | null;
   /** Optional — exports from before the candle streak omit it. */

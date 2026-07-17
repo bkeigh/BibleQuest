@@ -5,16 +5,19 @@
  * quest lifecycle into clear actions, tracks the four walk steps, and routes
  * completion reflections back through the QuestOS store.
  */
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import type { QuestTemplate, ReflectionMood } from "@/lib/questos/types";
 import {
   useQuestOS,
   selectMyQuests,
-  selectTodayPicks,
-  MAX_DAILY_PICKS,
 } from "@/lib/questos/store";
+import {
+  activeQuestAssignments,
+  formatQuestWindowRemaining,
+  nextQuestSlotAt,
+} from "@/lib/questos/quest-engine";
 import { QUEST_STEP_KEYS, hasBegun } from "@/lib/questos/quest-steps";
 import { stepLabels } from "@/components/quests/QuestAccordionCard";
 import { useToast } from "@/components/design-system/Toast";
@@ -35,8 +38,9 @@ import { completionLine } from "@/lib/questos/copy";
 import { useStrings } from "@/lib/i18n";
 import { gentleEase, celebrationScale, pixelSparkle } from "@/lib/motion";
 import { cleanVerseText } from "@/lib/utils/scripture";
-import { toDateKey, hashString } from "@/lib/utils/dates";
+import { hashString } from "@/lib/utils/dates";
 import { track } from "@/lib/analytics/events";
+import { usePlus } from "@/lib/revenuecat/usePlus";
 
 type Phase = "detail" | "reflect" | "done";
 
@@ -59,11 +63,25 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
   const pickQuest = useQuestOS((s) => s.pickQuest);
   const startQuest = useQuestOS((s) => s.startQuest);
   const saveQuestForLater = useQuestOS((s) => s.saveQuestForLater);
-  const resumeQuest = useQuestOS((s) => s.resumeQuest);
   const markQuestStep = useQuestOS((s) => s.markQuestStep);
-  const picks = useQuestOS(selectTodayPicks);
+  const assignments = useQuestOS((s) => s.assignments);
   const myQuests = useQuestOS(selectMyQuests);
-  const completions = useQuestOS((s) => s.completions);
+  const { isPlus } = usePlus();
+
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const refresh = () => setNow(Date.now());
+    const interval = window.setInterval(refresh, 60_000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
+  const picks = useMemo(
+    () => activeQuestAssignments(assignments, now),
+    [assignments, now]
+  );
 
   const [phase, setPhase] = useState<Phase>("detail");
   const [reflection, setReflection] = useState("");
@@ -77,9 +95,8 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
     entry &&
     (entry.status === "active" || entry.status === "paused") &&
     hasBegun(entry);
-  const alreadyCompletedToday = completions.some(
-    (c) => c.questSlug === quest.slug && c.dateKey === toDateKey()
-  );
+  const completedInWindow = todayPick?.status === "completed";
+  const nextSlot = nextQuestSlotAt(assignments, isPlus, now);
 
   useEffect(() => {
     track("quest_viewed", { category: quest.category });
@@ -90,10 +107,14 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
   }, [phase]);
 
   function addToToday() {
-    if (pickQuest(quest.slug)) {
+    if (pickQuest(quest.slug, isPlus)) {
       toast(t.quests.added, { variant: "success" });
     } else {
-      toast(t.quests.capReached);
+      toast(
+        nextSlot
+          ? `Your next slot opens in ${formatQuestWindowRemaining(nextSlot, now).replace(" left", "")}.`
+          : t.quests.capReached
+      );
     }
   }
 
@@ -104,30 +125,36 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
   }
 
   function begin() {
-    startQuest(quest.slug);
-    setPhase("reflect");
+    if (startQuest(quest.slug, isPlus)) {
+      setPhase("reflect");
+      return;
+    }
+    toast(
+      nextSlot
+        ? `Your next slot opens in ${formatQuestWindowRemaining(nextSlot, now).replace(" left", "")}. Save this quest and return then.`
+        : "This quest window is no longer available. Choose it again to continue."
+    );
   }
 
   /**
-   * Pick up a walk begun on another day. Joining today's picks (when the
-   * day has room) keeps the daily rhythm honest — continuing a quest IS
-   * today's quest work — but a full day never blocks continuing.
+   * Pick up a saved or expired walk. startQuest atomically claims a fresh
+   * rolling slot when needed, so no begin path can bypass the free limit.
    */
   function continueWalk() {
-    if (entry?.status === "paused") resumeQuest(quest.slug);
-    if (!todayPick && picks.length < MAX_DAILY_PICKS) {
-      pickQuest(quest.slug);
-      startQuest(quest.slug);
-    }
-    setPhase("reflect");
+    begin();
   }
 
   function finish(withReflection: boolean) {
     const hasText = withReflection && reflection.trim().length > 0;
-    completeQuestBySlug(
+    const result = completeQuestBySlug(
       quest.slug,
       hasText ? { body: reflection, mood } : undefined
     );
+    if (!result.completed) {
+      toast("That 24-hour window ended. Choose the quest again to finish it.");
+      setPhase("detail");
+      return;
+    }
     toast(hasText ? "Done. Reflection saved." : "Quest complete.", {
       variant: "celebrate",
     });
@@ -224,9 +251,21 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
               </p>
             </PaperCard>
 
+            {todayPick && (
+              <p className="mt-3 text-center text-caption text-accent">
+                {completedInWindow ? "Slot resets" : "Quest window"} ·{" "}
+                <time
+                  dateTime={todayPick.expiresAt}
+                  title={new Date(todayPick.expiresAt).toLocaleString()}
+                >
+                  {formatQuestWindowRemaining(todayPick.expiresAt, now)}
+                </time>
+              </p>
+            )}
+
             {/* Your walk so far — a bookmark, never homework. Appears once
                 the quest is underway so a first visit stays uncluttered. */}
-            {walking && !alreadyCompletedToday && (
+            {walking && !completedInWindow && (
               <PaperCard variant="quiet" padding="md" className="mt-5">
                 <p className="text-[0.75rem] uppercase tracking-wide text-accent">
                   Your walk so far
@@ -271,9 +310,11 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
             )}
 
             <div className="mt-6">
-              {alreadyCompletedToday ? (
+              {completedInWindow ? (
                 <PaperCard variant="quiet" padding="md" className="text-center">
-                  <p className="text-small text-charcoal">Already done today.</p>
+                  <p className="text-small text-charcoal">
+                    Completed in this quest window.
+                  </p>
                   <GentleLink variant="text" href="/app/journey" className="mt-2">
                     See your journey
                   </GentleLink>
@@ -315,10 +356,10 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
                     )}
                     <button
                       type="button"
-                      onClick={() => setPhase("reflect")}
+                      onClick={begin}
                       className="py-2 text-center text-small text-ash transition-colors hover:text-charcoal"
                     >
-                      Begin without adding
+                      Begin now
                     </button>
                   </div>
                 </div>

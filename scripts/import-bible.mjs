@@ -16,6 +16,7 @@
  */
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { DAILY_VERSE_REFS } from './content/daily-verse-manifest.mjs'
 
 const RAW = 'https://raw.githubusercontent.com/TehShrike/world-english-bible/master/json'
 const OUT_BIBLE = path.join(process.cwd(), 'src/data/bible')
@@ -50,8 +51,8 @@ const CANON = [
   testament: i < 39 ? 'old' : 'new',
 }))
 
-/** Curated daily-verse pool: [bookSlug, chapter, startVerse, endVerse, theme] */
-const DAILY_VERSES = [
+/** Original launch rotation, retained here as an explicit stability check. */
+const LAUNCH_DAILY_VERSES = [
   ['john', 3, 16, 16, 'love'],
   ['psalms', 23, 1, 3, 'rest'],
   ['psalms', 46, 10, 10, 'stillness'],
@@ -113,6 +114,10 @@ const DAILY_VERSES = [
   ['2-corinthians', 5, 17, 17, 'renewal'],
   ['deuteronomy', 31, 8, 8, 'courage'],
 ]
+
+if (LAUNCH_DAILY_VERSES.length !== 60) {
+  throw new Error('The stable 60-entry launch rotation changed unexpectedly')
+}
 
 async function fetchJson(url, attempt = 1) {
   const res = await fetch(url)
@@ -183,32 +188,25 @@ async function main() {
   meta.sort((a, b) => a.order - b.order)
   await writeFile(path.join(OUT_BIBLE, 'books.json'), JSON.stringify(meta, null, 1))
 
-  // A few WEB verses are fragments of longer speech and carry internal
-  // narrative-quote punctuation ("...," says Yahweh, "...") that reads as
-  // malformed inside a devotional card. Override with clean, faithful excerpts
-  // keyed by "bookSlug chapter:start". Keep in sync with the daily verse pool.
-  const DAILY_VERSE_OVERRIDES = {
-    'jeremiah 29:11':
-      'For I know the thoughts that I think toward you, thoughts of peace, and not of evil, to give you hope and a future.',
-    'matthew 22:37':
-      'You shall love the Lord your God with all your heart, with all your soul, and with all your mind. This is the first and great commandment. A second likewise is this: You shall love your neighbor as yourself.',
-    'mark 12:30':
-      'You shall love the Lord your God with all your heart, and with all your soul, and with all your mind, and with all your strength. This is the first commandment. The second is like this: You shall love your neighbor as yourself. There is no other commandment greater than these.',
-  }
-
   // Daily verse pool with exact WEB text pulled from the imported data
-  const pool = DAILY_VERSES.map(([slug, chapter, start, end, theme], i) => {
+  const seenPassages = new Set()
+  const pool = DAILY_VERSE_REFS.map(([slug, chapter, start, end, theme], i) => {
+    const passageKey = `${slug}:${chapter}:${start}:${end}`
+    if (seenPassages.has(passageKey)) throw new Error(`Duplicate daily passage: ${passageKey}`)
+    seenPassages.add(passageKey)
     const book = bySlug.get(slug)
     if (!book) throw new Error(`Unknown book slug in DAILY_VERSES: ${slug}`)
     const ch = book.chapters[chapter - 1]
     if (!ch) throw new Error(`Missing ${slug} ${chapter}`)
-    const override = DAILY_VERSE_OVERRIDES[`${slug} ${chapter}:${start}`]
-    const text = override ?? ch.slice(start - 1, end).join(' ')
+    const text = ch.slice(start - 1, end).join(' ')
     if (!text) throw new Error(`Empty text for ${slug} ${chapter}:${start}-${end}`)
     const refBook = book.name === 'Psalms' ? 'Psalm' : book.name
     const reference = start === end ? `${refBook} ${chapter}:${start}` : `${refBook} ${chapter}:${start}-${end}`
-    return { id: `dv${String(i + 1).padStart(2, '0')}`, reference, bookSlug: slug, chapter, verseStart: start, verseEnd: end, text, theme }
+    return { id: `dv${String(i + 1).padStart(3, '0')}`, reference, bookSlug: slug, chapter, verseStart: start, verseEnd: end, text, theme }
   })
+  if (pool.length !== 180 || new Set(pool.map((verse) => verse.bookSlug)).size !== 66) {
+    throw new Error('Daily rotation must contain 180 unique passages across all 66 books')
+  }
   await writeFile(path.join(OUT_SEED, 'daily-verses.json'), JSON.stringify(pool, null, 1))
 
   const totalVerses = meta.reduce((n, b) => n + b.verseCounts.reduce((x, y) => x + y, 0), 0)

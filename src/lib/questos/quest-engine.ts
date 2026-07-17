@@ -1,13 +1,14 @@
 /**
  * Quest engine — picking, filtering, and suggestion.
  *
- * The user picks their own quests now (up to MAX_DAILY_PICKS a day);
+ * The user picks their own quests now (three concurrent windows for free);
  * the old daily-assignment scorer lives on as the "Suggested for today"
  * shelf. Suggestion is deterministic per user + date (seeded), avoids
  * recent repeats, respects preferences, and honors the current season.
  */
 import { hashString, seededRandom } from "@/lib/utils/dates";
 import type {
+  DailyQuestAssignment,
   Profile,
   QuestCategory,
   QuestDuration,
@@ -17,11 +18,122 @@ import type {
 } from "./types";
 
 /**
- * How many quests a user may pick per day. This is the free tier's cap —
- * if Plus ever lifts it, route the number through subscription-engine
- * instead of importing the constant directly.
+ * Free members may hold this many concurrent quest windows. A window lasts a
+ * rolling 24 hours from the instant it is picked; it is deliberately not tied
+ * to midnight, so a late-night pick never disappears a few minutes later.
  */
-export const MAX_DAILY_PICKS = 3;
+export const FREE_QUEST_SLOTS = 3;
+/** Backward-compatible UI name; new domain code should use FREE_QUEST_SLOTS. */
+export const MAX_DAILY_PICKS = FREE_QUEST_SLOTS;
+export const QUEST_WINDOW_MS = 24 * 60 * 60 * 1000;
+/** Brief protection for an accidental tap before a free slot is reserved. */
+export const QUEST_PICK_UNDO_MS = 2 * 60 * 1000;
+
+function validTime(value?: string): number | null {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * Backfill a legacy calendar-day assignment with a stable rolling window.
+ * Existing picked/started timestamps win. Very old rows without either keep
+ * their former midnight-to-midnight behavior instead of being resurrected.
+ */
+export function normalizeAssignmentWindow(
+  assignment: DailyQuestAssignment,
+): DailyQuestAssignment {
+  const legacyDayStart = new Date(`${assignment.dateKey}T00:00:00`).getTime();
+  const pickedMs =
+    validTime(assignment.pickedAt) ??
+    validTime(assignment.startedAt) ??
+    validTime(assignment.completedAt) ??
+    (Number.isFinite(legacyDayStart) ? legacyDayStart : Date.now());
+  const expiresMs = validTime(assignment.expiresAt) ?? pickedMs + QUEST_WINDOW_MS;
+  const pickedAt = new Date(pickedMs).toISOString();
+  const expiresAt = new Date(Math.max(expiresMs, pickedMs)).toISOString();
+  if (
+    assignment.pickedAt === pickedAt &&
+    assignment.expiresAt === expiresAt
+  ) {
+    return assignment;
+  }
+  return { ...assignment, pickedAt, expiresAt };
+}
+
+export function questWindowExpiresAt(assignment: DailyQuestAssignment): number {
+  return Date.parse(normalizeAssignmentWindow(assignment).expiresAt);
+}
+
+export function isQuestWindowOpen(
+  assignment: DailyQuestAssignment,
+  now: Date | number = Date.now(),
+): boolean {
+  const nowMs = typeof now === "number" ? now : now.getTime();
+  return questWindowExpiresAt(assignment) > nowMs;
+}
+
+/** Every unexpired slot reservation, including a quest removed from the UI. */
+export function occupiedQuestAssignments(
+  assignments: Record<string, DailyQuestAssignment[]>,
+  now: Date | number = Date.now(),
+): DailyQuestAssignment[] {
+  return Object.values(assignments)
+    .flat()
+    .map(normalizeAssignmentWindow)
+    .filter((assignment) => isQuestWindowOpen(assignment, now))
+    .sort((a, b) => a.pickedAt.localeCompare(b.pickedAt));
+}
+
+/** Visible rolling-window picks, oldest first. */
+export function activeQuestAssignments(
+  assignments: Record<string, DailyQuestAssignment[]>,
+  now: Date | number = Date.now(),
+): DailyQuestAssignment[] {
+  return occupiedQuestAssignments(assignments, now).filter(
+    (assignment) => assignment.status !== "released",
+  );
+}
+
+export function questSlotLimit(isPlus: boolean): number {
+  return isPlus ? Number.POSITIVE_INFINITY : FREE_QUEST_SLOTS;
+}
+
+export function questSlotsRemaining(
+  assignments: Record<string, DailyQuestAssignment[]>,
+  isPlus: boolean,
+  now: Date | number = Date.now(),
+): number {
+  if (isPlus) return Number.POSITIVE_INFINITY;
+  return Math.max(
+    0,
+    FREE_QUEST_SLOTS - occupiedQuestAssignments(assignments, now).length,
+  );
+}
+
+export function nextQuestSlotAt(
+  assignments: Record<string, DailyQuestAssignment[]>,
+  isPlus: boolean,
+  now: Date | number = Date.now(),
+): string | null {
+  if (isPlus || questSlotsRemaining(assignments, false, now) > 0) return null;
+  const [oldest] = occupiedQuestAssignments(assignments, now);
+  return oldest?.expiresAt ?? null;
+}
+
+/** Compact, human timing for quest cards; exact expiry remains in title/ARIA. */
+export function formatQuestWindowRemaining(
+  expiresAt: string,
+  now: Date | number = Date.now(),
+): string {
+  const nowMs = typeof now === "number" ? now : now.getTime();
+  const remaining = Math.max(0, Date.parse(expiresAt) - nowMs);
+  if (remaining === 0) return "Window ended";
+  const minutes = Math.ceil(remaining / 60_000);
+  if (minutes < 60) return `${minutes} min left`;
+  const hours = Math.ceil(minutes / 60);
+  return `${hours} hr left`;
+}
 
 export interface QuestFilters {
   durations?: QuestDuration[];

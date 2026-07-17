@@ -25,6 +25,12 @@ Every quest is specific, safe, doable today, free, and grounded in Scripture or
 Christian practice. Structure: title · invitation (one imperative sentence) ·
 why it matters · scripture reference · reflection prompt · prayer prompt.
 
+The launch catalogue contains 150 reviewed quests across 14 categories. It
+must preserve a real range of commitment: short accessible invitations remain,
+but filters also need substantial Scripture study, practiced prayer, service,
+repair, community participation, justice, discernment, silence, and formation.
+Adding volume by paraphrasing the same surface-level action is not acceptable.
+
 Scripture references must genuinely support the action (no proof-texting) and be
 real. Short passages (≤ 4 verses) are hydrated with exact WEB text.
 
@@ -64,11 +70,28 @@ promise financial reward for giving; publicize private prayers; build holiness
 leaderboards; treat subscription as spiritual superiority; use copyrighted Bible
 translations without a license.
 
+## Plus quest generation boundary
+
+At launch, “Generate a quest” is a device-local recommendation over the 150
+reviewed templates. It accepts structured filters only and sends no profile,
+prayer, reflection, journal, or free-form spiritual text to any provider. Its
+result must say that it came from the reviewed catalogue.
+
+An OpenAI, Anthropic, or other adapter may implement the provider-neutral
+contract later, but it is not enabled merely by adding an API key. Before an
+external adapter ships it needs server-side Plus enforcement, strict
+structured-output validation, the complete safety checks above, rate and cost
+controls, privacy disclosure, audit-safe telemetry that excludes sacred text,
+and a human review/moderation path. Generated text must never claim to be God's
+voice or replace Scripture, clergy, counseling, or emergency support.
+
 ## Regenerating content
 
 ```bash
 node scripts/build-seed.mjs <seed-result.json>          # → src/data/seed/*.ts
-node scripts/build-supabase-seed.mjs <seed-result.json> # → supabase/seed.sql
+node scripts/build-quest-expansion.mjs                  # → reviewed 66-quest expansion
+node scripts/build-daily-verses.mjs                     # → 180 local WEB passages
+node scripts/build-supabase-seed.mjs                    # → canonical supabase/seed.sql
 ```
 
 New sensitive content should be treated as human-review-needed before launch.

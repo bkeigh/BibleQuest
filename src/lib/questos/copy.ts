@@ -28,7 +28,7 @@ export const emptyStates = {
   journey: "Nothing here yet. Your first quest will show up here.",
   bookmarks: "Save verses you want to come back to.",
   questsFiltered: "Nothing matches those filters. Try widening them.",
-  questsUnpicked: "No quests picked yet. Choose up to three for today.",
+  questsUnpicked: "No active quests yet. Choose up to three 24-hour windows.",
 } as const;
 
 export const errors = {
@@ -39,10 +39,24 @@ export const errors = {
 
 export const treeStageLabels: Record<string, string> = {
   seed: "Seed",
-  sprout: "Sprout",
+  "stirring-seed": "Stirring Seed",
+  "first-root": "First Root",
+  "first-shoot": "First Shoot",
+  sprout: "New Sprout",
+  "rooted-sprout": "Rooted Sprout",
+  "young-sapling": "Young Sapling",
+  "branching-sapling": "Branching Sapling",
+  "leafing-sapling": "Leafing Sapling",
   young: "Young Tree",
   growing: "Growing Tree",
+  spreading: "Spreading Tree",
+  budding: "Budding Tree",
+  flowering: "Flowering Tree",
+  "first-fruit": "First Fruit",
   "fruit-bearing": "Fruit-Bearing Tree",
+  flourishing: "Flourishing Tree",
+  sturdy: "Sturdy Tree",
+  shade: "Shade Tree",
   sheltering: "Sheltering Tree",
 };
 

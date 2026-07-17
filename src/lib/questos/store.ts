@@ -16,7 +16,15 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { questBySlug } from "@/data/seed/quests";
 import { seedMilestones } from "@/data/seed/milestones";
 import { getDailyVerse } from "./verse-engine";
-import { MAX_DAILY_PICKS } from "./quest-engine";
+import {
+  activeQuestAssignments,
+  FREE_QUEST_SLOTS,
+  isQuestWindowOpen,
+  normalizeAssignmentWindow,
+  QUEST_PICK_UNDO_MS,
+  QUEST_WINDOW_MS,
+  questSlotsRemaining,
+} from "./quest-engine";
 import { computeMetrics, checkMilestones } from "./milestone-engine";
 import { toDateKey } from "@/lib/utils/dates";
 import { track, setAnalyticsConsent } from "@/lib/analytics/events";
@@ -39,6 +47,7 @@ import {
   type QuestStepKey,
   type QuestTemplate,
   type ReadingPosition,
+  type RecentVerse,
   type Reflection,
   type ReflectionMood,
   type Settings,
@@ -69,7 +78,7 @@ function id(): string {
 interface QuestOSState {
   profile: Profile | null;
   settings: Settings;
-  /** Per-day picked quests, up to MAX_DAILY_PICKS per dateKey. */
+  /** Rolling windows grouped by local pick date for persistence and sync. */
   assignments: Record<string, DailyQuestAssignment[]>;
   /**
    * The persistent quest shelf ("My Quests"), keyed by quest slug. A quest
@@ -87,6 +96,8 @@ interface QuestOSState {
   bookmarks: VerseBookmark[];
   readingPosition: ReadingPosition | null;
   chaptersRead: ChapterRead[];
+  /** Recently viewed/selected verses, newest first and deduplicated by range. */
+  recentVerses: RecentVerse[];
   /** Milestones earned but not yet gently shown to the user. */
   pendingMilestones: string[];
   lastVisitDateKey: string | null;
@@ -129,14 +140,17 @@ interface QuestOSState {
     opts?: { purgeAccount?: string }
   ) => void;
 
-  // -- daily loop (pick model: the user chooses up to MAX_DAILY_PICKS a day)
-  /** Add a quest to today. Returns false when the day is full or already picked. */
-  pickQuest: (slug: string) => boolean;
-  /** Remove an uncompleted quest from today. Completed picks stay. */
-  unpickQuest: (slug: string) => void;
-  /** Mark a picked quest as underway. */
-  startQuest: (slug: string) => void;
-  completeQuestBySlug: (slug: string, reflection?: { body: string; mood?: ReflectionMood }) => { newMilestones: MilestoneSeed[] };
+  // -- rolling quest windows (three concurrent for free; unlimited for Plus)
+  /** Open a 24-hour quest window. Plus status must come from usePlus(). */
+  pickQuest: (slug: string, isPlus?: boolean) => boolean;
+  /** Hide an unfinished quest; free reservations persist after the undo grace. */
+  unpickQuest: (slug: string, isPlus?: boolean) => void;
+  /** Atomically pick (if needed) and mark a quest underway. */
+  startQuest: (slug: string, isPlus?: boolean) => boolean;
+  completeQuestBySlug: (
+    slug: string,
+    reflection?: { body: string; mood?: ReflectionMood }
+  ) => { completed: boolean; newMilestones: MilestoneSeed[] };
 
   // -- quest shelf (My Quests — persistent, independent of the day)
   /** Tuck a quest away for another day. Returns false when it's already
@@ -146,10 +160,10 @@ interface QuestOSState {
   pauseQuest: (slug: string) => void;
   /** Take a saved or paused quest back up. */
   resumeQuest: (slug: string) => void;
-  /** Keep the record, out of the main feed. Also frees today's pick. */
-  archiveQuest: (slug: string) => void;
+  /** Keep the record out of the feed; Plus may also release its window. */
+  archiveQuest: (slug: string, isPlus?: boolean) => void;
   /** Take the quest off the shelf entirely (it stays in Browse). */
-  removeQuest: (slug: string) => void;
+  removeQuest: (slug: string, isPlus?: boolean) => void;
   /** Walk a completed (or archived) quest again with fresh steps. */
   reopenQuest: (slug: string) => void;
   /** Mark one movement of the walk done/undone (a bookmark, not a duty). */
@@ -178,6 +192,8 @@ interface QuestOSState {
   toggleBookmark: (bookmark: Omit<VerseBookmark, "id" | "createdAt">) => boolean;
   markChapterRead: (bookSlug: string, bookName: string, chapter: number) => { newMilestones: MilestoneSeed[] };
   setReadingPosition: (position: Omit<ReadingPosition, "updatedAt">) => void;
+  /** Record an intentionally viewed verse without retaining duplicates. */
+  recordRecentVerse: (verse: Omit<RecentVerse, "viewedAt">) => void;
 
   // -- daily verse
   /** Deterministically show a different verse for the rest of today. */
@@ -189,6 +205,63 @@ interface QuestOSState {
   // -- sync bookkeeping
   /** Remove tombstone entries the sync engine has propagated remotely. */
   clearSyncTombstones: (cleared: SyncTombstones) => void;
+}
+
+function normalizeAssignmentRecord(
+  assignments: Record<string, DailyQuestAssignment[]>,
+): Record<string, DailyQuestAssignment[]> {
+  let changed = false;
+  const normalized: Record<string, DailyQuestAssignment[]> = {};
+  for (const [dateKey, list] of Object.entries(assignments)) {
+    normalized[dateKey] = (list ?? []).map((assignment) => {
+      const next = normalizeAssignmentWindow(assignment);
+      if (next !== assignment) changed = true;
+      return next;
+    });
+  }
+  return changed ? normalized : assignments;
+}
+
+function findOpenAssignment(
+  assignments: Record<string, DailyQuestAssignment[]>,
+  slug: string,
+  now: Date | number = Date.now(),
+): { dateKey: string; assignment: DailyQuestAssignment } | null {
+  for (const [dateKey, list] of Object.entries(assignments)) {
+    const assignment = list
+      ?.map(normalizeAssignmentWindow)
+      .find(
+        (candidate) =>
+          candidate.questSlug === slug &&
+          candidate.status !== "released" &&
+          isQuestWindowOpen(candidate, now),
+      );
+    if (assignment) return { dateKey, assignment };
+  }
+  return null;
+}
+
+function findOccupiedAssignment(
+  assignments: Record<string, DailyQuestAssignment[]>,
+  slug: string,
+  now: Date | number = Date.now(),
+): { dateKey: string; assignment: DailyQuestAssignment } | null {
+  for (const [dateKey, list] of Object.entries(assignments)) {
+    const assignment = list
+      ?.map(normalizeAssignmentWindow)
+      .find(
+        (candidate) =>
+          candidate.questSlug === slug && isQuestWindowOpen(candidate, now),
+      );
+    if (assignment) return { dateKey, assignment };
+  }
+  return null;
+}
+
+function recentVerseKey(
+  verse: Pick<RecentVerse, "bookSlug" | "chapter" | "verseStart" | "verseEnd">,
+): string {
+  return `${verse.bookSlug}:${verse.chapter}:${verse.verseStart}-${verse.verseEnd}`;
 }
 
 /**
@@ -228,7 +301,7 @@ function deriveMyQuestsFromHistory(
   for (const [dateKey, picks] of Object.entries(assignments)) {
     if (dateKey < cutoffKey) continue;
     for (const pick of picks ?? []) {
-      if (pick.status === "completed") continue;
+      if (pick.status === "completed" || pick.status === "released") continue;
       if (myQuests[pick.questSlug]?.status === "completed") continue;
       const at =
         pick.startedAt ??
@@ -377,23 +450,78 @@ export const useQuestOS = create<QuestOSState>()(
         set({ myQuests: { ...s.myQuests, [slug]: entry } });
       }
 
+      /**
+       * Hide an unfinished window without turning removal into a free-tier
+       * cap bypass. Plus can release freely. A brand-new, unstarted free pick
+       * gets a two-minute true undo for accidental taps; after that the row is
+       * marked released and invisibly reserves its slot until expiry.
+       */
+      function releaseQuestWindow(
+        slug: string,
+        isPlus: boolean,
+      ): DailyQuestAssignment | null {
+        const s = get();
+        const open = findOpenAssignment(s.assignments, slug);
+        if (!open || open.assignment.status === "completed") return null;
+
+        const pickedAt = Date.parse(open.assignment.pickedAt);
+        const withinUndo =
+          open.assignment.status === "assigned" &&
+          Number.isFinite(pickedAt) &&
+          Date.now() - pickedAt <= QUEST_PICK_UNDO_MS;
+        const dayPicks = s.assignments[open.dateKey] ?? [];
+        set({
+          assignments: {
+            ...s.assignments,
+            [open.dateKey]:
+              isPlus || withinUndo
+                ? dayPicks.filter(
+                    (assignment) =>
+                      assignment.questSlug !== slug ||
+                      assignment.status === "completed"
+                  )
+                : dayPicks.map((assignment) =>
+                    assignment.questSlug === slug &&
+                    assignment.status !== "completed" &&
+                    isQuestWindowOpen(assignment)
+                      ? {
+                          ...normalizeAssignmentWindow(assignment),
+                          status: "released" as const,
+                        }
+                      : assignment
+                  ),
+          },
+        });
+        return open.assignment;
+      }
+
       function completeQuest(
         quest: QuestTemplate,
         reflection?: { body: string; mood?: ReflectionMood }
-      ): { newMilestones: MilestoneSeed[] } {
+      ): { completed: boolean; newMilestones: MilestoneSeed[] } {
         const s = get();
         const now = new Date();
         const dateKey = toDateKey(now);
 
-        // Idempotency: a fast double-tap (or re-entry) must never double-count
-        // growth. Growth only ever appends, so guard on an existing completion
-        // for this quest today.
+        // Completion is only available inside an open 24-hour window. Every
+        // UI begin path atomically opens one first, which keeps the free limit
+        // a domain rule instead of a presentation-only suggestion.
+        const openPick = findOpenAssignment(s.assignments, quest.slug, now);
+        if (!openPick || openPick.assignment.status === "completed") {
+          return { completed: false, newMilestones: [] };
+        }
+
+        // Legacy/imported histories may contain a completion without a matching
+        // completed assignment. Keep the append-only growth log idempotent.
         if (
           s.completions.some(
-            (c) => c.dateKey === dateKey && c.questSlug === quest.slug
+            (c) =>
+              c.questSlug === quest.slug &&
+              c.completedAt >= openPick.assignment.pickedAt &&
+              c.completedAt < openPick.assignment.expiresAt,
           )
         ) {
-          return { newMilestones: [] };
+          return { completed: false, newMilestones: [] };
         }
 
         let reflectionId: string | undefined;
@@ -422,32 +550,23 @@ export const useQuestOS = create<QuestOSState>()(
         };
         set({ completions: [...get().completions, completion] });
 
-        // Mark the matching pick completed. Check today first; if the quest
-        // was picked before midnight and finished after, complete it under
-        // its own day so yesterday's pick isn't stranded as "started".
-        const yesterday = new Date(now);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const pickDayKey = [dateKey, toDateKey(yesterday)].find((key) =>
-          s.assignments[key]?.some(
-            (a) => a.questSlug === quest.slug && a.status !== "completed"
-          )
-        );
-        if (pickDayKey) {
-          set({
-            assignments: {
-              ...get().assignments,
-              [pickDayKey]: (get().assignments[pickDayKey] ?? []).map((a) =>
-                a.questSlug === quest.slug && a.status !== "completed"
-                  ? {
-                      ...a,
-                      status: "completed" as const,
-                      completedAt: now.toISOString(),
-                    }
-                  : a
-              ),
-            },
-          });
-        }
+        // The assignment belongs to the day it was picked, even when its
+        // rolling window crosses midnight.
+        const pickDayKey = openPick.dateKey;
+        set({
+          assignments: {
+            ...get().assignments,
+            [pickDayKey]: (get().assignments[pickDayKey] ?? []).map((a) =>
+              a.questSlug === quest.slug && isQuestWindowOpen(a, now)
+                ? {
+                    ...normalizeAssignmentWindow(a),
+                    status: "completed" as const,
+                    completedAt: now.toISOString(),
+                  }
+                : a
+            ),
+          },
+        });
 
         // The shelf entry finishes with the quest — every step done, one
         // more completion on the record. "Begin without adding" walks land
@@ -463,7 +582,7 @@ export const useQuestOS = create<QuestOSState>()(
 
         recordAction("quest_completed", quest.title, quest.growthType);
         track("quest_completed", { category: quest.category });
-        return { newMilestones: runMilestoneCheck() };
+        return { completed: true, newMilestones: runMilestoneCheck() };
       }
 
       return {
@@ -480,6 +599,7 @@ export const useQuestOS = create<QuestOSState>()(
         bookmarks: [],
         readingPosition: null,
         chaptersRead: [],
+        recentVerses: [],
         pendingMilestones: [],
         lastVisitDateKey: null,
         streak: emptyStreak(),
@@ -534,6 +654,7 @@ export const useQuestOS = create<QuestOSState>()(
             bookmarks: [],
             readingPosition: null,
             chaptersRead: [],
+            recentVerses: [],
             pendingMilestones: [],
             lastVisitDateKey: null,
             streak: emptyStreak(),
@@ -568,7 +689,7 @@ export const useQuestOS = create<QuestOSState>()(
                   },
                 }
               : DEFAULT_SETTINGS,
-            assignments: snapshot.assignments ?? {},
+            assignments: normalizeAssignmentRecord(snapshot.assignments ?? {}),
             // Pre-v6 exports carry no shelf — seed it from their history
             // exactly like the storage migration does.
             myQuests:
@@ -586,6 +707,7 @@ export const useQuestOS = create<QuestOSState>()(
             bookmarks: snapshot.bookmarks ?? [],
             readingPosition: snapshot.readingPosition ?? null,
             chaptersRead: snapshot.chaptersRead ?? [],
+            recentVerses: snapshot.recentVerses ?? [],
             pendingMilestones: snapshot.pendingMilestones ?? [],
             lastVisitDateKey: snapshot.lastVisitDateKey ?? null,
             streak: snapshot.streak ?? emptyStreak(),
@@ -615,19 +737,46 @@ export const useQuestOS = create<QuestOSState>()(
           setAnalyticsConsent(get().settings.analyticsConsent);
         },
 
-        pickQuest: (slug) => {
+        pickQuest: (slug, isPlus = false) => {
           const s = get();
+          if (!questBySlug.has(slug)) return false;
+          const occupied = findOccupiedAssignment(s.assignments, slug);
+          if (occupied) {
+            // A free member may hide a quest without releasing its slot. If
+            // they change their mind, restore that same reservation instead
+            // of trapping the quest or charging a second slot.
+            if (occupied.assignment.status !== "released") return false;
+            set({
+              assignments: {
+                ...s.assignments,
+                [occupied.dateKey]: (s.assignments[occupied.dateKey] ?? []).map(
+                  (assignment) =>
+                    assignment.questSlug === slug &&
+                    assignment.status === "released" &&
+                    isQuestWindowOpen(assignment)
+                      ? {
+                          ...normalizeAssignmentWindow(assignment),
+                          status: "assigned" as const,
+                        }
+                      : assignment
+                ),
+              },
+            });
+            touchMyQuest(slug, { status: "active", pausedAt: undefined });
+            track("quest_picked");
+            return true;
+          }
+          if (questSlotsRemaining(s.assignments, isPlus) <= 0) return false;
+
           const dateKey = toDateKey();
           const dayPicks = s.assignments[dateKey] ?? [];
-          if (dayPicks.length >= MAX_DAILY_PICKS) return false;
+          // The database natural key is (user, day, slug). A same-day expired
+          // duplicate is only possible after clock/time-zone manipulation; fail
+          // closed rather than creating a row that cannot sync.
           if (dayPicks.some((a) => a.questSlug === slug)) return false;
-          if (!questBySlug.has(slug)) return false;
-          const now = new Date().toISOString();
-          // A quest already completed today joins the day as completed, so
-          // picks and completions can't disagree.
-          const doneToday = s.completions.some(
-            (c) => c.dateKey === dateKey && c.questSlug === slug
-          );
+          const nowDate = new Date();
+          const now = nowDate.toISOString();
+          const expiresAt = new Date(nowDate.getTime() + QUEST_WINDOW_MS).toISOString();
           set({
             assignments: {
               ...s.assignments,
@@ -636,9 +785,9 @@ export const useQuestOS = create<QuestOSState>()(
                 {
                   dateKey,
                   questSlug: slug,
-                  status: doneToday ? ("completed" as const) : ("assigned" as const),
+                  status: "assigned" as const,
                   pickedAt: now,
-                  ...(doneToday ? { completedAt: now } : {}),
+                  expiresAt,
                   rerolls: 0,
                 },
               ],
@@ -649,9 +798,7 @@ export const useQuestOS = create<QuestOSState>()(
           // count stays. addedAt aligning with pickedAt marks entries born
           // from this pick, so an immediate unpick can tidy up after itself.
           const shelfEntry = get().myQuests[slug];
-          if (doneToday) {
-            touchMyQuest(slug, { status: "completed" });
-          } else if (shelfEntry?.status === "completed" || shelfEntry?.status === "archived") {
+          if (shelfEntry?.status === "completed" || shelfEntry?.status === "archived") {
             touchMyQuest(slug, {
               status: "active",
               stepsDone: [],
@@ -670,23 +817,14 @@ export const useQuestOS = create<QuestOSState>()(
           return true;
         },
 
-        unpickQuest: (slug) => {
+        unpickQuest: (slug, isPlus = false) => {
           const s = get();
-          const dateKey = toDateKey();
-          const dayPicks = s.assignments[dateKey];
-          if (!dayPicks) return;
-          const target = dayPicks.find((a) => a.questSlug === slug);
+          const open = findOpenAssignment(s.assignments, slug);
+          if (!open) return;
+          const { assignment: target } = open;
           // Completed picks are part of the record — they don't come off.
-          if (!target || target.status === "completed") return;
-          // Keep the (possibly empty) array so sync knows this device
-          // deliberately cleared the day — a missing key would let a stale
-          // remote day resurrect on merge.
-          set({
-            assignments: {
-              ...s.assignments,
-              [dateKey]: dayPicks.filter((a) => a.questSlug !== slug),
-            },
-          });
+          if (target.status === "completed") return;
+          releaseQuestWindow(slug, isPlus);
           // Tidy the shelf: an entry born from this very pick (addedAt ===
           // pickedAt) that was never begun leaves with it — the person was
           // browsing, not committing. Removal must tombstone or sync
@@ -694,8 +832,9 @@ export const useQuestOS = create<QuestOSState>()(
           // standing: a re-picked completed quest returns to the completed
           // record (its walks aren't erased by a change of heart about
           // today), anything else goes back to saved-for-later. A walk
-          // that's already begun stays active — unpicking only frees the
-          // day, not the journey.
+          // that's already begun stays active. After the accidental-tap
+          // grace, free-tier removal hides the quest but keeps its slot
+          // reservation until the rolling window ends.
           const entry = get().myQuests[slug];
           if (entry && entry.status === "active") {
             const begun = entry.stepsDone.length > 0 || Boolean(entry.startedAt);
@@ -720,35 +859,47 @@ export const useQuestOS = create<QuestOSState>()(
           track("quest_unpicked");
         },
 
-        startQuest: (slug) => {
-          const s = get();
-          const dateKey = toDateKey();
-          const dayPicks = s.assignments[dateKey];
-          if (!dayPicks?.some((a) => a.questSlug === slug && a.status === "assigned"))
-            return;
-          set({
-            assignments: {
-              ...s.assignments,
-              [dateKey]: dayPicks.map((a) =>
-                a.questSlug === slug && a.status === "assigned"
-                  ? { ...a, status: "started" as const, startedAt: new Date().toISOString() }
-                  : a
-              ),
-            },
-          });
+        startQuest: (slug, isPlus = false) => {
+          let open = findOpenAssignment(get().assignments, slug);
+          if (!open) {
+            if (!get().pickQuest(slug, isPlus)) return false;
+            open = findOpenAssignment(get().assignments, slug);
+          }
+          if (!open || open.assignment.status === "completed") return false;
+
+          const now = new Date().toISOString();
+          if (open.assignment.status === "assigned") {
+            const s = get();
+            const dayPicks = s.assignments[open.dateKey] ?? [];
+            set({
+              assignments: {
+                ...s.assignments,
+                [open.dateKey]: dayPicks.map((a) =>
+                  a.questSlug === slug && isQuestWindowOpen(a)
+                    ? {
+                        ...normalizeAssignmentWindow(a),
+                        status: "started" as const,
+                        startedAt: now,
+                      }
+                    : a
+                ),
+              },
+            });
+            track("quest_started");
+          }
           touchMyQuest(slug, {
             status: "active",
             pausedAt: undefined,
             ...(get().myQuests[slug]?.startedAt
               ? {}
-              : { startedAt: new Date().toISOString() }),
+              : { startedAt: now }),
           });
-          track("quest_started");
+          return true;
         },
 
         completeQuestBySlug: (slug, reflection) => {
           const quest = questBySlug.get(slug);
-          if (!quest) return { newMilestones: [] };
+          if (!quest) return { completed: false, newMilestones: [] };
           return completeQuest(quest, reflection);
         },
 
@@ -790,7 +941,7 @@ export const useQuestOS = create<QuestOSState>()(
           track("quest_resumed");
         },
 
-        archiveQuest: (slug) => {
+        archiveQuest: (slug, isPlus = false) => {
           const s = get();
           const entry = s.myQuests[slug];
           if (!entry || entry.status === "archived") return;
@@ -799,28 +950,11 @@ export const useQuestOS = create<QuestOSState>()(
             archivedAt: new Date().toISOString(),
             pausedAt: undefined,
           });
-          // Free today's pick — an archived quest shouldn't keep holding
-          // one of the day's three places. Completed picks are history.
-          const dateKey = toDateKey();
-          const dayPicks = s.assignments[dateKey];
-          if (
-            dayPicks?.some(
-              (a) => a.questSlug === slug && a.status !== "completed"
-            )
-          ) {
-            set({
-              assignments: {
-                ...get().assignments,
-                [dateKey]: dayPicks.filter(
-                  (a) => a.questSlug !== slug || a.status === "completed"
-                ),
-              },
-            });
-          }
+          releaseQuestWindow(slug, isPlus);
           track("quest_archived");
         },
 
-        removeQuest: (slug) => {
+        removeQuest: (slug, isPlus = false) => {
           const s = get();
           if (!s.myQuests[slug]) return;
           const rest = { ...s.myQuests };
@@ -834,23 +968,7 @@ export const useQuestOS = create<QuestOSState>()(
               myQuests: [...s.tombstones.myQuests, slug],
             },
           });
-          // Also free today's uncompleted pick of the same quest.
-          const dateKey = toDateKey();
-          const dayPicks = get().assignments[dateKey];
-          if (
-            dayPicks?.some(
-              (a) => a.questSlug === slug && a.status !== "completed"
-            )
-          ) {
-            set({
-              assignments: {
-                ...get().assignments,
-                [dateKey]: dayPicks.filter(
-                  (a) => a.questSlug !== slug || a.status === "completed"
-                ),
-              },
-            });
-          }
+          releaseQuestWindow(slug, isPlus);
           track("quest_removed");
         },
 
@@ -1112,6 +1230,20 @@ export const useQuestOS = create<QuestOSState>()(
           });
         },
 
+        recordRecentVerse: (verse) => {
+          const now = new Date().toISOString();
+          const key = recentVerseKey(verse);
+          const next: RecentVerse = { ...verse, viewedAt: now };
+          set({
+            recentVerses: [
+              next,
+              ...get().recentVerses.filter(
+                (candidate) => recentVerseKey(candidate) !== key,
+              ),
+            ].slice(0, 20),
+          });
+        },
+
         dismissPendingMilestone: (key) => {
           set({
             pendingMilestones: get().pendingMilestones.filter(
@@ -1178,7 +1310,7 @@ export const useQuestOS = create<QuestOSState>()(
     {
       name: "biblequest:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 7,
+      version: 8,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
@@ -1256,6 +1388,16 @@ export const useQuestOS = create<QuestOSState>()(
             | undefined;
           if (settings) settings.analyticsConsent = false;
         }
+        if (version < 8) {
+          // v8: rolling 24-hour quest windows and persistent recent verses.
+          state.assignments = normalizeAssignmentRecord(
+            (state.assignments ?? {}) as Record<
+              string,
+              DailyQuestAssignment[]
+            >,
+          );
+          state.recentVerses = [];
+        }
         return state as unknown as QuestOSState;
       },
       onRehydrateStorage: () => (state, error) => {
@@ -1278,13 +1420,25 @@ export const useQuestOS = create<QuestOSState>()(
 // returns a primitive.
 // ---------------------------------------------------------------------------
 
-// Shared empty array so the selector returns a stable reference on days
-// with no picks (a fresh [] every call would loop zustand's getSnapshot).
+// Shared empty array + tiny memo so rolling-window derivation stays stable for
+// Zustand. Components that display countdowns re-render once a minute/focus;
+// the minute key lets expiry fall out without mutating persisted history.
 const NO_PICKS: DailyQuestAssignment[] = [];
+let activePicksSource: Record<string, DailyQuestAssignment[]> | null = null;
+let activePicksMinute = -1;
+let activePicksResult: DailyQuestAssignment[] = NO_PICKS;
 
-/** Today's picked quests, in pick order. Stable reference — render-safe. */
+/** Open 24-hour quest windows, in pick order. Stable reference — render-safe. */
 export function selectTodayPicks(s: QuestOSState): DailyQuestAssignment[] {
-  return s.assignments[toDateKey()] ?? NO_PICKS;
+  const minute = Math.floor(Date.now() / 60_000);
+  if (activePicksSource === s.assignments && activePicksMinute === minute) {
+    return activePicksResult;
+  }
+  activePicksSource = s.assignments;
+  activePicksMinute = minute;
+  activePicksResult = activeQuestAssignments(s.assignments);
+  if (activePicksResult.length === 0) activePicksResult = NO_PICKS;
+  return activePicksResult;
 }
 
 /** The candle. Stable reference — the stored object itself. */
@@ -1312,4 +1466,4 @@ export function selectVerseRefreshCount(s: QuestOSState): number {
 }
 
 export { getDailyVerse };
-export { MAX_DAILY_PICKS };
+export { FREE_QUEST_SLOTS, FREE_QUEST_SLOTS as MAX_DAILY_PICKS };

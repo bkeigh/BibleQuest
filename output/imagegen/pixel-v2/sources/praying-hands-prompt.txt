@@ -1,0 +1,9 @@
+Use case: style-transfer
+Asset type: production quest-category sprite for “Pray for Three People by Name”
+Input images: UI-Reference/exec-7366b95b-c615-4402-ab3a-d82fe55b06ea.png is the prayer-subject reference; PixelArtReferenceSheet.png is the authoritative style and palette reference.
+
+Rebuild exactly one unmistakable pair of human hands pressed palm-to-palm in prayer. Grouped fingertips point upward, both thumbs remain readable at mid-height, a one-native-pixel dark divider separates the palms, and narrow deep-green cuffs anchor the wrists. Preserve the compact proportions and warm skin shading of the PRAYER example.
+
+Author on a strict 32x32 native pixel grid with a continuous one-native-pixel deep-green/charcoal outline, two to three flat shade levels, upper-left light, and no detail smaller than one native pixel. Use only the BibleQuest green, moss, charcoal, warm skin, parchment-highlight, and restrained-gold ramps.
+
+Generate one centered icon on a perfectly flat #ff00ff chroma-key background with two to three native pixels of padding. No antialiasing, blur, vector-smooth curves, mixed pixel sizes, malformed anatomy, fused fingers, oversized cuffs, stray pixels, glow, shadow, text, border, watermark, body, face, or extra hands.

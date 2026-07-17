@@ -113,7 +113,7 @@ rows. Keep conversions symmetric and update both directions together.
 
 ### Authentication
 
-- `src/middleware.ts` delegates cookie refresh to
+- `src/proxy.ts` delegates cookie refresh to
   `src/lib/supabase/middleware.ts`.
 - `src/lib/supabase/client.ts` creates the browser client only when public
   configuration exists.

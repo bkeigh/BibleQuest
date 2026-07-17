@@ -4,7 +4,7 @@
  * validated build assets. Prayers, reflections, and other user data continue
  * to live in the persisted Zustand store; this worker never handles that data.
  */
-const CACHE_VERSION = "biblequest-v4";
+const CACHE_VERSION = "biblequest-v6";
 const CACHE_OWNER_PREFIX = "biblequest-";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
@@ -12,11 +12,66 @@ const CURRENT_CACHES = [SHELL_CACHE, RUNTIME_CACHE];
 
 // These are generic, client-rendered shells. Fetch without credentials during
 // install so an authenticated response can never become a shared offline shell.
+const PIXEL_ASSET_NAMES = [
+  "candle",
+  "leaf",
+  "star",
+  "bird",
+  "flower",
+  "chapel",
+  "book",
+  "open-book",
+  "bookmark",
+  "lantern",
+  "path",
+  "tree",
+  "sun",
+  "heart",
+  "hands",
+  "praying-hands",
+  "wheat",
+  "dove",
+  "cross",
+  "door",
+  "key",
+  "scroll",
+  "compass",
+  "crown",
+  "mountain",
+  "moon",
+  "service-basket",
+  "links",
+  "people",
+  "fountain",
+  "candle-unlit",
+  "candle-small",
+  "candle-steady",
+  "candle-sparks",
+  "candle-halo",
+  "mascot-lamb",
+  "mascot-lantern",
+  "mascot-scroll",
+  "mascot-dove",
+  "mascot-sprout",
+  "mascot-key",
+  "mascot-map",
+  "mascot-campfire",
+];
+
+const PIXEL_ASSET_PATHS = [
+  ...PIXEL_ASSET_NAMES.map((name) => `/pixel/${name}.png`),
+  ...Array.from({ length: 20 }, (_, stage) =>
+    `/pixel/tree-stage-${stage}.png`
+  ),
+];
+const PIXEL_ASSET_PATH_SET = new Set(PIXEL_ASSET_PATHS);
+
 const PRECACHE_PATHS = [
   "/offline",
   "/app",
   "/onboarding",
   "/manifest.webmanifest",
+  ...PIXEL_ASSET_PATHS,
 ];
 
 const OFFLINE_PATH = "/offline";
@@ -84,6 +139,13 @@ function isImmutableStaticRequest(request, url = new URL(request.url)) {
   return (
     isRequestCacheCandidate(request, url) &&
     url.pathname.startsWith("/_next/static/")
+  );
+}
+
+function isPixelAssetRequest(request, url = new URL(request.url)) {
+  return (
+    isRequestCacheCandidate(request, url) &&
+    PIXEL_ASSET_PATH_SET.has(url.pathname)
   );
 }
 
@@ -239,7 +301,10 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (isImmutableStaticRequest(request, url)) {
+  if (
+    isImmutableStaticRequest(request, url) ||
+    isPixelAssetRequest(request, url)
+  ) {
     event.respondWith(staleWhileRevalidate(event, request));
   }
 });
@@ -254,12 +319,14 @@ if (self.__BIBLEQUEST_SW_TESTING__) {
     RUNTIME_CACHE,
     CURRENT_CACHES,
     PRECACHE_PATHS,
+    PIXEL_ASSET_PATHS,
     OFFLINE_SAFE_NAVIGATION_PATHS,
     isForbiddenPath,
     isRequestCacheCandidate,
     isOfflineSafeNavigationPath,
     isOfflineSafeNavigationRequest,
     isImmutableStaticRequest,
+    isPixelAssetRequest,
     isResponseCacheable,
   });
 }

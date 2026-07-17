@@ -1,154 +1,126 @@
-# BibleQuest Pixel Upgrade — Production Kit
+# BibleQuest Production Sprite Pipeline
 
-Turnkey plan to generate the reference-sheet assets, replace the current pixel
-art, and wire it into the registry. Built while you slept, so read this first.
+BibleQuest ships a reviewed 63-file transparent PNG catalogue. Art creation and
+runtime delivery are deliberately separate: reference-conditioned ImageGen
+creates editable staging sources, while a deterministic local processor owns
+native-grid reconstruction, alpha, palette, and final dimensions. The app never
+generates art at runtime and no provider credential is part of the build.
 
-**Status: ready to generate — blocked only on PixelLab auth.**
+The live registry remains stable: screens request a named `PixelIcon` or
+`PixelMascot`; `src/components/design-system/pixel-assets.ts` owns its public
+file source and logical canvas.
 
----
+## Production contract
 
-## 1. The one thing to fix (2 min)
+| Family | Files | Physical PNG | Registry grid |
+| --- | ---: | ---: | ---: |
+| Small interface/category sprites | 30 | 32×32 | 32×32 |
+| Streak-candle states | 5 | 32×36 | 16×18 |
+| Olive-tree stages | 20 | 64×64 | 32×32 |
+| Feature mascots | 8 | 48×48 | 48×48 |
 
-PixelLab can't generate in this session yet. The connected PixelLab MCP returns
-`401: Missing Authorization header`, and the sandbox is firewalled off from
-`api.pixellab.ai`, so the token you pasted can't be injected from my side.
+Navigation and form controls remain clean vector icons. Pixel art is reserved
+for quests, growth, milestones, onboarding, and meaningful empty states. The
+exact names and family membership live in `asset-manifest.json` beside this
+guide.
 
-Fix: make sure the PixelLab connector carries your token — the exact block you
-pasted is correct, it just isn't live on the connected instance:
+## 1. Anchor the source
 
-```json
-"pixellab": {
-  "url": "https://api.pixellab.ai/mcp",
-  "headers": { "Authorization": "Bearer 3622bf22-…" }
-}
+Use the approved `PixelArtReferenceSheet.png` as the master style and palette
+reference. Use the subject PNGs in `BibleQuest-Assets/UI-ASSETS/` as explicit
+shape anchors. A reference image guides silhouette, materials, viewpoint,
+outline, and shading; it is not a production sprite to shrink automatically.
+
+For new or revised art:
+
+- state each reference image's role in the generation prompt;
+- request strict native pixel clusters, one dark-evergreen outline, upper-left
+  light, flat stepped shading, and the shared BibleQuest palette;
+- use a uniform removable chroma field (`#ff00ff` for green subjects);
+- prohibit text, frames, cast shadows, blur, soft glow, partial transparency,
+  checkerboards, and unrelated scenery;
+- for a family sequence, generate one coherent atlas so body/species, baseline,
+  light, and scale remain stable.
+
+Save untouched results under `output/imagegen/pixel-v2/sources/`. Do not write
+generated files directly into `public/pixel/`.
+
+## 2. Reconstruct the native grid
+
+`scripts/process-pixel-sprites.mjs` is the provider-neutral production tool. It
+removes connected opaque backdrops, reconstructs binary alpha, maps every
+opaque pixel to the fixed BibleQuest palette, uses transparent padding, and
+normalizes without soft resampling.
+
+Clean the supplied opaque anchors:
+
+```sh
+node scripts/process-pixel-sprites.mjs clean-supplied \
+  /path/to/BibleQuest-Assets/UI-ASSETS \
+  output/imagegen/pixel-v2/supplied
 ```
 
-Add/confirm that `headers.Authorization` on the PixelLab connector (Claude →
-Settings → Connectors → PixelLab), reconnect, then tell me "PixelLab is live"
-and I'll run the whole manifest.
+Normalize one approved transparent/chroma-keyed source:
 
-## 2. What I did / didn't touch
-
-- **Did:** read your whole pixel system, reconciled the reference sheet against
-  the registry, and wrote a complete generation spec: `asset-manifest.json`
-  (62 assets, every one with a tuned prompt, exact dimensions, and animation
-  plan) plus this plan.
-- **Did NOT:** touch a single line of live source. Adding `kind:"png"` registry
-  entries that point at PNGs that don't exist yet would render broken images and
-  could break your build. Those edits are staged here for review, applied only
-  after the art lands.
-
-## 3. Scope decisions I made for you (all easy to change)
-
-- **Everything in one pass**, as you asked — 44 core assets now, 14 optional
-  (6 nav icons + 8 mascots) flagged separately.
-- **The reference sheet is the target, not the current app.** Today's icons are
-  tiny hand-placed "marks" (5–8 cells). The sheet is richer 32-bit art. So this
-  upgrades icon/feature/tile assets to PixelLab **PNGs**, using your documented
-  PNG-swap workflow (drop in `public/pixel/`, flip one registry entry).
-- **Kept your architecture intact.** Each PNG keeps the logical grid of the
-  sprite it replaces, so rendered sizes and every call site stay unchanged.
-- **Respected your own rule** that nav/tab bars use vector icons — the 6
-  bottom-nav pixel icons on the sheet are in the manifest but marked
-  `optional`, off by default. Say the word to promote them.
-- **Content-guide safe:** the Forgiveness glyph reads as *release*, and the
-  streak candle is never a loss/punishment motif — an unlit candle is "waiting
-  to be lit."
-
-## 4. Style guide → PixelLab settings
-
-Your sheet maps almost 1:1 onto PixelLab controls (baked into every prompt):
-
-| Your spec | PixelLab setting |
-|---|---|
-| 1–2px dark green/charcoal outline | `outline: single color outline` |
-| 2–3 shade levels, minimal dither | `shading: basic shading` |
-| Detailed hero objects (bible, lantern, window) | `detail: high detail` |
-| Highlight upper-left, shadow lower-right | in prompt (model honors it) |
-| Icons/objects front view | `view: side` |
-| Ground tiles | `view: high top-down` (+ tileset tools for seamless) |
-| Transparent-ready | `create_map_object` (transparent bg) |
-| Brand palette | hex list embedded in every prompt |
-
-## 5. Generate → normalize → drop → flip (the pipeline)
-
-1. **Generate** each asset at `genCanvasPx` (usually 64–96px) for model quality.
-2. **Normalize** to exact `pngPx` — trim transparent margins, nearest-neighbor
-   snap-scale to the integer multiple of the logical grid, re-quantize to the
-   brand palette. (Your PNG rule: file pixels must map to whole logical cells.)
-3. **Drop** into `public/pixel/<id>.png`.
-4. **Flip** the registry entry to `{ kind:"png", src:"/pixel/<id>.png", cols, rows }`.
-
-Nothing else changes — names, sizes, a11y, importing files all stay put.
-
-## 6. Animation plan (the three you chose)
-
-- **Candle flame + streak stages** — the 5 states (`candle-unlit → -small →
-  -steady → -sparks → -halo`) *are* the Day 0/1+/7+/30+ progression. Each lit
-  PNG gets a subtle whole-image flicker via `ambientClassName`. Optional upgrade:
-  a 6-frame PixelLab `animate_object` flame loop for a truer per-flame flicker.
-- **Dove flight** — a 6-frame PixelLab `animate_character` wing-flap/hover loop.
-  This is the one item that needs a *new* tiny renderer: a `PixelSprite` frame
-  player (CSS `steps()` over a horizontal strip). I'll add it when we wire, kept
-  behind the same `.ambient` reduced-motion kill-switch as everything else.
-- **Sprout → tree growth** — the 6 tree stages already animate as a staged
-  spring sequence in `GrowthTree.tsx`; regenerating them richer keeps that for
-  free. Optional: PixelLab interpolation between stages for a true grow-in.
-
-## 7. Proposed `CATEGORY_SPRITE` remap (after art lands)
-
-Give the nine sheet categories their own glyphs (currently they reuse older
-marks in `PixelIcon.tsx`):
-
-```
-prayer      → icon-prayer          (was candle)
-scripture   → open-bible           (was book)
-service     → icon-service         (was hands)
-kindness    → icon-kindness        (was heart)
-forgiveness → icon-forgiveness     (was dove)
-gratitude   → icon-gratitude       (was flower/star)
-silence     → icon-silence         (was leaf)
-community   → icon-community        (was door)
-reflection  → icon-reflection      (was compass)
+```sh
+node scripts/process-pixel-sprites.mjs normalize \
+  output/imagegen/pixel-v2/sources/praying-hands.png \
+  output/imagegen/pixel-v2/staging/praying-hands.png \
+  32 32 alpha nearest
 ```
 
-Other categories (generosity, discipline, worship, family, patience,
-evangelization, self-control, humility, patience) keep their current marks
-until a later pass.
+Build a review sheet:
 
-## 8. Staged registry edit (review — NOT applied)
-
-Example of the single-line swaps that happen in step 4, e.g. for the candle:
-
-```ts
-// before
-candle: { kind: "grid", palette: {…}, rows: […], ambient: {…} },
-// after
-candle: { kind: "png", src: "/pixel/candle.png", cols: 10, rows: 14,
-          ambientClassName: "[animation:var(--animate-flicker)]" },
+```sh
+node scripts/process-pixel-sprites.mjs qa-sheet \
+  output/imagegen/pixel-v2/staging \
+  output/imagegen/pixel-v2/staging-contact-sheet.png
 ```
 
-Every asset's exact `registryEntry` is in `asset-manifest.json`.
+Atlas families may use a family-specific splitter in the staging directory,
+but it must finish with the same invariants: exact dimensions, fixed palette,
+binary alpha, nearest-neighbor reconstruction, shared baseline, and distinct
+frames. Keep that processing recipe beside its raw atlas and generation notes
+so the result remains reproducible.
 
-## 9. Run sequence once PixelLab is live
+## 3. Review before promotion
 
-1. Generate all `status: upgrade|new` assets (skip `optional`) from the manifest.
-2. Normalize + drop into `public/pixel/`.
-3. Flip registry entries; add `PixelSprite` player for the dove.
-4. Remap `CATEGORY_SPRITE`.
-5. `npm run build` + a quick visual pass; iterate any misses (regen is cheap).
-6. Then, if you want them: the 8 mascots and 6 nav icons.
+Review every candidate at the true 32px/48px/64px source size and at its actual
+rendered size in the app. A zoomed contact sheet alone is not approval.
 
-## 10. Decisions for you to confirm (I picked sensible defaults)
+Required checks:
 
-- Promote the 6 **bottom-nav** pixel icons, or keep nav vector? *(default: keep vector)*
-- Include the 8 **mascot** upgrades this round? *(default: yes, as a final phase)*
-- Streak flame: whole-image flicker only, or the richer **6-frame** PixelLab
-  flame + new player? *(default: ship flicker first, add frames if you like it)*
-- Estimated PixelLab generations: ~44 core (×1–2 with retries) + ~18 animation
-  frames. I'll check `get_balance` before a full run and warn if it's tight.
+- exact family dimensions and expected file count;
+- alpha values are only 0 or 255, with transparent corners and safe padding;
+- every opaque RGB value belongs to the shared production palette;
+- no antialiased fringe, isolated noise, checkerboard residue, or chroma spill;
+- silhouettes remain unmistakable at the smallest call site;
+- category marks are visually distinct — especially `praying-hands`, `hands`,
+  and `service-basket`;
+- the five candles share one body and holder; only flame, sparks, and halo grow;
+- all twenty tree stages share olive species, viewpoint, baseline, light,
+  palette, soil/trunk language, and genuine incremental development;
+- no readable text or letter-like artifacts on books, scrolls, or maps.
 
----
+Regenerate or reconstruct a failed asset; do not rename an unrelated image to
+make a sequence appear complete.
 
-*Manifest: `asset-manifest.json` · System of record: `docs/PIXEL_SYSTEM.md` ·
-Registry: `src/components/design-system/pixel-assets.ts`*
+## 4. Promote and ship
+
+1. Copy only approved normalized files to `public/pixel/<registry-key>.png`.
+2. Keep registry logical dimensions unchanged in
+   `src/components/design-system/pixel-assets.ts`.
+3. Keep category mappings in `PixelIcon.tsx` semantically distinct; prayer uses
+   `praying-hands`.
+4. Keep every production path in the explicit catalogue in `public/sw.js`.
+5. Bump the service-worker cache version when replacing bytes behind existing
+   names, so installed clients receive the approved art immediately.
+6. Run the pixel, service-worker, growth, type, lint, test, and build checks.
+7. Inspect mobile and desktop screens, reduced motion, candle mode, and a true
+   offline reload.
+
+The registry paths, logical sizes, accessibility behavior, and consuming
+components remain unchanged by an art-only replacement.
+
+See `docs/PIXEL_SYSTEM.md` for placement, typography, motion, and product-tone
+guardrails.

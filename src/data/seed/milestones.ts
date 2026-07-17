@@ -205,5 +205,149 @@ export const seedMilestones: MilestoneSeed[] = [
     "requirementMetric": "quests_community",
     "requirementCount": 3,
     "iconKey": "chapel"
+  },
+  {
+    "key": "three-mornings",
+    "title": "A Rhythm Begins",
+    "description": "You returned on three different days. A practice starts by coming back.",
+    "milestoneType": "rhythm",
+    "requirementMetric": "journey_days",
+    "requirementCount": 3,
+    "iconKey": "sun"
+  },
+  {
+    "key": "two-weeks-returning",
+    "title": "Two Weeks Returning",
+    "description": "Fourteen days along the road, made from ordinary moments of attention.",
+    "milestoneType": "rhythm",
+    "requirementMetric": "journey_days",
+    "requirementCount": 14,
+    "iconKey": "path"
+  },
+  {
+    "key": "season-of-returning",
+    "title": "A Season of Returning",
+    "description": "You have returned on ninety days. The rhythm has had time to take root.",
+    "milestoneType": "rhythm",
+    "requirementMetric": "journey_days",
+    "requirementCount": 90,
+    "iconKey": "tree"
+  },
+  {
+    "key": "many-small-steps",
+    "title": "Many Small Steps",
+    "description": "Twenty-five quests completed. Small acts have become a well-worn path.",
+    "milestoneType": "rhythm",
+    "requirementMetric": "quest_completions",
+    "requirementCount": 25,
+    "iconKey": "path"
+  },
+  {
+    "key": "fifty-quests",
+    "title": "The Longer Road",
+    "description": "Fifty quests completed, each one lived beyond the screen.",
+    "milestoneType": "rhythm",
+    "requirementMetric": "quest_completions",
+    "requirementCount": 50,
+    "iconKey": "mountain"
+  },
+  {
+    "key": "deeper-into-the-story",
+    "title": "Deeper into the Story",
+    "description": "Twenty-five chapters read. Familiar words are becoming a larger story.",
+    "milestoneType": "scripture",
+    "requirementMetric": "chapters_read",
+    "requirementCount": 25,
+    "iconKey": "open-book"
+  },
+  {
+    "key": "prayer-woven-in",
+    "title": "Prayer Woven In",
+    "description": "Twenty-five prayers written across whatever the days held.",
+    "milestoneType": "prayer",
+    "requirementMetric": "prayers_created",
+    "requirementCount": 25,
+    "iconKey": "candle"
+  },
+  {
+    "key": "pages-of-attention",
+    "title": "Pages of Attention",
+    "description": "Fifty reflections. You kept making room to notice what was happening within and around you.",
+    "milestoneType": "depth",
+    "requirementMetric": "reflections_created",
+    "requirementCount": 50,
+    "iconKey": "fountain"
+  },
+  {
+    "key": "small-treasury",
+    "title": "A Small Treasury",
+    "description": "Twenty-five verses saved — a collection of words worth carrying.",
+    "milestoneType": "scripture",
+    "requirementMetric": "verses_bookmarked",
+    "requirementCount": 25,
+    "iconKey": "bookmark"
+  },
+  {
+    "key": "graces-remembered",
+    "title": "Graces Remembered",
+    "description": "Ten prayers marked answered. You paused long enough to remember each one.",
+    "milestoneType": "prayer",
+    "requirementMetric": "prayers_answered",
+    "requirementCount": 10,
+    "iconKey": "bird"
+  },
+  {
+    "key": "mercy-practiced",
+    "title": "Mercy Practiced",
+    "description": "Three forgiveness quests. Mercy took shape in choices you could actually make.",
+    "milestoneType": "depth",
+    "requirementMetric": "quests_forgiveness",
+    "requirementCount": 3,
+    "iconKey": "links"
+  },
+  {
+    "key": "open-hands",
+    "title": "Open Hands",
+    "description": "Three generosity quests. You made room to give without needing to be noticed.",
+    "milestoneType": "kindness",
+    "requirementMetric": "quests_generosity",
+    "requirementCount": 3,
+    "iconKey": "wheat"
+  },
+  {
+    "key": "steady-practice",
+    "title": "Steady Practice",
+    "description": "Five discipline quests. A faithful practice is being built one choice at a time.",
+    "milestoneType": "rhythm",
+    "requirementMetric": "quests_discipline",
+    "requirementCount": 5,
+    "iconKey": "lantern"
+  },
+  {
+    "key": "ordinary-worship",
+    "title": "Worship in Ordinary Days",
+    "description": "Five worship quests. Attention and praise found a home in everyday life.",
+    "milestoneType": "prayer",
+    "requirementMetric": "quests_worship",
+    "requirementCount": 5,
+    "iconKey": "chapel"
+  },
+  {
+    "key": "attentive-heart",
+    "title": "An Attentive Heart",
+    "description": "Five reflection quests. You practiced staying with what was worth noticing.",
+    "milestoneType": "depth",
+    "requirementMetric": "quests_reflection",
+    "requirementCount": 5,
+    "iconKey": "fountain"
+  },
+  {
+    "key": "patient-steps",
+    "title": "Patient Steps",
+    "description": "Five patience quests. You kept choosing the slower, steadier way.",
+    "milestoneType": "depth",
+    "requirementMetric": "quests_patience",
+    "requirementCount": 5,
+    "iconKey": "path"
   }
 ];

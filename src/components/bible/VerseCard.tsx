@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useState } from "react";
 import { motion } from "framer-motion";
 import type { DailyVerse } from "@/lib/questos/types";
 import { PaperCard } from "@/components/design-system/PaperCard";
@@ -17,6 +18,7 @@ import { cleanVerseText } from "@/lib/utils/scripture";
 import { useStrings } from "@/lib/i18n";
 import { riseIn } from "@/lib/motion";
 import { track } from "@/lib/analytics/events";
+import { VerseShareSheet } from "@/components/bible/VerseShareSheet";
 
 /**
  * VerseCard — today's verse as a devotional card / margin note.
@@ -46,14 +48,32 @@ export function VerseCard({
   const t = useStrings();
   const bookmarks = useQuestOS((s) => s.bookmarks);
   const toggleBookmark = useQuestOS((s) => s.toggleBookmark);
+  const [sharing, setSharing] = useState(false);
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
+
+  const closeShareSheet = useCallback(() => setShareSheetOpen(false), []);
+
+  const verseSegment =
+    verse.verseEnd > verse.verseStart
+      ? `${verse.verseStart}-${verse.verseEnd}`
+      : `${verse.verseStart}`;
+  const shareTitle = `${verse.reference} — BibleQuest`;
+  const shareText = `“${cleanVerseText(verse.text)}” — ${verse.reference}`;
+  const sharePath = `/verse/${verse.bookSlug}/${verse.chapter}/${verseSegment}`;
 
   async function shareVerse() {
-    // Plain text travels everywhere — Messages, WhatsApp, an Instagram
-    // story via the OS share sheet. No ids, no tracking params.
-    const text = `“${cleanVerseText(verse.text)}” — ${verse.reference}\n\nbiblequest.co`;
+    if (sharing) return;
+    const url = new URL(sharePath, window.location.origin).toString();
+    setShareUrl(url);
+    setSharing(true);
     if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
       try {
-        await navigator.share({ text });
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url,
+        });
         track("verse_shared");
         return;
       } catch (err) {
@@ -61,15 +81,13 @@ export function VerseCard({
         // an event. Anything else (webview stubs, permissions policy) falls
         // through to the clipboard so the button never dies silently.
         if (err instanceof DOMException && err.name === "AbortError") return;
+      } finally {
+        setSharing(false);
       }
+    } else {
+      setSharing(false);
     }
-    try {
-      await navigator.clipboard.writeText(text);
-      toast(t.home.shareCopied);
-      track("verse_shared");
-    } catch {
-      toast(t.home.shareCopyFailed);
-    }
+    setShareSheetOpen(true);
   }
 
   const bookName =
@@ -170,9 +188,12 @@ export function VerseCard({
             size="sm"
             className="min-h-11 max-[360px]:gap-1 max-[360px]:px-1 max-[360px]:text-[0.875rem]"
             onClick={shareVerse}
+            disabled={sharing}
+            aria-busy={sharing}
+            aria-haspopup="dialog"
           >
             <IconShare size={16} />
-            {t.home.share}
+            {sharing ? "Sharing…" : t.home.share}
           </GentleButton>
           <GentleLink
             variant="text"
@@ -183,6 +204,13 @@ export function VerseCard({
           </GentleLink>
         </div>
       )}
+      <VerseShareSheet
+        open={shareSheetOpen}
+        title={shareTitle}
+        text={shareText}
+        url={shareUrl || sharePath}
+        onClose={closeShareSheet}
+      />
     </PaperCard>
   );
 }

@@ -20,6 +20,7 @@ export function createExportSnapshot(source: QuestOSSnapshot): QuestOSSnapshot {
     bookmarks: source.bookmarks,
     readingPosition: source.readingPosition,
     chaptersRead: source.chaptersRead,
+    recentVerses: source.recentVerses,
     pendingMilestones: source.pendingMilestones,
     lastVisitDateKey: source.lastVisitDateKey,
     streak: source.streak,

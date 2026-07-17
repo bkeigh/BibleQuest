@@ -47,8 +47,8 @@ browser, and do not commit local keys.
    pointer with no DDL. See
    [`SUPABASE_SECURITY_ROLLOUT.md`](SUPABASE_SECURITY_ROLLOUT.md) for the exact
    local reset, migration-history checks, staging rollout, and rollback gates.
-   Seed separately with `supabase/seed.sql` only when intended (regenerate with
-   `node scripts/build-supabase-seed.mjs <seed-result.json>` if content changes).
+   Seed separately with `supabase/seed.sql` only when intended (regenerate the
+   canonical launch payload with `node scripts/build-supabase-seed.mjs`).
 3. Copy your keys into `.env.local`:
    ```
    NEXT_PUBLIC_SUPABASE_URL=...
@@ -69,7 +69,7 @@ docker exec -i supabase_db_BibleQuest \
   < supabase/evidence/rls_policy_report.sql
 ```
 
-All 26 public tables must show `rowsecurity = true`; verify policy roles and
+All 27 public tables must show `rowsecurity = true`; verify policy roles and
 expressions in the same report. See [`../SECURITY.md`](../SECURITY.md).
 
 ## 3. Bible content
@@ -83,17 +83,73 @@ node scripts/import-bible.mjs
 
 ## 4. Regenerating content
 
-Verified seed content lives in `src/data/seed/`. To rebuild the typed files from
-a content result JSON and the imported Bible text:
+Verified seed content lives in `src/data/seed/`. The 84 core quests may still be
+rebuilt from a reviewed legacy content result; the reviewed expansion, daily
+rotation, and Console payload rebuild directly from checked-in manifests and
+the imported WEB text:
 
 ```bash
 node scripts/build-seed.mjs <seed-result.json>
-node scripts/build-supabase-seed.mjs <seed-result.json>
+node scripts/build-quest-expansion.mjs
+node scripts/build-daily-verses.mjs
+node scripts/build-supabase-seed.mjs
 ```
 
-## 5. Icons
+`build-supabase-seed.mjs` accepts a legacy seed-result path only as an optional
+core-quest override. Its default, authoritative path always emits exactly 150
+reviewed free quests, 180 daily passages, the current milestones, and exact WEB
+scripture snapshots from local source data.
+
+## 5. Pixel sprites
+
+The checked-in production catalogue contains 63 reviewed transparent PNGs.
+Sprite generation is an editorial, source-anchored step rather than a runtime
+or build dependency: use the approved BibleQuest reference sheet and subject
+anchors, save raw results under `output/imagegen/pixel-v2/sources/`, and never
+copy unreviewed generator output directly into `public/pixel/`.
+
+The deterministic processor removes connected backdrops, reconstructs binary
+alpha, snaps art to the native grid, and maps opaque pixels to the shared
+BibleQuest palette. For the supplied UI anchors and an individual staged asset:
+
+```bash
+node scripts/process-pixel-sprites.mjs clean-supplied \
+  /path/to/BibleQuest-Assets/UI-ASSETS \
+  output/imagegen/pixel-v2/supplied
+
+node scripts/process-pixel-sprites.mjs normalize \
+  output/imagegen/pixel-v2/sources/praying-hands.png \
+  output/imagegen/pixel-v2/staging/praying-hands.png \
+  32 32 alpha nearest
+
+node scripts/process-pixel-sprites.mjs qa-sheet \
+  output/imagegen/pixel-v2/staging \
+  output/imagegen/pixel-v2/staging-contact-sheet.png
+```
+
+Inspect the staged sprites at their real 32px size and on a nearest-neighbor
+contact sheet before promoting them. See `docs/pixel-upgrade/README.md` for the
+63-file contract, family dimensions, promotion checklist, and QA gates.
+
+## 6. App icons
 
 ```bash
 node scripts/build-icons.mjs   # rebuilds icon.svg, PWA icons, favicon.ico + OG image
                                # from assets/BQ-Logo-Vector-Cross.svg
 ```
+
+## 7. Enable one-time Stripe support (optional)
+
+Create and review a Stripe Payment Link in the intended test or live Stripe
+environment, then set the complete link as a server-only variable:
+
+```bash
+STRIPE_DONATION_URL=https://buy.stripe.com/...
+```
+
+Visitors enter through `/support`; `/api/support/checkout` validates the URL
+again before redirecting. Only exact HTTPS `buy.stripe.com` links with one clean
+path segment are accepted. Missing, whitespace-damaged, query-bearing, or
+non-Stripe values fail closed and show “Donations are temporarily unavailable.”
+Do not add `NEXT_PUBLIC_` to this variable, and do not place donor-identifying
+prefill data in the configured URL.

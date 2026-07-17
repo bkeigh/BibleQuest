@@ -73,8 +73,11 @@ you're ready to wire up Supabase, analytics, or payments.
 | `pnpm test` | Noninteractive unit tests |
 | `node scripts/import-bible.mjs` | Re-import the WEB Bible → `src/data/bible/` |
 | `node scripts/build-seed.mjs <json>` | Rebuild typed seed content |
+| `node scripts/build-quest-expansion.mjs` | Rebuild the reviewed 66-quest expansion from local WEB text |
+| `node scripts/build-daily-verses.mjs` | Rebuild the 180-passage daily rotation from local WEB text |
+| `node scripts/process-pixel-sprites.mjs clean-supplied [source-dir] [out-dir]` | Normalize approved source-anchored art onto the production pixel grids |
 | `node scripts/build-icons.mjs` | Rebuild the icon set, favicon, + OG image from the brand art |
-| `node scripts/build-supabase-seed.mjs <json>` | Emit `supabase/seed.sql` |
+| `node scripts/build-supabase-seed.mjs` | Emit the canonical 150-quest/180-passage `supabase/seed.sql` |
 
 ---
 
@@ -83,9 +86,12 @@ you're ready to wire up Supabase, analytics, or payments.
 All app content is generated and **adversarially verified** (safety + tone +
 theology lenses) before it ships:
 
-- **84 quests** across 14 categories, 79 with exact WEB verse text
-- **32 prayer prompts**, **32 reflection prompts**, **22 milestones**
-- **60 curated daily verses** with exact public-domain text
+- **150 reviewed free quests** across 14 categories, from five-minute practices
+  to sustained study, service, reconciliation, and formation
+- **32 prayer prompts**, **32 reflection prompts**, **38 milestones**
+- **180 curated daily passages** across all 66 books, with exact
+  public-domain WEB text
+- **63 reviewed production sprites**, including a 20-stage growth tree
 
 Seed data lives in `src/data/seed/` (typed) and mirrors to `supabase/seed.sql`.
 See [`docs/CONTENT_GUIDE.md`](docs/CONTENT_GUIDE.md) for the writing guardrails.
@@ -133,8 +139,11 @@ docs/                   # Codex + setup/deployment/security/content/QA guides
 
 ## Known limitations (V1)
 
-- Account sync, notifications, payments, and the AI Guide are **scaffolded**, not
-  shipped. The app runs entirely in guest mode today.
+- Guest mode is complete. Account sync, notification delivery, and external
+  quest-generation providers remain opt-in deployment integrations.
+- Plus billing uses RevenueCat configuration. One-time support uses a validated
+  server-side Stripe Payment Link and stays unavailable until
+  `STRIPE_DONATION_URL` is configured for the deployment.
 - Data lives in the browser (localStorage). Export/clear is in Settings.
 - Bible text is the World English Bible only; the schema supports adding
   licensed translations later (do not add copyrighted ones without a license).

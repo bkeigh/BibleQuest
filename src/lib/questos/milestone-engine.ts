@@ -50,6 +50,12 @@ export function computeMetrics(
     quests_silence: categoryCount("silence"),
     quests_family: categoryCount("family"),
     quests_community: categoryCount("community"),
+    quests_forgiveness: categoryCount("forgiveness"),
+    quests_generosity: categoryCount("generosity"),
+    quests_discipline: categoryCount("discipline"),
+    quests_worship: categoryCount("worship"),
+    quests_reflection: categoryCount("reflection"),
+    quests_patience: categoryCount("patience"),
     journey_days: new Set(inputs.journeyEvents.map((e) => e.dateKey)).size,
   };
 }

@@ -1,4 +1,97 @@
-BibleQuest Codex v1.2 — Repo-Aware Claude Handoff
+BibleQuest Codex v1.3 — Repo-Aware Launch Update
+
+## v1.3 implementation update — July 17, 2026
+
+This section records the repository's current launch contract and supersedes
+older counts, the old "empty repository" description, and any earlier six-stage
+tree or single-day quest-cap language elsewhere in this document. The remainder
+of the Codex still governs brand, theology, safety, privacy, and product tone.
+
+### Current product inventory
+
+- The full public-domain World English Bible remains available for chapter
+  reading: 66 books and 31,103 verses.
+- The daily rotation contains 180 unique, checked-in WEB passages distributed
+  across all 66 books. Exact text is rebuilt from local Bible files rather than
+  copied from an external model.
+- The free reviewed quest catalogue contains 150 quests across all 14 launch
+  categories. The 66-quest expansion intentionally adds longer study, service,
+  reconciliation, justice, discernment, silence, family, and community work so
+  the catalogue is not dominated by surface-level five-minute actions.
+- The journey contains 20 named tree stages from Seed through Sheltering, with
+  thresholds from the first meaningful action through 250 actions.
+- The milestone catalogue contains 38 milestones and includes measurable
+  progress for every quest category.
+- The production sprite catalogue contains 63 reviewed transparent PNGs: 30
+  interface/category marks, five candle states, 20 tree stages, and eight
+  feature mascots. Source art is conditioned on the approved BibleQuest
+  reference sheet and anchors, then reconstructed by the deterministic
+  native-grid processor; unreviewed generator output never ships directly.
+  The praying-hands mark must always read unmistakably as two hands joined in
+  prayer.
+
+### Quest lifecycle and Plus
+
+- A free account has three concurrent rolling quest slots. Claiming a quest
+  opens its own 24-hour window; completing it does not immediately recycle the
+  slot. A new slot becomes available when that window expires.
+- A quest remains addressable and clickable after selection and after
+  completion. Today’s Quests shows its completion check and exact remaining or
+  reset time. Expired unfinished work remains on the private quest shelf and
+  can be resumed when a slot is available; progress is never silently erased.
+- BibleQuest Plus has unlimited concurrent quest windows and access to Generate
+  a quest. Launch generation is private and deterministic: it recommends from
+  the 150 human-reviewed local quests using structured filters, sends no prayer,
+  reflection, or journal text off-device, and never invents spiritual claims.
+- `QuestGenerationProvider` is the provider-neutral seam for a future OpenAI,
+  Anthropic, or other server adapter. No external model is enabled until
+  entitlement enforcement, structured-output validation, safety review,
+  privacy disclosure, observability, and a human content-review path exist.
+
+### Launch UX contract
+
+- The Home identity card exposes a labeled, accessible Settings action.
+- Recent Verses is persistent, deduplicated, horizontally scrollable, and each
+  item opens the exact verse range in its chapter.
+- Verse sharing uses the native share sheet when available and otherwise offers
+  a real choice of link copy, verse copy, email, and text message. Shared links
+  resolve to a public verse page with canonical and social metadata.
+- Scripture lead type is smaller and more compact than the earlier prototype;
+  the Large Text accessibility setting remains authoritative.
+- Long catalogues use disclosure, compact shelves, and progressive or sideways
+  browsing where it reduces mobile scroll without hiding the daily loop.
+- One-time support uses a same-origin redirect to a strictly validated Stripe
+  Payment Link. If `STRIPE_DONATION_URL` is absent or invalid, the payment
+  control fails closed and explains that support is unavailable.
+
+### QuestOS and BibleQuest Console parity
+
+- Local QuestOS persistence, import/export, sync mappings, and Supabase rows all
+  carry `picked_at`, `expires_at`, and owner-only recent-verse history. A
+  database trigger keeps same-passage timestamps monotonic so a stale device
+  cannot overwrite the complete newer visit recorded by another device.
+- Apply `0010_rolling_quest_windows_and_recent_verses.sql` only through the
+  staged migration procedure, then load the regenerated idempotent
+  `supabase/seed.sql`. The seed mirrors 150 quests, 180 daily passages, and 38
+  milestones, updates existing reviewed rows by natural key, and preserves
+  public-domain scripture snapshots. It also explicitly reactivates the
+  canonical BibleQuest provider and launch content during a deliberate seed.
+- The repository is not currently linked to a hosted Supabase project and no
+  CLI access token is present. Therefore this update prepares and verifies the
+  Console payload but does not guess a production project or execute a remote
+  migration. Link and dry-run against staging first, retain the output, then
+  obtain explicit production approval as described in
+  `docs/SUPABASE_SECURITY_ROLLOUT.md`.
+
+### Deployment gates still owned by the operator
+
+- Set and verify RevenueCat's live public configuration before selling Plus.
+- Set the server-only `STRIPE_DONATION_URL` to the intended
+  `https://buy.stripe.com/...` Payment Link before enabling donations.
+- Run the complete build, unit, security-header, service-worker, responsive,
+  keyboard, reduced-motion, offline, staging database, and payment smoke gates
+  in `docs/LAUNCH_RUNBOOK.md`. Passing local code checks is necessary but does
+  not by itself publish or migrate production.
 
 Canonical Product, Brand, Design, Engineering, and Growth Specification
 

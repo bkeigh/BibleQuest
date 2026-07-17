@@ -25,5 +25,5 @@ export default async function ChapterPage({
   const content = await loadChapter(book, chapterNum);
   if (!content) notFound();
 
-  return <ChapterReader content={content} />;
+  return <ChapterReader key={`${book}:${chapterNum}`} content={content} />;
 }

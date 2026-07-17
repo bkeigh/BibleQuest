@@ -40,7 +40,7 @@ export const en: UIStrings = {
     todaysVerse: "Today’s verse",
     todaysQuests: "Today’s quests",
     yourGrowth: "Your growth",
-    recently: "Recently",
+    recently: "Recent Verses",
     quickPrayer: "Quick prayer",
     openSettings: "Settings",
     anotherVerse: "Another verse",

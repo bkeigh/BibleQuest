@@ -3,12 +3,12 @@
 /**
  * GrowthTree — the living emotional center of the journey.
  *
- * The tree grows through six stages and never decays. Prayer feeds roots,
+ * The tree grows through twenty stages and never decays. Prayer feeds roots,
  * Scripture the branches, kindness the leaves, service the fruit, reflection
  * the light, gratitude the flowers. It is an illustration, not a chart.
  *
- * Drawn in the app's own pixel language: each stage is a deterministic 32x32
- * transparent sprite from the pixel-asset registry,
+ * Drawn in the app's own pixel language: each stage is a reviewed,
+ * source-anchored transparent sprite on the registry's shared 32x32 logical canvas,
  * scaled in whole cells so every pixel stays crisp (the box snaps to the
  * nearest cell multiple of `size` and then holds still, so surrounding
  * layout never shifts). Around the sprite the scene stays quiet — a
@@ -22,16 +22,13 @@ import { cn } from "@/lib/utils/cn";
 import { PixelIcon, type PixelSpriteName } from "@/components/design-system/PixelIcon";
 import type { GrowthTreeState, TreeStage } from "@/lib/questos/types";
 import { useQuestOS } from "@/lib/questos/store";
+import { TREE_STAGE_DEFINITIONS } from "@/lib/questos/growth-engine";
 
-/** Each stage maps to its hand-drawn sprite in the pixel registry. */
-const STAGE_SPRITE: Record<TreeStage, PixelSpriteName> = {
-  seed: "tree-stage-0",
-  sprout: "tree-stage-1",
-  young: "tree-stage-2",
-  growing: "tree-stage-3",
-  "fruit-bearing": "tree-stage-4",
-  sheltering: "tree-stage-5",
-};
+/** Resolve the domain stage to its same-position sprite in the registry. */
+function stageSprite(stage: TreeStage): PixelSpriteName {
+  const index = TREE_STAGE_DEFINITIONS.findIndex((entry) => entry.stage === stage);
+  return `tree-stage-${Math.max(0, index)}` as PixelSpriteName;
+}
 
 /** All tree-stage sprites share one true 32x32 logical grid. */
 const GRID = 32;
@@ -110,11 +107,11 @@ export function GrowthTree({
       <motion.div
         key={state.stage}
         className="relative origin-bottom"
-        initial={still ? false : { scale: 0.92, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
+        initial={still ? false : { opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={still ? { duration: 0 } : grow}
       >
-        <PixelIcon name={STAGE_SPRITE[state.stage]} size={cell} animate />
+        <PixelIcon name={stageSprite(state.stage)} size={cell} animate />
       </motion.div>
 
       {/* Flowers — gratitude, gathered left of the trunk. Each blooms once in

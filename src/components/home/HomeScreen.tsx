@@ -7,19 +7,27 @@
  * when a long-lived tab crosses local midnight.
  */
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   useQuestOS,
   selectStreak,
-  selectTodayPicks,
   selectVerseRefreshCount,
   MAX_DAILY_PICKS,
 } from "@/lib/questos/store";
 import { calculateTreeState, stageProgress } from "@/lib/questos/growth-engine";
-import { selectSuggestedQuests } from "@/lib/questos/quest-engine";
+import {
+  activeQuestAssignments,
+  formatQuestWindowRemaining,
+  nextQuestSlotAt,
+  occupiedQuestAssignments,
+  questSlotsRemaining,
+  selectSuggestedQuests,
+} from "@/lib/questos/quest-engine";
 import { getDailyVerse } from "@/lib/questos/verse-engine";
+import { getBookMeta } from "@/lib/bible";
 import { timeOfDay, toDateKey } from "@/lib/utils/dates";
+import { cleanVerseText } from "@/lib/utils/scripture";
 import { useStrings, fmt } from "@/lib/i18n";
 import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
 import { celebrationScale } from "@/lib/motion";
@@ -41,35 +49,40 @@ import { Avatar } from "@/components/profile/Avatar";
 import { StreakCard } from "@/components/home/StreakCard";
 import {
   IconArrowRight,
-  IconCheck,
   IconChevronRight,
+  IconSettings,
 } from "@/components/design-system/icons";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { seedQuests, questBySlug } from "@/data/seed/quests";
+import { usePlus } from "@/lib/revenuecat/usePlus";
 
 function HomeInner() {
   const profile = useQuestOS((s) => s.profile);
   const settings = useQuestOS((s) => s.settings);
   const growthEvents = useQuestOS((s) => s.growthEvents);
   const readingPosition = useQuestOS((s) => s.readingPosition);
-  const journeyEvents = useQuestOS((s) => s.journeyEvents);
+  const recentVerses = useQuestOS((s) => s.recentVerses);
+  const recordRecentVerse = useQuestOS((s) => s.recordRecentVerse);
   const completions = useQuestOS((s) => s.completions);
+  const assignments = useQuestOS((s) => s.assignments);
+  const { isPlus } = usePlus();
   // The candle. Stable ref — the stored object itself.
   const streak = useQuestOS(selectStreak);
   // Today's "Another verse" count (primitive) + the action that grows it.
   const verseRefreshCount = useQuestOS(selectVerseRefreshCount);
   const refreshVerse = useQuestOS((s) => s.refreshVerse);
-  // Today's picked quests (0..MAX_DAILY_PICKS). Stable ref — render-safe.
-  const picks = useQuestOS(selectTodayPicks);
   // Keep day-scoped content fresh when the local day rolls over while the app
   // is left open (or the tab regains focus) — otherwise the verse and date
   // silently show "yesterday".
   const [dayKey, setDayKey] = useState(() => toDateKey());
+  const [now, setNow] = useState(() => Date.now());
+  const recordedVerseRef = useRef<string | null>(null);
 
   // Watch for a local day rollover: re-check on an interval, on focus, and on
   // visibility change. setDayKey is a no-op when the day hasn't changed.
   useEffect(() => {
     function check() {
+      setNow(Date.now());
       const k = toDateKey();
       setDayKey((prev) => (prev === k ? prev : k));
     }
@@ -92,11 +105,50 @@ function HomeInner() {
     () => getDailyVerse(dayKey, verseRefreshCount),
     [dayKey, verseRefreshCount]
   );
+  const verseBookName = useMemo(
+    () =>
+      getBookMeta(verse.bookSlug)?.name ??
+      verse.reference.replace(/\s+\d+:.*$/, ""),
+    [verse.bookSlug, verse.reference]
+  );
+
+  // Home is a real verse view, so keep it in the same persistent history as
+  // chapter-reader visits. The ref prevents the store write from retriggering
+  // on the recent-verses render it causes; the store remains the authority for
+  // cross-session dedupe and the 20-entry cap.
+  useEffect(() => {
+    const passageKey = `${verse.bookSlug}:${verse.chapter}:${verse.verseStart}-${verse.verseEnd}`;
+    if (recordedVerseRef.current === passageKey) return;
+    recordedVerseRef.current = passageKey;
+    recordRecentVerse({
+      bookSlug: verse.bookSlug,
+      bookName: verseBookName,
+      chapter: verse.chapter,
+      verseStart: verse.verseStart,
+      verseEnd: verse.verseEnd,
+      reference: verse.reference,
+      text: verse.text,
+    });
+  }, [recordRecentVerse, verse, verseBookName]);
   const season = useMemo(() => getCurrentSeason(), []);
   const name = profile?.displayName?.trim();
   const time = timeOfDay();
   const t = useStrings();
   const hello = t.greeting[time];
+
+  // Quest windows are rolling rather than calendar-day based. Derive them
+  // from the full reservation record so hidden free-member reservations still
+  // count, and refresh the projection once a minute without a store write.
+  const picks = useMemo(
+    () => activeQuestAssignments(assignments, now),
+    [assignments, now]
+  );
+  const occupiedPicks = useMemo(
+    () => occupiedQuestAssignments(assignments, now),
+    [assignments, now]
+  );
+  const slotsRemaining = questSlotsRemaining(assignments, isPlus, now);
+  const nextSlot = nextQuestSlotAt(assignments, isPlus, now);
 
   // Resolve picks to their quest templates (drop any unknown slugs safely).
   const pickedQuests = useMemo(
@@ -112,6 +164,12 @@ function HomeInner() {
     ({ pick }) => pick.status === "completed"
   ).length;
   const allDone = pickCount >= 1 && completedCount === pickCount;
+  const useCompactQuestRail = pickCount > MAX_DAILY_PICKS;
+  const hiddenReservationCount = Math.max(
+    0,
+    occupiedPicks.length - pickCount
+  );
+  const canAddQuest = isPlus || slotsRemaining > 0;
 
   // Suggested quests for the open day — the same deterministic shelf as the
   // browse page, so home and browse always agree on today's offer.
@@ -130,11 +188,6 @@ function HomeInner() {
       count: 3,
     });
   }, [pickCount, dayKey, profile, settings, season.key, completions]);
-
-  const recent = [...journeyEvents]
-    .filter((e) => e.type !== "milestone_reached")
-    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
-    .slice(0, 3);
 
   return (
     <div className="relative">
@@ -173,6 +226,17 @@ function HomeInner() {
             </div>
             <StreakCard streak={streak} dayKey={dayKey} />
           </div>
+          <Link
+            href="/app/settings"
+            className="relative z-10 mt-4 flex min-h-11 items-center gap-2.5 rounded-[10px] bg-linen/80 px-3 text-small font-medium text-charcoal ring-1 ring-mist transition-colors hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <IconSettings size={18} className="shrink-0 text-accent" />
+            <span>Settings</span>
+            <span className="ml-1 truncate text-caption font-normal text-ash max-[390px]:hidden">
+              Profile, preferences &amp; accessibility
+            </span>
+            <IconChevronRight className="ml-auto shrink-0 text-fog" />
+          </Link>
         </header>
 
         <div className="space-y-4 pb-4">
@@ -187,10 +251,18 @@ function HomeInner() {
                 {t.home.todaysQuests}
               </h2>
               {pickCount === 0 ? (
-                <PixelIcon name="scroll" size={5} />
-              ) : !allDone && (
+                hiddenReservationCount > 0 ? (
+                  <p className="text-caption text-ash">
+                    {occupiedPicks.length}/{MAX_DAILY_PICKS} slots reserved
+                  </p>
+                ) : (
+                  <PixelIcon name="scroll" size={5} />
+                )
+              ) : (
                 <p className="text-caption text-ash">
-                  {fmt(t.quests.picked, { n: pickCount })}
+                  {completedCount > 0
+                    ? `${completedCount}/${pickCount} done`
+                    : fmt(t.quests.picked, { n: pickCount })}
                 </p>
               )}
             </div>
@@ -200,14 +272,18 @@ function HomeInner() {
               {pickCount === 0
                 ? t.quests.emptyTitle
                 : allDone
-                  ? t.dayComplete.title
+                  ? canAddQuest
+                    ? "Your open quests are complete."
+                    : t.dayComplete.title
                   : `${t.quests.completedToday}: ${completedCount}/${pickCount}`}
             </p>
 
             {pickCount === 0 && (
               <>
                 <p className="mb-3 px-1 text-small text-ash">
-                  {t.quests.emptyBody}
+                  {hiddenReservationCount > 0 && nextSlot
+                    ? `Your hidden quest ${hiddenReservationCount === 1 ? "slot" : "slots"} stays reserved until its 24-hour window ends. Your next slot opens in ${formatQuestWindowRemaining(nextSlot, now).replace(" left", "")}.`
+                    : t.quests.emptyBody}
                 </p>
                 {suggested.length > 0 && (
                   <PaperCard variant="linen" padding="sm" className="overflow-hidden !p-2">
@@ -222,35 +298,55 @@ function HomeInner() {
                 )}
                 <div className="mt-4 flex justify-center">
                   <GentleLink variant="primary" href="/app/quests">
-                    {t.quests.pickCta} <IconArrowRight />
+                    {canAddQuest ? t.quests.pickCta : "Browse and save quests"}{" "}
+                    <IconArrowRight />
                   </GentleLink>
                 </div>
               </>
             )}
 
-            {pickCount > 0 && !allDone && (
+            {pickCount > 0 && (
               <>
-                <ul className="space-y-3">
+                <p className="mb-2.5 px-1 text-caption text-ash">
+                  Each quest stays open for 24 hours. Countdown times appear on every quest.
+                </p>
+                <ul
+                  aria-label={useCompactQuestRail ? "Your open quest windows" : undefined}
+                  className={
+                    useCompactQuestRail
+                      ? "-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-8 sm:px-8"
+                      : "space-y-3"
+                  }
+                >
                   {pickedQuests.map(({ pick, quest }) => {
                     const done = pick.status === "completed";
                     return (
-                      <li key={quest.slug} className="relative">
+                      <li
+                        key={`${pick.pickedAt}:${quest.slug}`}
+                        className={
+                          useCompactQuestRail
+                            ? "w-[min(84vw,20rem)] shrink-0 snap-start"
+                            : undefined
+                        }
+                      >
                         <QuestSlip
                           quest={quest}
                           href={`/app/quests/${quest.slug}`}
-                          className={done ? "opacity-60" : undefined}
+                          picked={!done}
+                          completed={done}
+                          expiresAt={pick.expiresAt}
+                          compact={useCompactQuestRail}
                         />
-                        {done && (
-                          <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-accent-surface px-2 py-0.5 text-caption text-accent-ink">
-                            <IconCheck size={13} />
-                            {t.common.done}
-                          </span>
-                        )}
                       </li>
                     );
                   })}
                 </ul>
-                {pickCount < MAX_DAILY_PICKS && (
+                {useCompactQuestRail && (
+                  <p className="mt-1 px-1 text-caption text-ash">
+                    Swipe sideways to review every open quest.
+                  </p>
+                )}
+                {canAddQuest && (
                   <div className="mt-2.5">
                     <GentleLink variant="text" size="sm" href="/app/quests">
                       {t.quests.addAnother} <IconArrowRight size={14} />
@@ -275,10 +371,14 @@ function HomeInner() {
                     <PixelIcon name="star" size={5} animate />
                   </div>
                   <h3 className="font-display text-editorial text-graphite">
-                    {t.dayComplete.title}
+                    {canAddQuest
+                      ? "Your open quests are complete."
+                      : t.dayComplete.title}
                   </h3>
                   <p className="mx-auto mt-2 max-w-sm text-small leading-relaxed text-charcoal">
-                    {t.dayComplete.body}
+                    {canAddQuest
+                      ? "Take the win. There’s room for another quest if it would serve your day."
+                      : t.dayComplete.body}
                   </p>
                   <div className="mt-4 flex justify-center gap-3">
                     <GentleLink variant="outline" size="sm" href="/app/bible">
@@ -327,7 +427,7 @@ function HomeInner() {
           {/* Your quests — the shelf: active walks beyond today, saved for
               later, and the completed record. Renders nothing when the
               shelf holds nothing beyond today's picks. */}
-          <QuestFeed />
+          <QuestFeed picks={picks} />
 
           {/* A gentle, once-per-context invitation to keep the journey
               safe across devices. Never a modal; easy to wave off. */}
@@ -368,25 +468,50 @@ function HomeInner() {
             />
           </div>
 
-          {/* Recent growth */}
-          {recent.length > 0 && (
-            <section aria-label="Recent activity" className="pt-1">
+          {/* Recent Scripture history — persistent, deduplicated, and linked
+              back to the exact range in its chapter. */}
+          {recentVerses.length > 0 && (
+            <section aria-label="Recent Verses" className="pt-1">
               <SectionLabel pixel>{t.home.recently}</SectionLabel>
-              <PaperCard variant="quiet" padding="sm">
-                <ul className="divide-y divide-mist/70">
-                  {recent.map((e) => (
+              <ul className="-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-8 sm:px-8">
+                {recentVerses.slice(0, 8).map((recentVerse) => {
+                  const verseSegment =
+                    recentVerse.verseEnd > recentVerse.verseStart
+                      ? `${recentVerse.verseStart}-${recentVerse.verseEnd}`
+                      : `${recentVerse.verseStart}`;
+                  const href = `/app/bible/${recentVerse.bookSlug}/${recentVerse.chapter}?verse=${verseSegment}#verse-${recentVerse.verseStart}`;
+                  return (
                     <li
-                      key={e.id}
-                      className="flex items-center gap-3 py-2.5 first:pt-1 last:pb-1"
+                      key={`${recentVerse.bookSlug}:${recentVerse.chapter}:${verseSegment}`}
+                      className="w-[min(78vw,18rem)] shrink-0 snap-start"
                     >
-                      <span className="h-1.5 w-1.5 rounded-full bg-olive-300" />
-                      <span className="flex-1 text-small text-charcoal">
-                        {e.title}
-                      </span>
+                      <Link
+                        href={href}
+                        aria-label={`Open ${recentVerse.reference} in the Bible`}
+                        className="block h-full rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                      >
+                        <PaperCard
+                          interactive
+                          variant="quiet"
+                          padding="sm"
+                          className="flex h-full min-h-28 flex-col"
+                        >
+                          <div className="flex items-center gap-2">
+                            <PixelIcon name="book" size={4} />
+                            <p className="font-display text-[1.0625rem] text-graphite">
+                              {recentVerse.reference}
+                            </p>
+                            <IconChevronRight className="ml-auto shrink-0 text-fog" />
+                          </div>
+                          <p className="mt-2 line-clamp-2 text-caption leading-relaxed text-ash">
+                            “{cleanVerseText(recentVerse.text)}”
+                          </p>
+                        </PaperCard>
+                      </Link>
                     </li>
-                  ))}
-                </ul>
-              </PaperCard>
+                  );
+                })}
+              </ul>
             </section>
           )}
         </div>

@@ -26,6 +26,7 @@ export function currentSnapshot(): QuestOSSnapshot {
           questSlug: "fixture-walk",
           status: "started",
           pickedAt: FIXED_NOW,
+          expiresAt: "2026-07-17T12:00:00.000Z",
           startedAt: FIXED_NOW,
           rerolls: 0,
         },

@@ -141,4 +141,42 @@ describe("sync ownership, lifecycle, and merge safety", () => {
     expect(merged.bookmarks.length).toBe(0);
     expect(Object.keys(merged.myQuests ?? {}).length).toBe(0);
   });
+
+  it("merges recent verses by passage, keeps the newest visit, and caps at twenty", () => {
+    const local = currentSnapshot();
+    local.recentVerses = Array.from({ length: 20 }, (_, index) => ({
+      bookSlug: "john",
+      bookName: "John",
+      chapter: 1,
+      verseStart: index + 1,
+      verseEnd: index + 1,
+      reference: `John 1:${index + 1}`,
+      text: `Local ${index + 1}`,
+      viewedAt: `2026-07-16T12:${String(index).padStart(2, "0")}:00.000Z`,
+    }));
+    const remote = emptySnapshot();
+    remote.recentVerses = [
+      {
+        ...local.recentVerses[19],
+        text: "Older remote duplicate",
+        viewedAt: "2026-07-16T11:00:00.000Z",
+      },
+      {
+        bookSlug: "romans",
+        bookName: "Romans",
+        chapter: 8,
+        verseStart: 1,
+        verseEnd: 1,
+        reference: "Romans 8:1",
+        text: "Remote newest",
+        viewedAt: "2026-07-16T13:00:00.000Z",
+      },
+    ];
+
+    const merged = mergeSnapshots(local, remote);
+    expect(merged.recentVerses).toHaveLength(20);
+    expect(merged.recentVerses?.[0].reference).toBe("Romans 8:1");
+    expect(merged.recentVerses?.find((verse) => verse.reference === "John 1:20")?.text)
+      .toBe("Local 20");
+  });
 });

@@ -3,25 +3,23 @@ import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { IconCheck, IconSparkle } from "@/components/design-system/icons";
 import { PlusCta } from "@/components/plus/PlusCta";
 import { getRevenueCatAvailability } from "@/lib/revenuecat/client";
+import { GentleLink } from "@/components/design-system/GentleButton";
 
 const FREE_INCLUDES = [
-  "Daily verse, prayer, and quests",
+  "150 reviewed quests across 14 categories",
+  "Three rolling 24-hour quest slots",
   "The full Bible reader",
   "Private prayer journal",
   "Private reflection journal",
   "Your growth tree and journey",
-  "Milestones and seasons",
+  "38 milestones and seasons",
 ];
 
 const PLUS_FEATURES = [
-  "An AI study companion",
-  "Personalized quests for your life",
-  "Guided reading plans",
-  "Reflection insights over time",
-  "Premium seasonal themes",
-  "Voice journaling",
-  "Your Year in Review",
-  "Family prayer circles",
+  "Unlimited active quest windows",
+  "Generate a reviewed quest by focus, category, and time",
+  "Private, on-device recommendations with no journal data sent away",
+  "Support continued free access for the whole community",
 ];
 
 /**
@@ -68,8 +66,9 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
           Go deeper, when you’re ready
         </h3>
         <p className="mt-2 text-[0.9375rem] leading-relaxed text-charcoal">
-          Plus adds guidance, personalization, and long-term insight. It
-          deepens the experience — it never decides how close you are to God.
+          Plus adds room for more simultaneous practices and a private way to
+          find the right reviewed quest. It deepens the experience — it never
+          decides how close you are to God.
         </p>
         <ul className="mt-4 grid gap-2 sm:grid-cols-2">
           {PLUS_FEATURES.map((f) => (
@@ -95,8 +94,13 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
         </h3>
         <p className="mt-2 text-[0.9375rem] leading-relaxed text-charcoal">
           Some people just want to help keep BibleQuest free for everyone.
-          Patrons get our gratitude — no spiritual perks, ever. Coming after
-          Plus.
+          One-time supporters get our gratitude — no spiritual perks, ever.
+        </p>
+        <GentleLink variant="gold" size="sm" href="/support" className="mt-4 min-h-11">
+          Make a one-time donation
+        </GentleLink>
+        <p className="mt-2 text-[0.75rem] leading-relaxed text-ash">
+          Stripe checkout is shown only when it is safely configured.
         </p>
       </PaperCard>
     </div>

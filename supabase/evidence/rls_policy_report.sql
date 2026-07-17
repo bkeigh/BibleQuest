@@ -24,6 +24,7 @@ with expected (table_name, classification) as (
     ('prayers', 'user-owned'),
     ('reflections', 'user-owned'),
     ('verse_bookmarks', 'user-owned'),
+    ('user_recent_verses', 'user-owned'),
     ('reading_progress', 'user-owned'),
     ('chapters_read', 'user-owned'),
     ('journey_events', 'user-owned'),
@@ -111,3 +112,31 @@ where table_schema = 'public'
   and grantee in ('anon', 'authenticated', 'service_role')
 group by grantee, table_name
 order by table_name, grantee;
+
+-- 6. Same-passage recent-verse updates must be guarded by the non-callable
+-- trigger that preserves the entire row with the newest viewed_at timestamp.
+select
+  trigger.tgname as trigger_name,
+  trigger.tgenabled as enabled,
+  pg_catalog.pg_get_triggerdef(trigger.oid, true) as definition
+from pg_catalog.pg_trigger as trigger
+where trigger.tgrelid = 'public.user_recent_verses'::regclass
+  and not trigger.tgisinternal
+order by trigger.tgname;
+
+select
+  procedure.proname as function_name,
+  procedure.prosecdef as security_definer,
+  procedure.proconfig as function_settings,
+  pg_catalog.has_function_privilege(
+    'anon', procedure.oid, 'EXECUTE'
+  ) as anon_can_execute,
+  pg_catalog.has_function_privilege(
+    'authenticated', procedure.oid, 'EXECUTE'
+  ) as authenticated_can_execute
+from pg_catalog.pg_proc as procedure
+join pg_catalog.pg_namespace as namespace
+  on namespace.oid = procedure.pronamespace
+where namespace.nspname = 'public'
+  and procedure.proname = 'keep_newest_recent_verse'
+  and pg_catalog.pg_get_function_identity_arguments(procedure.oid) = '';
