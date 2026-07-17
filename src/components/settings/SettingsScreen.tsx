@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Settings and data-control surface. Preference changes write directly to the
+ * persisted QuestOS store; account actions delegate to Supabase; exports,
+ * imports, and destructive resets stay explicit and user-confirmed here.
+ */
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";

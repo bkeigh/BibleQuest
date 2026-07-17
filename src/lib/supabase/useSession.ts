@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Small auth adapter shared by client components. It presents configured,
+ * loading, and user state consistently while deduplicating sign-in analytics
+ * across the several mounted consumers and open browser tabs.
+ */
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { createClient, isSupabaseConfigured } from "./client";

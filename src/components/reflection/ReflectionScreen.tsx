@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Private reflection-journal index. Entries are rendered newest first with
+ * their optional quest or verse context; mutations remain in QuestOS so guest
+ * persistence and signed-in sync follow the same path.
+ */
 import { useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";

@@ -1,3 +1,8 @@
+/**
+ * Pure RevenueCat domain model. This module converts SDK responses into the
+ * minimal Plus state used by the UI and classifies paywall outcomes without
+ * exposing provider-specific errors to components.
+ */
 import type {
   CustomerInfo,
   Offering,

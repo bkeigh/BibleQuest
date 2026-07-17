@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * React coordinator for BibleQuest Plus. It binds RevenueCat to the current
+ * Supabase identity, suppresses stale async responses during account changes,
+ * and exposes a provider-neutral state/actions API to membership screens.
+ */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Offering } from "@revenuecat/purchases-js";
 import { useSession } from "@/lib/supabase/useSession";

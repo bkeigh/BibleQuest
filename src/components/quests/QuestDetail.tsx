@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Full quest workflow for a single seed quest. It translates the saved/daily
+ * quest lifecycle into clear actions, tracks the four walk steps, and routes
+ * completion reflections back through the QuestOS store.
+ */
 import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";

@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * First-run onboarding state machine. It collects only the profile and rhythm
+ * needed to personalize the daily loop, keeps intermediate answers local, and
+ * commits onboarding to QuestOS only after the final confirmation.
+ */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
