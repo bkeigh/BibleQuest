@@ -12,29 +12,38 @@ import { CATEGORY_SPRITE } from "@/components/design-system/PixelIcon";
 
 const PUBLIC_ROOT = path.resolve(process.cwd(), "public");
 const PIXEL_ROOT = path.join(PUBLIC_ROOT, "pixel");
+const ASSET_MANIFEST = path.resolve(
+  process.cwd(),
+  "docs/pixel-upgrade/asset-manifest.json"
+);
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const EXPECTED_PRODUCTION_PNGS = 63;
+const NATIVE_CANVAS = 128;
 
 type PngSpec = {
-  width: number;
-  height: number;
   maxOpaqueColors: number;
 };
 
+const OPAQUE_COLOR_BUDGET_OVERRIDES = new Map<string, number>([
+  ["chapel.png", 20],
+  ["fountain.png", 18],
+  ["people.png", 24],
+  ["mascot-dove.png", 24],
+  ["mascot-map.png", 24],
+  ["mascot-scroll.png", 24],
+]);
+
 function physicalPngSpec(src: string): PngSpec {
   const filename = path.basename(src);
+  const override = OPAQUE_COLOR_BUDGET_OVERRIDES.get(filename);
+  if (override != null) return { maxOpaqueColors: override };
   if (filename.startsWith("mascot-")) {
-    return { width: 48, height: 48, maxOpaqueColors: 20 };
+    return { maxOpaqueColors: 20 };
   }
   if (/^tree-stage-(?:[0-9]|1[0-9])\.png$/.test(filename)) {
-    return { width: 64, height: 64, maxOpaqueColors: 24 };
+    return { maxOpaqueColors: 24 };
   }
-  if (
-    /^candle-(?:unlit|small|steady|sparks|halo)\.png$/.test(filename)
-  ) {
-    return { width: 32, height: 36, maxOpaqueColors: 16 };
-  }
-  return { width: 32, height: 32, maxOpaqueColors: 16 };
+  return { maxOpaqueColors: 16 };
 }
 
 function registryPngSources() {
@@ -91,6 +100,18 @@ function expectValidAsset(name: string, asset: PixelAsset) {
 
   expect(asset.cols, `${name} has no logical width`).toBeGreaterThan(0);
   expect(asset.rows, `${name} has no logical height`).toBeGreaterThan(0);
+  expect(asset.nativeWidth, `${name} registry native width`).toBe(NATIVE_CANVAS);
+  expect(asset.nativeHeight, `${name} registry native height`).toBe(
+    NATIVE_CANVAS
+  );
+  expect(
+    NATIVE_CANVAS % asset.cols,
+    `${name} logical width must divide the 128px physical canvas`
+  ).toBe(0);
+  expect(
+    NATIVE_CANVAS % asset.rows,
+    `${name} logical height must divide the 128px physical canvas`
+  ).toBe(0);
   const bytes = pngFile(name, asset);
   expect(bytes.subarray(0, 8).equals(PNG_SIGNATURE), `${name} is not a PNG`).toBe(
     true
@@ -99,14 +120,6 @@ function expectValidAsset(name: string, asset: PixelAsset) {
   const sourceHeight = bytes.readUInt32BE(20);
   expect(sourceWidth, `${name} has no source width`).toBeGreaterThan(0);
   expect(sourceHeight, `${name} has no source height`).toBeGreaterThan(0);
-  expect(
-    sourceWidth % asset.cols,
-    `${name} source width must scale cleanly to its logical grid`
-  ).toBe(0);
-  expect(
-    sourceHeight % asset.rows,
-    `${name} source height must scale cleanly to its logical grid`
-  ).toBe(0);
 }
 
 function assetSignature(name: string, asset: PixelAsset) {
@@ -141,8 +154,8 @@ async function expectProductionPng(
   const metadata = await sharp(bytes).metadata();
 
   expect.soft(metadata.format, `${name} physical format`).toBe("png");
-  expect.soft(metadata.width, `${name} physical width`).toBe(expected.width);
-  expect.soft(metadata.height, `${name} physical height`).toBe(expected.height);
+  expect.soft(metadata.width, `${name} physical width`).toBe(NATIVE_CANVAS);
+  expect.soft(metadata.height, `${name} physical height`).toBe(NATIVE_CANVAS);
   expect
     .soft(metadata.hasAlpha, `${name} must carry an alpha channel`)
     .toBe(true);
@@ -232,7 +245,84 @@ describe("BibleQuest pixel art system", () => {
     expect(publicSources).toEqual(registrySources);
   });
 
-  it("keeps every production PNG physically pixel-safe", async () => {
+  it("keeps the manifest on the uniform 128x128 physical contract", () => {
+    const manifest = JSON.parse(fs.readFileSync(ASSET_MANIFEST, "utf8")) as {
+      schemaVersion: number;
+      totalFiles: number;
+      qualityContract: {
+        nativeCanvas: { width: number; height: number };
+        opaqueColorBudgets: {
+          smallAndCandlesDefault: number;
+          treesDefault: number;
+          mascotsDefault: number;
+          reviewedPerFileExceptions: Record<string, number>;
+        };
+      };
+      families: Array<{
+        id: string;
+        count: number;
+        physicalPixels: { width: number; height: number };
+        logicalGrid: { columns: number; rows: number };
+        cellScale: number;
+      }>;
+    };
+
+    expect(manifest.schemaVersion).toBe(3);
+    expect(manifest.totalFiles).toBe(EXPECTED_PRODUCTION_PNGS);
+    expect(manifest.qualityContract.nativeCanvas).toEqual({
+      width: NATIVE_CANVAS,
+      height: NATIVE_CANVAS,
+    });
+    expect(manifest.qualityContract.opaqueColorBudgets).toEqual({
+      smallAndCandlesDefault: 16,
+      treesDefault: 24,
+      mascotsDefault: 20,
+      reviewedPerFileExceptions: Object.fromEntries(
+        OPAQUE_COLOR_BUDGET_OVERRIDES
+      ),
+    });
+    expect(manifest.families.reduce((sum, family) => sum + family.count, 0)).toBe(
+      EXPECTED_PRODUCTION_PNGS
+    );
+    for (const family of manifest.families) {
+      expect(family.physicalPixels).toEqual({
+        width: NATIVE_CANVAS,
+        height: NATIVE_CANVAS,
+      });
+      expect(NATIVE_CANVAS % family.logicalGrid.columns, family.id).toBe(0);
+      expect(NATIVE_CANVAS % family.logicalGrid.rows, family.id).toBe(0);
+    }
+    expect(
+      manifest.families.map(({ id, logicalGrid, cellScale }) => ({
+        id,
+        logicalGrid,
+        cellScale,
+      }))
+    ).toEqual([
+      {
+        id: "small-sprites",
+        logicalGrid: { columns: 32, rows: 32 },
+        cellScale: 0.2,
+      },
+      {
+        id: "streak-candles",
+        logicalGrid: { columns: 16, rows: 16 },
+        cellScale: 0.75,
+      },
+      {
+        id: "tree-stages",
+        logicalGrid: { columns: 32, rows: 32 },
+        cellScale: 1,
+      },
+      {
+        id: "feature-mascots",
+        logicalGrid: { columns: 32, rows: 32 },
+        cellScale: 0.625,
+      },
+    ]);
+  });
+
+  it("keeps every production PNG on a pixel-safe 128x128 canvas", async () => {
     for (const [name, asset] of Object.entries(PIXEL_SPRITES)) {
       expect(asset.kind, `${name} must use a production PNG`).toBe("png");
       if (asset.kind === "png") await expectProductionPng(name, asset);
@@ -263,6 +353,23 @@ describe("BibleQuest pixel art system", () => {
     for (const [name, asset] of Object.entries(PIXEL_SPRITES)) {
       if (name.startsWith("tree-stage-") || name.startsWith("candle-")) continue;
       expectLogicalCanvas(name, asset, 32, 32);
+    }
+  });
+
+  it("uses divisor-compatible logical grids for candles and mascots", () => {
+    for (const name of [
+      "candle-unlit",
+      "candle-small",
+      "candle-steady",
+      "candle-sparks",
+      "candle-halo",
+    ] as const) {
+      expectLogicalCanvas(name, PIXEL_SPRITES[name], 16, 16);
+      expect(PIXEL_SPRITES[name].cellScale, `${name} cell scale`).toBe(0.75);
+    }
+    for (const [name, asset] of Object.entries(PIXEL_MASCOTS)) {
+      expectLogicalCanvas(`mascot-${name}`, asset, 32, 32);
+      expect(asset.cellScale, `mascot-${name} cell scale`).toBe(0.625);
     }
   });
 

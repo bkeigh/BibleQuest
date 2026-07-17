@@ -3,8 +3,9 @@
 BibleQuest ships a reviewed 63-file transparent PNG catalogue. Art creation and
 runtime delivery are deliberately separate: reference-conditioned ImageGen
 creates editable staging sources, while a deterministic local processor owns
-native-grid reconstruction, alpha, palette, and final dimensions. The app never
-generates art at runtime and no provider credential is part of the build.
+native-grid reconstruction, alpha, palette, and the uniform 128×128 physical
+canvas. The app never generates art at runtime and no provider credential is
+part of the build.
 
 The live registry remains stable: screens request a named `PixelIcon` or
 `PixelMascot`; `src/components/design-system/pixel-assets.ts` owns its public
@@ -14,10 +15,17 @@ file source and logical canvas.
 
 | Family | Files | Physical PNG | Registry grid |
 | --- | ---: | ---: | ---: |
-| Small interface/category sprites | 30 | 32×32 | 32×32 |
-| Streak-candle states | 5 | 32×36 | 16×18 |
-| Olive-tree stages | 20 | 64×64 | 32×32 |
-| Feature mascots | 8 | 48×48 | 48×48 |
+| Small interface/category sprites | 30 | 128×128 | 32×32 |
+| Streak-candle states | 5 | 128×128 | 16×16 |
+| Olive-tree stages | 20 | 128×128 | 32×32 |
+| Feature mascots | 8 | 128×128 | 32×32 |
+
+Physical and logical dimensions are separate contracts. Every shipped file is
+exactly 128×128; the smaller registry grids remain layout metadata so existing
+call sites keep their established rendered scale. Every logical row
+and column count must divide 128 evenly; current grids are 32×32 for small
+sprites, trees, and mascots, and 16×16 for candles. Transparent square padding
+preserves the candles' narrow silhouette within their square logical grid.
 
 Navigation and form controls remain clean vector icons. Pixel art is reserved
 for quests, growth, milestones, onboarding, and meaningful empty states. The
@@ -47,10 +55,20 @@ generated files directly into `public/pixel/`.
 
 ## 2. Reconstruct the native grid
 
-`scripts/process-pixel-sprites.mjs` is the provider-neutral production tool. It
+`output/imagegen/pixel-v2/process-production-128.mjs` is the canonical full-set
+production tool. It rebuilds every family from the high-resolution masters,
 removes connected opaque backdrops, reconstructs binary alpha, maps every
 opaque pixel to the fixed BibleQuest palette, uses transparent padding, and
-normalizes without soft resampling.
+normalizes without soft resampling. Run it before review:
+
+```sh
+node output/imagegen/pixel-v2/process-production-128.mjs \
+  /path/to/BibleQuest-Assets/UI-ASSETS
+```
+
+`scripts/process-pixel-sprites.mjs` remains the provider-neutral utility for
+cleaning supplied anchors, normalizing one candidate, and building ad-hoc QA
+sheets.
 
 Clean the supplied opaque anchors:
 
@@ -64,17 +82,17 @@ Normalize one approved transparent/chroma-keyed source:
 
 ```sh
 node scripts/process-pixel-sprites.mjs normalize \
-  output/imagegen/pixel-v2/sources/praying-hands.png \
-  output/imagegen/pixel-v2/staging/praying-hands.png \
-  32 32 alpha nearest
+  output/imagegen/pixel-v2/sources/praying-hands-alpha.png \
+  output/imagegen/pixel-v2/production-128/praying-hands.png \
+  128 128 alpha nearest
 ```
 
 Build a review sheet:
 
 ```sh
 node scripts/process-pixel-sprites.mjs qa-sheet \
-  output/imagegen/pixel-v2/staging \
-  output/imagegen/pixel-v2/staging-contact-sheet.png
+  output/imagegen/pixel-v2/production-128 \
+  output/imagegen/pixel-v2/production-128-contact-sheet.png
 ```
 
 Atlas families may use a family-specific splitter in the staging directory,
@@ -83,16 +101,23 @@ binary alpha, nearest-neighbor reconstruction, shared baseline, and distinct
 frames. Keep that processing recipe beside its raw atlas and generation notes
 so the result remains reproducible.
 
+The older mixed-size staging files remain as provenance only. The canonical
+processor supersedes those exports and writes the reviewed uniform set to
+`output/imagegen/pixel-v2/production-128/` and `public/pixel/`.
+
 ## 3. Review before promotion
 
-Review every candidate at the true 32px/48px/64px source size and at its actual
-rendered size in the app. A zoomed contact sheet alone is not approval.
+Review every candidate at its true 128×128 source size and at its actual
+smaller rendered size in the app. A zoomed contact sheet alone is not approval.
 
 Required checks:
 
-- exact family dimensions and expected file count;
+- exactly 128×128 physical dimensions for all 63 files;
 - alpha values are only 0 or 255, with transparent corners and safe padding;
 - every opaque RGB value belongs to the shared production palette;
+- opaque-color budgets remain 16 for small sprites and candles, 20 for
+  mascots, and 24 for trees unless a reviewed per-file exception is recorded
+  in the manifest;
 - no antialiased fringe, isolated noise, checkerboard residue, or chroma spill;
 - silhouettes remain unmistakable at the smallest call site;
 - category marks are visually distinct — especially `praying-hands`, `hands`,
@@ -108,19 +133,25 @@ make a sequence appear complete.
 ## 4. Promote and ship
 
 1. Copy only approved normalized files to `public/pixel/<registry-key>.png`.
-2. Keep registry logical dimensions unchanged in
+2. Reject promotion unless every file is exactly 128×128 with the required
+   alpha, palette, padding, and edge clearance.
+3. Keep registry logical dimensions aligned with `asset-manifest.json` in
    `src/components/design-system/pixel-assets.ts`.
-3. Keep category mappings in `PixelIcon.tsx` semantically distinct; prayer uses
+4. Keep category mappings in `PixelIcon.tsx` semantically distinct; prayer uses
    `praying-hands`.
-4. Keep every production path in the explicit catalogue in `public/sw.js`.
-5. Bump the service-worker cache version when replacing bytes behind existing
+5. Keep every production path in the explicit catalogue in `public/sw.js`.
+6. Bump the service-worker cache version when replacing bytes behind existing
    names, so installed clients receive the approved art immediately.
-6. Run the pixel, service-worker, growth, type, lint, test, and build checks.
-7. Inspect mobile and desktop screens, reduced motion, candle mode, and a true
+7. Run the pixel, service-worker, growth, type, lint, test, and build checks.
+8. Inspect mobile and desktop screens, reduced motion, candle mode, and a true
    offline reload.
 
-The registry paths, logical sizes, accessibility behavior, and consuming
-components remain unchanged by an art-only replacement.
+Use `node scripts/install-imagegen-sprites.mjs` for promotion; it reads only
+the reviewed `production-128` directory and rejects any non-128×128 source.
+
+Registry paths, accessibility behavior, and consuming components remain stable.
+Logical sizes follow the divisor-compatible values in the manifest: 16×16 for
+candles and 32×32 for every other production family.
 
 See `docs/PIXEL_SYSTEM.md` for placement, typography, motion, and product-tone
 guardrails.

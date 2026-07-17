@@ -1,24 +1,26 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "project": "BibleQuest",
-  "status": "live production contract",
+  "status": "required production contract",
   "totalFiles": 63,
   "sourcesOfTruth": {
     "registry": "src/components/design-system/pixel-assets.ts",
     "categoryMap": "src/components/design-system/PixelIcon.tsx",
     "offlineCatalogue": "public/sw.js",
-    "processor": "scripts/process-pixel-sprites.mjs",
+    "processor": "output/imagegen/pixel-v2/process-production-128.mjs",
     "dropDirectory": "public/pixel/",
     "stagingDirectory": "output/imagegen/pixel-v2/"
   },
   "pipeline": {
     "sourceArt": "Reference-conditioned ImageGen staging using the approved PixelArtReferenceSheet and UI subject anchors",
     "promotionRule": "Never place unreviewed generated output directly in public/pixel",
-    "normalization": "Deterministic native-grid reconstruction, fixed palette, binary alpha, transparent padding, and nearest-neighbor scaling",
+    "normalization": "Deterministic reconstruction onto one uniform 128x128 physical canvas, fixed palette, binary alpha, transparent padding, and nearest-neighbor scaling",
     "runtimeGeneration": false,
     "buildCredentialRequired": false
   },
   "qualityContract": {
+    "nativeCanvas": { "width": 128, "height": 128 },
+    "physicalCanvasRule": "Every one of the 63 production PNGs uses this exact physical canvas; family logical grids remain runtime layout metadata only",
     "alphaValues": [0, 255],
     "dithering": false,
     "antialiasing": false,
@@ -26,13 +28,26 @@
     "lightDirection": "upper-left",
     "background": "transparent with clear corners and safe padding",
     "text": "no readable text or letter-like noise inside sprites",
-    "palette": "only BIBLEQUEST_PIXEL_PALETTE colors from scripts/process-pixel-sprites.mjs"
+    "palette": "only the canonical BibleQuest palette shared by process-production-128.mjs and scripts/process-pixel-sprites.mjs",
+    "opaqueColorBudgets": {
+      "smallAndCandlesDefault": 16,
+      "treesDefault": 24,
+      "mascotsDefault": 20,
+      "reviewedPerFileExceptions": {
+        "chapel.png": 20,
+        "fountain.png": 18,
+        "people.png": 24,
+        "mascot-dove.png": 24,
+        "mascot-map.png": 24,
+        "mascot-scroll.png": 24
+      }
+    }
   },
   "families": [
     {
       "id": "small-sprites",
       "count": 30,
-      "physicalPixels": { "width": 32, "height": 32 },
+      "physicalPixels": { "width": 128, "height": 128 },
       "logicalGrid": { "columns": 32, "rows": 32 },
       "cellScale": 0.2,
       "files": [
@@ -71,8 +86,8 @@
     {
       "id": "streak-candles",
       "count": 5,
-      "physicalPixels": { "width": 32, "height": 36 },
-      "logicalGrid": { "columns": 16, "rows": 18 },
+      "physicalPixels": { "width": 128, "height": 128 },
+      "logicalGrid": { "columns": 16, "rows": 16 },
       "cellScale": 0.75,
       "files": [
         "candle-unlit.png",
@@ -86,7 +101,7 @@
     {
       "id": "tree-stages",
       "count": 20,
-      "physicalPixels": { "width": 64, "height": 64 },
+      "physicalPixels": { "width": 128, "height": 128 },
       "logicalGrid": { "columns": 32, "rows": 32 },
       "cellScale": 1,
       "filePattern": "tree-stage-{0..19}.png",
@@ -117,9 +132,9 @@
     {
       "id": "feature-mascots",
       "count": 8,
-      "physicalPixels": { "width": 48, "height": 48 },
-      "logicalGrid": { "columns": 48, "rows": 48 },
-      "cellScale": 0.4,
+      "physicalPixels": { "width": 128, "height": 128 },
+      "logicalGrid": { "columns": 32, "rows": 32 },
+      "cellScale": 0.625,
       "files": [
         "mascot-campfire.png",
         "mascot-dove.png",
@@ -133,6 +148,7 @@
     }
   ],
   "promotionChecks": [
+    "Verify all 63 physical PNGs are exactly 128x128 before promotion",
     "Review at native size and rendered size on parchment, linen, and candle surfaces",
     "Run pixel-assets, service-worker, and growth tests",
     "Run lint, TypeScript, the full test suite, and production build",

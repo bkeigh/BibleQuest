@@ -429,7 +429,7 @@ describe("service-worker fetch behavior", () => {
 });
 
 describe("service-worker lifecycle and upgrades", () => {
-  it("installs the v6 shell and production sprite catalogue, omitting uncacheable responses", async () => {
+  it("installs the v7 shell and production sprite catalogue, omitting uncacheable responses", async () => {
     const harness = loadWorker(async (fetchRequest) => {
       if (fetchRequest.url.endsWith("/onboarding")) {
         return makeResponse("private", {
@@ -443,7 +443,7 @@ describe("service-worker lifecycle and upgrades", () => {
     await event.done();
 
     const shell = await harness.caches.open(harness.policy.SHELL_CACHE);
-    expect(harness.policy.CACHE_VERSION).toBe("biblequest-v6");
+    expect(harness.policy.CACHE_VERSION).toBe("biblequest-v7");
     expect(shell.entries.size).toBe(harness.policy.PRECACHE_PATHS.length - 1);
     expect(await shell.match(`${ORIGIN}/onboarding`)).toBeUndefined();
     expect(
@@ -452,10 +452,10 @@ describe("service-worker lifecycle and upgrades", () => {
     expect(harness.state.skipped).toBe(true);
   });
 
-  it("deletes only obsolete BibleQuest caches during v6 activation", async () => {
+  it("deletes only obsolete BibleQuest caches during v7 activation", async () => {
     const harness = loadWorker();
-    await harness.caches.open("biblequest-v5-shell");
-    await harness.caches.open("biblequest-v5-runtime");
+    await harness.caches.open("biblequest-v6-shell");
+    await harness.caches.open("biblequest-v6-runtime");
     await harness.caches.open(harness.policy.SHELL_CACHE);
     await harness.caches.open(harness.policy.RUNTIME_CACHE);
     await harness.caches.open("another-app-runtime");
@@ -465,13 +465,13 @@ describe("service-worker lifecycle and upgrades", () => {
     await event.done();
 
     expect(harness.caches.deleted.sort()).toEqual([
-      "biblequest-v5-runtime",
-      "biblequest-v5-shell",
+      "biblequest-v6-runtime",
+      "biblequest-v6-shell",
     ]);
     expect((await harness.caches.keys()).sort()).toEqual([
       "another-app-runtime",
-      "biblequest-v6-runtime",
-      "biblequest-v6-shell",
+      "biblequest-v7-runtime",
+      "biblequest-v7-shell",
     ]);
     expect(harness.state.claimed).toBe(true);
   });

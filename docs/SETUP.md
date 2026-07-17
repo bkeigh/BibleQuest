@@ -108,28 +108,21 @@ or build dependency: use the approved BibleQuest reference sheet and subject
 anchors, save raw results under `output/imagegen/pixel-v2/sources/`, and never
 copy unreviewed generator output directly into `public/pixel/`.
 
-The deterministic processor removes connected backdrops, reconstructs binary
-alpha, snaps art to the native grid, and maps opaque pixels to the shared
-BibleQuest palette. For the supplied UI anchors and an individual staged asset:
+The deterministic production processor removes connected backdrops,
+reconstructs binary alpha, maps opaque pixels to the shared BibleQuest palette,
+and writes the complete reviewed 128×128 catalogue:
 
 ```bash
-node scripts/process-pixel-sprites.mjs clean-supplied \
-  /path/to/BibleQuest-Assets/UI-ASSETS \
-  output/imagegen/pixel-v2/supplied
-
-node scripts/process-pixel-sprites.mjs normalize \
-  output/imagegen/pixel-v2/sources/praying-hands.png \
-  output/imagegen/pixel-v2/staging/praying-hands.png \
-  32 32 alpha nearest
-
-node scripts/process-pixel-sprites.mjs qa-sheet \
-  output/imagegen/pixel-v2/staging \
-  output/imagegen/pixel-v2/staging-contact-sheet.png
+node output/imagegen/pixel-v2/process-production-128.mjs \
+  /path/to/BibleQuest-Assets/UI-ASSETS
+node scripts/install-imagegen-sprites.mjs
+node scripts/build-sprite-previews.mjs
 ```
 
-Inspect the staged sprites at their real 32px size and on a nearest-neighbor
-contact sheet before promoting them. See `docs/pixel-upgrade/README.md` for the
-63-file contract, family dimensions, promotion checklist, and QA gates.
+Inspect the native 128×128 sheets and the sprites at their actual smaller app
+sizes before promotion. The installer refuses non-128px sources. See
+`docs/pixel-upgrade/README.md` for the 63-file contract, logical dimensions,
+promotion checklist, and QA gates.
 
 ## 6. App icons
 

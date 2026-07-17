@@ -1,7 +1,11 @@
-# BibleQuest pixel-v2 tree and candle staging
+# BibleQuest pixel-v2 sources and 128×128 production pass
 
 Generated with the built-in `image_gen` workflow. PixelLab was not used.
-Nothing in this staging directory is wired to `public/pixel/` automatically.
+The original mixed-size staging outputs remain as provenance. The canonical
+`process-production-128.mjs` pass now reconstructs all 63 sprites from the
+high-resolution masters onto one exact 128×128 physical canvas and writes the
+reviewed candidates to `production-128/`. The guarded installer promotes that
+directory to `public/pixel/` after review.
 
 ## References
 
@@ -57,9 +61,12 @@ Nothing in this staging directory is wired to `public/pixel/` automatically.
 - `sources/tree-progression-atlas.png` — untouched built-in result, SHA-256 `284dafc83cd423130394499d5a33504f80eb8f4b0c4fe7b37fb230686147bec3`
 - `sources/candle-states-atlas.png` — untouched built-in result, SHA-256 `9f4e903b1a207de20885d8df41fad0e1da6025f56718257af587d870540da3e2`
 - `sources/*-chroma-normalized.png` — exact `#ff00ff` background plus fixed subject palette
-- `staging/trees/tree-stage-0.png` through `tree-stage-19.png` — 64×64 indexed PNG
-- `staging/candles/candle-unlit.png` through `candle-halo.png` — 32×36 indexed PNG
+- `staging/trees/tree-stage-0.png` through `tree-stage-19.png` — legacy 64×64 indexed PNG
+- `staging/candles/candle-unlit.png` through `candle-halo.png` — legacy 32×36 indexed PNG
 - `process-atlases.mjs` — deterministic hard-key, component extraction, nearest-neighbor normalization, fixed-palette encoder, and preview builder
+- `process-production-128.mjs` — canonical 63-file reconstruction, promotion,
+  preview, and physical-QA pass
+- `production-128/` — reviewed 128×128 indexed PNG source for promotion
 
 The raw model outputs used near-magenta color variation instead of literal
 `#ff00ff`. The processor globally classifies that chroma family, gives it
@@ -73,7 +80,7 @@ aligned to the same output baseline. The candle frames are normalized with one
 shared scale; rows 13–35 use the unlit frame as a canonical body so the body
 and holder are byte-identical in every state.
 
-## QA
+## Historical staging QA
 
 - 20/20 distinct tree frames at exactly 64×64
 - 5/5 distinct candle frames at exactly 32×36
@@ -87,3 +94,15 @@ and holder are byte-identical in every state.
 No model reroll was needed. The only generation deviation was the nonuniform
 near-magenta raw backdrop; the exact-chroma and transparent deliverables fix it
 deterministically.
+
+## Current production QA
+
+- 63/63 distinct indexed PNGs at exactly 128×128
+- binary alpha only, fully transparent outer borders, and 7–24 colors per file
+- every opaque color belongs to the shared 31-color BibleQuest palette
+- the guarded installer makes `production-128/` and `public/pixel/`
+  byte-identical after review
+- all twenty tree stages, five candle states, and eight mascots remain distinct
+- second-pass edge cleanup removed detached strips from `hands` and
+  `mascot-sprout` while preserving intentional sparks, rays, and broken links
+- logical registry axes divide 128 evenly

@@ -3,8 +3,9 @@
  *
  * A thin resolver over the pixel-asset registry (pixel-assets.ts).
  * Grid assets render as crisp SVG <rect>s so they scale without blur;
- * png assets render as a plain pixelated <img> (drop a file in
- * public/pixel/ and flip the registry entry — no call site changes).
+ * PNG assets render from their native source dimensions into a separate,
+ * integer-sized logical layout box, so changing source resolution never
+ * changes a call site's footprint.
  * These are one of BibleQuest's signatures: a modern spiritual
  * storybook, never retro-arcade.
  */
@@ -36,17 +37,22 @@ export function PixelIcon({
 
   if (asset.kind === "png") {
     const cell = Math.max(1, Math.round(size * (asset.cellScale ?? 1)));
+    const renderedWidth = asset.cols * cell;
+    const renderedHeight = asset.rows * cell;
     return (
       // eslint-disable-next-line @next/next/no-img-element -- tiny local pixel art; next/image would blur and lazy-load it
       <img
         src={asset.src}
-        width={asset.cols * cell}
-        height={asset.rows * cell}
+        width={asset.nativeWidth}
+        height={asset.nativeHeight}
+        style={{ width: renderedWidth, height: renderedHeight }}
         alt={title ?? ""}
         role={title ? "img" : "presentation"}
         aria-hidden={title ? undefined : true}
+        draggable={false}
+        decoding="async"
         className={cn(
-          "pixelated shrink-0",
+          "pixelated block shrink-0 object-contain",
           animate && "ambient",
           animate && asset.ambientClassName,
           className

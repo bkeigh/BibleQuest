@@ -59,15 +59,15 @@ const palette = BIBLEQUEST_PIXEL_PALETTE.map((hex) => {
 });
 
 const supplied = {
-  "book.png": ["BQ-UI-Bible-Closed.png", 32, 32],
-  "open-book.png": ["BQ-UI-Bible-Open.png", 32, 32],
-  "bookmark.png": ["BQ-UI-571eee02-07bd-41e5-bb1e-c44efb1b9261.png", 32, 32],
-  "candle.png": ["BQ-UI-Candle-1.png", 32, 32],
-  "dove.png": ["BQ-UI-Dove.png", 32, 32],
-  "lantern.png": ["BQ-UI-50488e00-7030-4455-ae91-cef5184919d4.png", 32, 32],
-  "path.png": ["BQ-UI-90f31be5-1ac9-4451-8c4a-125f8e8e993e.png", 32, 32],
-  "scroll.png": ["BQ-UI-Scroll.png", 32, 32],
-  "tree.png": ["BQ-UI-b698119c-43bb-4d5a-bcb2-16a77465d896.png", 32, 32],
+  "book.png": ["BQ-UI-Bible-Closed.png", 128, 128],
+  "open-book.png": ["BQ-UI-Bible-Open.png", 128, 128],
+  "bookmark.png": ["BQ-UI-571eee02-07bd-41e5-bb1e-c44efb1b9261.png", 128, 128],
+  "candle.png": ["BQ-UI-Candle-1.png", 128, 128],
+  "dove.png": ["BQ-UI-Dove.png", 128, 128],
+  "lantern.png": ["BQ-UI-50488e00-7030-4455-ae91-cef5184919d4.png", 128, 128],
+  "path.png": ["BQ-UI-90f31be5-1ac9-4451-8c4a-125f8e8e993e.png", 128, 128],
+  "scroll.png": ["BQ-UI-Scroll.png", 128, 128],
+  "tree.png": ["BQ-UI-b698119c-43bb-4d5a-bcb2-16a77465d896.png", 128, 128],
 };
 
 function isConnectedBackdrop(r, g, b) {

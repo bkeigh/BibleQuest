@@ -8,9 +8,9 @@ rationed on purpose: when everything is pixelated, nothing is special.
 
 | Instrument | Component / utility | Scale | Use |
 |---|---|---|---|
-| Small sprites | `PixelIcon` (`design-system/PixelIcon.tsx`) | 32×32 logical canvas, normally shown at 32px | Quest category glyphs, milestone marks, tiny decorations |
-| Feature sprites | `PixelIcon` (same component) | 16×18 logical candles; 32×32 logical tree stages | The streak candle set, the twenty-stage journey tree |
-| Mascots | `PixelMascot` (`design-system/PixelMascot.tsx`) | Existing logical canvases, generated at 48×48 source resolution | One per onboarding / sign-in page, big empty states |
+| Small sprites | `PixelIcon` (`design-system/PixelIcon.tsx`) | 128×128 physical PNG; 32×32 logical canvas | Quest category glyphs, milestone marks, tiny decorations |
+| Feature sprites | `PixelIcon` (same component) | 128×128 physical PNG; 16×16 logical candles or 32×32 logical trees | The streak candle set, the twenty-stage journey tree |
+| Mascots | `PixelMascot` (`design-system/PixelMascot.tsx`) | 128×128 physical PNG; 32×32 logical canvas | One per onboarding / sign-in page, big empty states |
 
 Plus the accent font: `font-pixel` utility (Ithaca, SIL OFL), 14px minimum —
 short labels only (badges, quest tags, tiny decorative headings). And two
@@ -34,11 +34,16 @@ remains supported as a fallback and useful test fixture:
 ```
 
 - `PIXEL_SPRITES` feeds `PixelIcon`; `PIXEL_MASCOTS` feeds `PixelMascot`.
+- Every production PNG is exactly 128×128 physical pixels, regardless of
+  family. The registry's logical columns and rows are independent rendering
+  metadata, and each logical axis must divide 128 evenly.
 - The `size` prop always means **px per cell**. A png entry declares its
   logical grid (`cols`/`rows`), so rendered dimensions are identical to the
   grid it replaces — no call site ever changes.
 - `cellScale` preserves historic component sizing while snapping every final
   cell to a whole CSS pixel. Small icons normally resolve to exactly 32×32.
+  Production candles use `0.75`; mascots use `0.625` so size 7/8/9/10 call
+  sites render at 128/160/192/192px without a 224px onboarding jump.
 - Palette colors come only from the named constants at the top of the file:
   live-token dark outline (`#1e3329`), evergreen (`#0e533c`), olive, brand
   gold (`#d3a336`), leather, parchment, charcoal, and restrained prayer blue,
@@ -58,17 +63,18 @@ remains supported as a fallback and useful test fixture:
 
    ```sh
    node scripts/process-pixel-sprites.mjs normalize \
-     output/imagegen/pixel-v2/sources/praying-hands.png \
-     output/imagegen/pixel-v2/staging/praying-hands.png \
-     32 32 alpha nearest
+     output/imagegen/pixel-v2/sources/praying-hands-alpha.png \
+     output/imagegen/pixel-v2/production-128/praying-hands.png \
+     128 128 alpha nearest
    ```
 
    The processor supplies binary alpha, transparent padding, fixed-palette
    mapping, and nearest-neighbor grid reconstruction. Use `clean-supplied` for
    the approved opaque UI anchors and `qa-sheet` for a review contact sheet.
-4. Keep every export at an **integer multiple** of its logical grid.
-   Fractional scaling smears; source pixels must map to whole logical cells.
-   Tree files are 64×64 sources registered on a 32×32 logical canvas.
+4. Keep every export at exactly **128×128 physical pixels**. Logical columns
+   and rows must both divide 128 evenly: candles use 16×16; small sprites,
+   trees, and mascots use 32×32. Use transparent square padding for narrow or
+   tall subjects instead of introducing a non-square file or logical grid.
 5. Name files after their registry keys:
    `public/pixel/<name>.png` for sprites, `public/pixel/mascot-<name>.png`
    for mascots (e.g. `candle-halo.png`, `tree-stage-4.png`,
@@ -77,8 +83,8 @@ remains supported as a fallback and useful test fixture:
    linen, and candle surfaces. Reject malformed silhouettes, loose pixels,
    softened edges, inconsistent outlines, or sequence regressions. Only then
    copy the approved PNG into `public/pixel/`.
-7. Register the PNG while keeping its logical grid dimensions:
-   `{ kind: "png", src: "/pixel/candle-halo.png", cols: 16, rows: 18 }`.
+7. Register the PNG with its divisor-compatible logical grid:
+   `{ kind: "png", src: "/pixel/candle-halo.png", cols: 16, rows: 16 }`.
 8. If the grid had `ambient` per-cell motion, set `ambientClassName` to a
    whole-image fallback (e.g. `"[animation:var(--animate-flicker)]"`), or
    leave it off for stillness. PNGs cannot flicker a single flame cell —
@@ -114,11 +120,11 @@ file stay untouched.
   book, open book, bookmark, lantern, path, tree, sun, heart, hands, praying
   hands, wheat, dove, cross, door, key, scroll, compass, crown, mountain,
   moon, service basket, forgiveness links, community people, and fountain.
-- **Streak candles (5, 16×18)**: `candle-unlit` → `candle-small` →
+- **Streak candles (5, 128×128 source / 16×16 logical)**: `candle-unlit` → `candle-small` →
   `candle-steady` → `candle-sparks` → `candle-halo`. One shared body; only
   the flame and blessing details grow (see `candleStage` in
   `lib/questos/streak-engine.ts`). Flame cells flicker via `ambient`.
-- **Journey tree stages (20, 64×64 source / 32×32 logical)**:
+- **Journey tree stages (20, 128×128 source / 32×32 logical)**:
   `seed` → `stirring-seed` → `first-root` → `first-shoot` → `sprout` →
   `rooted-sprout` → `young-sapling` → `branching-sapling` →
   `leafing-sapling` → `young` → `growing` → `spreading` → `budding` →
@@ -127,7 +133,7 @@ file stay untouched.
   `tree-stage-19`. Every stage shares one olive species, soil base, light
   direction, forked-trunk language, outline, and palette; the silhouette and
   botanical details advance at every step.
-- **Mascots (8, 48×48 source)**: lamb, lantern, scroll, dove, sprout, key,
+- **Mascots (8, 128×128 source / 32×32 logical)**: lamb, lantern, scroll, dove, sprout, key,
   map, campfire.
 
 ## Where pixel art is allowed

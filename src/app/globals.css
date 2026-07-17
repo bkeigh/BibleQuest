@@ -329,6 +329,7 @@ body {
 
 /* Pixel-art rendering for tiny sprites */
 @utility pixelated {
+  image-rendering: crisp-edges;
   image-rendering: pixelated;
 }
 

@@ -2,8 +2,9 @@
  * PixelMascot — medium, hand-placed pixel companions.
  *
  * Bigger cousins of PixelIcon, resolved from the same pixel-asset
- * registry (pixel-assets.ts): grid assets render as SVG <rect>s, png
- * assets as a plain pixelated <img>. One friendly sprite per
+ * registry (pixel-assets.ts): grid assets render as SVG <rect>s, while PNGs
+ * keep their native source canvas separate from their rendered layout. One
+ * friendly sprite per
  * onboarding / sign-in page, always centered, always singular. Sacred
  * exploration, never arcade — same limited brand palette, one
  * consistent outline.
@@ -19,7 +20,7 @@ export type { PixelMascotName } from "./pixel-assets";
 
 interface PixelMascotProps {
   name: PixelMascotName;
-  /** Rendered size of each pixel cell. 8-11 ≈ medium (128-190px wide). */
+  /** Rendered logical-cell size. Current 7-10 call sites are 128-192px wide. */
   size?: number;
   className?: string;
   /** Accessible label. Mascots are decorative by default. */
@@ -37,16 +38,21 @@ export function PixelMascot({
 
   if (asset.kind === "png") {
     const cell = Math.max(1, Math.round(size * (asset.cellScale ?? 1)));
+    const renderedWidth = asset.cols * cell;
+    const renderedHeight = asset.rows * cell;
     return (
       // eslint-disable-next-line @next/next/no-img-element -- tiny local pixel art; next/image would blur and lazy-load it
       <img
         src={asset.src}
-        width={asset.cols * cell}
-        height={asset.rows * cell}
+        width={asset.nativeWidth}
+        height={asset.nativeHeight}
+        style={{ width: renderedWidth, height: renderedHeight }}
         alt={title ?? ""}
         role={title ? "img" : "presentation"}
         aria-hidden={title ? undefined : true}
-        className={cn("pixelated mx-auto block shrink-0", className)}
+        draggable={false}
+        decoding="async"
+        className={cn("pixelated mx-auto block shrink-0 object-contain", className)}
       />
     );
   }

@@ -1,13 +1,13 @@
 /**
  * BibleQuest pixel art registry.
  *
- * The artwork is deterministic and transparent by construction: every sprite
- * is rasterised from integer-aligned shapes into a character grid, then drawn
- * as crisp SVG rectangles by PixelIcon / PixelMascot. Small icons and the
- * living journey tree use true 32x32 authored canvases. Older 16x16 shape
- * recipes are doubled onto that grid before rasterisation, so call sites keep
- * their historic proportions while gaining a consistent one-pixel art grid.
+ * Grid fallbacks are rasterised from integer-aligned shapes and drawn as crisp
+ * SVG rectangles by PixelIcon / PixelMascot. Every production PNG uses one
+ * physical 128x128 source canvas. `cols` and `rows` describe the smaller
+ * logical layout grid used by call sites; they are not the PNG's native size.
  */
+
+export const PRODUCTION_PIXEL_NATIVE_SIZE = 128;
 
 export type PixelAsset =
   | {
@@ -21,8 +21,12 @@ export type PixelAsset =
   | {
       kind: "png";
       src: string;
+      /** Divisor-compatible logical layout grid, independent of source pixels. */
       cols: number;
       rows: number;
+      /** Intrinsic file dimensions used by the browser before CSS layout. */
+      nativeWidth: number;
+      nativeHeight: number;
       cellScale?: number;
       ambientClassName?: string;
     };
@@ -464,9 +468,10 @@ const GRID_PIXEL_SPRITES = defineAssets({
  * Reviewed production PNG art. Source illustrations are conditioned on the
  * approved BibleQuest reference sheet and anchors, then reconstructed on the
  * native grid with the deterministic processor. The grid recipes above stay
- * as an editable fallback/reference language. Source pixels and logical cells
- * are intentionally separate: small sprites are native 32px; trees use 64px
- * sources while remaining on the 32-cell layout grid.
+ * as an editable fallback/reference language. All PNGs share one physical
+ * 128px square canvas while their logical layout grids preserve intended UI
+ * scale. Keeping those concepts separate prevents source-size changes from
+ * inflating or distorting call sites.
  */
 const pixelPng = (
   src: string,
@@ -479,6 +484,8 @@ const pixelPng = (
   src,
   cols,
   rows,
+  nativeWidth: PRODUCTION_PIXEL_NATIVE_SIZE,
+  nativeHeight: PRODUCTION_PIXEL_NATIVE_SIZE,
   ...(cellScale == null ? {} : { cellScale }),
   ...(ambientClassName ? { ambientClassName } : {}),
 });
@@ -515,11 +522,11 @@ const PRODUCTION_PNG_SPRITES = defineAssets({
   people: pixelPng("/pixel/people.png", 32, 32, 0.2),
   fountain: pixelPng("/pixel/fountain.png", 32, 32, 0.2),
 
-  "candle-unlit": pixelPng("/pixel/candle-unlit.png", 16, 18, 0.75),
-  "candle-small": pixelPng("/pixel/candle-small.png", 16, 18, 0.75, "[animation:var(--animate-flicker)]"),
-  "candle-steady": pixelPng("/pixel/candle-steady.png", 16, 18, 0.75, "[animation:var(--animate-flicker)]"),
-  "candle-sparks": pixelPng("/pixel/candle-sparks.png", 16, 18, 0.75, "[animation:var(--animate-flicker)]"),
-  "candle-halo": pixelPng("/pixel/candle-halo.png", 16, 18, 0.75, "[animation:var(--animate-flicker)]"),
+  "candle-unlit": pixelPng("/pixel/candle-unlit.png", 16, 16, 0.75),
+  "candle-small": pixelPng("/pixel/candle-small.png", 16, 16, 0.75, "[animation:var(--animate-flicker)]"),
+  "candle-steady": pixelPng("/pixel/candle-steady.png", 16, 16, 0.75, "[animation:var(--animate-flicker)]"),
+  "candle-sparks": pixelPng("/pixel/candle-sparks.png", 16, 16, 0.75, "[animation:var(--animate-flicker)]"),
+  "candle-halo": pixelPng("/pixel/candle-halo.png", 16, 16, 0.75, "[animation:var(--animate-flicker)]"),
 
   "tree-stage-0": pixelPng("/pixel/tree-stage-0.png", 32, 32),
   "tree-stage-1": pixelPng("/pixel/tree-stage-1.png", 32, 32),
@@ -705,14 +712,14 @@ const GRID_PIXEL_MASCOTS = defineAssets({
 });
 
 const PRODUCTION_PNG_MASCOTS = defineAssets({
-  lamb: pixelPng("/pixel/mascot-lamb.png", 48, 48, 0.4),
-  lantern: pixelPng("/pixel/mascot-lantern.png", 48, 48, 0.4, "[animation:var(--animate-flicker)]"),
-  scroll: pixelPng("/pixel/mascot-scroll.png", 48, 48, 0.4),
-  dove: pixelPng("/pixel/mascot-dove.png", 48, 48, 0.4),
-  sprout: pixelPng("/pixel/mascot-sprout.png", 48, 48, 0.4),
-  key: pixelPng("/pixel/mascot-key.png", 48, 48, 0.4),
-  map: pixelPng("/pixel/mascot-map.png", 48, 48, 0.4),
-  campfire: pixelPng("/pixel/mascot-campfire.png", 48, 48, 0.4, "[animation:var(--animate-flicker)]"),
+  lamb: pixelPng("/pixel/mascot-lamb.png", 32, 32, 0.625),
+  lantern: pixelPng("/pixel/mascot-lantern.png", 32, 32, 0.625, "[animation:var(--animate-flicker)]"),
+  scroll: pixelPng("/pixel/mascot-scroll.png", 32, 32, 0.625),
+  dove: pixelPng("/pixel/mascot-dove.png", 32, 32, 0.625),
+  sprout: pixelPng("/pixel/mascot-sprout.png", 32, 32, 0.625),
+  key: pixelPng("/pixel/mascot-key.png", 32, 32, 0.625),
+  map: pixelPng("/pixel/mascot-map.png", 32, 32, 0.625),
+  campfire: pixelPng("/pixel/mascot-campfire.png", 32, 32, 0.625, "[animation:var(--animate-flicker)]"),
 });
 
 export const PIXEL_MASCOTS = defineAssets({
