@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * The daily landing screen. It composes the local-first QuestOS state into one
+ * calm sequence: welcome and candle, verse, today's quest choices, growth,
+ * active walks, and private next steps. Day-bound content refreshes in place
+ * when a long-lived tab crosses local midnight.
+ */
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";

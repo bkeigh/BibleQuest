@@ -118,6 +118,7 @@ docs/                   # Codex + setup/deployment/security/content/QA guides
 
 ## Documentation
 
+- [`docs/CODEBASE_GUIDE.md`](docs/CODEBASE_GUIDE.md) — architecture map and change guide
 - [`docs/BIBLEQUEST_CODEX.md`](docs/BIBLEQUEST_CODEX.md) — the source of truth
 - [`docs/SETUP.md`](docs/SETUP.md) — Supabase, auth, migrations, seeding
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Vercel + domain

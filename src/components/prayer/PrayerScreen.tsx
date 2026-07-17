@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Private prayer-journal index. It derives active, answered, and archived
+ * views from the local-first store and keeps filtering, editing, and deletion
+ * controls close to the journal entries they affect.
+ */
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";

@@ -1,3 +1,8 @@
+/**
+ * Parses the public, build-time RevenueCat configuration into a small trusted
+ * state machine. Checkout stays disabled unless the selected billing mode and
+ * public SDK key agree, so a stray environment variable cannot enable sales.
+ */
 export type RevenueCatBillingMode = "coming-soon" | "sandbox" | "live";
 
 export type RevenueCatConfigurationStatus =

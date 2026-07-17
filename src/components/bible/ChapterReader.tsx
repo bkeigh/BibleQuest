@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Interactive WEB chapter reader. Opening a chapter records reading progress,
+ * and keyboard-accessible verse selection lets the shared QuestOS store add or
+ * remove bookmarks without moving Scripture text out of its reading layout.
+ */
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useQuestOS } from "@/lib/questos/store";

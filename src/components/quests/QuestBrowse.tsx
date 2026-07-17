@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Quest discovery and daily-pick surface. Suggestions are deterministic for a
+ * given day and profile, while category filters and the three-pick limit remain
+ * presentation concerns layered over the QuestOS quest engine.
+ */
 import { useMemo, useState } from "react";
 import { seedQuests, questBySlug } from "@/data/seed/quests";
 import { filterQuests, selectSuggestedQuests } from "@/lib/questos/quest-engine";
