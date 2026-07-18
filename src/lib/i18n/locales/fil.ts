@@ -149,7 +149,7 @@ export const fil: UIStrings = {
   settings: {
     language: "Wika ng app",
     languageNote:
-      "Lilitaw sa sarili mong wika ang mga menu at button. Sa ngayon, mananatiling Ingles ang Banal na Kasulatan at nilalaman ng mga gawain.",
+      "Lilitaw sa sarili mong wika ang mga menu at button. Hiwalay mong pipiliin ang salin ng Bibliya; sa ngayon, mananatiling Ingles ang nilalaman ng mga gawain.",
     appearance: "Itsura",
     theme: "Tema",
     themeLight: "Maliwanag",

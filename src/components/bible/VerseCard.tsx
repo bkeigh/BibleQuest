@@ -17,8 +17,10 @@ import { useToast } from "@/components/design-system/Toast";
 import { cleanVerseText } from "@/lib/utils/scripture";
 import { useStrings } from "@/lib/i18n";
 import { riseIn } from "@/lib/motion";
-import { track } from "@/lib/analytics/events";
 import { VerseShareSheet } from "@/components/bible/VerseShareSheet";
+import { ApiBibleViewTracker } from "@/components/bible/ApiBibleViewTracker";
+import { usePreferredBiblePassage } from "@/lib/bible/use-preferred-scripture";
+import { LOCAL_WEB_TRANSLATION_KEY } from "@/lib/bible/translations";
 
 /**
  * VerseCard — today's verse as a devotional card / margin note.
@@ -48,9 +50,9 @@ export function VerseCard({
   const t = useStrings();
   const bookmarks = useQuestOS((s) => s.bookmarks);
   const toggleBookmark = useQuestOS((s) => s.toggleBookmark);
-  const [sharing, setSharing] = useState(false);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
+  const resolved = usePreferredBiblePassage(verse, !preview);
 
   const closeShareSheet = useCallback(() => setShareSheetOpen(false), []);
 
@@ -59,34 +61,14 @@ export function VerseCard({
       ? `${verse.verseStart}-${verse.verseEnd}`
       : `${verse.verseStart}`;
   const shareTitle = `${verse.reference} — BibleQuest`;
-  const shareText = `“${cleanVerseText(verse.text)}” — ${verse.reference}`;
+  // Public share pages intentionally remain WEB: licensed provider text is
+  // transient and must not leak into public metadata, exports, or URLs.
+  const shareText = `“${cleanVerseText(verse.text)}” — ${verse.reference} (WEB)`;
   const sharePath = `/verse/${verse.bookSlug}/${verse.chapter}/${verseSegment}`;
 
-  async function shareVerse() {
-    if (sharing) return;
+  function shareVerse() {
     const url = new URL(sharePath, window.location.origin).toString();
     setShareUrl(url);
-    setSharing(true);
-    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-      try {
-        await navigator.share({
-          title: shareTitle,
-          text: shareText,
-          url,
-        });
-        track("verse_shared");
-        return;
-      } catch (err) {
-        // Dismissing the share sheet is a choice, not a failure — and not
-        // an event. Anything else (webview stubs, permissions policy) falls
-        // through to the clipboard so the button never dies silently.
-        if (err instanceof DOMException && err.name === "AbortError") return;
-      } finally {
-        setSharing(false);
-      }
-    } else {
-      setSharing(false);
-    }
     setShareSheetOpen(true);
   }
 
@@ -99,7 +81,8 @@ export function VerseCard({
     (b) =>
       b.bookSlug === verse.bookSlug &&
       b.chapter === verse.chapter &&
-      b.verse === verse.verseStart
+      b.verse === verse.verseStart &&
+      (b.translationKey ?? "web") === resolved.effectiveTranslation.key
   );
 
   return (
@@ -133,32 +116,69 @@ export function VerseCard({
           </GentleButton>
         )}
       </div>
-      {/* Stable aria-live wrapper: "Another verse" swaps the content, and
-          screen readers should hear the new verse without refocusing. */}
-      <div aria-live="polite">
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {resolved.loading
+          ? `${verse.reference} is shown in the World English Bible while BibleQuest checks ${resolved.preferredTranslation?.abbreviation ?? "your preferred edition"}.`
+          : `${verse.reference}, ${resolved.effectiveTranslation.name}. ${cleanVerseText(resolved.text)}`}
+      </p>
+      <div aria-busy={resolved.loading}>
         {/* Keyed by verse: a new pick settles in gently instead of snapping. */}
         <motion.div
-          key={verse.id}
+          key={`${verse.id}:${resolved.effectiveTranslation.key}`}
           variants={riseIn}
           initial="hidden"
           animate="visible"
         >
           <blockquote
+            dir={resolved.effectiveTranslation.direction}
+            lang={resolved.effectiveTranslation.languageId}
             className={
               preview ? "verse-text mt-2.5" : "verse-text verse-text-lead mt-2.5"
             }
           >
-            “{cleanVerseText(verse.text)}”
+            “{cleanVerseText(resolved.text)}”
           </blockquote>
           <cite
             className={`block text-[0.9375rem] not-italic text-ash ${
               preview ? "mt-2" : "mt-3"
             }`}
           >
-            — {verse.reference} <span className="text-fog">·</span> World English Bible
+            — {verse.reference} <span className="text-fog">·</span>{" "}
+            {resolved.loading
+              ? `World English Bible · checking ${resolved.preferredTranslation?.abbreviation ?? "preferred edition"}…`
+              : (
+                  <span
+                    dir={resolved.effectiveTranslation.direction}
+                    lang={resolved.effectiveTranslation.languageId}
+                  >
+                    {resolved.effectiveTranslation.name}
+                  </span>
+                )}
           </cite>
+          {!preview &&
+            !resolved.loading &&
+            resolved.fallbackReason &&
+            resolved.requestedKey !== LOCAL_WEB_TRANSLATION_KEY && (
+              <p className="mt-1.5 text-caption leading-relaxed text-ash">
+                {resolved.preferredTranslation?.abbreviation ?? "Your preferred edition"}{" "}
+                is preferred. WEB is active until its licensed connection is available.
+              </p>
+            )}
+          {!preview &&
+            !resolved.loading &&
+            resolved.effectiveTranslation.copyright &&
+            resolved.effectiveTranslation.key !== LOCAL_WEB_TRANSLATION_KEY && (
+              <p
+                className="mt-2 text-caption leading-relaxed text-ash"
+                dir={resolved.effectiveTranslation.direction}
+                lang={resolved.effectiveTranslation.languageId}
+              >
+                {resolved.effectiveTranslation.copyright}
+              </p>
+            )}
         </motion.div>
       </div>
+      <ApiBibleViewTracker token={resolved.fumsToken} />
       {!preview && (
         <div className="mt-3 flex flex-wrap items-center gap-1 min-[380px]:mt-4 min-[380px]:gap-2">
           <GentleButton
@@ -172,28 +192,28 @@ export function VerseCard({
                 chapter: verse.chapter,
                 verse: verse.verseStart,
                 text: verse.text,
+                translationKey: resolved.effectiveTranslation.key,
               });
               toast(nowSaved ? "Saved to your verses." : "Removed from your verses.");
             }}
+            disabled={resolved.loading}
           >
             {saved ? (
               <IconBookmarkFilled size={17} className="text-accent" />
             ) : (
               <IconBookmark size={17} />
             )}
-            {saved ? "Saved" : "Save"}
+            {resolved.loading ? "Loading…" : saved ? "Saved" : "Save"}
           </GentleButton>
           <GentleButton
             variant="ghost"
             size="sm"
             className="min-h-11 max-[360px]:gap-1 max-[360px]:px-1 max-[360px]:text-[0.875rem]"
             onClick={shareVerse}
-            disabled={sharing}
-            aria-busy={sharing}
             aria-haspopup="dialog"
           >
             <IconShare size={16} />
-            {sharing ? "Sharing…" : t.home.share}
+            {t.home.share}
           </GentleButton>
           <GentleLink
             variant="text"
@@ -209,6 +229,12 @@ export function VerseCard({
         title={shareTitle}
         text={shareText}
         url={shareUrl || sharePath}
+        notice={
+          !resolved.loading &&
+          resolved.effectiveTranslation.key !== LOCAL_WEB_TRANSLATION_KEY
+            ? `You’re reading ${resolved.effectiveTranslation.abbreviation}. Sharing uses the public-domain WEB wording so licensed text stays inside BibleQuest.`
+            : undefined
+        }
         onClose={closeShareSheet}
       />
     </PaperCard>

@@ -13,11 +13,15 @@ import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosure";
 import { IconChevronRight } from "@/components/design-system/icons";
 import type { BibleBookMeta } from "@/lib/questos/types";
+import { translationPreferenceLabel } from "@/lib/bible/translations";
 
 function BibleIndexInner() {
   const readingPosition = useQuestOS((s) => s.readingPosition);
   const bookmarks = useQuestOS((s) => s.bookmarks);
   const verse = useMemo(() => getDailyVerse(), []);
+  const preferredBibleTranslation = useQuestOS(
+    (state) => state.settings.preferredBibleTranslation,
+  );
 
   // Open the testament the reader is currently in; default to New Testament.
   const readingTestament = useMemo(() => {
@@ -86,7 +90,9 @@ function BibleIndexInner() {
         </DisclosureGroup>
 
         <p className="mt-6 pb-4 text-center text-[0.75rem] text-ash">
-          World English Bible · Public Domain
+          {preferredBibleTranslation === "web"
+            ? "World English Bible · Public Domain"
+            : `${translationPreferenceLabel(preferredBibleTranslation)} preferred · WEB offline fallback`}
         </p>
       </PageContainer>
     </>

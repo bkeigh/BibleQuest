@@ -149,7 +149,7 @@ export const sw: UIStrings = {
   settings: {
     language: "Lugha ya programu",
     languageNote:
-      "Menyu na vitufe vitaonekana kwa lugha yako. Maandiko na maudhui ya mazoezi yatabaki kwa Kiingereza kwa sasa.",
+      "Menyu na vitufe vitaonekana kwa lugha yako. Chagua tafsiri ya Biblia kando; maudhui ya mazoezi yatabaki kwa Kiingereza kwa sasa.",
     appearance: "Muonekano",
     theme: "Mandhari",
     themeLight: "Mwangaza",

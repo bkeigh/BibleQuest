@@ -34,6 +34,7 @@ import type {
   Settings,
   VerseBookmark,
 } from "@/lib/questos/types";
+import { normalizeBibleTranslationKey } from "@/lib/bible/translations";
 import { DEFAULT_SETTINGS } from "@/lib/questos/types";
 
 // ---------------------------------------------------------------------------
@@ -119,6 +120,7 @@ export interface BookmarkRow {
   chapter: number;
   verse: number;
   text: string;
+  translation_key: string;
   note: string | null;
   created_at: string;
 }
@@ -182,6 +184,7 @@ export interface UserSettingsRow {
   quest_duration_pref: number[];
   quest_category_pref: string[];
   language: string;
+  preferred_bible_translation: string;
   analytics_consent: boolean;
 }
 
@@ -296,6 +299,7 @@ export function bookmarkToRow(uid: string, b: VerseBookmark): BookmarkRow {
     chapter: b.chapter,
     verse: b.verse,
     text: b.text,
+    translation_key: b.translationKey ?? "web",
     note: b.note ?? null,
     created_at: b.createdAt,
   };
@@ -376,6 +380,7 @@ export function settingsToRows(
       quest_duration_pref: s.questDurationPreference,
       quest_category_pref: s.questCategoryPreference,
       language: s.language,
+      preferred_bible_translation: s.preferredBibleTranslation,
       analytics_consent: s.analyticsConsent,
     },
     notifications: {
@@ -479,6 +484,7 @@ export function rowToBookmark(row: BookmarkRow): VerseBookmark {
     chapter: row.chapter,
     verse: row.verse,
     text: row.text,
+    translationKey: row.translation_key ?? "web",
     note: row.note ?? undefined,
     createdAt: row.created_at,
   };
@@ -565,6 +571,9 @@ export function rowsToSettings(
     questCategoryPreference: (settings?.quest_category_pref ??
       d.questCategoryPreference) as Settings["questCategoryPreference"],
     language: settings?.language ?? d.language,
+    preferredBibleTranslation: normalizeBibleTranslationKey(
+      settings?.preferred_bible_translation ?? d.preferredBibleTranslation,
+    ),
     analyticsConsent: settings?.analytics_consent ?? d.analyticsConsent,
   };
 }

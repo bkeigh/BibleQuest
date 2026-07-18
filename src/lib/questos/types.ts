@@ -223,6 +223,8 @@ export interface VerseBookmark {
   chapter: number;
   verse: number;
   text: string;
+  /** Edition actually shown when saved; legacy bookmarks are bundled WEB. */
+  translationKey?: string;
   note?: string;
   createdAt: string;
 }
@@ -542,8 +544,14 @@ export interface Settings {
   notifications: NotificationPreferences;
   questDurationPreference: QuestDuration[];
   questCategoryPreference: QuestCategory[];
-  /** UI-chrome language code (see src/lib/i18n). Scripture stays English (WEB). */
+  /** UI-chrome language code (see src/lib/i18n). Independent of Scripture. */
   language: string;
+  /**
+   * Preferred Scripture edition. The rendering resolver may explicitly fall
+   * back to bundled WEB until this edition is commercially licensed and
+   * connected; the two must never be mislabeled as one another.
+   */
+  preferredBibleTranslation: string;
   /**
    * Anonymous usage analytics opt-in/out (see src/lib/analytics/events.ts).
    * Counts taps and screens only — never prayer, reflection, or note text.
@@ -559,6 +567,7 @@ export const DEFAULT_SETTINGS: Settings = {
     boldText: false,
   },
   language: "en",
+  preferredBibleTranslation: "niv",
   notifications: {
     dailyVerse: false,
     dailyQuest: false,
@@ -579,7 +588,12 @@ export const DEFAULT_SETTINGS: Settings = {
 export interface SyncTombstones {
   prayers: string[];
   reflections: string[];
-  bookmarks: Array<{ bookSlug: string; chapter: number; verse: number }>;
+  bookmarks: Array<{
+    bookSlug: string;
+    chapter: number;
+    verse: number;
+    translationKey?: string;
+  }>;
   myQuests: string[];
   /**
    * User id whose ENTIRE account copy must be deleted before the next push.

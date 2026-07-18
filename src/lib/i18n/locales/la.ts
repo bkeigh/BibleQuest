@@ -149,7 +149,7 @@ export const la: UIStrings = {
   settings: {
     language: "Lingua",
     languageNote:
-      "Indices et instrumenta lingua tua apparent; Scriptura et munera interim Anglice manent.",
+      "Indices et instrumenta lingua tua apparent. Versionem Bibliae seorsum elige; munera interim Anglice manent.",
     appearance: "Species",
     theme: "Thema",
     themeLight: "Lucidum",

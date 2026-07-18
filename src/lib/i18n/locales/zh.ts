@@ -148,7 +148,24 @@ export const zh: UIStrings = {
   },
   settings: {
     language: "应用语言",
-    languageNote: "菜单和按钮会以你的语言显示。经文和任务内容暂时仍为英文。",
+    languageNote: "菜单和按钮会以你的语言显示。圣经译本可单独选择；任务内容暂时仍为英文。",
+    bibleTranslation: {
+      label: "圣经译本",
+      preferredSummary: "首选 {translation}",
+      preferenceDescription:
+        "你首选 {translation}。如果授权连接不可用，BibleQuest 会改用公版 WEB，并清楚标明这一替代。",
+      licensingNote:
+        "受版权保护的译本仅会在其确切提供商 ID 获准用于 BibleQuest 商业服务时显示；这些文本不会内置到应用中，也不会发送给任务生成功能。",
+      availableOffline: "可离线使用",
+      connected: "已连接",
+      licensePending: "授权待定",
+      providerRequired: "需要连接提供商",
+      checking: "正在检查已连接的译本…",
+      providerError: "无法检查已连接的译本。WEB 仍可使用。",
+      searchLabel: "搜索已连接的语言和译本",
+      searchPlaceholder: "西班牙语、中文、印地语…",
+      noMatches: "没有符合搜索条件的已连接译本。",
+    },
     appearance: "外观",
     theme: "主题",
     themeLight: "浅色",

@@ -17,6 +17,7 @@ import {
   type AccountNudgeContext,
   type QuestOSSnapshot,
 } from "./types";
+import { normalizeBibleTranslationKey } from "@/lib/bible/translations";
 
 function isObj(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -203,6 +204,11 @@ export function parseSnapshot(rawText: string): ParseResult {
   if (isObj(src.settings)) {
     const s = { ...src.settings };
     if ("appearance" in s && !isObj(s.appearance)) delete s.appearance;
+    if ("preferredBibleTranslation" in s) {
+      s.preferredBibleTranslation = normalizeBibleTranslationKey(
+        s.preferredBibleTranslation,
+      );
+    }
     delete s.analyticsConsent;
     out.settings = s;
   }

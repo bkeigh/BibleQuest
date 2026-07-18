@@ -149,7 +149,7 @@ export const ro: UIStrings = {
   settings: {
     language: "Limba aplicației",
     languageNote:
-      "Meniurile și butoanele apar în limba ta. Scriptura și conținutul misiunilor rămân deocamdată în engleză.",
+      "Meniurile și butoanele apar în limba ta. Alege separat versiunea Bibliei; conținutul misiunilor rămâne deocamdată în engleză.",
     appearance: "Aspect",
     theme: "Temă",
     themeLight: "Luminoasă",

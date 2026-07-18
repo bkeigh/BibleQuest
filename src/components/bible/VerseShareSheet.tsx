@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { IconClose, IconShare } from "@/components/design-system/icons";
@@ -13,6 +13,8 @@ interface VerseShareSheetProps {
   title: string;
   text: string;
   url: string;
+  /** Explains when the share-safe WEB wording differs from the edition shown. */
+  notice?: string;
   onClose: () => void;
 }
 
@@ -46,21 +48,23 @@ async function copyText(value: string): Promise<boolean> {
 }
 
 /**
- * Accessible fallback for browsers without Web Share. It is intentionally
- * mounted only while open, traps focus, closes on Escape/backdrop, restores
- * the invoking control, and offers useful choices instead of silently copying.
+ * Accessible share chooser. It is intentionally mounted only while open,
+ * traps focus, closes on Escape/backdrop, restores the invoking control, and
+ * previews the exact wording before any native handoff or copy action.
  */
 export function VerseShareSheet({
   open,
   title,
   text,
   url,
+  notice,
   onClose,
 }: VerseShareSheetProps) {
   const t = useStrings();
   const { toast } = useToast();
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  const [nativeSharing, setNativeSharing] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -122,6 +126,22 @@ export function VerseShareSheet({
     }
   }
 
+  async function shareNatively() {
+    if (nativeSharing || typeof navigator.share !== "function") return;
+    setNativeSharing(true);
+    try {
+      await navigator.share({ title, text, url });
+      track("verse_shared");
+      onClose();
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        toast("We couldn’t open your device’s share options. Try one below.");
+      }
+    } finally {
+      setNativeSharing(false);
+    }
+  }
+
   return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-end bg-dusk/25 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"
@@ -155,11 +175,35 @@ export function VerseShareSheet({
           </button>
         </div>
 
+        {notice && (
+          <p
+            role="note"
+            className="mt-3 rounded-[10px] bg-linen px-3 py-2.5 text-caption leading-relaxed text-charcoal"
+          >
+            {notice}
+          </p>
+        )}
+
         <p className="mt-3 line-clamp-3 text-small leading-relaxed text-charcoal">
           {text}
         </p>
 
-        <div className="mt-5 grid grid-cols-2 gap-2.5">
+        {typeof navigator.share === "function" && (
+          <GentleButton
+            variant="primary"
+            size="md"
+            fullWidth
+            className="mt-5"
+            disabled={nativeSharing}
+            aria-busy={nativeSharing}
+            onClick={() => void shareNatively()}
+          >
+            <IconShare size={16} />
+            {nativeSharing ? "Opening share options…" : "More share options"}
+          </GentleButton>
+        )}
+
+        <div className="mt-4 grid grid-cols-2 gap-2.5">
           <GentleButton
             variant="outline"
             size="sm"

@@ -149,7 +149,7 @@ export const id: UIStrings = {
   settings: {
     language: "Bahasa aplikasi",
     languageNote:
-      "Menu dan tombol tampil dalam bahasamu. Ayat Alkitab dan isi misi masih dalam bahasa Inggris untuk saat ini.",
+      "Menu dan tombol tampil dalam bahasamu. Pilih versi Alkitab secara terpisah; isi misi masih dalam bahasa Inggris untuk saat ini.",
     appearance: "Tampilan",
     theme: "Tema",
     themeLight: "Terang",

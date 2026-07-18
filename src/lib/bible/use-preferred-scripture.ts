@@ -1,0 +1,213 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useQuestOS } from "@/lib/questos/store";
+import type { DailyVerse } from "@/lib/questos/types";
+import type { ChapterContent } from "@/lib/bible/server";
+import {
+  LOCAL_WEB_TRANSLATION_KEY,
+  WEB_TRANSLATION,
+  featuredTranslation,
+  type BibleTranslation,
+  type ResolvedBiblePassage,
+} from "./translations";
+
+type FallbackReason = NonNullable<ResolvedBiblePassage["fallbackReason"]>;
+
+function errorCode(value: unknown): FallbackReason {
+  if (
+    value === "provider_not_configured" ||
+    value === "translation_unavailable" ||
+    value === "content_unavailable"
+  ) {
+    return value;
+  }
+  return "content_unavailable";
+}
+
+export interface PreferredPassageResult extends ResolvedBiblePassage {
+  loading: boolean;
+  preferredTranslation?: BibleTranslation;
+}
+
+export function usePreferredBiblePassage(
+  passage: DailyVerse,
+  enabled = true,
+  preferenceOverride?: string,
+): PreferredPassageResult {
+  const storedPreference = useQuestOS(
+    (state) => state.settings.preferredBibleTranslation,
+  );
+  const requestedKey = enabled
+    ? preferenceOverride || storedPreference || LOCAL_WEB_TRANSLATION_KEY
+    : LOCAL_WEB_TRANSLATION_KEY;
+  const preferredTranslation = featuredTranslation(requestedKey);
+  const fallback = useMemo<PreferredPassageResult>(
+    () => ({
+      text: passage.text,
+      requestedKey,
+      effectiveTranslation: WEB_TRANSLATION,
+      preferredTranslation,
+      loading: requestedKey !== LOCAL_WEB_TRANSLATION_KEY,
+    }),
+    [passage.text, preferredTranslation, requestedKey],
+  );
+  const requestId = `${requestedKey}:${passage.bookSlug}:${passage.chapter}:${passage.verseStart}:${passage.verseEnd}`;
+  const [remote, setRemote] = useState<{
+    requestId: string;
+    result: PreferredPassageResult;
+  } | null>(null);
+
+  useEffect(() => {
+    if (requestedKey === LOCAL_WEB_TRANSLATION_KEY) return;
+    const controller = new AbortController();
+    const query = new URLSearchParams({
+      translation: requestedKey,
+      book: passage.bookSlug,
+      chapter: String(passage.chapter),
+      start: String(passage.verseStart),
+      end: String(passage.verseEnd),
+    });
+
+    void fetch(`/api/bible/passage?${query}`, {
+      signal: controller.signal,
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        const body = (await response.json()) as {
+          error?: unknown;
+          text?: unknown;
+          translation?: BibleTranslation;
+          fumsToken?: string;
+        };
+        if (!response.ok || typeof body.text !== "string" || !body.translation) {
+          throw body.error;
+        }
+        setRemote({
+          requestId,
+          result: {
+            text: body.text,
+            requestedKey,
+            effectiveTranslation: body.translation,
+            preferredTranslation: body.translation,
+            fumsToken: body.fumsToken,
+            loading: false,
+          },
+        });
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setRemote({
+          requestId,
+          result: {
+            ...fallback,
+            loading: false,
+            fallbackReason: errorCode(error),
+          },
+        });
+      });
+    return () => controller.abort();
+  }, [
+    fallback,
+    passage.bookSlug,
+    passage.chapter,
+    passage.verseEnd,
+    passage.verseStart,
+    requestId,
+    requestedKey,
+  ]);
+
+  return remote?.requestId === requestId ? remote.result : fallback;
+}
+
+export interface PreferredChapterResult {
+  verses: string[];
+  requestedKey: string;
+  effectiveTranslation: BibleTranslation;
+  preferredTranslation?: BibleTranslation;
+  fallbackReason?: FallbackReason;
+  fumsToken?: string;
+  loading: boolean;
+}
+
+export function usePreferredBibleChapter(
+  chapter: ChapterContent,
+  preferenceOverride?: string,
+): PreferredChapterResult {
+  const storedPreference = useQuestOS(
+    (state) => state.settings.preferredBibleTranslation,
+  );
+  const requestedKey =
+    preferenceOverride || storedPreference || LOCAL_WEB_TRANSLATION_KEY;
+  const preferredTranslation = featuredTranslation(requestedKey);
+  const fallback = useMemo<PreferredChapterResult>(
+    () => ({
+      verses: chapter.verses,
+      requestedKey,
+      effectiveTranslation: WEB_TRANSLATION,
+      preferredTranslation,
+      loading: requestedKey !== LOCAL_WEB_TRANSLATION_KEY,
+    }),
+    [chapter.verses, preferredTranslation, requestedKey],
+  );
+  const requestId = `${requestedKey}:${chapter.bookSlug}:${chapter.chapter}`;
+  const [remote, setRemote] = useState<{
+    requestId: string;
+    result: PreferredChapterResult;
+  } | null>(null);
+
+  useEffect(() => {
+    if (requestedKey === LOCAL_WEB_TRANSLATION_KEY) return;
+    const controller = new AbortController();
+    const query = new URLSearchParams({
+      translation: requestedKey,
+      book: chapter.bookSlug,
+      chapter: String(chapter.chapter),
+    });
+    void fetch(`/api/bible/chapter?${query}`, {
+      signal: controller.signal,
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        const body = (await response.json()) as {
+          error?: unknown;
+          verses?: unknown;
+          translation?: BibleTranslation;
+          fumsToken?: string;
+        };
+        if (
+          !response.ok ||
+          !Array.isArray(body.verses) ||
+          !body.verses.every((verse) => typeof verse === "string") ||
+          !body.translation
+        ) {
+          throw body.error;
+        }
+        setRemote({
+          requestId,
+          result: {
+            verses: body.verses,
+            requestedKey,
+            effectiveTranslation: body.translation,
+            preferredTranslation: body.translation,
+            fumsToken: body.fumsToken,
+            loading: false,
+          },
+        });
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setRemote({
+          requestId,
+          result: {
+            ...fallback,
+            loading: false,
+            fallbackReason: errorCode(error),
+          },
+        });
+      });
+    return () => controller.abort();
+  }, [chapter.bookSlug, chapter.chapter, fallback, requestId, requestedKey]);
+
+  return remote?.requestId === requestId ? remote.result : fallback;
+}

@@ -149,7 +149,7 @@ export const ko: UIStrings = {
   settings: {
     language: "앱 언어",
     languageNote:
-      "메뉴와 버튼은 한국어로 표시돼요. 성경 말씀과 실천 내용은 아직 영어로 제공돼요.",
+      "메뉴와 버튼은 한국어로 표시돼요. 성경 번역본은 별도로 선택할 수 있고, 실천 내용은 아직 영어로 제공돼요.",
     appearance: "화면",
     theme: "테마",
     themeLight: "밝게",

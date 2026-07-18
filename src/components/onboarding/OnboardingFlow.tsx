@@ -107,7 +107,7 @@ const ACCOUNT_STEP = 7;
 /** The one heading rendered per step — focus lands here on step change. */
 const STEP_HEADING_ID = "onboarding-step-heading";
 
-function OnboardingInner() {
+function OnboardingInner({ signInFailed }: { signInFailed: boolean }) {
   const router = useRouter();
   const { user, configured } = useSession();
   const completeOnboarding = useQuestOS((s) => s.completeOnboarding);
@@ -133,7 +133,8 @@ function OnboardingInner() {
 
   // Phone OTP verifies in-page (no redirect), so when a sign-in completes while
   // we're on the account step, move the user into the app ourselves. Magic-link
-  // and Google instead leave the page and return via /auth/callback → /app.
+  // and Google instead leave the page and return via /auth/callback to the
+  // destination captured when the journey was committed.
   useEffect(() => {
     if (step === ACCOUNT_STEP && user) router.replace(pendingDest);
   }, [step, user, pendingDest, router]);
@@ -272,6 +273,8 @@ function OnboardingInner() {
                   name={draft.displayName}
                   onName={(displayName) => set({ displayName })}
                   onNext={next}
+                  accountEnabled={configured}
+                  signInFailed={signInFailed}
                 />
               )}
               {step === 1 && (
@@ -356,6 +359,7 @@ function OnboardingInner() {
                 <StepAccount
                   name={draft.displayName.trim() || "friend"}
                   onProceed={proceed}
+                  nextPath={pendingDest}
                 />
               )}
             </motion.div>
@@ -407,11 +411,17 @@ function StepWelcome({
   name,
   onName,
   onNext,
+  accountEnabled,
+  signInFailed,
 }: {
   name: string;
   onName: (v: string) => void;
   onNext: () => void;
+  accountEnabled: boolean;
+  signInFailed: boolean;
 }) {
+  const [signInOpen, setSignInOpen] = useState(signInFailed);
+
   return (
     <div className="text-center">
       <StepMascot name="lamb" size={10} />
@@ -451,6 +461,46 @@ function StepWelcome({
       >
         Begin
       </GentleButton>
+      {accountEnabled && (
+        <div className="mt-5 border-t border-mist pt-4">
+          <GentleButton
+            variant="text"
+            size="sm"
+            className="min-h-11"
+            aria-expanded={signInOpen}
+            aria-controls="returning-user-sign-in"
+            onClick={() => setSignInOpen((open) => !open)}
+          >
+            Already have an account? Sign in
+          </GentleButton>
+
+          {signInOpen && (
+            <div id="returning-user-sign-in" className="mt-4 text-left">
+              {signInFailed && (
+                <div
+                  role="alert"
+                  className="mb-3 rounded-[var(--radius-card)] border border-rose-300 px-4 py-3"
+                >
+                  <p className="text-small leading-relaxed text-rose-700">
+                    That sign-in link didn’t work — it may have expired. Send
+                    yourself a fresh one below.
+                  </p>
+                </div>
+              )}
+              <PaperCard variant="paper" padding="md">
+                <h2 className="text-[1.0625rem] font-medium text-graphite">
+                  Welcome back
+                </h2>
+                <p className="mb-4 mt-1 text-caption leading-relaxed text-ash">
+                  Sign in and we’ll restore your saved journey before opening
+                  the app.
+                </p>
+                <SignInMethods source="onboarding" nextPath="/onboarding" />
+              </PaperCard>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -577,9 +627,11 @@ function StepFirstQuest({
 function StepAccount({
   name,
   onProceed,
+  nextPath,
 }: {
   name: string;
   onProceed: () => void;
+  nextPath: string;
 }) {
   const [emailSent, setEmailSent] = useState(false);
   return (
@@ -601,7 +653,11 @@ function StepAccount({
       </div>
 
       <PaperCard variant="paper" padding="md" className="mt-4">
-        <SignInMethods source="onboarding" onEmailSent={() => setEmailSent(true)} />
+        <SignInMethods
+          source="onboarding"
+          nextPath={nextPath}
+          onEmailSent={() => setEmailSent(true)}
+        />
       </PaperCard>
 
       <GentleButton
@@ -617,7 +673,7 @@ function StepAccount({
   );
 }
 
-export function OnboardingFlow() {
+export function OnboardingFlow({ signInFailed = false }: { signInFailed?: boolean }) {
   return (
     <ClientOnly
       fallback={
@@ -626,7 +682,7 @@ export function OnboardingFlow() {
         </div>
       }
     >
-      <OnboardingInner />
+      <OnboardingInner signInFailed={signInFailed} />
     </ClientOnly>
   );
 }

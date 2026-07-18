@@ -48,10 +48,19 @@ export default function PrivacyPage() {
         journal content.
       </Prose>
 
-      <ProseHeading>If you create an account later</ProseHeading>
+      <ProseHeading>If you choose a connected Bible edition</ProseHeading>
       <Prose>
-        When account sync becomes available, your private content will be
-        protected by database-level security so that only you can read it. The
+        The licensed Scripture provider receives the requested passage plus
+        random device and session identifiers required to report that the text
+        was viewed. BibleQuest does not send your name, contact details, prayers,
+        reflections, or account ID with that report. Choosing the bundled WEB
+        edition keeps Scripture reading entirely on BibleQuest’s own service.
+      </Prose>
+
+      <ProseHeading>If you create an account</ProseHeading>
+      <Prose>
+        Synced private content is protected by database-level security so that
+        only you can read it. The
         keys that could bypass that protection are server-only and never reach
         your browser.
       </Prose>

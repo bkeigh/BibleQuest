@@ -149,7 +149,7 @@ export const vi: UIStrings = {
   settings: {
     language: "Ngôn ngữ ứng dụng",
     languageNote:
-      "Trình đơn và nút bấm hiển thị bằng ngôn ngữ của bạn. Kinh Thánh và nội dung việc lành tạm thời vẫn bằng tiếng Anh.",
+      "Trình đơn và nút bấm hiển thị bằng ngôn ngữ của bạn. Hãy chọn riêng bản dịch Kinh Thánh; nội dung việc lành tạm thời vẫn bằng tiếng Anh.",
     appearance: "Giao diện",
     theme: "Chủ đề màu",
     themeLight: "Sáng",

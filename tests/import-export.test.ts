@@ -46,6 +46,30 @@ describe("journey import and export", () => {
     );
   });
 
+  it("sanitizes untrusted Bible translation preferences", () => {
+    const invalid = parseSnapshot(
+      JSON.stringify({
+        settings: { preferredBibleTranslation: { startsWith: "boom" } },
+      }),
+    );
+    expect(invalid.ok).toBe(true);
+    if (!invalid.ok) return;
+    expect(invalid.data.settings?.preferredBibleTranslation).toBe("niv");
+
+    const connected = parseSnapshot(
+      JSON.stringify({
+        settings: {
+          preferredBibleTranslation: "api:de4e12af7f28f599-02",
+        },
+      }),
+    );
+    expect(connected.ok).toBe(true);
+    if (!connected.ok) return;
+    expect(connected.data.settings?.preferredBibleTranslation).toBe(
+      "api:de4e12af7f28f599-02",
+    );
+  });
+
   it("drops malformed records and returns content-free errors", () => {
     const marker = "fixture-private-marker";
     const malformed = JSON.stringify({

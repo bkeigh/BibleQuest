@@ -3,8 +3,8 @@
  *
  * v1 scope, on purpose: navigation, common actions, the daily quest loop,
  * settings — the strings a non-English speaker hits constantly. Scripture
- * (WEB), quest content, prayers, and long-form copy remain English for
- * now; the language note in Settings says so plainly.
+ * edition selection is independent; quest content, prayers, and long-form
+ * copy remain English for now, as the language note in Settings explains.
  *
  * Every locale file implements this interface completely — the type system
  * is the completeness check. English (en.ts) is the source of truth.
@@ -188,6 +188,22 @@ export interface UIStrings {
   settings: {
     language: string;
     languageNote: string;
+    /** Optional while locale dictionaries adopt the translation catalogue UI. */
+    bibleTranslation?: {
+      label: string;
+      preferredSummary: string;
+      preferenceDescription: string;
+      licensingNote: string;
+      availableOffline: string;
+      connected: string;
+      licensePending: string;
+      providerRequired: string;
+      checking: string;
+      providerError: string;
+      searchLabel: string;
+      searchPlaceholder: string;
+      noMatches: string;
+    };
     appearance: string;
     theme: string;
     themeLight: string;

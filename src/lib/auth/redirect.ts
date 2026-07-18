@@ -40,3 +40,14 @@ export function safeNextPath(next: string | null): string {
     return DEFAULT_NEXT;
   }
 }
+
+/**
+ * Build the same-origin callback path used by browser auth methods. Keeping
+ * the target in a validated query parameter lets onboarding return to its
+ * account-restoration boundary, while the final account invitation can keep
+ * a previously chosen in-app destination.
+ */
+export function authCallbackPath(next: string | null): string {
+  const params = new URLSearchParams({ next: safeNextPath(next) });
+  return `/auth/callback?${params.toString()}`;
+}

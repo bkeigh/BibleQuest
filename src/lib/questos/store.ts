@@ -1208,11 +1208,13 @@ export const useQuestOS = create<QuestOSState>()(
 
         toggleBookmark: (bookmark) => {
           const s = get();
+          const translationKey = bookmark.translationKey ?? "web";
           const existing = s.bookmarks.find(
             (b) =>
               b.bookSlug === bookmark.bookSlug &&
               b.chapter === bookmark.chapter &&
-              b.verse === bookmark.verse
+              b.verse === bookmark.verse &&
+              (b.translationKey ?? "web") === translationKey
           );
           if (existing) {
             set({
@@ -1225,6 +1227,7 @@ export const useQuestOS = create<QuestOSState>()(
                     bookSlug: existing.bookSlug,
                     chapter: existing.chapter,
                     verse: existing.verse,
+                    translationKey: existing.translationKey ?? "web",
                   },
                 ],
               },
@@ -1233,6 +1236,7 @@ export const useQuestOS = create<QuestOSState>()(
           }
           const created: VerseBookmark = {
             ...bookmark,
+            translationKey,
             id: id(),
             createdAt: new Date().toISOString(),
           };
@@ -1334,7 +1338,9 @@ export const useQuestOS = create<QuestOSState>()(
                     (c) =>
                       c.bookSlug === b.bookSlug &&
                       c.chapter === b.chapter &&
-                      c.verse === b.verse
+                      c.verse === b.verse &&
+                      (c.translationKey ?? "web") ===
+                        (b.translationKey ?? "web")
                   )
               ),
               myQuests: t.myQuests.filter(
@@ -1354,7 +1360,7 @@ export const useQuestOS = create<QuestOSState>()(
     {
       name: "biblequest:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 8,
+      version: 9,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
@@ -1441,6 +1447,24 @@ export const useQuestOS = create<QuestOSState>()(
             >,
           );
           state.recentVerses = [];
+        }
+        if (version < 9) {
+          // v9: preferred Bible edition. NIV is the requested default, while
+          // the resolver keeps WEB as an honestly-labelled fallback until a
+          // licensed provider is connected.
+          const settings = state.settings as
+            | { preferredBibleTranslation?: string }
+            | undefined;
+          if (settings && !settings.preferredBibleTranslation) {
+            settings.preferredBibleTranslation = "niv";
+          }
+          // Every pre-v9 bookmark snapshot is exact bundled WEB text.
+          state.bookmarks = ((state.bookmarks ?? []) as VerseBookmark[]).map(
+            (bookmark) => ({
+              ...bookmark,
+              translationKey: bookmark.translationKey ?? "web",
+            }),
+          );
         }
         return state as unknown as QuestOSState;
       },

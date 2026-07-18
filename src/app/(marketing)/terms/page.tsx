@@ -37,8 +37,11 @@ export default function TermsPage() {
 
       <ProseHeading>Scripture</ProseHeading>
       <Prose>
-        Scripture is presented from the World English Bible, which is in the
-        public domain.
+        BibleQuest bundles the public-domain World English Bible. A selected
+        copyrighted edition is shown only through a separately licensed provider,
+        with its source and copyright notice displayed in context. If that
+        connection is unavailable, the app clearly returns to WEB; it never labels
+        WEB text as another edition.
       </Prose>
     </MarketingPage>
   );

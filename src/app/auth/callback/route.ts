@@ -59,5 +59,12 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(new URL("/app/account?error=signin", url.origin));
+  // A failed returning-user sign-in must stay on the public onboarding route;
+  // sending a fresh device to /app/account would put it behind the very gate
+  // that is waiting for account restoration. Other account invitations keep
+  // the established in-app recovery screen.
+  const errorPath = new URL(next, url.origin).pathname === "/onboarding"
+    ? "/onboarding?error=signin"
+    : "/app/account?error=signin";
+  return NextResponse.redirect(new URL(errorPath, url.origin));
 }

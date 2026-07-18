@@ -107,6 +107,11 @@ needed — just don't remove that config.
       in [`REVENUECAT.md`](REVENUECAT.md) has evidence and explicit approval.
 - [ ] **Verify Bible translation licensing** before adding any non-public-domain
       translation. WEB is public domain and needs none.
+- [ ] For API.Bible, configure server-only `API_BIBLE_API_KEY` and
+      `API_BIBLE_COMMERCIALLY_LICENSED_BIBLE_IDS` only after each exact id is
+      licensed for commercial BibleQuest use. Catalog access alone is not
+      permission. The old `API_BIBLE_ALLOWED_BIBLE_IDS` name remains a temporary
+      backwards-compatible alias.
 - [ ] Review sensitive quests once more (see [`CONTENT_GUIDE.md`](CONTENT_GUIDE.md)).
 - [ ] Finalize Privacy Policy and Terms.
 - [ ] Keep AI Guide scaffold-only unless separately reviewed and guardrailed.

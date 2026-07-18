@@ -10,6 +10,92 @@ import { GentleLink } from "@/components/design-system/GentleButton";
 import { IconArrowLeft, IconBookmarkFilled } from "@/components/design-system/icons";
 import { emptyStates } from "@/lib/questos/copy";
 import { cleanVerseText } from "@/lib/utils/scripture";
+import type { VerseBookmark } from "@/lib/questos/types";
+import { usePreferredBiblePassage } from "@/lib/bible/use-preferred-scripture";
+import { ApiBibleViewTracker } from "@/components/bible/ApiBibleViewTracker";
+import { LOCAL_WEB_TRANSLATION_KEY } from "@/lib/bible/translations";
+
+function SavedVerseCard({
+  bookmark,
+  onToggle,
+}: {
+  bookmark: VerseBookmark;
+  onToggle: (bookmark: VerseBookmark) => void;
+}) {
+  const savedTranslationKey = bookmark.translationKey ?? "web";
+  const resolved = usePreferredBiblePassage(
+    {
+      id: `saved:${bookmark.id}`,
+      bookSlug: bookmark.bookSlug,
+      chapter: bookmark.chapter,
+      verseStart: bookmark.verse,
+      verseEnd: bookmark.verse,
+      reference: `${bookmark.bookName} ${bookmark.chapter}:${bookmark.verse}`,
+      text: bookmark.text,
+      theme: "saved",
+    },
+    true,
+    savedTranslationKey,
+  );
+  const href = `/app/bible/${bookmark.bookSlug}/${bookmark.chapter}?translation=${encodeURIComponent(savedTranslationKey)}&verse=${bookmark.verse}#verse-${bookmark.verse}`;
+
+  return (
+    <PaperCard variant="paper" padding="md">
+      <Link
+        href={href}
+        aria-busy={resolved.loading}
+        className="block"
+      >
+        <blockquote
+          className="verse-text"
+          dir={resolved.effectiveTranslation.direction}
+          lang={resolved.effectiveTranslation.languageId}
+        >
+          “{cleanVerseText(resolved.text)}”
+        </blockquote>
+        <cite className="mt-2 block text-[0.875rem] not-italic text-accent">
+          {bookmark.bookName} {bookmark.chapter}:{bookmark.verse}{" "}
+          <span className="text-fog">·</span>{" "}
+          <span
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            className="text-ash"
+          >
+            {resolved.loading
+              ? `WEB · checking ${resolved.preferredTranslation?.abbreviation ?? "saved edition"}…`
+              : resolved.effectiveTranslation.abbreviation}
+          </span>
+        </cite>
+        {!resolved.loading && resolved.fallbackReason && (
+          <p className="mt-1 text-caption leading-relaxed text-ash">
+            The saved edition is unavailable, so this copy is shown in WEB.
+          </p>
+        )}
+        {!resolved.loading &&
+          resolved.effectiveTranslation.copyright &&
+          resolved.effectiveTranslation.key !== LOCAL_WEB_TRANSLATION_KEY && (
+            <p
+              className="mt-2 text-caption leading-relaxed text-ash"
+              dir={resolved.effectiveTranslation.direction}
+              lang={resolved.effectiveTranslation.languageId}
+            >
+              {resolved.effectiveTranslation.copyright}
+            </p>
+          )}
+      </Link>
+      <ApiBibleViewTracker token={resolved.fumsToken} />
+      <button
+        type="button"
+        aria-label={`Remove ${bookmark.bookName} ${bookmark.chapter}:${bookmark.verse} from saved verses`}
+        onClick={() => onToggle(bookmark)}
+        className="mt-1 inline-flex min-h-11 items-center gap-1.5 text-[0.8125rem] text-ash transition-colors hover:text-charcoal"
+      >
+        <IconBookmarkFilled size={15} className="text-accent" /> Remove saved verse
+      </button>
+    </PaperCard>
+  );
+}
 
 function SavedVersesInner() {
   const { toast } = useToast();
@@ -42,38 +128,20 @@ function SavedVersesInner() {
         </PaperCard>
       ) : (
         <div className="mt-6 space-y-3 pb-8">
-          {sorted.map((b) => (
-            <PaperCard key={b.id} variant="paper" padding="md">
-              <Link href={`/app/bible/${b.bookSlug}/${b.chapter}`} className="block">
-                <blockquote className="verse-text">
-                  “{cleanVerseText(b.text)}”
-                </blockquote>
-                <cite className="mt-2 block text-[0.875rem] not-italic text-accent">
-                  {b.bookName} {b.chapter}:{b.verse}
-                </cite>
-              </Link>
-              <button
-                onClick={() => {
-                  const entry = {
-                    bookSlug: b.bookSlug,
-                    bookName: b.bookName,
-                    chapter: b.chapter,
-                    verse: b.verse,
-                    text: b.text,
-                  };
-                  toggleBookmark(entry);
-                  toast("Removed.", {
-                    action: {
-                      label: "Undo",
-                      onClick: () => toggleBookmark(entry),
-                    },
-                  });
-                }}
-                className="mt-2.5 inline-flex items-center gap-1.5 text-[0.8125rem] text-ash transition-colors hover:text-charcoal"
-              >
-                <IconBookmarkFilled size={15} className="text-accent" /> Saved
-              </button>
-            </PaperCard>
+          {sorted.map((bookmark) => (
+            <SavedVerseCard
+              key={bookmark.id}
+              bookmark={bookmark}
+              onToggle={(entry) => {
+                toggleBookmark(entry);
+                toast("Removed.", {
+                  action: {
+                    label: "Undo",
+                    onClick: () => toggleBookmark(entry),
+                  },
+                });
+              }}
+            />
           ))}
         </div>
       )}

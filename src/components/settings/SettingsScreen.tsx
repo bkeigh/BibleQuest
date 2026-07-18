@@ -5,7 +5,7 @@
  * persisted QuestOS store; account actions delegate to Supabase; exports,
  * imports, and destructive resets stay explicit and user-confirmed here.
  */
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuestOS } from "@/lib/questos/store";
@@ -23,9 +23,14 @@ import { createExportSnapshot } from "@/lib/questos/snapshot";
 import { clearLastSyncedUserId } from "@/lib/sync/last-user";
 import { useSession } from "@/lib/supabase/useSession";
 import type { QuestOSSnapshot } from "@/lib/questos/types";
-import { useStrings, LANGUAGES, languageMeta } from "@/lib/i18n";
+import { useStrings, LANGUAGES, languageMeta, fmt } from "@/lib/i18n";
 import { IconCheck } from "@/components/design-system/icons";
 import { cn } from "@/lib/utils/cn";
+import {
+  FEATURED_TRANSLATIONS,
+  translationPreferenceLabel,
+  type BibleTranslation,
+} from "@/lib/bible/translations";
 
 function Row({
   label,
@@ -196,6 +201,265 @@ function LanguagePicker({
   );
 }
 
+interface BibleTranslationCopy {
+  label: string;
+  preferredSummary: string;
+  preferenceDescription: string;
+  licensingNote: string;
+  availableOffline: string;
+  connected: string;
+  licensePending: string;
+  providerRequired: string;
+  checking: string;
+  providerError: string;
+  searchLabel: string;
+  searchPlaceholder: string;
+  noMatches: string;
+}
+
+const DEFAULT_BIBLE_TRANSLATION_COPY: BibleTranslationCopy = {
+  label: "Bible translation",
+  preferredSummary: "{translation} preferred",
+  preferenceDescription:
+    "{translation} is your preference. If its licensed connection is unavailable, BibleQuest uses the public-domain WEB and labels the fallback clearly.",
+  licensingNote:
+    "Copyrighted editions appear only when their exact provider IDs are approved for BibleQuest’s commercial use; they are never bundled or sent to quest generation.",
+  availableOffline: "Available offline",
+  connected: "Connected",
+  licensePending: "License pending",
+  providerRequired: "Provider connection required",
+  checking: "Checking connected editions…",
+  providerError: "Connected editions could not be checked. WEB remains available.",
+  searchLabel: "Search connected languages and editions",
+  searchPlaceholder: "Spanish, Chinese, Hindi…",
+  noMatches: "No connected edition matches that search.",
+};
+
+function translationStatus(
+  translation: BibleTranslation,
+  copy: BibleTranslationCopy,
+): string {
+  switch (translation.availability) {
+    case "bundled":
+      return copy.availableOffline;
+    case "connected":
+      return copy.connected;
+    case "license_pending":
+      return copy.licensePending;
+    default:
+      return copy.providerRequired;
+  }
+}
+
+function TranslationRow({
+  translation,
+  checked,
+  status,
+  onChange,
+}: {
+  translation: BibleTranslation;
+  checked: boolean;
+  status: string;
+  onChange: (key: string) => void;
+}) {
+  return (
+    <label className="block cursor-pointer rounded-[10px]">
+      <input
+        type="radio"
+        name="preferred-bible-translation"
+        value={translation.key}
+        checked={checked}
+        onChange={() => onChange(translation.key)}
+        className="peer sr-only"
+      />
+      <span
+        className={cn(
+          "flex min-h-11 w-full items-start gap-3 rounded-[10px] px-2 py-3 text-left transition-colors",
+          "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent",
+          checked ? "bg-accent-surface" : "hover:bg-linen",
+        )}
+      >
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="text-[0.9375rem] font-medium text-graphite">
+              {translation.abbreviation}
+            </span>
+            <span
+              className="text-[0.8125rem] text-charcoal"
+              dir={translation.direction}
+              lang={translation.languageId}
+            >
+              {translation.name}
+            </span>
+          </span>
+          <span className="mt-0.5 block text-caption text-ash">
+            <span dir={translation.direction} lang={translation.languageId}>
+              {translation.languageNameLocal}
+            </span>{" "}
+            · {status}
+          </span>
+        </span>
+        {checked && (
+          <IconCheck size={16} className="mt-0.5 shrink-0 text-accent" />
+        )}
+      </span>
+    </label>
+  );
+}
+
+function BibleTranslationPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (key: string) => void;
+}) {
+  const strings = useStrings();
+  const copy: BibleTranslationCopy = {
+    ...DEFAULT_BIBLE_TRANSLATION_COPY,
+    ...strings.settings.bibleTranslation,
+  };
+  const [translations, setTranslations] = useState<BibleTranslation[]>(
+    FEATURED_TRANSLATIONS,
+  );
+  const [loading, setLoading] = useState(true);
+  const [providerError, setProviderError] = useState(false);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/bible/translations", {
+      signal: controller.signal,
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        const body = (await response.json()) as {
+          translations?: BibleTranslation[];
+          provider?: { error?: boolean };
+        };
+        if (!response.ok || !Array.isArray(body.translations)) throw new Error();
+        setTranslations(body.translations);
+        setProviderError(Boolean(body.provider?.error));
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setProviderError(true);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
+
+  const featured = translations.filter((item) => item.featured);
+  const connectedLanguages = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase();
+    const connected = translations.filter(
+      (item) =>
+        !item.featured &&
+        item.availability === "connected" &&
+        (!needle ||
+          item.key === value ||
+          `${item.name} ${item.abbreviation} ${item.languageName} ${item.languageNameLocal}`
+            .toLocaleLowerCase()
+            .includes(needle)),
+    );
+    const groups = new Map<string, BibleTranslation[]>();
+    for (const translation of connected) {
+      const group = groups.get(translation.languageName) ?? [];
+      group.push(translation);
+      groups.set(translation.languageName, group);
+    }
+    return [...groups.entries()];
+  }, [query, translations, value]);
+
+  const selected = translations.find((item) => item.key === value);
+  const hasConnected = translations.some(
+    (item) => !item.featured && item.availability === "connected",
+  );
+
+  return (
+    <fieldset>
+      <legend className="sr-only">{copy.label}</legend>
+      <div className="rounded-[10px] bg-linen px-3.5 py-3">
+        <p className="text-[0.875rem] leading-relaxed text-charcoal">
+          {fmt(copy.preferenceDescription, {
+            translation:
+              selected?.abbreviation ?? translationPreferenceLabel(value),
+          })}
+        </p>
+        <p className="mt-1.5 text-caption leading-relaxed text-ash">
+          {copy.licensingNote}
+        </p>
+      </div>
+
+      <div className="mt-3 space-y-1">
+        {featured.map((translation) => (
+          <TranslationRow
+            key={translation.key}
+            translation={translation}
+            checked={translation.key === value}
+            status={translationStatus(translation, copy)}
+            onChange={onChange}
+          />
+        ))}
+      </div>
+
+      {loading && (
+        <p role="status" className="mt-3 text-caption text-ash">
+          {copy.checking}
+        </p>
+      )}
+      {providerError && (
+        <p role="status" className="mt-3 text-caption leading-relaxed text-ash">
+          {copy.providerError}
+        </p>
+      )}
+
+      {hasConnected && (
+        <div className="mt-4 border-t border-mist/70 pt-4">
+          <label htmlFor="translation-search" className="text-caption text-ash">
+            {copy.searchLabel}
+          </label>
+          <input
+            id="translation-search"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={copy.searchPlaceholder}
+            className="mt-1.5 w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-[0.9375rem] text-graphite outline-none focus:border-accent/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          />
+          <div className="mt-3 max-h-80 space-y-4 overflow-y-auto pr-1">
+            {connectedLanguages.map(([language, editions]) => (
+              <div key={language}>
+                <p
+                  className="px-2 text-caption uppercase tracking-[0.12em] text-accent"
+                  dir="auto"
+                >
+                  {language}
+                </p>
+                <div>
+                  {editions.map((translation) => (
+                    <TranslationRow
+                      key={translation.key}
+                      translation={translation}
+                      checked={translation.key === value}
+                      status={translationStatus(translation, copy)}
+                      onChange={onChange}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+            {connectedLanguages.length === 0 && (
+              <p className="text-caption text-ash">{copy.noMatches}</p>
+            )}
+          </div>
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
 function SettingsInner() {
   const router = useRouter();
   const { toast } = useToast();
@@ -222,7 +486,12 @@ function SettingsInner() {
 
   const appearance = settings.appearance;
   const t = useStrings();
+  const bibleTranslationCopy: BibleTranslationCopy = {
+    ...DEFAULT_BIBLE_TRANSLATION_COPY,
+    ...t.settings.bibleTranslation,
+  };
   const language = settings.language ?? "en";
+  const bibleTranslation = settings.preferredBibleTranslation ?? "niv";
 
   function setAppearance(patch: Partial<typeof appearance>) {
     const next = { ...appearance, ...patch };
@@ -476,6 +745,25 @@ function SettingsInner() {
         </PaperCard>
 
         <DisclosureGroup className="mt-6">
+          <Disclosure
+            variant="card"
+            label={bibleTranslationCopy.label}
+            summary={
+              <span className="text-[0.8125rem] text-ash">
+                {fmt(bibleTranslationCopy.preferredSummary, {
+                  translation: translationPreferenceLabel(bibleTranslation),
+                })}
+              </span>
+            }
+          >
+            <BibleTranslationPicker
+              value={bibleTranslation}
+              onChange={(preferredBibleTranslation) =>
+                updateSettings({ preferredBibleTranslation })
+              }
+            />
+          </Disclosure>
+
           <Disclosure
             variant="card"
             label={t.settings.language}

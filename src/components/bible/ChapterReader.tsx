@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Interactive WEB chapter reader. Opening a chapter records reading progress,
+ * Translation-aware chapter reader. Opening a chapter records reading progress,
  * and keyboard-accessible verse selection lets the shared QuestOS store add or
  * remove bookmarks without moving Scripture text out of its reading layout.
  */
@@ -19,6 +19,9 @@ import {
 } from "@/components/design-system/icons";
 import type { ChapterContent } from "@/lib/bible/server";
 import { cn } from "@/lib/utils/cn";
+import { ApiBibleViewTracker } from "@/components/bible/ApiBibleViewTracker";
+import { usePreferredBibleChapter } from "@/lib/bible/use-preferred-scripture";
+import { LOCAL_WEB_TRANSLATION_KEY } from "@/lib/bible/translations";
 
 interface VerseRange {
   start: number;
@@ -55,7 +58,13 @@ function targetFromLocation(verseCount: number): VerseRange | null {
   return queryRange;
 }
 
-function ReaderInner({ content }: { content: ChapterContent }) {
+function ReaderInner({
+  content,
+  translationOverride,
+}: {
+  content: ChapterContent;
+  translationOverride?: string;
+}) {
   const { toast } = useToast();
   const bookmarks = useQuestOS((s) => s.bookmarks);
   const toggleBookmark = useQuestOS((s) => s.toggleBookmark);
@@ -67,6 +76,7 @@ function ReaderInner({ content }: { content: ChapterContent }) {
   const [targeted, setTargeted] = useState<VerseRange | null>(null);
   const verseRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const instructionsId = useId();
+  const resolved = usePreferredBibleChapter(content, translationOverride);
 
   // Record reading position + chapter read on open.
   useEffect(() => {
@@ -83,6 +93,7 @@ function ReaderInner({ content }: { content: ChapterContent }) {
   // with both ?verse=7-8 and #verse-7. Focus the first verse for assistive
   // technology, highlight the range, and honor both OS/app reduced motion.
   useEffect(() => {
+    if (resolved.loading) return;
     let frame = 0;
 
     function applyLocationTarget() {
@@ -127,16 +138,25 @@ function ReaderInner({ content }: { content: ChapterContent }) {
     content.chapter,
     content.verses,
     recordRecentVerse,
+    resolved.loading,
   ]);
 
   const bookmarkedVerses = new Set(
     bookmarks
-      .filter((b) => b.bookSlug === content.bookSlug && b.chapter === content.chapter)
+      .filter(
+        (b) =>
+          b.bookSlug === content.bookSlug &&
+          b.chapter === content.chapter &&
+          (b.translationKey ?? "web") === resolved.effectiveTranslation.key,
+      )
       .map((b) => b.verse)
   );
 
   const prev = content.chapter > 1 ? content.chapter - 1 : null;
   const next = content.chapter < content.chapterCount ? content.chapter + 1 : null;
+  const editionQuery = translationOverride
+    ? `?translation=${encodeURIComponent(translationOverride)}`
+    : "";
 
   function moveVerseFocus(nextVerse: number) {
     const bounded = Math.min(content.verses.length, Math.max(1, nextVerse));
@@ -154,18 +174,45 @@ function ReaderInner({ content }: { content: ChapterContent }) {
         >
           <IconArrowLeft size={16} /> {content.bookName}
         </Link>
-        <span className="text-[0.75rem] text-ash">World English Bible</span>
+        <span
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="text-right text-[0.75rem] text-ash"
+        >
+          {resolved.loading
+            ? `World English Bible · checking ${resolved.preferredTranslation?.abbreviation ?? "saved edition"}…`
+            : (
+                <span
+                  dir={resolved.effectiveTranslation.direction}
+                  lang={resolved.effectiveTranslation.languageId}
+                >
+                  {resolved.effectiveTranslation.name}
+                </span>
+              )}
+        </span>
       </div>
 
       <h1 className="mt-5 font-display text-editorial text-graphite">
         {content.bookName} {content.chapter}
       </h1>
 
+      {!resolved.loading &&
+        resolved.fallbackReason &&
+        resolved.requestedKey !== LOCAL_WEB_TRANSLATION_KEY && (
+          <p className="mt-2 rounded-[10px] bg-linen px-3 py-2 text-caption leading-relaxed text-ash">
+            {resolved.preferredTranslation?.abbreviation ?? "Your preferred edition"}{" "}
+            is preferred. This chapter is using WEB until its licensed connection is available.
+          </p>
+        )}
+      <ApiBibleViewTracker token={resolved.fumsToken} />
+
       {/* Verses remain continuous text, while a roving Tab stop avoids forcing
           keyboard users through every verse before they can leave the chapter. */}
       <div
         className="measure-reading mt-5"
         role="group"
+        aria-busy={resolved.loading}
         aria-label={`${content.bookName} ${content.chapter} verses`}
         aria-describedby={instructionsId}
       >
@@ -173,7 +220,7 @@ function ReaderInner({ content }: { content: ChapterContent }) {
           Use the arrow keys to move between verses. Press Enter or Space to
           select a verse and show its save action.
         </p>
-        {content.verses.map((text, i) => {
+        {resolved.verses.map((text, i) => {
           const num = i + 1;
           const isSel = selected === num;
           const isSaved = bookmarkedVerses.has(num);
@@ -191,7 +238,9 @@ function ReaderInner({ content }: { content: ChapterContent }) {
                 verseStart: num,
                 verseEnd: num,
                 reference: `${content.bookName} ${content.chapter}:${num}`,
-                text,
+                // Persist only the bundled public-domain fallback. Licensed
+                // provider text remains transient and is refreshed on view.
+                text: content.verses[i],
               });
             }
           };
@@ -203,12 +252,16 @@ function ReaderInner({ content }: { content: ChapterContent }) {
               }}
               id={`verse-${num}`}
               role="button"
-              tabIndex={focusedVerse === num ? 0 : -1}
+              tabIndex={!resolved.loading && focusedVerse === num ? 0 : -1}
+              aria-disabled={resolved.loading || undefined}
               aria-pressed={isSel}
               aria-current={isTargeted ? "location" : undefined}
-              onClick={toggle}
+              onClick={() => {
+                if (!resolved.loading) toggle();
+              }}
               onFocus={() => setFocusedVerse(num)}
               onKeyDown={(e) => {
+                if (resolved.loading) return;
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
                   toggle();
@@ -227,14 +280,21 @@ function ReaderInner({ content }: { content: ChapterContent }) {
                 }
               }}
               className={cn(
-                "scroll-mt-28 cursor-pointer rounded transition-colors",
+                "scroll-mt-28 rounded transition-colors",
+                resolved.loading ? "cursor-wait" : "cursor-pointer",
                 isSel && "bg-gold-500/20",
                 isTargeted && !isSel && "bg-gold-500/15 ring-1 ring-gold-500/35",
                 isSaved && !isSel && !isTargeted && "bg-gold-500/10"
               )}
             >
               <span className="verse-number">{num}</span>
-              <span className="verse-text">{text} </span>
+              <span
+                className="verse-text"
+                dir={resolved.effectiveTranslation.direction}
+                lang={resolved.effectiveTranslation.languageId}
+              >
+                {text || "This verse is presented in this edition’s notes."}{" "}
+              </span>
               {isSaved && <span className="sr-only">(saved)</span>}
             </span>
           );
@@ -254,11 +314,15 @@ function ReaderInner({ content }: { content: ChapterContent }) {
                 bookName: content.bookName,
                 chapter: content.chapter,
                 verse: selected,
+                // Keep saved/exported/account text public-domain. The chosen
+                // edition is resolved afresh whenever Scripture is viewed.
                 text: content.verses[selected - 1],
+                translationKey: resolved.effectiveTranslation.key,
               });
               toast(nowSaved ? "Verse saved." : "Removed.");
             }}
             aria-pressed={bookmarkedVerses.has(selected)}
+            disabled={resolved.loading}
             className="inline-flex items-center gap-1.5 text-[0.875rem] text-accent"
           >
             {bookmarkedVerses.has(selected) ? (
@@ -266,7 +330,11 @@ function ReaderInner({ content }: { content: ChapterContent }) {
             ) : (
               <IconBookmark size={16} />
             )}
-            {bookmarkedVerses.has(selected) ? "Saved" : "Save"}
+            {resolved.loading
+              ? "Loading…"
+              : bookmarkedVerses.has(selected)
+                ? "Saved"
+                : "Save"}
           </button>
         </div>
       )}
@@ -277,7 +345,7 @@ function ReaderInner({ content }: { content: ChapterContent }) {
           <GentleLink
             variant="ghost"
             size="sm"
-            href={`/app/bible/${content.bookSlug}/${prev}`}
+            href={`/app/bible/${content.bookSlug}/${prev}${editionQuery}`}
           >
             <IconArrowLeft size={16} /> Chapter {prev}
           </GentleLink>
@@ -288,7 +356,7 @@ function ReaderInner({ content }: { content: ChapterContent }) {
           <GentleLink
             variant="ghost"
             size="sm"
-            href={`/app/bible/${content.bookSlug}/${next}`}
+            href={`/app/bible/${content.bookSlug}/${next}${editionQuery}`}
           >
             Chapter {next} <IconArrowRight size={16} />
           </GentleLink>
@@ -296,14 +364,33 @@ function ReaderInner({ content }: { content: ChapterContent }) {
           <span />
         )}
       </div>
+      {resolved.effectiveTranslation.copyright &&
+        resolved.effectiveTranslation.key !== LOCAL_WEB_TRANSLATION_KEY && (
+          <p
+            className="-mt-4 pb-8 text-caption leading-relaxed text-ash"
+            dir={resolved.effectiveTranslation.direction}
+            lang={resolved.effectiveTranslation.languageId}
+          >
+            {resolved.effectiveTranslation.copyright}
+          </p>
+        )}
     </div>
   );
 }
 
-export function ChapterReader({ content }: { content: ChapterContent }) {
+export function ChapterReader({
+  content,
+  translationOverride,
+}: {
+  content: ChapterContent;
+  translationOverride?: string;
+}) {
   return (
     <ClientOnly>
-      <ReaderInner content={content} />
+      <ReaderInner
+        content={content}
+        translationOverride={translationOverride}
+      />
     </ClientOnly>
   );
 }

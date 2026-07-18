@@ -149,7 +149,24 @@ export const es: UIStrings = {
   settings: {
     language: "Idioma de la app",
     languageNote:
-      "Los menús y botones aparecen en tu idioma. La Escritura y el contenido de las misiones siguen en inglés por ahora.",
+      "Los menús y botones aparecen en tu idioma. Elige la versión de la Biblia por separado; el contenido de las misiones sigue en inglés por ahora.",
+    bibleTranslation: {
+      label: "Traducción de la Biblia",
+      preferredSummary: "{translation} preferida",
+      preferenceDescription:
+        "{translation} es tu preferencia. Si su conexión con licencia no está disponible, BibleQuest usa WEB, de dominio público, e indica claramente el cambio.",
+      licensingNote:
+        "Las ediciones con derechos de autor solo aparecen cuando sus identificadores exactos del proveedor están aprobados para el uso comercial de BibleQuest; nunca se incluyen en la app ni se envían a la generación de misiones.",
+      availableOffline: "Disponible sin conexión",
+      connected: "Conectada",
+      licensePending: "Licencia pendiente",
+      providerRequired: "Se requiere conectar un proveedor",
+      checking: "Comprobando ediciones conectadas…",
+      providerError: "No se pudieron comprobar las ediciones conectadas. WEB sigue disponible.",
+      searchLabel: "Buscar idiomas y ediciones conectados",
+      searchPlaceholder: "Español, chino, hindi…",
+      noMatches: "Ninguna edición conectada coincide con la búsqueda.",
+    },
     appearance: "Apariencia",
     theme: "Tema",
     themeLight: "Claro",

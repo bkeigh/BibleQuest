@@ -33,7 +33,12 @@ describe("QuestOS clearing, restore, and deletion tombstones", () => {
     expect(state.tombstones.prayers).toContain(fixture.prayers[0].id);
     expect(state.tombstones.reflections).toContain(fixture.reflections[0].id);
     expect(state.tombstones.bookmarks).toEqual([
-      { bookSlug: "fixture-book", chapter: 1, verse: 1 },
+      {
+        bookSlug: "fixture-book",
+        chapter: 1,
+        verse: 1,
+        translationKey: "web",
+      },
     ]);
     expect(state.tombstones.myQuests).toContain("fixture-walk");
   });

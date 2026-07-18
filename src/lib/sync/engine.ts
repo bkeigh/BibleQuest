@@ -94,6 +94,27 @@ const SYNCED_FIELDS: SyncedField[] = [
 const PUSH_DEBOUNCE_MS = 2_500;
 const RETRY_MS = 30_000;
 
+/**
+ * Migration 0011 is intentionally deployed separately from the web bundle.
+ * During that rolling window PostgREST can report either PostgreSQL's missing
+ * column code or its own stale-schema-cache code. Only downgrade the two
+ * additive Bible fields; every other sync error must still fail closed.
+ */
+export function isMissingBibleSyncColumn(
+  error: unknown,
+  column: "preferred_bible_translation" | "translation_key",
+): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: unknown; message?: unknown };
+  const code = typeof candidate.code === "string" ? candidate.code : "";
+  const message =
+    typeof candidate.message === "string" ? candidate.message.toLowerCase() : "";
+  return (
+    message.includes(column) &&
+    (code === "42703" || code === "PGRST204")
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Engine lifecycle state (module singleton — one engine per tab)
 // ---------------------------------------------------------------------------
@@ -109,10 +130,15 @@ let rerunAfterPush = false;
 let applyingRemote = false;
 const dirty = new Set<SyncedField>();
 
-function setStatus(state: "off" | "syncing" | "idle" | "error", syncedNow = false) {
-  useSyncStatus
-    .getState()
-    .setState(state, syncedNow ? new Date().toISOString() : undefined);
+function setStatus(
+  state: "off" | "syncing" | "idle" | "error",
+  options?: { syncedNow?: boolean; initialSyncComplete?: boolean }
+) {
+  useSyncStatus.getState().setState(state, {
+    lastSyncedAt: options?.syncedNow ? new Date().toISOString() : undefined,
+    userId: currentUserId,
+    initialSyncComplete: options?.initialSyncComplete ?? false,
+  });
 }
 
 export function stopSync() {
@@ -125,10 +151,10 @@ export function stopSync() {
   pushTimer = null;
   retryTimer = null;
   dirty.clear();
-  setStatus("off");
+  setStatus("off", { initialSyncComplete: false });
 }
 
-export async function startSync(userId: string) {
+export async function startSync(userId: string, retryingFailure = false) {
   if (!isSupabaseConfigured()) return;
   if (currentUserId === userId) return;
   // The device still holds a journey last synced by a DIFFERENT account.
@@ -137,22 +163,28 @@ export async function startSync(userId: string) {
   // condition and asks the person to either start fresh or claim the data;
   // resolution calls setLastSyncedUserId and retries.
   if (localDataBelongsToOtherUser(userId)) {
-    setStatus("off");
+    // Also tear down any previous account subscriber. Refusing the new merge
+    // is not enough if an older engine could keep writing through the newly
+    // changed auth session while the privacy hand-off is unanswered.
+    stopSync();
     return;
   }
+  const previousStatus = useSyncStatus.getState();
+  const wasError =
+    retryingFailure ||
+    (previousStatus.state === "error" && previousStatus.userId === userId);
   stopSync();
   currentUserId = userId;
   const token = ++runToken;
   const isCurrent = () => runToken === token && currentUserId === userId;
   // Remember whether we're inside a failure streak BEFORE flipping to
   // "syncing", so retries don't re-count sync_failed every 30s.
-  const wasError = useSyncStatus.getState().state === "error";
-  setStatus("syncing");
+  setStatus("syncing", { initialSyncComplete: false });
 
   try {
     await initialSync(createClient(), userId, isCurrent);
     if (!isCurrent()) return; // stopped/restarted mid-sync
-    setStatus("idle", true);
+    setStatus("idle", { syncedNow: true, initialSyncComplete: true });
     track("sync_completed", { status: "initial" });
   } catch {
     if (!isCurrent()) return;
@@ -161,15 +193,14 @@ export async function startSync(userId: string) {
     if (!wasError) {
       track("sync_failed", { status: "initial" });
     }
-    setStatus("error");
+    setStatus("error", { initialSyncComplete: false });
     // NEVER fall through to write-through pushes before a successful pull —
     // a blind push would upsert this device's (possibly default/stale) data
     // over the account. Retry the full pull→merge instead, and install no
     // subscriber until it succeeds.
     retryTimer = setTimeout(() => {
       if (!isCurrent()) return;
-      currentUserId = null; // release the same-user guard for re-entry
-      void startSync(userId);
+      void retrySync(userId);
     }, RETRY_MS);
     return;
   }
@@ -206,6 +237,19 @@ export async function startSync(userId: string) {
   }
 }
 
+/**
+ * Deliberately restart the full pull → merge → push for an authenticated
+ * account. Unlike startSync(), this is allowed to replace a failed run for
+ * the same user, which gives recovery UI a real Retry action instead of being
+ * swallowed by the same-user guard.
+ */
+export async function retrySync(userId: string) {
+  const status = useSyncStatus.getState();
+  const retryingFailure = status.state === "error" && status.userId === userId;
+  stopSync();
+  await startSync(userId, retryingFailure);
+}
+
 function schedulePush() {
   if (pushTimer) clearTimeout(pushTimer);
   pushTimer = setTimeout(runPush, PUSH_DEBOUNCE_MS);
@@ -228,7 +272,7 @@ async function runPush() {
   }
   pushing = true;
   const wasError = useSyncStatus.getState().state === "error";
-  setStatus("syncing");
+  setStatus("syncing", { initialSyncComplete: true });
   try {
     const supabase = createClient();
     const state = useQuestOS.getState();
@@ -258,7 +302,9 @@ async function runPush() {
     // settings drops the marker, but anything written afterwards while still
     // signed in lands in this account's rows and belongs to it.
     setLastSyncedUserId(userId);
-    if (currentUserId === userId) setStatus("idle", true);
+    if (currentUserId === userId) {
+      setStatus("idle", { syncedNow: true, initialSyncComplete: true });
+    }
   } catch {
     // Push failed (offline, etc.) — mark everything dirty again and retry.
     for (const f of SYNCED_FIELDS) dirty.add(f);
@@ -267,7 +313,7 @@ async function runPush() {
       if (!wasError) {
         track("sync_failed", { status: "push" });
       }
-      setStatus("error");
+      setStatus("error", { initialSyncComplete: true });
       scheduleRetry();
     }
   } finally {
@@ -465,7 +511,8 @@ export function filterByTombstones(
           (d) =>
             d.bookSlug === b.bookSlug &&
             d.chapter === b.chapter &&
-            d.verse === b.verse
+            d.verse === b.verse &&
+            (d.translationKey ?? "web") === (b.translationKey ?? "web")
         )
     ),
     myQuests,
@@ -588,10 +635,12 @@ export function mergeSnapshots(
   // Bookmarks: union by natural key, local wins duplicates.
   const bookmarks = [...local.bookmarks];
   const bookmarkKeys = new Set(
-    local.bookmarks.map((b) => `${b.bookSlug}:${b.chapter}:${b.verse}`)
+    local.bookmarks.map(
+      (b) => `${b.bookSlug}:${b.chapter}:${b.verse}:${b.translationKey ?? "web"}`,
+    )
   );
   for (const b of remote.bookmarks ?? []) {
-    const key = `${b.bookSlug}:${b.chapter}:${b.verse}`;
+    const key = `${b.bookSlug}:${b.chapter}:${b.verse}:${b.translationKey ?? "web"}`;
     if (!bookmarkKeys.has(key)) {
       bookmarkKeys.add(key);
       bookmarks.push(b);
@@ -750,11 +799,30 @@ async function propagateTombstones(
     if (error) throw error;
   }
   for (const b of t.bookmarks) {
-    const { error } = await supabase
+    const result = await supabase
       .from("verse_bookmarks")
       .delete()
-      .match({ book_slug: b.bookSlug, chapter: b.chapter, verse: b.verse });
-    if (error) throw error;
+      .match({
+        book_slug: b.bookSlug,
+        chapter: b.chapter,
+        verse: b.verse,
+        translation_key: b.translationKey ?? "web",
+      });
+    if (!result.error) continue;
+    if (!isMissingBibleSyncColumn(result.error, "translation_key")) {
+      throw result.error;
+    }
+    // Pre-0011 compatibility: the legacy schema has exactly one row per
+    // verse, so the same tombstone can safely delete it without an edition.
+    const legacy = await supabase
+      .from("verse_bookmarks")
+      .delete()
+      .match({
+        book_slug: b.bookSlug,
+        chapter: b.chapter,
+        verse: b.verse,
+      });
+    if (legacy.error) throw legacy.error;
   }
   if (t.myQuests.length) {
     const { error } = await supabase
@@ -786,7 +854,29 @@ async function pushFields(
   }
   if (fields.has("settings")) {
     const rows = settingsToRows(uid, snap.settings);
-    jobs.push(run(supabase.from("user_settings").upsert(rows.settings)));
+    jobs.push(
+      (async () => {
+        const current = await supabase.from("user_settings").upsert(rows.settings);
+        if (!current.error) return;
+        if (
+          !isMissingBibleSyncColumn(
+            current.error,
+            "preferred_bible_translation",
+          )
+        ) {
+          throw current.error;
+        }
+        // Safe rolling-deploy fallback. The preference remains device-local
+        // until migration 0011 is applied; all older settings still sync.
+        const { preferred_bible_translation: _pending, ...legacySettings } =
+          rows.settings;
+        void _pending;
+        const legacy = await supabase
+          .from("user_settings")
+          .upsert(legacySettings);
+        if (legacy.error) throw legacy.error;
+      })(),
+    );
     jobs.push(
       run(supabase.from("notification_preferences").upsert(rows.notifications))
     );
@@ -891,12 +981,38 @@ async function pushFields(
   }
   if (fields.has("bookmarks") && snap.bookmarks.length) {
     jobs.push(
-      run(
-        supabase.from("verse_bookmarks").upsert(
-          snap.bookmarks.map((b) => bookmarkToRow(uid, b)),
-          { onConflict: "user_id,book_slug,chapter,verse" }
-        )
-      )
+      (async () => {
+        const rows = snap.bookmarks.map((b) => bookmarkToRow(uid, b));
+        const current = await supabase.from("verse_bookmarks").upsert(rows, {
+          onConflict: "user_id,book_slug,chapter,verse,translation_key",
+        });
+        if (!current.error) return;
+        if (!isMissingBibleSyncColumn(current.error, "translation_key")) {
+          throw current.error;
+        }
+        // Pre-0011 compatibility stores the public-domain WEB snapshot in
+        // the legacy one-row-per-verse shape. The selected edition remains a
+        // local hint until the additive migration is available.
+        const legacyByPassage = new Map<string, Omit<(typeof rows)[number], "translation_key">>();
+        for (const { translation_key: _pending, ...row } of rows) {
+          void _pending;
+          const passageKey = [
+            row.user_id,
+            row.book_slug,
+            row.chapter,
+            row.verse,
+          ].join(":");
+          const previous = legacyByPassage.get(passageKey);
+          if (!previous || previous.created_at < row.created_at) {
+            legacyByPassage.set(passageKey, row);
+          }
+        }
+        const legacyRows = [...legacyByPassage.values()];
+        const legacy = await supabase.from("verse_bookmarks").upsert(legacyRows, {
+          onConflict: "user_id,book_slug,chapter,verse",
+        });
+        if (legacy.error) throw legacy.error;
+      })(),
     );
   }
   if (fields.has("readingPosition") && snap.readingPosition) {

@@ -145,8 +145,13 @@ docs/                   # Codex + setup/deployment/security/content/QA guides
   server-side Stripe Payment Link and stays unavailable until
   `STRIPE_DONATION_URL` is configured for the deployment.
 - Data lives in the browser (localStorage). Export/clear is in Settings.
-- Bible text is the World English Bible only; the schema supports adding
-  licensed translations later (do not add copyrighted ones without a license).
+- The World English Bible is bundled offline. Translation preferences and a
+  server-only API.Bible adapter are included, but copyrighted editions activate
+  only when explicitly licensed. Configure `API_BIBLE_API_KEY` plus a
+  comma-separated `API_BIBLE_COMMERCIALLY_LICENSED_BIBLE_IDS` containing only
+  exact editions enabled for BibleQuest's commercial plan; catalog visibility
+  alone is not proof of rights. The legacy `API_BIBLE_ALLOWED_BIBLE_IDS` name is
+  accepted only for backwards compatibility.
 
 BibleQuest is not a church, and not a replacement for clergy, counseling, or
 emergency services.

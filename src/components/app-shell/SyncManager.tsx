@@ -33,24 +33,30 @@ export function SyncManager() {
 
   // Safe to read during render: on the server (and at hydration, when the
   // session hasn't loaded yet) userId is null, so both sides render nothing.
-  const handoff = configured && userId && localDataBelongsToOtherUser(userId);
+  const handoff = Boolean(
+    configured && userId && localDataBelongsToOtherUser(userId)
+  );
 
   useEffect(() => {
     if (!configured) return;
-    // While a hand-off is pending, startSync is a refused no-op — resolve()
-    // is what actually starts the engine in that case.
-    if (userId) {
+    // Stop any previous account before asking about a hand-off. startSync also
+    // refuses the mismatched owner, but leaving the old subscriber alive while
+    // the dialog is open would let it keep writing under the wrong session.
+    if (handoff) {
+      stopSync();
+    } else if (userId) {
       startSync(userId);
     } else {
       stopSync();
     }
-  }, [configured, userId]);
+  }, [configured, handoff, userId]);
 
   useEffect(() => () => stopSync(), []);
 
   if (!handoff) return null;
 
   const resolve = (startFresh: boolean) => {
+    if (!userId) return;
     // The engine never started (startSync refuses while the marker
     // mismatches), so clearing here can't race a push.
     if (startFresh) useQuestOS.getState().clearAllData();

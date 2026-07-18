@@ -11,13 +11,15 @@ export default function PrivateAppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <OnboardingGate>
-      <ThemeApplier />
+    <>
       <SyncManager />
-      <MotionProvider>
-        <AppShell>{children}</AppShell>
-        <MilestoneReveal />
-      </MotionProvider>
-    </OnboardingGate>
+      <OnboardingGate>
+        <ThemeApplier />
+        <MotionProvider>
+          <AppShell>{children}</AppShell>
+          <MilestoneReveal />
+        </MotionProvider>
+      </OnboardingGate>
+    </>
   );
 }

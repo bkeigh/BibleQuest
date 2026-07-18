@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { track } from "@/lib/analytics/events";
+import { authCallbackPath } from "@/lib/auth/redirect";
 
 type EmailStatus = "idle" | "sending" | "sent";
 type PhoneStatus = "idle" | "sending" | "code-sent" | "verifying";
@@ -34,9 +35,15 @@ interface SignInMethodsProps {
    * "check your email" panel (its flow has no other way forward from here).
    */
   onEmailSent?: () => void;
+  /** Safe same-origin destination after the auth callback completes. */
+  nextPath?: string;
 }
 
-export function SignInMethods({ source, onEmailSent }: SignInMethodsProps) {
+export function SignInMethods({
+  source,
+  onEmailSent,
+  nextPath = "/app",
+}: SignInMethodsProps) {
   const [email, setEmail] = useState("");
   const [emailStatus, setEmailStatus] = useState<EmailStatus>("idle");
   const [phone, setPhone] = useState("");
@@ -56,6 +63,13 @@ export function SignInMethods({ source, onEmailSent }: SignInMethodsProps) {
 
   const emailValid = EMAIL.test(email.trim());
 
+  function callbackUrl() {
+    return new URL(
+      authCallbackPath(nextPath),
+      window.location.origin
+    ).toString();
+  }
+
   async function sendLink() {
     if (!EMAIL.test(email.trim())) return;
     setError(null);
@@ -63,7 +77,7 @@ export function SignInMethods({ source, onEmailSent }: SignInMethodsProps) {
     track("sign_in_started", { method: "magic_link", source });
     const { error } = await createClient().auth.signInWithOtp({
       email: email.trim(),
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: { emailRedirectTo: callbackUrl() },
     });
     if (error) {
       setError("We couldn’t send the link. Please try again in a moment.");
@@ -132,7 +146,7 @@ export function SignInMethods({ source, onEmailSent }: SignInMethodsProps) {
     track("sign_in_started", { method: "google", source });
     const { error } = await createClient().auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: callbackUrl() },
     });
     if (error) {
       setOauthPending(false);
@@ -163,7 +177,12 @@ export function SignInMethods({ source, onEmailSent }: SignInMethodsProps) {
 
   if (phoneStatus === "code-sent" || phoneStatus === "verifying") {
     return (
-      <div>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void verifyCode();
+        }}
+      >
         <label
           htmlFor="signin-code"
           className="mb-1.5 block text-caption text-ash"
@@ -173,6 +192,7 @@ export function SignInMethods({ source, onEmailSent }: SignInMethodsProps) {
         <input
           id="signin-code"
           inputMode="numeric"
+          enterKeyHint="done"
           autoComplete="one-time-code"
           maxLength={8}
           value={code}
@@ -181,17 +201,19 @@ export function SignInMethods({ source, onEmailSent }: SignInMethodsProps) {
           className="w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-center text-[1.25rem] tracking-[0.3em] text-graphite outline-none focus:border-accent/50"
         />
         <GentleButton
+          type="submit"
           variant="primary"
           size="md"
           fullWidth
           className="mt-3"
-          onClick={verifyCode}
           disabled={code.trim().length < 4 || phoneStatus === "verifying"}
+          aria-busy={phoneStatus === "verifying"}
         >
           {phoneStatus === "verifying" ? "Verifying…" : "Verify & sign in"}
         </GentleButton>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
           <GentleButton
+            type="button"
             variant="ghost"
             size="sm"
             onClick={resendCode}
@@ -204,6 +226,7 @@ export function SignInMethods({ source, onEmailSent }: SignInMethodsProps) {
                 : "Resend code"}
           </GentleButton>
           <GentleButton
+            type="button"
             variant="ghost"
             size="sm"
             onClick={() => {
@@ -220,14 +243,19 @@ export function SignInMethods({ source, onEmailSent }: SignInMethodsProps) {
             {error}
           </p>
         )}
-      </div>
+      </form>
     );
   }
 
   return (
     <>
       {/* Email magic link */}
-      <div>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void sendLink();
+        }}
+      >
         <label
           htmlFor="signin-email"
           className="mb-1.5 block text-caption text-ash"
@@ -237,6 +265,7 @@ export function SignInMethods({ source, onEmailSent }: SignInMethodsProps) {
         <input
           id="signin-email"
           type="email"
+          enterKeyHint="send"
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -244,21 +273,27 @@ export function SignInMethods({ source, onEmailSent }: SignInMethodsProps) {
           className="w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-body text-graphite outline-none focus:border-accent/50"
         />
         <GentleButton
+          type="submit"
           variant="primary"
           size="md"
           fullWidth
           className="mt-3"
-          onClick={sendLink}
           disabled={!emailValid || emailStatus === "sending"}
+          aria-busy={emailStatus === "sending"}
         >
           {emailStatus === "sending" ? "Sending…" : "Send a sign-in link"}
         </GentleButton>
-      </div>
+      </form>
 
       <Divider />
 
       {/* Phone OTP */}
-      <div>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void sendCode();
+        }}
+      >
         <label
           htmlFor="signin-phone"
           className="mb-1.5 block text-caption text-ash"
@@ -268,6 +303,7 @@ export function SignInMethods({ source, onEmailSent }: SignInMethodsProps) {
         <input
           id="signin-phone"
           type="tel"
+          enterKeyHint="send"
           autoComplete="tel"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
@@ -275,20 +311,22 @@ export function SignInMethods({ source, onEmailSent }: SignInMethodsProps) {
           className="w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-body text-graphite outline-none focus:border-accent/50"
         />
         <GentleButton
+          type="submit"
           variant="outline"
           size="md"
           fullWidth
           className="mt-3"
-          onClick={sendCode}
           disabled={!phone.trim() || phoneStatus === "sending"}
+          aria-busy={phoneStatus === "sending"}
         >
           {phoneStatus === "sending" ? "Sending…" : "Text me a code"}
         </GentleButton>
-      </div>
+      </form>
 
       <Divider />
 
       <GentleButton
+        type="button"
         variant="outline"
         size="md"
         fullWidth

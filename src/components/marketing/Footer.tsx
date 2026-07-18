@@ -59,7 +59,7 @@ export function Footer() {
               hello@biblequest.co
             </a>
           </p>
-          <p>Scripture: World English Bible · Public Domain.</p>
+          <p>Bundled Scripture: World English Bible · Public Domain.</p>
         </div>
         <p className="mt-2 text-[0.8125rem] text-ash">
           Built with care. Not a replacement for church or community.

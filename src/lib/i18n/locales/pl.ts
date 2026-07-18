@@ -149,7 +149,7 @@ export const pl: UIStrings = {
   settings: {
     language: "Język aplikacji",
     languageNote:
-      "Menu i przyciski wyświetlają się w Twoim języku. Pismo Święte i treść zadań pozostają na razie po angielsku.",
+      "Menu i przyciski wyświetlają się w Twoim języku. Wersję Biblii wybierasz osobno; treść zadań pozostaje na razie po angielsku.",
     appearance: "Wygląd",
     theme: "Motyw",
     themeLight: "Jasny",

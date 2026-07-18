@@ -149,7 +149,7 @@ export const de: UIStrings = {
   settings: {
     language: "App-Sprache",
     languageNote:
-      "Menüs und Buttons erscheinen in deiner Sprache. Bibeltexte und Quest-Inhalte bleiben vorerst auf Englisch.",
+      "Menüs und Buttons erscheinen in deiner Sprache. Deine Bibelübersetzung wählst du separat; Quest-Inhalte bleiben vorerst auf Englisch.",
     appearance: "Darstellung",
     theme: "Design",
     themeLight: "Hell",
