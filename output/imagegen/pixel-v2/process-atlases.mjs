@@ -10,7 +10,7 @@ const TREE_DIR = path.join(ROOT, "staging/trees");
 const CANDLE_DIR = path.join(ROOT, "staging/candles");
 
 const PALETTE = [
-  [0x1e, 0x33, 0x29], // dark-evergreen outline
+  [0x00, 0x00, 0x00], // exact black outline
   [0x2c, 0x2c, 0x2c], // ink
   [0x0a, 0x3f, 0x2e], // deepest green
   [0x1f, 0x5e, 0x3a], // evergreen

@@ -24,7 +24,7 @@
     "alphaValues": [0, 255],
     "dithering": false,
     "antialiasing": false,
-    "outline": "one continuous dark-evergreen pixel outline",
+    "outline": "one continuous exact-black (#000000) pixel outline",
     "lightDirection": "upper-left",
     "background": "transparent with clear corners and safe padding",
     "text": "no readable text or letter-like noise inside sprites",

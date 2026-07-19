@@ -168,6 +168,8 @@ async function expectProductionPng(
   const opaqueColors = new Set<string>();
   let opaquePixels = 0;
   let transparentPixels = 0;
+  let blackPixels = 0;
+  let legacyGreenOutlinePixels = 0;
   const opaqueBorderPixels: Array<[number, number]> = [];
 
   for (let y = 0; y < info.height; y += 1) {
@@ -179,6 +181,20 @@ async function expectProductionPng(
         transparentPixels += 1;
       } else {
         opaquePixels += 1;
+        if (
+          data[offset] === 0 &&
+          data[offset + 1] === 0 &&
+          data[offset + 2] === 0
+        ) {
+          blackPixels += 1;
+        }
+        if (
+          data[offset] === 0x10 &&
+          data[offset + 1] === 0x2b &&
+          data[offset + 2] === 0x21
+        ) {
+          legacyGreenOutlinePixels += 1;
+        }
         opaqueColors.add(
           `${data[offset]},${data[offset + 1]},${data[offset + 2]}`
         );
@@ -219,6 +235,39 @@ async function expectProductionPng(
       `${name} exceeds its ${expected.maxOpaqueColors}-color production budget`
     )
     .toBeLessThanOrEqual(expected.maxOpaqueColors);
+  expect.soft(blackPixels, `${name} must use a true-black outline`).toBeGreaterThan(0);
+  expect
+    .soft(
+      legacyGreenOutlinePixels,
+      `${name} must not retain the legacy green outline`
+    )
+    .toBe(0);
+
+  const blockWidth = info.width / asset.cols;
+  const blockHeight = info.height / asset.rows;
+  let nonUniformBlockPixels = 0;
+  for (let top = 0; top < info.height; top += blockHeight) {
+    for (let left = 0; left < info.width; left += blockWidth) {
+      const anchor = (top * info.width + left) * info.channels;
+      for (let y = top; y < top + blockHeight; y += 1) {
+        for (let x = left; x < left + blockWidth; x += 1) {
+          const offset = (y * info.width + x) * info.channels;
+          for (let channel = 0; channel < info.channels; channel += 1) {
+            if (data[offset + channel] !== data[anchor + channel]) {
+              nonUniformBlockPixels += 1;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+  expect
+    .soft(
+      nonUniformBlockPixels,
+      `${name} must use flat, uniform ${blockWidth}x${blockHeight} physical blocks`
+    )
+    .toBe(0);
 }
 
 describe("BibleQuest pixel art system", () => {

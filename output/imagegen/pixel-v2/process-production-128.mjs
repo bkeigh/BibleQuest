@@ -22,13 +22,14 @@ const UI_ROOT = path.resolve(
 );
 const SIZE = 128;
 const LOGICAL_SIZE = 32;
-const MASCOT_SOURCE = "mascot-atlas-strict-source.png";
+const CANDLE_LOGICAL_SIZE = 16;
+const MASCOT_SOURCE = "mascot-atlas-black-source.png";
 
 // The canonical BibleQuest palette. Every production sprite is written as an
 // indexed PNG using only these colors plus one fully transparent entry.
 const PALETTE = [
-  [0x10, 0x2b, 0x21], // deepest evergreen outline
-  [0x2c, 0x2c, 0x2c], // ink charcoal
+  [0x10, 0x2b, 0x21], // legacy outline-mapping anchor; flattened before export
+  [0x00, 0x00, 0x00], // exact production outline
   [0x17, 0x3e, 0x2b], // Rolex-green shadow
   [0x1f, 0x5e, 0x3a], // Rolex green
   [0x3f, 0x75, 0x48], // Rolex-green light
@@ -114,7 +115,7 @@ const ALLOWED = {
 // catalogue. This prevents a parchment highlight from becoming a green fleck
 // (or vice versa) and keeps the large onboarding art calm at native size.
 const mascotMaterialSet = (...names) => [
-  1, // one charcoal contour; greens are reserved for subject interiors
+  1, // one true-black contour; greens are reserved for subject interiors
   ...materialSet(...names.filter((name) => name !== "outline")),
 ];
 
@@ -574,13 +575,39 @@ function keepLargestOpaqueComponent(buffer, width, height) {
   return buffer;
 }
 
-function applyCharcoalContour(buffer, width, height) {
-  const charcoal = PALETTE[1];
+function applyBlackContour(buffer, width, height, minimumComponentArea = 1) {
+  const black = PALETTE[1];
   const boundary = [];
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const point = y * width + x;
-      if (buffer[point * 4 + 3] === 0) continue;
+  const visited = new Uint8Array(width * height);
+  for (let start = 0; start < width * height; start += 1) {
+    if (visited[start] || buffer[start * 4 + 3] === 0) continue;
+    const component = [];
+    const stack = [start];
+    visited[start] = 1;
+    while (stack.length > 0) {
+      const point = stack.pop();
+      component.push(point);
+      const x = point % width;
+      const y = Math.floor(point / width);
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          const next = ny * width + nx;
+          if (!visited[next] && buffer[next * 4 + 3] !== 0) {
+            visited[next] = 1;
+            stack.push(next);
+          }
+        }
+      }
+    }
+    if (component.length < minimumComponentArea) continue;
+    const componentSet = new Set(component);
+    for (const point of component) {
+      const x = point % width;
+      const y = Math.floor(point / width);
       let touchesTransparent = false;
       for (const [dx, dy] of [
         [1, 0],
@@ -595,7 +622,7 @@ function applyCharcoalContour(buffer, width, height) {
             ny < 0 ||
             nx >= width ||
             ny >= height ||
-            buffer[(ny * width + nx) * 4 + 3] === 0
+            !componentSet.has(ny * width + nx)
           ) {
             touchesTransparent = true;
             break;
@@ -606,9 +633,9 @@ function applyCharcoalContour(buffer, width, height) {
   }
   for (const point of boundary) {
     const offset = point * 4;
-    buffer[offset] = charcoal[0];
-    buffer[offset + 1] = charcoal[1];
-    buffer[offset + 2] = charcoal[2];
+    buffer[offset] = black[0];
+    buffer[offset + 1] = black[1];
+    buffer[offset + 2] = black[2];
     buffer[offset + 3] = 255;
   }
   return buffer;
@@ -673,7 +700,7 @@ async function normalizeStrictMascot(source, name, alignment) {
     2
   );
   logical = keepLargestOpaqueComponent(logical, LOGICAL_SIZE, LOGICAL_SIZE);
-  logical = applyCharcoalContour(logical, LOGICAL_SIZE, LOGICAL_SIZE);
+  logical = applyBlackContour(logical, LOGICAL_SIZE, LOGICAL_SIZE);
   logical = removeIsolatedColorSpecks(logical, LOGICAL_SIZE, LOGICAL_SIZE);
   logical = removeInteriorColorSpecks(logical, LOGICAL_SIZE, LOGICAL_SIZE);
   return sharp(logical, {
@@ -698,10 +725,49 @@ async function normalizeOne(source, name, alignment = "center", allowed = ALLOWE
   return mapToAllowed(output, allowed);
 }
 
+function flattenOutlineToBlack(buffer) {
+  const legacy = PALETTE[0];
+  const black = PALETTE[1];
+  for (let offset = 0; offset < buffer.length; offset += 4) {
+    if (buffer[offset + 3] === 0) continue;
+    const isLegacyOutline =
+      buffer[offset] === legacy[0] &&
+      buffer[offset + 1] === legacy[1] &&
+      buffer[offset + 2] === legacy[2];
+    if (!isLegacyOutline) continue;
+    buffer[offset] = black[0];
+    buffer[offset + 1] = black[1];
+    buffer[offset + 2] = black[2];
+  }
+  return buffer;
+}
+
+async function strictifyProductionBuffer(name, buffer) {
+  const logicalSize = CANDLES.includes(name)
+    ? CANDLE_LOGICAL_SIZE
+    : LOGICAL_SIZE;
+  let logical = await sharp(buffer, {
+    raw: { width: SIZE, height: SIZE, channels: 4 },
+  })
+    .resize(logicalSize, logicalSize, { kernel: "nearest", fit: "fill" })
+    .raw()
+    .toBuffer();
+  logical = flattenOutlineToBlack(logical);
+  logical = applyBlackContour(logical, logicalSize, logicalSize, 3);
+  logical = removeInteriorColorSpecks(logical, logicalSize, logicalSize);
+  return sharp(logical, {
+    raw: { width: logicalSize, height: logicalSize, channels: 4 },
+  })
+    .resize(SIZE, SIZE, { kernel: "nearest", fit: "fill" })
+    .raw()
+    .toBuffer();
+}
+
 async function writeProduction(name, buffer) {
   const file = `${name}.png`;
+  const strict = await strictifyProductionBuffer(name, buffer);
   await fs.mkdir(PRODUCTION_ROOT, { recursive: true });
-  await writeIndexed(buffer, SIZE, SIZE, path.join(PRODUCTION_ROOT, file));
+  await writeIndexed(strict, SIZE, SIZE, path.join(PRODUCTION_ROOT, file));
 }
 
 async function processSmallSprites() {
@@ -968,6 +1034,8 @@ async function physicalQa() {
     const { data, info } = await sharp(full).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
     if (info.width !== SIZE || info.height !== SIZE) throw new Error(`${file}: expected 128x128`);
     let opaque = 0;
+    let blackPixels = 0;
+    let legacyOutlinePixels = 0;
     let parchmentPixels = 0;
     for (let y = 0; y < SIZE; y += 1) {
       for (let x = 0; x < SIZE; x += 1) {
@@ -981,11 +1049,39 @@ async function physicalQa() {
           opaque += 1;
           const color = `${data[offset]},${data[offset + 1]},${data[offset + 2]}`;
           if (!paletteSet.has(color)) throw new Error(`${file}: color outside master palette: ${color}`);
+          if (color === PALETTE[1].join(",")) blackPixels += 1;
+          if (color === PALETTE[0].join(",")) legacyOutlinePixels += 1;
           if (parchmentSet.has(color)) parchmentPixels += 1;
         }
       }
     }
     if (opaque === 0) throw new Error(`${file}: empty sprite`);
+    if (blackPixels === 0) throw new Error(`${file}: missing exact-black outline`);
+    if (legacyOutlinePixels !== 0) {
+      throw new Error(`${file}: retained ${legacyOutlinePixels} legacy green outline pixels`);
+    }
+    const name = file.slice(0, -4);
+    const logicalSize = CANDLES.includes(name)
+      ? CANDLE_LOGICAL_SIZE
+      : LOGICAL_SIZE;
+    const blockSize = SIZE / logicalSize;
+    for (let top = 0; top < SIZE; top += blockSize) {
+      for (let left = 0; left < SIZE; left += blockSize) {
+        const anchor = (top * SIZE + left) * 4;
+        for (let y = top; y < top + blockSize; y += 1) {
+          for (let x = left; x < left + blockSize; x += 1) {
+            const offset = (y * SIZE + x) * 4;
+            for (let channel = 0; channel < 4; channel += 1) {
+              if (data[offset + channel] !== data[anchor + channel]) {
+                throw new Error(
+                  `${file}: non-uniform ${blockSize}x${blockSize} block at ${left},${top}`
+                );
+              }
+            }
+          }
+        }
+      }
+    }
     if (file === "dove.png" && (opaque < 4000 || parchmentPixels / opaque < 0.4)) {
       throw new Error(`${file}: white body was lost while removing the source backdrop`);
     }

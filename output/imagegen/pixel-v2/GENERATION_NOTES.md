@@ -16,9 +16,15 @@ second strict-block reference. The untouched generated atlas is
 
 The production processor reconstructs these mascots on a 32×32 logical art
 grid and then scales each logical pixel exactly 4× with nearest-neighbor
-sampling onto the required 128×128 canvas. It applies a single charcoal outer
-contour, subject-specific palette ramps, connected-component cleanup, and a
-conservative interior-speck pass before export. PixelLab upload copies live in
+sampling onto the required 128×128 canvas. The black-outline refinement is
+preserved as `sources/mascot-atlas-black-source.png`, with its prompt in
+`sources/mascot-atlas-black-prompt.txt`.
+
+The final catalogue pass applies exact-black (`#000000`) contours and snaps all
+63 files to their declared logical grids. Small sprites, trees, and mascots use
+uniform 4×4 physical blocks; candles use uniform 8×8 blocks. Subject-specific
+palette ramps, connected-component cleanup, and a conservative interior-speck
+pass run before export. PixelLab upload copies live in
 `pixellab-ready/mascots/`.
 
 ## References

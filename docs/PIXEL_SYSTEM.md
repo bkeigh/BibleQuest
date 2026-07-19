@@ -45,7 +45,7 @@ remains supported as a fallback and useful test fixture:
   Production candles use `0.75`; mascots use `0.625` so size 7/8/9/10 call
   sites render at 128/160/192/192px without a 224px onboarding jump.
 - Palette colors come only from the named constants at the top of the file:
-  live-token dark outline (`#1e3329`), evergreen (`#0e533c`), olive, brand
+  exact black outline (`#000000`), evergreen (`#0e533c`), olive, brand
   gold (`#d3a336`), leather, parchment, charcoal, and restrained prayer blue,
   rose, stone, skin, and flame ramps. Lighter and darker material ramps are
   intentional pixel-art shades of those live brand anchors.
@@ -103,9 +103,13 @@ file stay untouched.
 - Every sprite uses a whole-cell logical grid and `image-rendering: pixelated`
   (`pixelated` utility), whether its source is PNG or SVG rectangles. Never
   scale to fractional cell sizes; never blur, never rotate.
-- Every silhouette carries a single dark-green outline. Small icons keep it
+- Every silhouette carries a single exact-black (`#000000`) outline. Small icons keep it
   sparse; mascots and feature sprites use it continuously so they remain
   recognizable on parchment, linen, and candle-mode surfaces.
+- Every physical pixel inside a declared logical cell is byte-identical. The
+  32×32 families export uniform 4×4 physical blocks; the 16×16 candle family
+  exports uniform 8×8 blocks. Gradients may be expressed only as adjacent flat
+  palette colors, never as interpolation within a pixel block.
 - Light comes from the **upper left**: highlights top-left, shade
   lower-right, 2–3 shade levels per material, minimal dithering.
 - Every shipped sprite uses only colors from the shared production palette in

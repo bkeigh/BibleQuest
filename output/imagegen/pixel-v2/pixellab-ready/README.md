@@ -1,4 +1,8 @@
-# PixelLab-ready BibleQuest mascots
+# PixelLab-ready BibleQuest pixel art
+
+`catalogue/` contains disposable upload copies of the complete 63-file
+production set. `mascots/` contains the eight large mascot files separately
+for the most common animation workflow.
 
 The files in `mascots/` are clean animation inputs for the BibleQuest mascot
 family. Each file is:
@@ -8,8 +12,12 @@ family. Each file is:
 - built on a 32×32 logical art grid, with every logical pixel exported as one
   uniform 4×4 block;
 - limited to the approved BibleQuest palette;
-- outlined with one charcoal contour;
+- outlined with one exact-black (`#000000`) contour;
 - free of disconnected fragments and partial-alpha edge pixels.
+
+Every file in `catalogue/` follows the same contract. Small sprites, trees,
+and mascots use uniform 4×4 physical blocks. The candle sequence uses uniform
+8×8 physical blocks.
 
 For onboarding, animate `mascot-map`, `mascot-scroll`, `mascot-lantern`,
 `mascot-campfire`, `mascot-dove`, and `mascot-sprout`. `mascot-lamb` and

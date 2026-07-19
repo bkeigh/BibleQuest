@@ -144,9 +144,10 @@ function rasterise(width: number, height: number, shapes: PixelShape[]): string[
   return cells.map((row) => row.join(""));
 }
 
-// Reference-board palette. Dark green replaces pure black throughout.
+// Reference-board palette. Sprite contours use true black; evergreen remains
+// an intentional interior material color.
 const TRANSPARENT = "transparent";
-const OUTLINE = "#1e3329";
+const OUTLINE = "#000000";
 const INK = "#2c2c2c";
 const GREEN_DARK = "#0a3f2e";
 const GREEN = "#0e533c";

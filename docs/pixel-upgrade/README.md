@@ -42,7 +42,7 @@ outline, and shading; it is not a production sprite to shrink automatically.
 For new or revised art:
 
 - state each reference image's role in the generation prompt;
-- request strict native pixel clusters, one dark-evergreen outline, upper-left
+- request strict native pixel clusters, one exact-black (`#000000`) outline, upper-left
   light, flat stepped shading, and the shared BibleQuest palette;
 - use a uniform removable chroma field (`#ff00ff` for green subjects);
 - prohibit text, frames, cast shadows, blur, soft glow, partial transparency,
@@ -100,6 +100,12 @@ but it must finish with the same invariants: exact dimensions, fixed palette,
 binary alpha, nearest-neighbor reconstruction, shared baseline, and distinct
 frames. Keep that processing recipe beside its raw atlas and generation notes
 so the result remains reproducible.
+
+The final production pass snaps every family to its declared logical grid
+before integer nearest-neighbor expansion: 32×32 art becomes uniform 4×4
+blocks and 16×16 candle art becomes uniform 8×8 blocks. Both legacy outline
+mapping shades are flattened to exact `#000000` before the indexed PNG is
+written.
 
 The older mixed-size staging files remain as provenance only. The canonical
 processor supersedes those exports and writes the reviewed uniform set to
