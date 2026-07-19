@@ -30,16 +30,16 @@
     "text": "no readable text or letter-like noise inside sprites",
     "palette": "only the canonical BibleQuest palette shared by process-production-128.mjs and scripts/process-pixel-sprites.mjs",
     "opaqueColorBudgets": {
-      "smallAndCandlesDefault": 16,
-      "treesDefault": 24,
-      "mascotsDefault": 20,
+      "smallAndCandlesDefault": 22,
+      "treesDefault": 28,
+      "mascotsDefault": 24,
       "reviewedPerFileExceptions": {
-        "chapel.png": 20,
-        "fountain.png": 18,
-        "people.png": 24,
+        "chapel.png": 28,
+        "fountain.png": 22,
+        "people.png": 28,
         "mascot-dove.png": 24,
         "mascot-map.png": 24,
-        "mascot-scroll.png": 24
+        "mascot-scroll.png": 28
       }
     }
   },
@@ -133,7 +133,7 @@
       "id": "feature-mascots",
       "count": 8,
       "physicalPixels": { "width": 128, "height": 128 },
-      "logicalGrid": { "columns": 32, "rows": 32 },
+      "logicalGrid": { "columns": 64, "rows": 64 },
       "cellScale": 0.625,
       "files": [
         "mascot-campfire.png",

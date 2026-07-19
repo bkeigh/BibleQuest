@@ -18,14 +18,15 @@ file source and logical canvas.
 | Small interface/category sprites | 30 | 128×128 | 32×32 |
 | Streak-candle states | 5 | 128×128 | 16×16 |
 | Olive-tree stages | 20 | 128×128 | 32×32 |
-| Feature mascots | 8 | 128×128 | 32×32 |
+| Feature mascots | 8 | 128×128 | 64×64 |
 
 Physical and logical dimensions are separate contracts. Every shipped file is
 exactly 128×128; the smaller registry grids remain layout metadata so existing
 call sites keep their established rendered scale. Every logical row
 and column count must divide 128 evenly; current grids are 32×32 for small
-sprites, trees, and mascots, and 16×16 for candles. Transparent square padding
-preserves the candles' narrow silhouette within their square logical grid.
+sprites and trees, 64×64 for mascots, and 16×16 for candles. Transparent square
+padding preserves the candles' narrow silhouette within their square logical
+grid.
 
 Navigation and form controls remain clean vector icons. Pixel art is reserved
 for quests, growth, milestones, onboarding, and meaningful empty states. The
@@ -102,10 +103,10 @@ frames. Keep that processing recipe beside its raw atlas and generation notes
 so the result remains reproducible.
 
 The final production pass snaps every family to its declared logical grid
-before integer nearest-neighbor expansion: 32×32 art becomes uniform 4×4
-blocks and 16×16 candle art becomes uniform 8×8 blocks. Both legacy outline
-mapping shades are flattened to exact `#000000` before the indexed PNG is
-written.
+before integer nearest-neighbor expansion: 64×64 mascot art becomes uniform
+2×2 blocks, 32×32 art becomes uniform 4×4 blocks, and 16×16 candle art becomes
+uniform 8×8 blocks. Both legacy outline mapping shades are flattened to exact
+`#000000` before the indexed PNG is written.
 
 The older mixed-size staging files remain as provenance only. The canonical
 processor supersedes those exports and writes the reviewed uniform set to
@@ -121,8 +122,8 @@ Required checks:
 - exactly 128×128 physical dimensions for all 63 files;
 - alpha values are only 0 or 255, with transparent corners and safe padding;
 - every opaque RGB value belongs to the shared production palette;
-- opaque-color budgets remain 16 for small sprites and candles, 20 for
-  mascots, and 24 for trees unless a reviewed per-file exception is recorded
+- opaque-color budgets remain 22 for small sprites and candles, 24 for
+  mascots, and 28 for trees unless a reviewed per-file exception is recorded
   in the manifest;
 - no antialiased fringe, isolated noise, checkerboard residue, or chroma spill;
 - silhouettes remain unmistakable at the smallest call site;

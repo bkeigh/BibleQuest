@@ -713,14 +713,14 @@ const GRID_PIXEL_MASCOTS = defineAssets({
 });
 
 const PRODUCTION_PNG_MASCOTS = defineAssets({
-  lamb: pixelPng("/pixel/mascot-lamb.png", 32, 32, 0.625),
-  lantern: pixelPng("/pixel/mascot-lantern.png", 32, 32, 0.625, "[animation:var(--animate-flicker)]"),
-  scroll: pixelPng("/pixel/mascot-scroll.png", 32, 32, 0.625),
-  dove: pixelPng("/pixel/mascot-dove.png", 32, 32, 0.625),
-  sprout: pixelPng("/pixel/mascot-sprout.png", 32, 32, 0.625),
-  key: pixelPng("/pixel/mascot-key.png", 32, 32, 0.625),
-  map: pixelPng("/pixel/mascot-map.png", 32, 32, 0.625),
-  campfire: pixelPng("/pixel/mascot-campfire.png", 32, 32, 0.625, "[animation:var(--animate-flicker)]"),
+  lamb: pixelPng("/pixel/mascot-lamb.png", 64, 64, 0.625),
+  lantern: pixelPng("/pixel/mascot-lantern.png", 64, 64, 0.625, "[animation:var(--animate-flicker)]"),
+  scroll: pixelPng("/pixel/mascot-scroll.png", 64, 64, 0.625),
+  dove: pixelPng("/pixel/mascot-dove.png", 64, 64, 0.625),
+  sprout: pixelPng("/pixel/mascot-sprout.png", 64, 64, 0.625),
+  key: pixelPng("/pixel/mascot-key.png", 64, 64, 0.625),
+  map: pixelPng("/pixel/mascot-map.png", 64, 64, 0.625),
+  campfire: pixelPng("/pixel/mascot-campfire.png", 64, 64, 0.625, "[animation:var(--animate-flicker)]"),
 });
 
 export const PIXEL_MASCOTS = defineAssets({

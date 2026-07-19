@@ -25,12 +25,12 @@ type PngSpec = {
 };
 
 const OPAQUE_COLOR_BUDGET_OVERRIDES = new Map<string, number>([
-  ["chapel.png", 20],
-  ["fountain.png", 18],
-  ["people.png", 24],
+  ["chapel.png", 28],
+  ["fountain.png", 22],
+  ["people.png", 28],
   ["mascot-dove.png", 24],
   ["mascot-map.png", 24],
-  ["mascot-scroll.png", 24],
+  ["mascot-scroll.png", 28],
 ]);
 
 function physicalPngSpec(src: string): PngSpec {
@@ -38,12 +38,12 @@ function physicalPngSpec(src: string): PngSpec {
   const override = OPAQUE_COLOR_BUDGET_OVERRIDES.get(filename);
   if (override != null) return { maxOpaqueColors: override };
   if (filename.startsWith("mascot-")) {
-    return { maxOpaqueColors: 20 };
-  }
-  if (/^tree-stage-(?:[0-9]|1[0-9])\.png$/.test(filename)) {
     return { maxOpaqueColors: 24 };
   }
-  return { maxOpaqueColors: 16 };
+  if (/^tree-stage-(?:[0-9]|1[0-9])\.png$/.test(filename)) {
+    return { maxOpaqueColors: 28 };
+  }
+  return { maxOpaqueColors: 22 };
 }
 
 function registryPngSources() {
@@ -323,9 +323,9 @@ describe("BibleQuest pixel art system", () => {
       height: NATIVE_CANVAS,
     });
     expect(manifest.qualityContract.opaqueColorBudgets).toEqual({
-      smallAndCandlesDefault: 16,
-      treesDefault: 24,
-      mascotsDefault: 20,
+      smallAndCandlesDefault: 22,
+      treesDefault: 28,
+      mascotsDefault: 24,
       reviewedPerFileExceptions: Object.fromEntries(
         OPAQUE_COLOR_BUDGET_OVERRIDES
       ),
@@ -365,7 +365,7 @@ describe("BibleQuest pixel art system", () => {
       },
       {
         id: "feature-mascots",
-        logicalGrid: { columns: 32, rows: 32 },
+        logicalGrid: { columns: 64, rows: 64 },
         cellScale: 0.625,
       },
     ]);
@@ -417,7 +417,7 @@ describe("BibleQuest pixel art system", () => {
       expect(PIXEL_SPRITES[name].cellScale, `${name} cell scale`).toBe(0.75);
     }
     for (const [name, asset] of Object.entries(PIXEL_MASCOTS)) {
-      expectLogicalCanvas(`mascot-${name}`, asset, 32, 32);
+      expectLogicalCanvas(`mascot-${name}`, asset, 64, 64);
       expect(asset.cellScale, `mascot-${name} cell scale`).toBe(0.625);
     }
   });

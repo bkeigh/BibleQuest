@@ -22,6 +22,7 @@ const UI_ROOT = path.resolve(
 );
 const SIZE = 128;
 const LOGICAL_SIZE = 32;
+const MASCOT_LOGICAL_SIZE = 64;
 const CANDLE_LOGICAL_SIZE = 16;
 const MASCOT_SOURCE = "mascot-atlas-black-source.png";
 
@@ -36,41 +37,58 @@ const PALETTE = [
   [0x52, 0x6f, 0x3e], // moss shadow
   [0x6b, 0x8f, 0x4e], // moss green
   [0x9a, 0xb9, 0x5c], // moss light
+  [0x2b, 0x19, 0x10], // leather deepest shadow
   [0x4c, 0x2f, 0x1d], // leather shadow
+  [0x6a, 0x43, 0x27], // leather dark midtone
   [0x8b, 0x5e, 0x34], // leather brown
   [0xb9, 0x82, 0x43], // leather light
+  [0xd6, 0xa2, 0x5f], // leather highlight
+  [0x5d, 0x3b, 0x0a], // gold deepest shadow
   [0x8f, 0x65, 0x1a], // gold shadow
+  [0xb9, 0x85, 0x1f], // gold dark midtone
   [0xda, 0xaf, 0x37], // gold
   [0xf5, 0xd4, 0x6a], // gold light
+  [0xff, 0xe9, 0xa0], // gold highlight
+  [0xa5, 0x6f, 0x34], // parchment deepest shadow
+  [0xc4, 0x9a, 0x5b], // parchment warm shadow
   [0xd5, 0xb9, 0x82], // parchment shadow
+  [0xe9, 0xd0, 0xa3], // parchment midtone
   [0xf6, 0xe9, 0xd1], // parchment
-  [0xff, 0xf4, 0xde], // parchment highlight
+  [0xff, 0xf4, 0xde], // parchment light
+  [0xff, 0xf9, 0xed], // parchment highlight
+  [0x0d, 0x25, 0x37], // prayer-blue deepest shadow
   [0x18, 0x3a, 0x55], // prayer-blue shadow
   [0x29, 0x54, 0x70], // prayer blue
-  [0x5d, 0x89, 0xa3], // prayer-blue light
+  [0x3d, 0x6b, 0x86], // prayer-blue light
+  [0x9c, 0xb6, 0xc6], // prayer-blue highlight
+  [0x62, 0x35, 0x24], // skin deepest shadow
   [0x8a, 0x4f, 0x32], // skin shadow
   [0xc9, 0x82, 0x55], // skin
   [0xf0, 0xb6, 0x81], // skin light
   [0xf7, 0xd3, 0xa9], // skin highlight
+  [0x55, 0x20, 0x1d], // warm accent deepest shadow
   [0x7c, 0x30, 0x28], // warm accent shadow
   [0xc6, 0x5b, 0x3f], // warm accent
+  [0xef, 0x78, 0x24], // flame deep amber
   [0xef, 0x97, 0x38], // flame amber
   [0xf7, 0xc8, 0x4b], // flame light
+  [0x4e, 0x4c, 0x45], // stone deepest shadow
   [0x77, 0x74, 0x68], // stone shadow
   [0xaa, 0xa2, 0x8f], // stone
   [0xd8, 0xcf, 0xb8], // stone light
+  [0xee, 0xe8, 0xd8], // stone highlight
 ];
 
 const MATERIAL = {
   outline: [0, 1],
   green: [2, 3, 4, 5, 6, 7],
-  leather: [8, 9, 10],
-  gold: [11, 12, 13],
-  parchment: [14, 15, 16],
-  blue: [17, 18, 19],
-  skin: [20, 21, 22, 23],
-  warm: [24, 25, 26, 27],
-  stone: [28, 29, 30],
+  leather: [8, 9, 10, 11, 12, 13],
+  gold: [14, 15, 16, 17, 18, 19],
+  parchment: [20, 21, 22, 23, 24, 25, 26],
+  blue: [27, 28, 29, 30, 31],
+  skin: [32, 33, 34, 35, 36],
+  warm: [37, 38, 39, 40, 41, 42],
+  stone: [43, 44, 45, 46, 47],
 };
 
 const materialSet = (...names) => [...new Set(names.flatMap((name) => MATERIAL[name]))];
@@ -458,7 +476,12 @@ async function fitRaw(source, { maxVisible = 112, alignment = "center", bottom =
 
 async function fitLogicalRaw(
   source,
-  { maxVisible = 28, alignment = "center", bottom = 30 } = {}
+  {
+    logicalSize = LOGICAL_SIZE,
+    maxVisible = logicalSize - 4,
+    alignment = "center",
+    bottom = logicalSize - 2,
+  } = {}
 ) {
   const trimmed = await trimRaw(source);
   const scale = Math.min(
@@ -471,15 +494,15 @@ async function fitLogicalRaw(
     .resize(width, height, { kernel: "nearest", fit: "fill" })
     .raw()
     .toBuffer();
-  const left = Math.floor((LOGICAL_SIZE - width) / 2);
+  const left = Math.floor((logicalSize - width) / 2);
   const top =
     alignment === "bottom"
       ? bottom - height
-      : Math.floor((LOGICAL_SIZE - height) / 2);
+      : Math.floor((logicalSize - height) / 2);
   return sharp({
     create: {
-      width: LOGICAL_SIZE,
-      height: LOGICAL_SIZE,
+      width: logicalSize,
+      height: logicalSize,
       channels: 4,
       background: [0, 0, 0, 0],
     },
@@ -691,20 +714,45 @@ function removeInteriorColorSpecks(buffer, width, height) {
 }
 
 async function normalizeStrictMascot(source, name, alignment) {
-  let logical = await fitLogicalRaw(source, { alignment });
+  let logical = await fitLogicalRaw(source, {
+    logicalSize: MASCOT_LOGICAL_SIZE,
+    maxVisible: 56,
+    alignment,
+    bottom: 60,
+  });
   logical = mapToAllowed(logical, MASCOT_ALLOWED[name]);
   logical = removeSmallComponents(
     logical,
-    LOGICAL_SIZE,
-    LOGICAL_SIZE,
+    MASCOT_LOGICAL_SIZE,
+    MASCOT_LOGICAL_SIZE,
     2
   );
-  logical = keepLargestOpaqueComponent(logical, LOGICAL_SIZE, LOGICAL_SIZE);
-  logical = applyBlackContour(logical, LOGICAL_SIZE, LOGICAL_SIZE);
-  logical = removeIsolatedColorSpecks(logical, LOGICAL_SIZE, LOGICAL_SIZE);
-  logical = removeInteriorColorSpecks(logical, LOGICAL_SIZE, LOGICAL_SIZE);
+  logical = keepLargestOpaqueComponent(
+    logical,
+    MASCOT_LOGICAL_SIZE,
+    MASCOT_LOGICAL_SIZE
+  );
+  logical = applyBlackContour(
+    logical,
+    MASCOT_LOGICAL_SIZE,
+    MASCOT_LOGICAL_SIZE
+  );
+  logical = removeIsolatedColorSpecks(
+    logical,
+    MASCOT_LOGICAL_SIZE,
+    MASCOT_LOGICAL_SIZE
+  );
+  logical = removeInteriorColorSpecks(
+    logical,
+    MASCOT_LOGICAL_SIZE,
+    MASCOT_LOGICAL_SIZE
+  );
   return sharp(logical, {
-    raw: { width: LOGICAL_SIZE, height: LOGICAL_SIZE, channels: 4 },
+    raw: {
+      width: MASCOT_LOGICAL_SIZE,
+      height: MASCOT_LOGICAL_SIZE,
+      channels: 4,
+    },
   })
     .resize(SIZE, SIZE, { kernel: "nearest", fit: "fill" })
     .raw()
@@ -743,9 +791,11 @@ function flattenOutlineToBlack(buffer) {
 }
 
 async function strictifyProductionBuffer(name, buffer) {
-  const logicalSize = CANDLES.includes(name)
-    ? CANDLE_LOGICAL_SIZE
-    : LOGICAL_SIZE;
+  const logicalSize = MASCOTS.includes(name)
+    ? MASCOT_LOGICAL_SIZE
+    : CANDLES.includes(name)
+      ? CANDLE_LOGICAL_SIZE
+      : LOGICAL_SIZE;
   let logical = await sharp(buffer, {
     raw: { width: SIZE, height: SIZE, channels: 4 },
   })
@@ -1061,9 +1111,11 @@ async function physicalQa() {
       throw new Error(`${file}: retained ${legacyOutlinePixels} legacy green outline pixels`);
     }
     const name = file.slice(0, -4);
-    const logicalSize = CANDLES.includes(name)
-      ? CANDLE_LOGICAL_SIZE
-      : LOGICAL_SIZE;
+    const logicalSize = MASCOTS.includes(name)
+      ? MASCOT_LOGICAL_SIZE
+      : CANDLES.includes(name)
+        ? CANDLE_LOGICAL_SIZE
+        : LOGICAL_SIZE;
     const blockSize = SIZE / logicalSize;
     for (let top = 0; top < SIZE; top += blockSize) {
       for (let left = 0; left < SIZE; left += blockSize) {

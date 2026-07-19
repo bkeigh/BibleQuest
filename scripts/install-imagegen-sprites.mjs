@@ -18,6 +18,15 @@ const productionRoot = path.join(
   "production-128"
 );
 const publicRoot = path.join(root, "public", "pixel");
+const pixelLabRoot = path.join(
+  root,
+  "output",
+  "imagegen",
+  "pixel-v2",
+  "pixellab-ready"
+);
+const pixelLabCatalogueRoot = path.join(pixelLabRoot, "catalogue");
+const pixelLabMascotRoot = path.join(pixelLabRoot, "mascots");
 
 const reviewedSmallSprites = [
   "bird.png",
@@ -93,14 +102,26 @@ if (JSON.stringify(productionSources) !== JSON.stringify(expectedSources)) {
   throw new Error("production-128 must contain exactly the reviewed 63-file contract");
 }
 
-await mkdir(publicRoot, { recursive: true });
+await Promise.all([
+  mkdir(publicRoot, { recursive: true }),
+  mkdir(pixelLabCatalogueRoot, { recursive: true }),
+  mkdir(pixelLabMascotRoot, { recursive: true }),
+]);
 for (const [target, source] of copies) {
   const sourcePath = path.join(productionRoot, source);
   const metadata = await sharp(sourcePath).metadata();
   if (metadata.width !== 128 || metadata.height !== 128) {
     throw new Error(`${source}: expected a reviewed 128x128 production PNG`);
   }
-  await copyFile(sourcePath, path.join(publicRoot, target));
+  await Promise.all([
+    copyFile(sourcePath, path.join(publicRoot, target)),
+    copyFile(sourcePath, path.join(pixelLabCatalogueRoot, target)),
+    ...(reviewedMascots.includes(target)
+      ? [copyFile(sourcePath, path.join(pixelLabMascotRoot, target))]
+      : []),
+  ]);
 }
 
-console.log(`Installed ${copies.length} reviewed sprites in ${publicRoot}`);
+console.log(
+  `Installed ${copies.length} reviewed sprites in ${publicRoot} and ${pixelLabCatalogueRoot}`
+);

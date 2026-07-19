@@ -4,20 +4,23 @@
 production set. `mascots/` contains the eight large mascot files separately
 for the most common animation workflow.
 
+Both directories are refreshed automatically by
+`node scripts/install-imagegen-sprites.mjs` after a reviewed production build.
+
 The files in `mascots/` are clean animation inputs for the BibleQuest mascot
 family. Each file is:
 
 - exactly 128×128 pixels;
 - transparent outside the subject;
-- built on a 32×32 logical art grid, with every logical pixel exported as one
-  uniform 4×4 block;
+- built on a 64×64 logical art grid, with every logical pixel exported as one
+  uniform 2×2 block;
 - limited to the approved BibleQuest palette;
 - outlined with one exact-black (`#000000`) contour;
 - free of disconnected fragments and partial-alpha edge pixels.
 
-Every file in `catalogue/` follows the same contract. Small sprites, trees,
-and mascots use uniform 4×4 physical blocks. The candle sequence uses uniform
-8×8 physical blocks.
+Every file in `catalogue/` follows the same contract. Mascots use uniform 2×2
+physical blocks; small sprites and trees use uniform 4×4 blocks. The candle
+sequence uses uniform 8×8 physical blocks.
 
 For onboarding, animate `mascot-map`, `mascot-scroll`, `mascot-lantern`,
 `mascot-campfire`, `mascot-dove`, and `mascot-sprout`. `mascot-lamb` and
