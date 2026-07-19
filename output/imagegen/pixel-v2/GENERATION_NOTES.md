@@ -7,6 +7,20 @@ high-resolution masters onto one exact 128×128 physical canvas and writes the
 reviewed candidates to `production-128/`. The guarded installer promotes that
 directory to `public/pixel/` after review.
 
+## Strict mascot reconstruction
+
+The onboarding mascot family was rebuilt from the original mascot atlas with a
+second strict-block reference. The untouched generated atlas is
+`sources/mascot-atlas-strict-source.png`; its complete prompt is preserved in
+`sources/mascot-atlas-strict-prompt.txt`.
+
+The production processor reconstructs these mascots on a 32×32 logical art
+grid and then scales each logical pixel exactly 4× with nearest-neighbor
+sampling onto the required 128×128 canvas. It applies a single charcoal outer
+contour, subject-specific palette ramps, connected-component cleanup, and a
+conservative interior-speck pass before export. PixelLab upload copies live in
+`pixellab-ready/mascots/`.
+
 ## References
 
 - `/Users/brendankenney/Pictures/BibleQuest-Assets/PixelArtReferenceSheet.png` — master style, palette, outline, and progression language

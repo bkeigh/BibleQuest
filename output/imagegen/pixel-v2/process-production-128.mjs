@@ -21,6 +21,8 @@ const UI_ROOT = path.resolve(
     "/Users/brendankenney/Pictures/BibleQuest-Assets/UI-ASSETS"
 );
 const SIZE = 128;
+const LOGICAL_SIZE = 32;
+const MASCOT_SOURCE = "mascot-atlas-strict-source.png";
 
 // The canonical BibleQuest palette. Every production sprite is written as an
 // indexed PNG using only these colors plus one fully transparent entry.
@@ -106,6 +108,25 @@ const ALLOWED = {
   mascot: materialSet("outline", "green", "leather", "gold", "parchment", "blue", "skin", "warm"),
   trees: materialSet("outline", "green", "leather", "gold", "parchment"),
   candles: materialSet("outline", "leather", "gold", "parchment", "warm"),
+};
+
+// Mascots deliberately use smaller subject-specific ramps than the general
+// catalogue. This prevents a parchment highlight from becoming a green fleck
+// (or vice versa) and keeps the large onboarding art calm at native size.
+const mascotMaterialSet = (...names) => [
+  1, // one charcoal contour; greens are reserved for subject interiors
+  ...materialSet(...names.filter((name) => name !== "outline")),
+];
+
+const MASCOT_ALLOWED = {
+  "mascot-lamb": mascotMaterialSet("parchment", "leather", "skin"),
+  "mascot-lantern": mascotMaterialSet("leather", "gold", "parchment", "warm"),
+  "mascot-scroll": mascotMaterialSet("leather", "gold", "parchment", "green"),
+  "mascot-dove": mascotMaterialSet("parchment", "gold", "green"),
+  "mascot-sprout": mascotMaterialSet("green", "leather", "gold"),
+  "mascot-key": mascotMaterialSet("gold", "leather"),
+  "mascot-map": mascotMaterialSet("leather", "gold", "parchment", "green"),
+  "mascot-campfire": mascotMaterialSet("leather", "gold", "warm"),
 };
 
 const SMALL_SPRITES = [
@@ -434,6 +455,235 @@ async function fitRaw(source, { maxVisible = 112, alignment = "center", bottom =
     .toBuffer();
 }
 
+async function fitLogicalRaw(
+  source,
+  { maxVisible = 28, alignment = "center", bottom = 30 } = {}
+) {
+  const trimmed = await trimRaw(source);
+  const scale = Math.min(
+    maxVisible / trimmed.info.width,
+    maxVisible / trimmed.info.height
+  );
+  const width = Math.max(1, Math.round(trimmed.info.width * scale));
+  const height = Math.max(1, Math.round(trimmed.info.height * scale));
+  const sprite = await sharp(trimmed.data, { raw: trimmed.info })
+    .resize(width, height, { kernel: "nearest", fit: "fill" })
+    .raw()
+    .toBuffer();
+  const left = Math.floor((LOGICAL_SIZE - width) / 2);
+  const top =
+    alignment === "bottom"
+      ? bottom - height
+      : Math.floor((LOGICAL_SIZE - height) / 2);
+  return sharp({
+    create: {
+      width: LOGICAL_SIZE,
+      height: LOGICAL_SIZE,
+      channels: 4,
+      background: [0, 0, 0, 0],
+    },
+  })
+    .composite([
+      {
+        input: sprite,
+        raw: { width, height, channels: 4 },
+        left,
+        top,
+      },
+    ])
+    .raw()
+    .toBuffer();
+}
+
+function removeIsolatedColorSpecks(buffer, width, height) {
+  const outlineColors = new Set(MATERIAL.outline.map((index) => PALETTE[index].join(",")));
+  const colorAt = (point) => {
+    const offset = point * 4;
+    return buffer[offset + 3] === 0
+      ? null
+      : `${buffer[offset]},${buffer[offset + 1]},${buffer[offset + 2]}`;
+  };
+
+  // Two conservative passes remove salt-and-pepper highlights while keeping
+  // outline pixels, eyes, route lines, flame tips, and transparent contours.
+  for (let pass = 0; pass < 2; pass += 1) {
+    const replacements = [];
+    for (let y = 1; y < height - 1; y += 1) {
+      for (let x = 1; x < width - 1; x += 1) {
+        const point = y * width + x;
+        const color = colorAt(point);
+        if (!color || outlineColors.has(color)) continue;
+        const neighbors = [point - 1, point + 1, point - width, point + width]
+          .map(colorAt)
+          .filter(Boolean);
+        if (neighbors.length !== 4 || neighbors.includes(color)) continue;
+        const counts = new Map();
+        for (const neighbor of neighbors) {
+          counts.set(neighbor, (counts.get(neighbor) ?? 0) + 1);
+        }
+        const [replacement, count] = [...counts.entries()].sort(
+          (a, b) => b[1] - a[1]
+        )[0] ?? [];
+        if (replacement && count >= 3) replacements.push([point, replacement]);
+      }
+    }
+    for (const [point, replacement] of replacements) {
+      const offset = point * 4;
+      const [r, g, b] = replacement.split(",").map(Number);
+      buffer[offset] = r;
+      buffer[offset + 1] = g;
+      buffer[offset + 2] = b;
+    }
+  }
+  return buffer;
+}
+
+function keepLargestOpaqueComponent(buffer, width, height) {
+  const visited = new Uint8Array(width * height);
+  const components = [];
+  for (let start = 0; start < width * height; start += 1) {
+    if (visited[start] || buffer[start * 4 + 3] === 0) continue;
+    const component = [];
+    const stack = [start];
+    visited[start] = 1;
+    while (stack.length > 0) {
+      const point = stack.pop();
+      component.push(point);
+      const x = point % width;
+      const y = Math.floor(point / width);
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          const next = ny * width + nx;
+          if (!visited[next] && buffer[next * 4 + 3] !== 0) {
+            visited[next] = 1;
+            stack.push(next);
+          }
+        }
+      }
+    }
+    components.push(component);
+  }
+  components.sort((a, b) => b.length - a.length);
+  for (const component of components.slice(1)) {
+    for (const point of component) buffer.fill(0, point * 4, point * 4 + 4);
+  }
+  return buffer;
+}
+
+function applyCharcoalContour(buffer, width, height) {
+  const charcoal = PALETTE[1];
+  const boundary = [];
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const point = y * width + x;
+      if (buffer[point * 4 + 3] === 0) continue;
+      let touchesTransparent = false;
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (
+            nx < 0 ||
+            ny < 0 ||
+            nx >= width ||
+            ny >= height ||
+            buffer[(ny * width + nx) * 4 + 3] === 0
+          ) {
+            touchesTransparent = true;
+            break;
+          }
+      }
+      if (touchesTransparent) boundary.push(point);
+    }
+  }
+  for (const point of boundary) {
+    const offset = point * 4;
+    buffer[offset] = charcoal[0];
+    buffer[offset + 1] = charcoal[1];
+    buffer[offset + 2] = charcoal[2];
+    buffer[offset + 3] = 255;
+  }
+  return buffer;
+}
+
+function removeInteriorColorSpecks(buffer, width, height) {
+  const outlineColors = new Set(MATERIAL.outline.map((index) => PALETTE[index].join(",")));
+  const colorAt = (point) => {
+    const offset = point * 4;
+    return buffer[offset + 3] === 0
+      ? null
+      : `${buffer[offset]},${buffer[offset + 1]},${buffer[offset + 2]}`;
+  };
+  const replacements = [];
+  for (let y = 1; y < height - 1; y += 1) {
+    for (let x = 1; x < width - 1; x += 1) {
+      const point = y * width + x;
+      const color = colorAt(point);
+      if (!color || outlineColors.has(color)) continue;
+      const neighbors = [];
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          if (dx === 0 && dy === 0) continue;
+          const neighbor = colorAt((y + dy) * width + x + dx);
+          if (neighbor) neighbors.push(neighbor);
+        }
+      }
+      // Only touch fully enclosed pixels. Edge stairs and small meaningful
+      // details remain intact, while isolated dots inside a flat material are
+      // folded into the surrounding contiguous shade cluster.
+      if (neighbors.length < 7) continue;
+      const sameColor = neighbors.filter((neighbor) => neighbor === color).length;
+      if (sameColor > 1) continue;
+      const counts = new Map();
+      for (const neighbor of neighbors) {
+        if (outlineColors.has(neighbor)) continue;
+        counts.set(neighbor, (counts.get(neighbor) ?? 0) + 1);
+      }
+      const [replacement, count] = [...counts.entries()].sort(
+        (a, b) => b[1] - a[1]
+      )[0] ?? [];
+      if (replacement && count >= 3) replacements.push([point, replacement]);
+    }
+  }
+  for (const [point, replacement] of replacements) {
+    const offset = point * 4;
+    const [r, g, b] = replacement.split(",").map(Number);
+    buffer[offset] = r;
+    buffer[offset + 1] = g;
+    buffer[offset + 2] = b;
+  }
+  return buffer;
+}
+
+async function normalizeStrictMascot(source, name, alignment) {
+  let logical = await fitLogicalRaw(source, { alignment });
+  logical = mapToAllowed(logical, MASCOT_ALLOWED[name]);
+  logical = removeSmallComponents(
+    logical,
+    LOGICAL_SIZE,
+    LOGICAL_SIZE,
+    2
+  );
+  logical = keepLargestOpaqueComponent(logical, LOGICAL_SIZE, LOGICAL_SIZE);
+  logical = applyCharcoalContour(logical, LOGICAL_SIZE, LOGICAL_SIZE);
+  logical = removeIsolatedColorSpecks(logical, LOGICAL_SIZE, LOGICAL_SIZE);
+  logical = removeInteriorColorSpecks(logical, LOGICAL_SIZE, LOGICAL_SIZE);
+  return sharp(logical, {
+    raw: { width: LOGICAL_SIZE, height: LOGICAL_SIZE, channels: 4 },
+  })
+    .resize(SIZE, SIZE, { kernel: "nearest", fit: "fill" })
+    .raw()
+    .toBuffer();
+}
+
 async function normalizeOne(source, name, alignment = "center", allowed = ALLOWED[name]) {
   let output = await fitRaw(source, { alignment });
   output = removeThinEdgeFragments(removeSmallComponents(output, SIZE, SIZE, 12), SIZE, SIZE);
@@ -460,7 +710,9 @@ async function processSmallSprites() {
     path.join(SOURCE_ROOT, "quest-category-atlas-imagegen-original.png")
   );
   const prayer = await magentaToAlpha(path.join(SOURCE_ROOT, "praying-hands-chroma.png"));
-  const mascots = await magentaToAlpha(path.join(SOURCE_ROOT, "mascot-atlas-source.png"));
+  const mascots = await magentaToAlpha(
+    path.join(SOURCE_ROOT, "mascot-atlas-chroma-normalized.png")
+  );
 
   for (const name of SMALL_SPRITES) {
     let source;
@@ -614,12 +866,12 @@ async function processCandles() {
 }
 
 async function processMascots() {
-  const source = await magentaToAlpha(path.join(SOURCE_ROOT, "mascot-atlas-source.png"));
+  const source = await magentaToAlpha(path.join(SOURCE_ROOT, MASCOT_SOURCE));
   for (let index = 0; index < MASCOTS.length; index += 1) {
     const name = MASCOTS[index];
     const alignment = name === "mascot-dove" || name === "mascot-key" ? "center" : "bottom";
     const cell = await extractCell(source, 3, 3, index);
-    const frame = await normalizeOne(cell, name, alignment, ALLOWED.mascot);
+    const frame = await normalizeStrictMascot(cell, name, alignment);
     await writeProduction(name, frame);
   }
 }
