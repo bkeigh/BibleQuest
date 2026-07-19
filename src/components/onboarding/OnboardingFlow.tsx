@@ -131,14 +131,6 @@ function OnboardingInner({ signInFailed }: { signInFailed: boolean }) {
     if (alreadyDone && !finishing.current) router.replace("/app");
   }, [alreadyDone, router]);
 
-  // Phone OTP verifies in-page (no redirect), so when a sign-in completes while
-  // we're on the account step, move the user into the app ourselves. Magic-link
-  // and Google instead leave the page and return via /auth/callback to the
-  // destination captured when the journey was committed.
-  useEffect(() => {
-    if (step === ACCOUNT_STEP && user) router.replace(pendingDest);
-  }, [step, user, pendingDest, router]);
-
   useEffect(() => {
     track("onboarding_started");
   }, []);

@@ -1,30 +1,25 @@
 "use client";
 
 /**
- * SignInMethods — the actual sign-in affordances (magic link, phone OTP,
- * Google), extracted from AccountScreen so the onboarding account step can
- * reuse them verbatim rather than duplicating auth logic. This is the single
- * place any of signInWithOtp / verifyOtp / signInWithOAuth is called.
+ * SignInMethods — the actual sign-in affordances (magic link and Google),
+ * extracted from AccountScreen so the onboarding account step can reuse them
+ * verbatim rather than duplicating auth logic. This is the single place any
+ * signInWithOtp / signInWithOAuth call is made.
  *
- * It renders ONLY the method controls and their transient states (link sent,
- * code entry). Surrounding chrome — page header, benefits copy, the signed-in
- * card, the callback-error banner — stays with whoever hosts it.
+ * It renders ONLY the method controls and their transient states. Surrounding
+ * chrome — page header, benefits copy, the signed-in card, the callback-error
+ * banner — stays with whoever hosts it.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { track } from "@/lib/analytics/events";
 import { authCallbackPath } from "@/lib/auth/redirect";
 
 type EmailStatus = "idle" | "sending" | "sent";
-type PhoneStatus = "idle" | "sending" | "code-sent" | "verifying";
 
-// E.164: a leading + and 7–15 digits (first digit non-zero).
-const E164 = /^\+[1-9]\d{6,14}$/;
 // Loose email shape check — the real validation is the link arriving.
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-
-const RESEND_COOLDOWN_SECONDS = 30;
 
 interface SignInMethodsProps {
   /** Where these controls live — flows into analytics as the funnel source. */
@@ -46,20 +41,8 @@ export function SignInMethods({
 }: SignInMethodsProps) {
   const [email, setEmail] = useState("");
   const [emailStatus, setEmailStatus] = useState<EmailStatus>("idle");
-  const [phone, setPhone] = useState("");
-  const [code, setCode] = useState("");
-  const [phoneStatus, setPhoneStatus] = useState<PhoneStatus>("idle");
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const [resending, setResending] = useState(false);
   const [oauthPending, setOauthPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Tick the OTP resend cooldown down once a second.
-  useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const t = setTimeout(() => setResendCooldown((s) => s - 1), 1000);
-    return () => clearTimeout(t);
-  }, [resendCooldown]);
 
   const emailValid = EMAIL.test(email.trim());
 
@@ -86,58 +69,6 @@ export function SignInMethods({
       setEmailStatus("sent");
       onEmailSent?.();
     }
-  }
-
-  async function sendCode() {
-    const p = phone.trim();
-    if (!E164.test(p)) {
-      setError("Enter your number with country code, like +15551234567.");
-      return;
-    }
-    setError(null);
-    setPhoneStatus("sending");
-    track("sign_in_started", { method: "phone_otp", source });
-    const { error } = await createClient().auth.signInWithOtp({ phone: p });
-    if (error) {
-      setError("We couldn’t send the code. Please check the number and retry.");
-      setPhoneStatus("idle");
-    } else {
-      setPhoneStatus("code-sent");
-      setResendCooldown(RESEND_COOLDOWN_SECONDS);
-    }
-  }
-
-  async function resendCode() {
-    if (resendCooldown > 0 || resending) return;
-    setError(null);
-    setResending(true);
-    const { error } = await createClient().auth.signInWithOtp({
-      phone: phone.trim(),
-    });
-    setResending(false);
-    if (error) {
-      setError("We couldn’t send the code. Please try again in a moment.");
-    } else {
-      setResendCooldown(RESEND_COOLDOWN_SECONDS);
-    }
-  }
-
-  async function verifyCode() {
-    const token = code.trim();
-    if (token.length < 4) return;
-    setError(null);
-    setPhoneStatus("verifying");
-    const { error } = await createClient().auth.verifyOtp({
-      phone: phone.trim(),
-      token,
-      type: "sms",
-    });
-    if (error) {
-      setError("That code didn’t match. Please try again.");
-      setPhoneStatus("code-sent");
-    }
-    // On success, onAuthStateChange updates the session and the host swaps to
-    // its signed-in view automatically.
   }
 
   async function oauth(provider: "google") {
@@ -172,78 +103,6 @@ export function SignInMethods({
           Use a different method
         </GentleButton>
       </div>
-    );
-  }
-
-  if (phoneStatus === "code-sent" || phoneStatus === "verifying") {
-    return (
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          void verifyCode();
-        }}
-      >
-        <label
-          htmlFor="signin-code"
-          className="mb-1.5 block text-caption text-ash"
-        >
-          Enter the code sent to {phone.trim()}
-        </label>
-        <input
-          id="signin-code"
-          inputMode="numeric"
-          enterKeyHint="done"
-          autoComplete="one-time-code"
-          maxLength={8}
-          value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-          placeholder="123456"
-          className="w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-center text-[1.25rem] tracking-[0.3em] text-graphite outline-none focus:border-accent/50"
-        />
-        <GentleButton
-          type="submit"
-          variant="primary"
-          size="md"
-          fullWidth
-          className="mt-3"
-          disabled={code.trim().length < 4 || phoneStatus === "verifying"}
-          aria-busy={phoneStatus === "verifying"}
-        >
-          {phoneStatus === "verifying" ? "Verifying…" : "Verify & sign in"}
-        </GentleButton>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <GentleButton
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={resendCode}
-            disabled={resendCooldown > 0 || resending}
-          >
-            {resending
-              ? "Sending…"
-              : resendCooldown > 0
-                ? `Resend code (${resendCooldown}s)`
-                : "Resend code"}
-          </GentleButton>
-          <GentleButton
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setPhoneStatus("idle");
-              setCode("");
-              setError(null);
-            }}
-          >
-            Use a different number
-          </GentleButton>
-        </div>
-        {error && (
-          <p role="alert" className="mt-3 text-caption text-rose-700">
-            {error}
-          </p>
-        )}
-      </form>
     );
   }
 
@@ -282,44 +141,6 @@ export function SignInMethods({
           aria-busy={emailStatus === "sending"}
         >
           {emailStatus === "sending" ? "Sending…" : "Send a sign-in link"}
-        </GentleButton>
-      </form>
-
-      <Divider />
-
-      {/* Phone OTP */}
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          void sendCode();
-        }}
-      >
-        <label
-          htmlFor="signin-phone"
-          className="mb-1.5 block text-caption text-ash"
-        >
-          Phone
-        </label>
-        <input
-          id="signin-phone"
-          type="tel"
-          enterKeyHint="send"
-          autoComplete="tel"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="+15551234567"
-          className="w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-body text-graphite outline-none focus:border-accent/50"
-        />
-        <GentleButton
-          type="submit"
-          variant="outline"
-          size="md"
-          fullWidth
-          className="mt-3"
-          disabled={!phone.trim() || phoneStatus === "sending"}
-          aria-busy={phoneStatus === "sending"}
-        >
-          {phoneStatus === "sending" ? "Sending…" : "Text me a code"}
         </GentleButton>
       </form>
 

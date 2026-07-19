@@ -17,7 +17,6 @@ import { questBySlug } from "@/data/seed/quests";
 import { seedMilestones } from "@/data/seed/milestones";
 import { getDailyVerse } from "./verse-engine";
 import {
-  activeQuestAssignments,
   FREE_QUEST_SLOTS,
   isQuestWindowOpen,
   normalizeAssignmentWindow,
@@ -1487,27 +1486,6 @@ export const useQuestOS = create<QuestOSState>()(
 // or zustand's getSnapshot loops. selectVerseRefreshCount is safe because it
 // returns a primitive.
 // ---------------------------------------------------------------------------
-
-// Shared empty array + tiny memo so rolling-window derivation stays stable for
-// Zustand. Components that display countdowns re-render once a minute/focus;
-// the minute key lets expiry fall out without mutating persisted history.
-const NO_PICKS: DailyQuestAssignment[] = [];
-let activePicksSource: Record<string, DailyQuestAssignment[]> | null = null;
-let activePicksMinute = -1;
-let activePicksResult: DailyQuestAssignment[] = NO_PICKS;
-
-/** Open 24-hour quest windows, in pick order. Stable reference — render-safe. */
-export function selectTodayPicks(s: QuestOSState): DailyQuestAssignment[] {
-  const minute = Math.floor(Date.now() / 60_000);
-  if (activePicksSource === s.assignments && activePicksMinute === minute) {
-    return activePicksResult;
-  }
-  activePicksSource = s.assignments;
-  activePicksMinute = minute;
-  activePicksResult = activeQuestAssignments(s.assignments);
-  if (activePicksResult.length === 0) activePicksResult = NO_PICKS;
-  return activePicksResult;
-}
 
 /** The candle. Stable reference — the stored object itself. */
 export function selectStreak(s: QuestOSState): StreakState {

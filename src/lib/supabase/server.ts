@@ -1,7 +1,7 @@
 /**
- * Supabase server client — scaffold for server components and route handlers.
+ * Supabase server client for auth callbacks, server components, and routes.
  * Uses the anon key with the user's cookie session; RLS enforces ownership.
- * See docs/SETUP.md and supabase/policies.sql.
+ * See docs/SETUP.md and supabase/migrations.
  */
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";

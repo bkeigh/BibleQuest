@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { EditorialSection, Eyebrow } from "@/components/design-system/EditorialSection";
 import { GentleLink } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
@@ -16,6 +17,10 @@ import { questBySlug, seedQuests } from "@/data/seed/quests";
 
 /* "Today's Verse" is date-derived — re-render hourly so it doesn't freeze at deploy. */
 export const revalidate = 3600;
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 const RHYTHM = [
   { sprite: "book", title: "Read", body: "One verse, chosen for today. Slow enough to actually land." },

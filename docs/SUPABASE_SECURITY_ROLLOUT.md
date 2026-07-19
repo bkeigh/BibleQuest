@@ -2,9 +2,11 @@
 
 This runbook covers the forward-only reconciliation migration
 `0008_reassert_rls_and_purge.sql` and the rolling quest/recent-verse migration
-`0010_rolling_quest_windows_and_recent_verses.sql`. It is deliberately
-local/staging-first. Do not run any linked or remote command until the project
-reference and exact command have been reviewed and explicitly approved.
+`0010_rolling_quest_windows_and_recent_verses.sql`, through the current Bible
+preference/bookmark migration `0011_bible_translation_preference.sql`. It is
+deliberately local/staging-first. Do not run any linked or remote command until
+the project reference and exact command have been reviewed and explicitly
+approved.
 
 ## Why the migration history can diverge
 
@@ -24,6 +26,7 @@ The repository timeline is:
 | 2026-07-16 | current change | Adds only `0008_reassert_rls_and_purge.sql`; existing migrations remain unchanged. |
 | 2026-07-16 | later local change | Adds `0009_analytics_consent_opt_in.sql` after the RLS reconciliation. |
 | 2026-07-17 | launch content/lifecycle pass | Adds `0010_rolling_quest_windows_and_recent_verses.sql`: rolling 24-hour quest timestamps, owner-only recent verses, an idempotent daily-passage key, and a complete purge definition. |
+| 2026-07-18 | Bible edition sync pass | Adds `0011_bible_translation_preference.sql`: account-backed Bible preference, bookmark translation key, and translation-aware bookmark uniqueness. |
 
 If a database recorded an old `0002`, `0003`, or `0004` before the renames,
 the later filenames do not change those recorded versions. Conversely, a
@@ -75,6 +78,7 @@ Expected migration order:
 0008_reassert_rls_and_purge.sql
 0009_analytics_consent_opt_in.sql
 0010_rolling_quest_windows_and_recent_verses.sql
+0011_bible_translation_preference.sql
 ```
 
 Evidence must show 27 existing tables with `rowsecurity = true`, only the
@@ -85,6 +89,10 @@ policy commands: anonymous content reads only, authenticated least privilege,
 and service-role administration. The report must also show the enabled
 `keep_newest_recent_verse` trigger and its fixed-search-path, security-invoker
 function with no direct anonymous or authenticated execute privilege.
+Verify that `user_settings.preferred_bible_translation` and
+`verse_bookmarks.translation_key` exist, and that
+`verse_bookmarks_passage_translation_key` is the active translation-aware
+unique index.
 
 ## Two-user negative tests
 
@@ -133,7 +141,7 @@ supabase migration list --linked
 
 Before the real push, save the `migration list` and dry-run output. The dry run
 must propose only the intended pending migration(s), including `0008` when it
-is not already present, and end in the current highest version (`0010`). If it
+is not already present, and end in the current highest version (`0011`). If it
 tries to replay renamed `0002`-`0006`, stop: do not use `--include-all` and do
 not repair history as a shortcut. After the push, run
 `supabase/evidence/rls_policy_report.sql` in the staging SQL editor, then execute
@@ -144,17 +152,24 @@ Keep staging under observation for at least one full test cycle. The production
 gate requires: clean local reset, matching staging migration list, clean
 evidence report, all negative tests passing, sync/purge passing, a current
 production backup/PITR decision, and a written approval of the exact production
-project reference and `supabase db push --linked --dry-run` output.
+project reference and `supabase db push --linked --dry-run` output. Reconcile
+the reviewed content seed only after this schema/RLS phase passes, using the
+separate procedure in [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md).
 
 ## Production rollout and rollback
 
 Production is a separate manual approval. Repeat the staging sequence against
 the confirmed production project: migration list, dry run, reviewed backup,
 approved push, migration list, evidence SQL, then limited smoke/negative tests.
-Do not seed production as part of this security migration.
+Keep this schema/RLS approval separate from the frozen idempotent content seed;
+follow [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md) only after the
+schema evidence passes, and verify content counts separately.
+Use the exact natural-key/content-hash manifest checks in
+[`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md); counts alone are not
+content parity.
 
 ```bash
-supabase link --project-ref <PRODUCTION_PROJECT_REF>
+supabase link --project-ref iacnjqnssovaaojswjoh
 supabase migration list --linked
 supabase db push --linked --dry-run
 # Stop here for review and explicit approval of this exact push.
@@ -162,8 +177,10 @@ supabase db push --linked
 supabase migration list --linked
 ```
 
-`0008` changes policies and a function but does not mutate application rows.
-Rollback is forward-only:
+`0008` changes policies and a function, `0010` backfills quest timestamps and
+deduplicates daily content before adding its unique key, and `0011` is additive
+apart from replacing bookmark uniqueness with a translation-aware index. The
+seed upserts reviewed public content. Rollback is forward-only:
 
 1. If the migration fails, its transaction rolls back; capture the error and do not alter history.
 2. If verification reveals a policy regression, stop application rollout and create a new, higher-numbered idempotent migration restoring the last known-safe policy/function definitions. Do not delete or edit `0008` after it has been applied.

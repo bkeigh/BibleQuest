@@ -1,11 +1,13 @@
-BibleQuest Codex v1.3 — Repo-Aware Launch Update
+BibleQuest Codex v1.4 — Production Recovery Update
 
-## v1.3 implementation update — July 17, 2026
+## v1.4 implementation update — July 19, 2026
 
 This section records the repository's current launch contract and supersedes
-older counts, the old "empty repository" description, and any earlier six-stage
-tree or single-day quest-cap language elsewhere in this document. The remainder
-of the Codex still governs brand, theology, safety, privacy, and product tone.
+older counts, the old "empty repository" description, legacy `BibleQuest.us`
+host references, unimplemented-library scaffolding claims, and any earlier
+six-stage tree or single-day quest-cap language elsewhere in this document. The
+remainder of the Codex still governs brand, theology, safety, privacy, and
+product tone. The production canonical host is `https://www.biblequest.co`.
 
 ### Current product inventory
 
@@ -70,21 +72,26 @@ of the Codex still governs brand, theology, safety, privacy, and product tone.
   carry `picked_at`, `expires_at`, and owner-only recent-verse history. A
   database trigger keeps same-passage timestamps monotonic so a stale device
   cannot overwrite the complete newer visit recorded by another device.
-- Apply `0010_rolling_quest_windows_and_recent_verses.sql` only through the
-  staged migration procedure, then load the regenerated idempotent
-  `supabase/seed.sql`. The seed mirrors 150 quests, 180 daily passages, and 38
+- Apply `0010_rolling_quest_windows_and_recent_verses.sql` and
+  `0011_bible_translation_preference.sql` only through the staged migration
+  procedure. Verify schema and RLS before a separate dry-run/review/application
+  of the regenerated idempotent `supabase/seed.sql`. The seed mirrors 150
+  quests, 180 daily passages, and 38
   milestones, updates existing reviewed rows by natural key, and preserves
   public-domain scripture snapshots. It also explicitly reactivates the
   canonical BibleQuest provider and launch content during a deliberate seed.
-- The repository is not currently linked to a hosted Supabase project and no
-  CLI access token is present. Therefore this update prepares and verifies the
-  Console payload but does not guess a production project or execute a remote
-  migration. Link and dry-run against staging first, retain the output, then
-  obtain explicit production approval as described in
-  `docs/SUPABASE_SECURITY_ROLLOUT.md`.
+- A July 19 read-only production probe found both migrations' expected schema
+  absent and the content mirror behind the checked-in catalogue. Follow
+  `docs/ACCOUNT_SYNC_RUNBOOK.md`: rehearse on staging, confirm the exact linked
+  project and backup, approve/apply the migration-only dry run, verify schema
+  and RLS, then separately approve the `--dry-run --include-seed` result with no
+  migrations pending. Never infer migration history from a column probe and
+  never reset a hosted project.
 
 ### Deployment gates still owned by the operator
 
+- Configure custom Supabase Auth SMTP, align its Site URL and callback with the
+  canonical `www` host, and pass cross-browser email-link tests.
 - Set and verify RevenueCat's live public configuration before selling Plus.
 - Set the server-only `STRIPE_DONATION_URL` to the intended
   `https://buy.stripe.com/...` Payment Link before enabling donations.

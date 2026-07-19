@@ -228,7 +228,11 @@ Storage. Cache Storage contains route shells and build assets, never user data.
 - [ ] Enable browser Do Not Track or Global Privacy Control and confirm analytics
       remains a silent no-op even with explicit in-app consent.
 
-## Known gaps (documented, not bugs)
+## Known launch postures
 
-- Account sync / notifications / payments / AI Guide are scaffolds.
-- Data is device-local until account sync is enabled.
+- Guest data is device-local. Account sync is implemented, but production must
+  pass migrations through `0011`, content reconciliation, custom auth-email,
+  and both-direction two-user checks in
+  [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md) before the beta gate opens.
+- Notification delivery and external AI generation are not implemented. Plus
+  stays coming-soon unless its complete provider and release gates pass.

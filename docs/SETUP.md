@@ -46,20 +46,35 @@ browser, and do not commit local keys.
    Supabase CLI. Do not run `supabase/policies.sql`; it is a compatibility
    pointer with no DDL. See
    [`SUPABASE_SECURITY_ROLLOUT.md`](SUPABASE_SECURITY_ROLLOUT.md) for the exact
-   local reset, migration-history checks, staging rollout, and rollback gates.
-   Seed separately with `supabase/seed.sql` only when intended (regenerate the
-   canonical launch payload with `node scripts/build-supabase-seed.mjs`).
+   local reset, migration-history checks, staging rollout, seed, and rollback
+   gates. For production recovery, first dry-run/apply migrations and verify
+   schema/RLS; only then run a separately reviewed `--dry-run --include-seed`
+   phase using [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md). Never reset
+   a hosted project. Regenerate the canonical launch payload with
+   `node scripts/build-supabase-seed.mjs` and require a clean seed diff before
+   freezing it.
 3. Copy your keys into `.env.local`:
    ```
    NEXT_PUBLIC_SUPABASE_URL=...
    NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-   SUPABASE_SERVICE_ROLE_KEY=...   # server-only, never client
    ```
-4. Configure Auth → URL configuration → add your local and production redirect
-   URLs (e.g. `http://localhost:3000/**`).
+   Do not copy a service-role key or direct database URL into the app's local
+   environment; no current application path consumes them.
+4. Configure Auth → URL configuration. Keep the local callback for development.
+   For production, set the Site URL to `https://www.biblequest.co` and allow the
+   exact callback URLs (including their encoded `next` values) listed in
+   [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md); do not use a broad
+   production wildcard.
 
 The app auto-creates a `profiles` row on signup via the `on_auth_user_created`
 trigger.
+
+After an approved hosted migration and seed, run the read-only compatibility
+probe. It is not a substitute for SMTP delivery or two-user RLS testing:
+
+```bash
+pnpm check:production-readiness
+```
 
 ### Verify RLS
 

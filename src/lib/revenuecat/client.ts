@@ -34,10 +34,6 @@ export function getRevenueCatAvailability(): RevenueCatAvailability {
   };
 }
 
-export function isRevenueCatConfigured(): boolean {
-  return runtimeConfiguration.configured;
-}
-
 export const REVENUECAT_ANONYMOUS_ID_KEY = "biblequest:rc-anon-id";
 
 type StorageAdapter = Pick<Storage, "getItem" | "setItem">;

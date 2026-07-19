@@ -326,10 +326,6 @@ export function translationPreferenceLabel(key: string): string {
   return normalized.startsWith("api:") ? "Connected translation" : "NIV";
 }
 
-export function isRemoteTranslationKey(key: string): boolean {
-  return key !== LOCAL_WEB_TRANSLATION_KEY;
-}
-
 /**
  * API.Bible text is intentionally transient. Bundled WEB and the reviewed
  * HelloAO open editions may be persisted, exported, and shared with their

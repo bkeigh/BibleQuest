@@ -9,6 +9,10 @@ alter table public.user_settings
 alter table public.verse_bookmarks
   add column if not exists translation_key text not null default 'web';
 
+-- App-first rollout is required: once the legacy four-column constraint is
+-- removed, an older cached client cannot use that retired conflict target.
+-- Verify the live and rollback bundles understand translation_key before this
+-- migration is applied, then include a full PWA close/relaunch in release QA.
 alter table public.verse_bookmarks
   drop constraint if exists verse_bookmarks_user_id_book_slug_chapter_verse_key;
 

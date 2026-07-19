@@ -1,11 +1,13 @@
 /**
- * Emit supabase/seed.sql from the same checked-in content the app ships.
+ * Emit supabase/seed.sql and its exact-content manifest from the same checked-in
+ * content the app ships.
  * Optional legacy seed-result input is supported for rebuilding the 84 core
  * records; the reviewed expansion, milestones, and WEB snapshots remain local.
  *
  * Run: node scripts/build-supabase-seed.mjs [seed-result.json]
  */
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 
 const root = process.cwd();
@@ -94,6 +96,24 @@ if (quests.length !== 150 || new Set(quests.map((quest) => quest.slug)).size !==
   throw new Error(`Console seed requires exactly 150 unique quests; found ${quests.length}`);
 }
 if (daily.length !== 180) throw new Error(`Console seed requires 180 daily verses; found ${daily.length}`);
+if (
+  milestones.length !== 38 ||
+  new Set(milestones.map((item) => item.key)).size !== 38
+) {
+  throw new Error(`Console seed requires exactly 38 unique milestones; found ${milestones.length}`);
+}
+if (
+  prayerPrompts.length !== 32 ||
+  new Set(prayerPrompts.map((item) => item.id ?? item.key)).size !== 32
+) {
+  throw new Error(`Console seed requires exactly 32 unique prayer prompts; found ${prayerPrompts.length}`);
+}
+if (
+  reflectionPrompts.length !== 32 ||
+  new Set(reflectionPrompts.map((item) => item.id ?? item.key)).size !== 32
+) {
+  throw new Error(`Console seed requires exactly 32 unique reflection prompts; found ${reflectionPrompts.length}`);
+}
 
 const bookMeta = JSON.parse(readFileSync(path.join(bibleDir, "books.json"), "utf8"));
 const byName = new Map(bookMeta.map((book) => [book.name.toLowerCase(), book]));
@@ -119,6 +139,120 @@ function exactWeb(reference) {
   if (!text || end > verses.length) throw new Error(`Missing WEB text: ${reference}`);
   return text;
 }
+
+function contentHash(record) {
+  return createHash("sha256").update(JSON.stringify(record)).digest("hex");
+}
+
+function manifestTable(fields, records, naturalKey) {
+  const entries = records.map((record) => [naturalKey(record), contentHash(record)]);
+  if (new Set(entries.map(([key]) => key)).size !== entries.length) {
+    throw new Error("Seed manifest natural keys must be unique");
+  }
+  const hashes = Object.fromEntries(
+    entries.sort(([left], [right]) => left.localeCompare(right)),
+  );
+  return { fields, hashes };
+}
+
+const questFields = [
+  "slug", "title", "category", "duration_minutes", "difficulty",
+  "energy_level", "solo_or_social", "indoor_or_outdoor", "invitation",
+  "why_it_matters", "scripture_reference", "scripture_text_snapshot",
+  "reflection_prompt", "prayer_prompt", "growth_type", "tags",
+  "season_tags", "tradition_tags", "sensitivity_tags", "is_premium",
+  "is_active", "review_status",
+];
+const questRecords = quests.map((item) => ({
+  slug: item.slug,
+  title: item.title,
+  category: item.category,
+  duration_minutes: item.durationMinutes,
+  difficulty: item.difficulty,
+  energy_level: item.energyLevel,
+  solo_or_social: item.soloOrSocial,
+  indoor_or_outdoor: item.indoorOrOutdoor,
+  invitation: item.invitation,
+  why_it_matters: item.whyItMatters,
+  scripture_reference: item.scriptureReference,
+  scripture_text_snapshot: exactWeb(item.scriptureReference),
+  reflection_prompt: item.reflectionPrompt,
+  prayer_prompt: item.prayerPrompt,
+  growth_type: item.growthType,
+  tags: item.tags,
+  season_tags: item.seasonTags,
+  tradition_tags: item.traditionTags,
+  sensitivity_tags: item.sensitivityTags,
+  is_premium: item.isPremium,
+  is_active: true,
+  review_status: "approved",
+}));
+
+const dailyFields = [
+  "reference", "book_slug", "chapter", "verse_start", "verse_end", "text",
+  "theme", "is_active",
+];
+const dailyRecords = daily.map((item) => ({
+  reference: item.reference,
+  book_slug: item.bookSlug,
+  chapter: item.chapter,
+  verse_start: item.verseStart,
+  verse_end: item.verseEnd,
+  text: item.text,
+  theme: item.theme,
+  is_active: true,
+}));
+
+const milestoneFields = [
+  "key", "title", "description", "milestone_type", "requirement_metric",
+  "requirement_count", "icon_key", "is_active",
+];
+const milestoneRecords = milestones.map((item) => ({
+  key: item.key,
+  title: item.title,
+  description: item.description,
+  milestone_type: item.milestoneType ?? item.milestone_type,
+  requirement_metric: item.requirementMetric ?? item.requirement_metric,
+  requirement_count: item.requirementCount ?? item.requirement_count,
+  icon_key: item.iconKey ?? item.icon_key,
+  is_active: true,
+}));
+
+const prayerFields = ["key", "text", "category", "is_active"];
+const prayerRecords = prayerPrompts.map((item) => ({
+  key: item.id ?? item.key,
+  text: item.text,
+  category: item.category,
+  is_active: true,
+}));
+
+const reflectionFields = ["key", "text", "context", "is_active"];
+const reflectionRecords = reflectionPrompts.map((item) => ({
+  key: item.id ?? item.key,
+  text: item.text,
+  context: item.context,
+  is_active: true,
+}));
+
+const manifest = {
+  version: 1,
+  algorithm: "sha256-json-v1",
+  tables: {
+    quest_templates: manifestTable(questFields, questRecords, (row) => row.slug),
+    daily_verses: manifestTable(
+      dailyFields,
+      dailyRecords,
+      (row) => `${row.book_slug}:${row.chapter}:${row.verse_start}:${row.verse_end}`,
+    ),
+    milestones: manifestTable(milestoneFields, milestoneRecords, (row) => row.key),
+    prayer_prompts: manifestTable(prayerFields, prayerRecords, (row) => row.key),
+    reflection_prompts: manifestTable(
+      reflectionFields,
+      reflectionRecords,
+      (row) => row.key,
+    ),
+  },
+};
 
 const sql = (value) => {
   if (value === null || value === undefined) return "null";
@@ -240,6 +374,10 @@ commit;
 `;
 
 writeFileSync(path.join(root, "supabase/seed.sql"), output);
+writeFileSync(
+  path.join(root, "supabase/seed-manifest.json"),
+  `${JSON.stringify(manifest, null, 2)}\n`,
+);
 console.log(
   `Wrote Console seed: ${quests.length} quests, ${daily.length} daily verses, ` +
   `${prayerPrompts.length} prayer prompts, ${reflectionPrompts.length} reflection prompts, ` +

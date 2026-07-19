@@ -94,24 +94,56 @@ const SYNCED_FIELDS: SyncedField[] = [
 const PUSH_DEBOUNCE_MS = 2_500;
 const RETRY_MS = 30_000;
 
+function mentionsSchemaIdentifier(message: string, identifier: string) {
+  const escaped = identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(
+    `(^|[^a-z0-9_])${escaped}(?![a-z0-9_])`,
+    "i",
+  ).test(message);
+}
+
 /**
- * Migration 0011 is intentionally deployed separately from the web bundle.
- * During that rolling window PostgREST can report either PostgreSQL's missing
- * column code or its own stale-schema-cache code. Only downgrade the two
- * additive Bible fields; every other sync error must still fail closed.
+ * Additive migrations are intentionally safe to roll out after a compatible
+ * web bundle. During that window PostgREST can report either PostgreSQL's
+ * missing-resource codes or its own schema-cache codes. Callers must still
+ * name the exact optional resource they support; every other sync error fails
+ * closed.
  */
-export function isMissingBibleSyncColumn(
-  error: unknown,
-  column: "preferred_bible_translation" | "translation_key",
-): boolean {
+function isMissingSyncColumn(error: unknown, column: string): boolean {
   if (!error || typeof error !== "object") return false;
   const candidate = error as { code?: unknown; message?: unknown };
   const code = typeof candidate.code === "string" ? candidate.code : "";
   const message =
     typeof candidate.message === "string" ? candidate.message.toLowerCase() : "";
   return (
-    message.includes(column) &&
+    mentionsSchemaIdentifier(message, column) &&
     (code === "42703" || code === "PGRST204")
+  );
+}
+
+export function isMissingBibleSyncColumn(
+  error: unknown,
+  column: "preferred_bible_translation" | "translation_key",
+): boolean {
+  return isMissingSyncColumn(error, column);
+}
+
+export function isMissingRecentVersesTable(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: unknown; message?: unknown };
+  const code = typeof candidate.code === "string" ? candidate.code : "";
+  const message =
+    typeof candidate.message === "string" ? candidate.message.toLowerCase() : "";
+  return (
+    mentionsSchemaIdentifier(message, "user_recent_verses") &&
+    (code === "42P01" || code === "PGRST205")
+  );
+}
+
+function isMissingQuestWindowColumn(error: unknown): boolean {
+  return (
+    isMissingSyncColumn(error, "picked_at") ||
+    isMissingSyncColumn(error, "expires_at")
   );
 }
 
@@ -443,14 +475,34 @@ async function pullAll(
     from("user_milestones"),
   ]);
 
+  // Recent-verse history was introduced in 0010 and is non-essential to the
+  // core journey restore. A pre-0010 database may omit only this table while a
+  // compatible client keeps the rest of the account usable. Permission,
+  // policy, query, and every other table error remain fatal.
+  const recentVersesUnavailable = isMissingRecentVersesTable(
+    recentVersesRes.error,
+  );
   const all = [
-    profileRes, settingsRes, notifRes, dailyRes, myQuestsRes, completionsRes,
-    prayersRes, reflectionsRes, bookmarksRes, readingRes, chaptersRes,
-    recentVersesRes,
-    journeyRes, growthRes, milestonesRes,
+    profileRes,
+    settingsRes,
+    notifRes,
+    dailyRes,
+    myQuestsRes,
+    completionsRes,
+    prayersRes,
+    reflectionsRes,
+    bookmarksRes,
+    readingRes,
+    chaptersRes,
+    journeyRes,
+    growthRes,
+    milestonesRes,
   ];
   for (const res of all) {
     if (res.error) throw res.error;
+  }
+  if (recentVersesRes.error && !recentVersesUnavailable) {
+    throw recentVersesRes.error;
   }
 
   const assignments: QuestOSSnapshot["assignments"] = {};
@@ -481,7 +533,9 @@ async function pullAll(
       ? rowToReadingPosition(readingRes.data)
       : null,
     chaptersRead: (chaptersRes.data ?? []).map(rowToChapterRead),
-    recentVerses: (recentVersesRes.data ?? []).map(rowToRecentVerse),
+    recentVerses: recentVersesUnavailable
+      ? undefined
+      : (recentVersesRes.data ?? []).map(rowToRecentVerse),
     journeyEvents: (journeyRes.data ?? []).map(rowToJourneyEvent),
     growthEvents: (growthRes.data ?? []).map(rowToGrowthEvent),
     earnedMilestones: (milestonesRes.data ?? []).map(rowToMilestone),
@@ -900,8 +954,28 @@ async function pushFields(
             .in("assigned_date", days);
           if (del.error) throw del.error;
           if (rows.length) {
-            const ins = await supabase.from("user_daily_quests").insert(rows);
-            if (ins.error) throw ins.error;
+            const current = await supabase
+              .from("user_daily_quests")
+              .insert(rows);
+            if (!current.error) return;
+            if (!isMissingQuestWindowColumn(current.error)) {
+              throw current.error;
+            }
+            // Pre-0010 compatibility. The old schema cannot preserve exact
+            // rolling-window timestamps, but all prior quest fields still
+            // sync. Once 0010 lands, the next successful push writes the
+            // authoritative local timestamps.
+            const legacyRows = rows.map(
+              ({ picked_at: _pickedAt, expires_at: _expiresAt, ...row }) => {
+                void _pickedAt;
+                void _expiresAt;
+                return row;
+              },
+            );
+            const legacy = await supabase
+              .from("user_daily_quests")
+              .insert(legacyRows);
+            if (legacy.error) throw legacy.error;
           }
         })()
       );
@@ -1047,7 +1121,10 @@ async function pushFields(
               "user_id,book_slug,chapter,verse_start,verse_end",
           }
         );
-        if (upsert.error) throw upsert.error;
+        if (upsert.error) {
+          if (isMissingRecentVersesTable(upsert.error)) return;
+          throw upsert.error;
+        }
 
         // The local/account merge keeps the newest twenty. Prune only rows
         // strictly older than that shared cutoff, so a concurrent newer visit

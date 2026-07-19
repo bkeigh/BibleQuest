@@ -21,7 +21,9 @@ free-text fields. There is no code path that sends journal text to analytics.
 
 When account sync is enabled, every user-owned table has RLS enabled with
 owner-only policies (`auth.uid() = user_id`). See
-[`0008_reassert_rls_and_purge.sql`](supabase/migrations/0008_reassert_rls_and_purge.sql).
+[`0008_reassert_rls_and_purge.sql`](supabase/migrations/0008_reassert_rls_and_purge.sql)
+and the current `0010`/`0011` account-sync migrations under
+[`supabase/migrations/`](supabase/migrations/).
 A user cannot read another user's prayers or reflections. Content tables are
 world-readable only for active/approved rows, and subscriptions have no client
 write policy.
@@ -128,11 +130,14 @@ CSP source allowances.
 - The Winterhill portfolio iframe exception is an exact, tested origin
   allowlist. Ownership, manual checks, and removal steps are documented in
   [`docs/EMBED_SECURITY.md`](docs/EMBED_SECURITY.md).
-- Server-side validation with Zod on mutations.
+- Server mutations use explicit allowlists, bounded values, and provider-shape
+  checks; keep validation next to the trust boundary.
 - Sanitize any user-generated text rendered as HTML (we render as plain text /
   `whitespace-pre-wrap`; no `dangerouslySetInnerHTML`).
 - Stripe webhooks (when enabled) must be signature-verified.
-- If Sentry is configured, scrub prayer/reflection fields before send.
+- Any future error-reporting provider must fail closed and prove that prayer,
+  reflection, note, verse, identity, and token data cannot leave the app before
+  it is enabled.
 
 ## Reporting a vulnerability
 

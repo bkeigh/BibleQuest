@@ -95,10 +95,6 @@ export function activeQuestAssignments(
   );
 }
 
-export function questSlotLimit(isPlus: boolean): number {
-  return isPlus ? Number.POSITIVE_INFINITY : FREE_QUEST_SLOTS;
-}
-
 export function questSlotsRemaining(
   assignments: Record<string, DailyQuestAssignment[]>,
   isPlus: boolean,

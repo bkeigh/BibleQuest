@@ -13,7 +13,7 @@ guest mode with analytics, payments, and Supabase integrations disabled.
 
 | Check | Commands | Policy |
 | --- | --- | --- |
-| `Quality` | `pnpm lint`, `git diff --check` over the event changes and working tree | Blocks lint and whitespace errors. |
+| `Quality` | `pnpm lint`, `pnpm check:seed`, `git diff --check` over the event changes and working tree | Blocks lint, stale generated Console content, and whitespace errors. |
 | `Types and tests` | `pnpm exec tsc --noEmit`, `pnpm test` | Blocks type errors and test failures. Tests run noninteractively. |
 | `Production build` | `pnpm build` | Blocks a guest-mode production build failure; times out after 20 minutes. |
 | `Dependency risk` | `pnpm audit --prod`, then `pnpm audit --prod --audit-level high` | Reports every production advisory. High and critical advisories block CI; moderate advisories stay visible for triage without blocking. |
@@ -44,3 +44,15 @@ should start an ephemeral local Supabase stack, apply every numbered migration
 from a clean database, run schema and RLS checks, and tear the stack down. It
 must never connect to a remote database or receive production credentials. Add
 that job as a required check only after it is deterministic and credential-free.
+
+Until then, the database owner must run the clean local reset, migration list,
+schema lint, and RLS evidence procedure in
+[`SUPABASE_SECURITY_ROLLOUT.md`](SUPABASE_SECURITY_ROLLOUT.md) at release
+freeze. After an approved production reconciliation, run
+`pnpm check:production-readiness`; it is a read-only compatibility probe, not
+proof of migration history, SMTP delivery, or cross-account isolation.
+
+The production probe intentionally stays out of pull-request CI: CI receives no
+production credentials, a transient provider incident must not block unrelated
+code review, and production state is a release gate rather than a source-code
+test. Record its sanitized pass/fail output in the restricted launch evidence.

@@ -26,7 +26,7 @@ const ithaca = localFont({
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL ?? "https://biblequest.co"
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://www.biblequest.co"
   ),
   title: {
     default: "BibleQuest — Scripture, prayer, and real-life quests",
