@@ -12,22 +12,10 @@ import {
   QUEST_STEP_KEYS,
   type MyQuest,
   type QuestChecklistItem,
-  type QuestStepKey,
   type QuestTemplate,
 } from "./types";
 
 export { QUEST_STEP_KEYS };
-
-/** Total steps in a quest walk. Constant today; a function so richer
- *  multi-part quests can vary it later without touching consumers. */
-export function questStepCount(): number {
-  return QUEST_STEP_KEYS.length;
-}
-
-/** Steps finished on the current walk, capped and de-duplicated. */
-export function stepsDoneCount(entry: Pick<MyQuest, "stepsDone">): number {
-  return new Set(entry.stepsDone).size;
-}
 
 /**
  * The explicitly required checklist for this quest. Generic walk steps are
@@ -50,17 +38,6 @@ export function isQuestChecklistComplete(
   if (!entry) return false;
   const done = new Set(entry.stepsDone);
   return checklist.every((item) => done.has(item.key));
-}
-
-/** The first movement not yet made, in canonical order. Null when done. */
-export function nextStep(
-  entry: Pick<MyQuest, "stepsDone">
-): QuestStepKey | null {
-  const done = new Set(entry.stepsDone);
-  for (const key of QUEST_STEP_KEYS) {
-    if (!done.has(key)) return key;
-  }
-  return null;
 }
 
 /** True once the walk has begun in any visible way. */

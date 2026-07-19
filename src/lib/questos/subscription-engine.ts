@@ -1,5 +1,5 @@
 /**
- * Subscription engine — scaffold only in V1.
+ * Subscription engine for the optional BibleQuest Plus supporter tier.
  *
  * NON-NEGOTIABLE (Codex, Volume V §4): the free tier is spiritually
  * complete. Nothing in this file may ever gate Bible reading, prayer,

@@ -8,27 +8,30 @@ template in [`../.env.example`](../.env.example).
 | `NEXT_PUBLIC_APP_URL` | Recommended | Canonical URL for metadata / OG. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Optional | Enables account sync. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Optional | Publishable client key (safe in browser). |
-| `SUPABASE_SERVICE_ROLE_KEY` | Optional | **Server-only.** Bypasses RLS — never expose to the client. |
-| `DATABASE_URL` | Optional | Direct Postgres connection for migrations/tooling. |
 | `NEXT_PUBLIC_ANALYTICS_ENABLED` | Optional | Must be exactly `true`; otherwise analytics is a silent no-op. |
 | `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | Optional | Plausible site domain. Required when analytics is enabled. |
 | `NEXT_PUBLIC_PLAUSIBLE_HOST` | Optional | HTTPS Plausible API origin; defaults to `https://plausible.io`. Paths, credentials, query strings, hashes, and HTTP are rejected. |
-| `SENTRY_DSN` | Optional | Error monitoring (scrub sensitive fields). |
 | `NEXT_PUBLIC_REVENUECAT_BILLING_MODE` | Recommended | `coming-soon` (default/off), `sandbox` (Test Store), or `live` (real billing after release gates). |
 | `NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY` | Optional | RevenueCat public key — Test Store (`test_…`) in dev, Web Billing (`rcb_…`) in prod. |
 | `NEXT_PUBLIC_REVENUECAT_PLUS_ENTITLEMENT` | Optional | Only if the entitlement is renamed in the RevenueCat dashboard. |
 | `STRIPE_DONATION_URL` | Optional | **Server-only.** Exact `https://buy.stripe.com/...` Payment Link used for one-time support through the validated same-origin redirect. |
 | `API_BIBLE_API_KEY` | Optional | **Server-only.** Enables the licensed API.Bible adapter. Not needed for reviewed Free Use Bible API editions. |
 | `API_BIBLE_COMMERCIALLY_LICENSED_BIBLE_IDS` | Optional | Comma-separated API.Bible IDs explicitly licensed for BibleQuest's commercial use. Catalogue visibility alone is not permission. |
-| `RESEND_API_KEY` | Optional | Lifecycle email (later). |
-| `ANTHROPIC_API_KEY` | Future | AI Guide (scaffold-only in V1). |
 
 ## Rules
 
 - The app must **run in development without any AI or payment keys**. It does.
-- `SUPABASE_SERVICE_ROLE_KEY` is server-only. If a build ever needs it in
-  `NEXT_PUBLIC_*`, that's a bug — see [`../SECURITY.md`](../SECURITY.md).
+- BibleQuest application builds do not consume a service-role key or direct
+  database URL. Keep those credentials out of `.env.local` and Vercel. If an
+  approved operator tool needs one temporarily, store it only in that tool's
+  secure credential mechanism; it must never use a `NEXT_PUBLIC_*` name. See
+  [`../SECURITY.md`](../SECURITY.md).
 - Never commit real values. Only `.env.example` (placeholders) is committed.
+- Supabase Auth email is provider-side configuration. Follow
+  [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md); do not add a
+  `RESEND_API_KEY` to Vercel or `.env.local` for SMTP. Lifecycle email, external
+  AI, and third-party error reporting get environment variables only when a
+  reviewed runtime integration exists.
 - A RevenueCat key alone never activates billing. The mode must match its
   documented public-key type; unknown modes, secret keys, and mismatches fail
   closed. Keep Vercel production on `coming-soon` until every gate in

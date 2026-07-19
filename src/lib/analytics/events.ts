@@ -29,7 +29,7 @@ type AccountContext =
   | "first_quest_completed"
   | "first_reflection"
   | "milestone_reached";
-type SignInMethod = "magic_link" | "phone_otp" | "google";
+type SignInMethod = "magic_link" | "google";
 type SignInSource = "account" | "onboarding";
 type SyncStatus = "initial" | "push";
 
@@ -153,7 +153,7 @@ const EVENT_RULES = {
     props: {
       method: {
         kind: "enum",
-        values: ["magic_link", "phone_otp", "google"],
+        values: ["magic_link", "google"],
       },
       source: { kind: "enum", values: ["account", "onboarding"] },
     },

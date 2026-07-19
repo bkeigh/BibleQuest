@@ -1,6 +1,8 @@
 # Deployment
 
-BibleQuest deploys to **Vercel** and installs as a PWA at BibleQuest.us.
+BibleQuest deploys to **Vercel** and installs as a PWA at
+`https://www.biblequest.co`. The apex redirects permanently to `www`; keep
+Supabase Auth and generated metadata on the same canonical host.
 
 For the July 31 production sequence, hard gates, named owners, evidence, and
 rollback procedure, execute [`LAUNCH_RUNBOOK.md`](LAUNCH_RUNBOOK.md).
@@ -11,7 +13,8 @@ rollback procedure, execute [`LAUNCH_RUNBOOK.md`](LAUNCH_RUNBOOK.md).
 2. Framework preset: **Next.js** (auto-detected). Build command `pnpm build`,
    install command `pnpm install`.
 3. Add environment variables (all optional for a guest-mode launch) — see
-   [`ENV.md`](ENV.md). Add `NEXT_PUBLIC_APP_URL=https://biblequest.co`.
+   [`ENV.md`](ENV.md). Add
+   `NEXT_PUBLIC_APP_URL=https://www.biblequest.co`.
 4. Deploy.
 
 Database changes use a separate staged, approval-gated process. Follow
@@ -24,7 +27,8 @@ linked migration command against production based only on this Vercel flow.
 
 ## Domain
 
-1. Add `biblequest.co` (and `www`) in Vercel → Domains.
+1. Add `biblequest.co` and `www.biblequest.co` in Vercel → Domains. Set
+   `www.biblequest.co` as canonical and redirect apex to it.
 2. Point DNS to Vercel per their instructions (A / CNAME).
 3. Confirm HTTPS is issued before sharing links.
 
@@ -56,8 +60,8 @@ After a production deploy, record the unmodified response headers for both a
 document and the worker (do not deploy from this checklist itself):
 
 ```bash
-curl --silent --show-error --dump-header - --output /dev/null https://biblequest.co/
-curl --silent --show-error --dump-header - --output /dev/null https://biblequest.co/sw.js
+curl --silent --show-error --dump-header - --output /dev/null https://www.biblequest.co/
+curl --silent --show-error --dump-header - --output /dev/null https://www.biblequest.co/sw.js
 ```
 
 Confirm the document has CSP and six-month HSTS, has no `X-Frame-Options`, and
@@ -98,11 +102,17 @@ needed — just don't remove that config.
 
 ## Manual founder checklist (before public launch)
 
-- [ ] Confirm the `biblequest.co` domain and DNS.
+- [ ] Confirm DNS/TLS for apex and `www`, the apex-to-`www` redirect, and that
+      `NEXT_PUBLIC_APP_URL`, canonical metadata, Open Graph URLs, Supabase Site
+      URL, and the exact Auth callback all use `https://www.biblequest.co`.
 - [ ] Rehearse the complete Supabase migration/RLS runbook on staging, review
       the production dry run, and obtain explicit approval before the database
       push (if enabling sync).
-- [ ] Configure analytics (privacy-first) and Sentry, if desired.
+- [ ] Complete [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md): apply
+      migrations through `0011` with the reviewed seed, configure custom SMTP,
+      and pass the production readiness and two-user isolation checks.
+- [ ] Configure privacy-first analytics if desired. Use Vercel logs and an
+      external uptime check until a privacy-reviewed error provider exists.
 - [ ] Keep RevenueCat in `coming-soon` unless every sandbox-to-production gate
       in [`REVENUECAT.md`](REVENUECAT.md) has evidence and explicit approval.
 - [ ] Keep the Free Use Bible API catalogue constrained to the reviewed

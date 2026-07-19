@@ -45,6 +45,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Lint
         run: pnpm lint
+      - name: Verify generated Console seed
+        run: pnpm check:seed
       - name: Check changed lines for whitespace errors
         run: |
           if [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then

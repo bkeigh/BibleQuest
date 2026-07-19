@@ -30,7 +30,7 @@ and unrecognized or oversized strings reject the whole event.
 | `reflection_started` | `source` | `quest` only |
 | `streak_milestone` | `count` | small integer, 1–365 |
 | `account_prompt_viewed`, `account_prompt_dismissed`, `account_prompt_accepted` | `context` | bounded account-prompt enum |
-| `sign_in_started` | `method`, `source` | method: `magic_link`, `phone_otp`, or `google`; source: `account` or `onboarding` |
+| `sign_in_started` | `method`, `source` | method: `magic_link` or `google`; source: `account` or `onboarding` |
 | `sync_completed` | `status` | `initial` only |
 | `sync_failed` | `status` | `initial` or `push` |
 
@@ -54,9 +54,9 @@ Sanitized example:
 
 ```json
 {
-  "domain": "biblequest.co",
+  "domain": "www.biblequest.co",
   "name": "sign_in_started",
-  "url": "https://biblequest.co/app/account",
+  "url": "https://www.biblequest.co/app/account",
   "props": {
     "method": "magic_link",
     "source": "account"

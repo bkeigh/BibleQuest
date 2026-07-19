@@ -21,6 +21,7 @@ vi.mock("@/lib/analytics/events", () => ({
 import {
   filterByTombstones,
   isMissingBibleSyncColumn,
+  isMissingRecentVersesTable,
   mergeSnapshots,
   retrySync,
   startSync,
@@ -51,6 +52,13 @@ function fakeClient(
     rows: unknown,
     options: unknown,
   ) => Promise<{ data: unknown; error: unknown }>,
+  onSelect?: (
+    table: string,
+  ) => Promise<{ data: unknown; error: unknown }>,
+  onInsert?: (
+    table: string,
+    rows: unknown,
+  ) => Promise<{ data: unknown; error: unknown }>,
 ): SupabaseClient {
   const ready = waitFor ?? Promise.resolve();
   const from = (table: string) => {
@@ -59,6 +67,7 @@ function fakeClient(
       eq: () => query,
       delete: () => query,
       in: async () => OK,
+      lt: async () => OK,
       match: async () => OK,
       maybeSingle: async () => {
         await ready;
@@ -66,11 +75,15 @@ function fakeClient(
       },
       upsert: async (rows: unknown, options?: unknown) =>
         onUpsert ? onUpsert(table, rows, options) : OK,
-      insert: async () => OK,
+      insert: async (rows: unknown) =>
+        onInsert ? onInsert(table, rows) : OK,
       then: (
-        resolve: (value: { data: unknown[]; error: null }) => unknown,
+        resolve: (value: { data: unknown; error: unknown }) => unknown,
         reject?: (reason: unknown) => unknown
-      ) => ready.then(() => ({ data: [], error: null })).then(resolve, reject),
+      ) =>
+        ready
+          .then(() => (onSelect ? onSelect(table) : { data: [], error: null }))
+          .then(resolve, reject),
     };
     return query;
   };
@@ -128,6 +141,150 @@ describe("sync ownership, lifecycle, and merge safety", () => {
         "translation_key",
       ),
     ).toBe(false);
+  });
+
+  it("recognizes only the exact additive recent-verse table as optional", () => {
+    expect(
+      isMissingRecentVersesTable({
+        code: "PGRST205",
+        message:
+          "Could not find the table 'public.user_recent_verses' in the schema cache",
+      }),
+    ).toBe(true);
+    expect(
+      isMissingRecentVersesTable({
+        code: "42P01",
+        message: 'relation "public.user_recent_verses" does not exist',
+      }),
+    ).toBe(true);
+    expect(
+      isMissingRecentVersesTable({
+        code: "42501",
+        message: "permission denied for table user_recent_verses",
+      }),
+    ).toBe(false);
+    expect(
+      isMissingRecentVersesTable({
+        code: "PGRST205",
+        message: "Could not find public.user_recent_verses_archive",
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps core sync available while the additive recent-verse table is absent", async () => {
+    const snapshot = currentSnapshot();
+    snapshot.recentVerses = [
+      {
+        bookSlug: "john",
+        bookName: "John",
+        chapter: 1,
+        verseStart: 1,
+        verseEnd: 1,
+        reference: "John 1:1",
+        text: "Fixture verse",
+        viewedAt: "2026-07-18T12:00:00.000Z",
+      },
+    ];
+    useQuestOS.getState().importData(snapshot);
+
+    const missingRecentVerses = {
+      data: null,
+      error: {
+        code: "PGRST205",
+        message:
+          "Could not find the table 'public.user_recent_verses' in the schema cache",
+      },
+    };
+    const attempts: string[] = [];
+    mocks.createClient.mockReturnValue(
+      fakeClient(
+        undefined,
+        async (table) => {
+          if (table !== "user_recent_verses") return OK;
+          attempts.push("push");
+          return missingRecentVerses;
+        },
+        async (table) => {
+          if (table !== "user_recent_verses") {
+            return { data: [], error: null };
+          }
+          attempts.push("pull");
+          return missingRecentVerses;
+        },
+      ),
+    );
+
+    await startSync("account-a");
+
+    expect(attempts).toEqual(["pull", "push"]);
+    expect(useSyncStatus.getState()).toMatchObject({
+      state: "idle",
+      initialSyncComplete: true,
+    });
+    expect(useQuestOS.getState().recentVerses).toEqual(snapshot.recentVerses);
+  });
+
+  it("retries daily-quest inserts without 0010 window columns", async () => {
+    useQuestOS.getState().importData(currentSnapshot());
+    const inserted: Array<Array<Record<string, unknown>>> = [];
+    mocks.createClient.mockReturnValue(
+      fakeClient(
+        undefined,
+        undefined,
+        undefined,
+        async (table, rows) => {
+          if (table !== "user_daily_quests") return OK;
+          const batch = rows as Array<Record<string, unknown>>;
+          inserted.push(batch);
+          if (inserted.length === 1) {
+            return {
+              data: null,
+              error: {
+                code: "PGRST204",
+                message:
+                  "Could not find the 'picked_at' column of 'user_daily_quests' in the schema cache",
+              },
+            };
+          }
+          return OK;
+        },
+      ),
+    );
+
+    await startSync("account-a");
+
+    expect(inserted).toHaveLength(2);
+    expect(inserted[0][0]).toMatchObject({
+      picked_at: "2026-07-16T12:00:00.000Z",
+      expires_at: "2026-07-17T12:00:00.000Z",
+    });
+    expect(inserted[1][0]).not.toHaveProperty("picked_at");
+    expect(inserted[1][0]).not.toHaveProperty("expires_at");
+    expect(useSyncStatus.getState().state).toBe("idle");
+  });
+
+  it("still fails closed when the recent-verse table returns a policy error", async () => {
+    mocks.createClient.mockReturnValue(
+      fakeClient(undefined, undefined, async (table) =>
+        table === "user_recent_verses"
+          ? {
+              data: null,
+              error: {
+                code: "42501",
+                message: "permission denied for table user_recent_verses",
+              },
+            }
+          : { data: [], error: null },
+      ),
+    );
+
+    await startSync("account-a");
+
+    expect(useSyncStatus.getState()).toMatchObject({
+      state: "error",
+      initialSyncComplete: false,
+    });
+    expect(getLastSyncedUserId()).toBeNull();
   });
 
   it("allows the same user to stop and restart sync", async () => {

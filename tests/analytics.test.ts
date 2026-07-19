@@ -194,6 +194,10 @@ describe("privacy-first analytics", () => {
     untypedTrack("streak_milestone", { count: 366 });
     untypedTrack("sync_completed", { status: "push" });
     untypedTrack("sign_in_started", {
+      method: "phone_otp",
+      source: "account",
+    });
+    untypedTrack("sign_in_started", {
       method: "x".repeat(100),
       source: "account",
     });

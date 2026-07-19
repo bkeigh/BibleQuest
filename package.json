@@ -16,6 +16,8 @@
     "test:headers": "NEXT_PUBLIC_SUPABASE_URL=https://header-fixture.supabase.co NEXT_PUBLIC_REVENUECAT_BILLING_MODE=live NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY=rcb_headerfixture pnpm build && pnpm test:headers:built",
     "test:headers:built": "node --test tests/security-headers.integration.test.mjs",
     "test:service-worker": "vitest run tests/service-worker.test.ts",
+    "check:seed": "node scripts/build-supabase-seed.mjs && git diff --exit-code -- supabase/seed.sql supabase/seed-manifest.json",
+    "check:production-readiness": "node --env-file-if-exists=.env.local scripts/check-production-readiness.mjs",
     "test:watch": "vitest"
   },
   "dependencies": {

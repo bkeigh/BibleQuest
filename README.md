@@ -44,8 +44,7 @@ Everything else is secondary.
 - Custom BibleQuest design system (shadcn/ui is *not* used as the visual identity)
 - **Framer Motion** for gentle motion; reduced-motion honored throughout
 - **Zustand** (+ persist) guest-mode store — local-first, private by default
-- **Supabase** (Postgres, Auth, RLS) — scaffolded for optional account sync
-- **Zod** + React Hook Form for validation
+- **Supabase** (Postgres, Auth, RLS) — optional, implemented account sync
 - PWA: web manifest, service worker (offline-capable), installable
 - Scripture: **World English Bible** (public domain) — full 66-book text
 
@@ -71,6 +70,8 @@ you're ready to wire up Supabase, analytics, or payments.
 | `pnpm start` | Serve the production build |
 | `pnpm lint` | ESLint |
 | `pnpm test` | Noninteractive unit tests |
+| `pnpm check:seed` | Regenerate and verify the canonical Console seed + exact-content manifest |
+| `pnpm check:production-readiness` | Read-only production schema, content, health/metadata, and auth-provider probe |
 | `node scripts/import-bible.mjs` | Re-import the WEB Bible → `src/data/bible/` |
 | `node scripts/build-seed.mjs <json>` | Rebuild typed seed content |
 | `node scripts/build-quest-expansion.mjs` | Rebuild the reviewed 66-quest expansion from local WEB text |
@@ -112,7 +113,7 @@ src/
     questos/            # domain engines + store (business logic lives here)
     bible/              # server-only chapter loader
     analytics/          # privacy-first event wrapper
-    supabase/           # client/server scaffolds
+    supabase/           # client/server auth and account-sync adapters
   data/
     bible/              # World English Bible JSON (server-loaded)
     seed/               # verified quests, prompts, milestones, daily verses
@@ -127,6 +128,7 @@ docs/                   # Codex + setup/deployment/security/content/QA guides
 - [`docs/CODEBASE_GUIDE.md`](docs/CODEBASE_GUIDE.md) — architecture map and change guide
 - [`docs/BIBLEQUEST_CODEX.md`](docs/BIBLEQUEST_CODEX.md) — the source of truth
 - [`docs/SETUP.md`](docs/SETUP.md) — Supabase, auth, migrations, seeding
+- [`docs/ACCOUNT_SYNC_RUNBOOK.md`](docs/ACCOUNT_SYNC_RUNBOOK.md) — production sync, SMTP, auth-link, schema, and content recovery
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Vercel + domain
 - [`docs/ENV.md`](docs/ENV.md) — environment variables
 - [`docs/REVENUECAT.md`](docs/REVENUECAT.md) — Plus identity, sandbox QA, and production gates
@@ -139,12 +141,17 @@ docs/                   # Codex + setup/deployment/security/content/QA guides
 
 ## Known limitations (V1)
 
-- Guest mode is complete. Account sync, notification delivery, and external
-  quest-generation providers remain opt-in deployment integrations.
+- Guest mode and account sync are implemented. Account sync must stay a
+  controlled beta capability until the production schema, content mirror,
+  custom auth email, and two-user isolation gates in the recovery runbook pass.
+- Notification delivery and external quest-generation providers are not
+  enabled for V1.
 - Plus billing uses RevenueCat configuration. One-time support uses a validated
   server-side Stripe Payment Link and stays unavailable until
   `STRIPE_DONATION_URL` is configured for the deployment.
-- Data lives in the browser (localStorage). Export/clear is in Settings.
+- Guest data lives in the browser (`localStorage`). After an explicit account
+  connection, supported journey data also syncs to the user's RLS-protected
+  Supabase rows. Export/clear controls are in Settings.
 - The World English Bible is bundled offline. Reviewed public-domain editions
   are fetched server-side from the keyless
   [Free Use Bible API](https://bible.helloao.org/docs/guide/) and fall back to
