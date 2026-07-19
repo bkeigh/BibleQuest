@@ -22,12 +22,12 @@ const UI_ROOT = path.resolve(
 );
 const SIZE = 128;
 const LOGICAL_SIZE = 32;
-const MASCOT_LOGICAL_SIZE = 64;
+const MASCOT_LOGICAL_SIZE = 128;
 const CANDLE_LOGICAL_SIZE = 16;
-const MASCOT_SOURCE = "mascot-atlas-black-source.png";
+const MASCOT_SOURCE = "mascot-atlas-rich-black-source.png";
 
-// The canonical BibleQuest palette. Every production sprite is written as an
-// indexed PNG using only these colors plus one fully transparent entry.
+// The canonical BibleQuest palette for small sprites, candles, and trees.
+// Native-resolution mascots retain reviewed source-faithful indexed palettes.
 const PALETTE = [
   [0x10, 0x2b, 0x21], // legacy outline-mapping anchor; flattened before export
   [0x00, 0x00, 0x00], // exact production outline
@@ -127,25 +127,6 @@ const ALLOWED = {
   mascot: materialSet("outline", "green", "leather", "gold", "parchment", "blue", "skin", "warm"),
   trees: materialSet("outline", "green", "leather", "gold", "parchment"),
   candles: materialSet("outline", "leather", "gold", "parchment", "warm"),
-};
-
-// Mascots deliberately use smaller subject-specific ramps than the general
-// catalogue. This prevents a parchment highlight from becoming a green fleck
-// (or vice versa) and keeps the large onboarding art calm at native size.
-const mascotMaterialSet = (...names) => [
-  1, // one true-black contour; greens are reserved for subject interiors
-  ...materialSet(...names.filter((name) => name !== "outline")),
-];
-
-const MASCOT_ALLOWED = {
-  "mascot-lamb": mascotMaterialSet("parchment", "leather", "skin"),
-  "mascot-lantern": mascotMaterialSet("leather", "gold", "parchment", "warm"),
-  "mascot-scroll": mascotMaterialSet("leather", "gold", "parchment", "green"),
-  "mascot-dove": mascotMaterialSet("parchment", "gold", "green"),
-  "mascot-sprout": mascotMaterialSet("green", "leather", "gold"),
-  "mascot-key": mascotMaterialSet("gold", "leather"),
-  "mascot-map": mascotMaterialSet("leather", "gold", "parchment", "green"),
-  "mascot-campfire": mascotMaterialSet("leather", "gold", "warm"),
 };
 
 const SMALL_SPRITES = [
@@ -265,6 +246,15 @@ function mapToAllowed(buffer, allowed) {
     buffer[offset + 3] = 255;
   }
   return buffer;
+}
+
+async function quantizeAdaptive(buffer, width, height, colors = 31) {
+  const indexed = await sharp(buffer, {
+    raw: { width, height, channels: 4 },
+  })
+    .png({ palette: true, colours: colors, dither: 0, effort: 10 })
+    .toBuffer();
+  return sharp(indexed).ensureAlpha().raw().toBuffer();
 }
 
 async function magentaToAlpha(input) {
@@ -519,49 +509,6 @@ async function fitLogicalRaw(
     .toBuffer();
 }
 
-function removeIsolatedColorSpecks(buffer, width, height) {
-  const outlineColors = new Set(MATERIAL.outline.map((index) => PALETTE[index].join(",")));
-  const colorAt = (point) => {
-    const offset = point * 4;
-    return buffer[offset + 3] === 0
-      ? null
-      : `${buffer[offset]},${buffer[offset + 1]},${buffer[offset + 2]}`;
-  };
-
-  // Two conservative passes remove salt-and-pepper highlights while keeping
-  // outline pixels, eyes, route lines, flame tips, and transparent contours.
-  for (let pass = 0; pass < 2; pass += 1) {
-    const replacements = [];
-    for (let y = 1; y < height - 1; y += 1) {
-      for (let x = 1; x < width - 1; x += 1) {
-        const point = y * width + x;
-        const color = colorAt(point);
-        if (!color || outlineColors.has(color)) continue;
-        const neighbors = [point - 1, point + 1, point - width, point + width]
-          .map(colorAt)
-          .filter(Boolean);
-        if (neighbors.length !== 4 || neighbors.includes(color)) continue;
-        const counts = new Map();
-        for (const neighbor of neighbors) {
-          counts.set(neighbor, (counts.get(neighbor) ?? 0) + 1);
-        }
-        const [replacement, count] = [...counts.entries()].sort(
-          (a, b) => b[1] - a[1]
-        )[0] ?? [];
-        if (replacement && count >= 3) replacements.push([point, replacement]);
-      }
-    }
-    for (const [point, replacement] of replacements) {
-      const offset = point * 4;
-      const [r, g, b] = replacement.split(",").map(Number);
-      buffer[offset] = r;
-      buffer[offset + 1] = g;
-      buffer[offset + 2] = b;
-    }
-  }
-  return buffer;
-}
-
 function keepLargestOpaqueComponent(buffer, width, height) {
   const visited = new Uint8Array(width * height);
   const components = [];
@@ -713,14 +660,13 @@ function removeInteriorColorSpecks(buffer, width, height) {
   return buffer;
 }
 
-async function normalizeStrictMascot(source, name, alignment) {
+async function normalizeStrictMascot(source, alignment) {
   let logical = await fitLogicalRaw(source, {
     logicalSize: MASCOT_LOGICAL_SIZE,
-    maxVisible: 56,
+    maxVisible: 112,
     alignment,
-    bottom: 60,
+    bottom: 120,
   });
-  logical = mapToAllowed(logical, MASCOT_ALLOWED[name]);
   logical = removeSmallComponents(
     logical,
     MASCOT_LOGICAL_SIZE,
@@ -732,17 +678,12 @@ async function normalizeStrictMascot(source, name, alignment) {
     MASCOT_LOGICAL_SIZE,
     MASCOT_LOGICAL_SIZE
   );
+  logical = await quantizeAdaptive(
+    logical,
+    MASCOT_LOGICAL_SIZE,
+    MASCOT_LOGICAL_SIZE
+  );
   logical = applyBlackContour(
-    logical,
-    MASCOT_LOGICAL_SIZE,
-    MASCOT_LOGICAL_SIZE
-  );
-  logical = removeIsolatedColorSpecks(
-    logical,
-    MASCOT_LOGICAL_SIZE,
-    MASCOT_LOGICAL_SIZE
-  );
-  logical = removeInteriorColorSpecks(
     logical,
     MASCOT_LOGICAL_SIZE,
     MASCOT_LOGICAL_SIZE
@@ -817,7 +758,12 @@ async function writeProduction(name, buffer) {
   const file = `${name}.png`;
   const strict = await strictifyProductionBuffer(name, buffer);
   await fs.mkdir(PRODUCTION_ROOT, { recursive: true });
-  await writeIndexed(strict, SIZE, SIZE, path.join(PRODUCTION_ROOT, file));
+  const output = path.join(PRODUCTION_ROOT, file);
+  if (MASCOTS.includes(name)) {
+    await writeAdaptiveIndexed(strict, SIZE, SIZE, output);
+  } else {
+    await writeIndexed(strict, SIZE, SIZE, output);
+  }
 }
 
 async function processSmallSprites() {
@@ -987,7 +933,7 @@ async function processMascots() {
     const name = MASCOTS[index];
     const alignment = name === "mascot-dove" || name === "mascot-key" ? "center" : "bottom";
     const cell = await extractCell(source, 3, 3, index);
-    const frame = await normalizeStrictMascot(cell, name, alignment);
+    const frame = await normalizeStrictMascot(cell, alignment);
     await writeProduction(name, frame);
   }
 }
@@ -1019,6 +965,51 @@ async function writeIndexed(buffer, width, height, output) {
     pngChunk("IHDR", ihdr),
     pngChunk("PLTE", Buffer.from(palette.flat())),
     pngChunk("tRNS", Buffer.from([0, ...PALETTE.map(() => 255)])),
+    pngChunk("IDAT", deflateSync(scanlines, { level: 9 })),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
+  await fs.mkdir(path.dirname(output), { recursive: true });
+  await fs.writeFile(output, png);
+}
+
+async function writeAdaptiveIndexed(buffer, width, height, output) {
+  const colors = [];
+  const lookup = new Map();
+  for (let offset = 0; offset < buffer.length; offset += 4) {
+    if (buffer[offset + 3] === 0) continue;
+    const key = `${buffer[offset]},${buffer[offset + 1]},${buffer[offset + 2]}`;
+    if (lookup.has(key)) continue;
+    lookup.set(key, colors.length + 1);
+    colors.push([buffer[offset], buffer[offset + 1], buffer[offset + 2]]);
+  }
+  if (colors.length > 255) {
+    throw new Error(`${output}: adaptive palette exceeds 255 opaque colors`);
+  }
+
+  const palette = [[0, 0, 0], ...colors];
+  const scanlines = Buffer.alloc((width + 1) * height);
+  for (let y = 0; y < height; y += 1) {
+    const row = y * (width + 1);
+    scanlines[row] = 0;
+    for (let x = 0; x < width; x += 1) {
+      const source = (y * width + x) * 4;
+      if (buffer[source + 3] === 0) continue;
+      const key = `${buffer[source]},${buffer[source + 1]},${buffer[source + 2]}`;
+      scanlines[row + x + 1] = lookup.get(key);
+    }
+  }
+
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 3;
+  const png = Buffer.concat([
+    signature,
+    pngChunk("IHDR", ihdr),
+    pngChunk("PLTE", Buffer.from(palette.flat())),
+    pngChunk("tRNS", Buffer.from([0, ...colors.map(() => 255)])),
     pngChunk("IDAT", deflateSync(scanlines, { level: 9 })),
     pngChunk("IEND", Buffer.alloc(0)),
   ]);
@@ -1081,11 +1072,15 @@ async function physicalQa() {
   const hashes = new Set();
   for (const file of files) {
     const full = path.join(PRODUCTION_ROOT, file);
+    const name = file.slice(0, -4);
+    const usesAdaptivePalette = MASCOTS.includes(name);
     const { data, info } = await sharp(full).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
     if (info.width !== SIZE || info.height !== SIZE) throw new Error(`${file}: expected 128x128`);
     let opaque = 0;
     let blackPixels = 0;
     let legacyOutlinePixels = 0;
+    let contourPixels = 0;
+    let nonBlackContourPixels = 0;
     let parchmentPixels = 0;
     for (let y = 0; y < SIZE; y += 1) {
       for (let x = 0; x < SIZE; x += 1) {
@@ -1098,8 +1093,30 @@ async function physicalQa() {
         if (alpha) {
           opaque += 1;
           const color = `${data[offset]},${data[offset + 1]},${data[offset + 2]}`;
-          if (!paletteSet.has(color)) throw new Error(`${file}: color outside master palette: ${color}`);
+          if (!usesAdaptivePalette && !paletteSet.has(color)) {
+            throw new Error(`${file}: color outside master palette: ${color}`);
+          }
           if (color === PALETTE[1].join(",")) blackPixels += 1;
+          const isContour = [
+            [x - 1, y],
+            [x + 1, y],
+            [x, y - 1],
+            [x, y + 1],
+          ].some(([neighborX, neighborY]) => {
+            if (
+              neighborX < 0 ||
+              neighborY < 0 ||
+              neighborX >= SIZE ||
+              neighborY >= SIZE
+            ) {
+              return true;
+            }
+            return data[(neighborY * SIZE + neighborX) * 4 + 3] === 0;
+          });
+          if (isContour) {
+            contourPixels += 1;
+            if (color !== PALETTE[1].join(",")) nonBlackContourPixels += 1;
+          }
           if (color === PALETTE[0].join(",")) legacyOutlinePixels += 1;
           if (parchmentSet.has(color)) parchmentPixels += 1;
         }
@@ -1107,10 +1124,17 @@ async function physicalQa() {
     }
     if (opaque === 0) throw new Error(`${file}: empty sprite`);
     if (blackPixels === 0) throw new Error(`${file}: missing exact-black outline`);
+    if (
+      contourPixels === 0 ||
+      (usesAdaptivePalette && nonBlackContourPixels !== 0)
+    ) {
+      throw new Error(
+        `${file}: exterior contour contains ${nonBlackContourPixels} non-black pixels`
+      );
+    }
     if (legacyOutlinePixels !== 0) {
       throw new Error(`${file}: retained ${legacyOutlinePixels} legacy green outline pixels`);
     }
-    const name = file.slice(0, -4);
     const logicalSize = MASCOTS.includes(name)
       ? MASCOT_LOGICAL_SIZE
       : CANDLES.includes(name)

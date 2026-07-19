@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "project": "BibleQuest",
   "status": "required production contract",
   "totalFiles": 63,
@@ -14,7 +14,7 @@
   "pipeline": {
     "sourceArt": "Reference-conditioned ImageGen staging using the approved PixelArtReferenceSheet and UI subject anchors",
     "promotionRule": "Never place unreviewed generated output directly in public/pixel",
-    "normalization": "Deterministic reconstruction onto one uniform 128x128 physical canvas, fixed palette, binary alpha, transparent padding, and nearest-neighbor scaling",
+    "normalization": "Deterministic reconstruction onto one uniform 128x128 physical canvas, capped indexed palettes, binary alpha, transparent padding, and nearest-neighbor scaling",
     "runtimeGeneration": false,
     "buildCredentialRequired": false
   },
@@ -28,7 +28,7 @@
     "lightDirection": "upper-left",
     "background": "transparent with clear corners and safe padding",
     "text": "no readable text or letter-like noise inside sprites",
-    "palette": "only the canonical BibleQuest palette shared by process-production-128.mjs and scripts/process-pixel-sprites.mjs",
+    "palette": "canonical shared ramps for small sprites, candles, and trees; reviewed source-faithful adaptive palettes for native-resolution mascots",
     "opaqueColorBudgets": {
       "smallAndCandlesDefault": 22,
       "treesDefault": 28,
@@ -49,6 +49,7 @@
       "count": 30,
       "physicalPixels": { "width": 128, "height": 128 },
       "logicalGrid": { "columns": 32, "rows": 32 },
+      "nativeArtGrid": { "columns": 32, "rows": 32 },
       "cellScale": 0.2,
       "files": [
         "bird.png",
@@ -88,6 +89,7 @@
       "count": 5,
       "physicalPixels": { "width": 128, "height": 128 },
       "logicalGrid": { "columns": 16, "rows": 16 },
+      "nativeArtGrid": { "columns": 16, "rows": 16 },
       "cellScale": 0.75,
       "files": [
         "candle-unlit.png",
@@ -103,6 +105,7 @@
       "count": 20,
       "physicalPixels": { "width": 128, "height": 128 },
       "logicalGrid": { "columns": 32, "rows": 32 },
+      "nativeArtGrid": { "columns": 32, "rows": 32 },
       "cellScale": 1,
       "filePattern": "tree-stage-{0..19}.png",
       "orderedStages": [
@@ -133,7 +136,8 @@
       "id": "feature-mascots",
       "count": 8,
       "physicalPixels": { "width": 128, "height": 128 },
-      "logicalGrid": { "columns": 64, "rows": 64 },
+      "logicalGrid": { "columns": 32, "rows": 32 },
+      "nativeArtGrid": { "columns": 128, "rows": 128 },
       "cellScale": 0.625,
       "files": [
         "mascot-campfire.png",

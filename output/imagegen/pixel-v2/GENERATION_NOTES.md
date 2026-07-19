@@ -14,17 +14,16 @@ second strict-block reference. The untouched generated atlas is
 `sources/mascot-atlas-strict-source.png`; its complete prompt is preserved in
 `sources/mascot-atlas-strict-prompt.txt`.
 
-The production processor reconstructs these mascots on a 64×64 logical art
-grid and then scales each logical pixel exactly 2× with nearest-neighbor
-sampling onto the required 128×128 canvas. The black-outline refinement is
-preserved as `sources/mascot-atlas-black-source.png`, with its prompt in
-`sources/mascot-atlas-black-prompt.txt`.
+The production processor now retains the full 128×128 native mascot art grid;
+there is no lower-resolution intermediary. The reference-preserving black
+outline refinement is stored as `sources/mascot-atlas-rich-black-source.png`,
+with its complete edit prompt in `sources/mascot-atlas-rich-black-prompt.txt`.
 
 The final catalogue pass applies exact-black (`#000000`) contours and snaps all
-63 files to their declared logical grids. Mascots use uniform 2×2 physical
-blocks, small sprites and trees use uniform 4×4 blocks, and candles use uniform
-8×8 blocks. Expanded subject-specific shade ramps, connected-component cleanup,
-and a conservative interior-speck pass run before export. PixelLab upload copies live in
+63 files to their declared native art grids. Mascots retain native one-pixel
+detail with source-faithful capped palettes; small sprites and trees use uniform
+4×4 blocks; and candles use uniform 8×8 blocks. Connected-component cleanup
+runs before export. PixelLab upload copies live in
 `pixellab-ready/mascots/`.
 
 ## References
@@ -119,7 +118,8 @@ deterministically.
 
 - 63/63 distinct indexed PNGs at exactly 128×128
 - binary alpha only, fully transparent outer borders, and 5–25 colors per file
-- every opaque color belongs to the shared 48-color BibleQuest palette
+- small sprites, trees, and candles use the shared 48-color BibleQuest palette;
+  mascots use reviewed source-faithful 15–16 color palettes
 - the guarded installer makes `production-128/` and `public/pixel/`
   byte-identical after review
 - all twenty tree stages, five candle states, and eight mascots remain distinct

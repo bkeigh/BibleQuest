@@ -24,6 +24,9 @@ export type PixelAsset =
       /** Divisor-compatible logical layout grid, independent of source pixels. */
       cols: number;
       rows: number;
+      /** Native authored pixel grid used for physical flat-block QA. */
+      artCols: number;
+      artRows: number;
       /** Intrinsic file dimensions used by the browser before CSS layout. */
       nativeWidth: number;
       nativeHeight: number;
@@ -479,12 +482,16 @@ const pixelPng = (
   cols: number,
   rows: number,
   cellScale?: number,
-  ambientClassName?: string
+  ambientClassName?: string,
+  artCols = cols,
+  artRows = rows
 ): PixelAsset => ({
   kind: "png",
   src,
   cols,
   rows,
+  artCols,
+  artRows,
   nativeWidth: PRODUCTION_PIXEL_NATIVE_SIZE,
   nativeHeight: PRODUCTION_PIXEL_NATIVE_SIZE,
   ...(cellScale == null ? {} : { cellScale }),
@@ -713,14 +720,14 @@ const GRID_PIXEL_MASCOTS = defineAssets({
 });
 
 const PRODUCTION_PNG_MASCOTS = defineAssets({
-  lamb: pixelPng("/pixel/mascot-lamb.png", 64, 64, 0.625),
-  lantern: pixelPng("/pixel/mascot-lantern.png", 64, 64, 0.625, "[animation:var(--animate-flicker)]"),
-  scroll: pixelPng("/pixel/mascot-scroll.png", 64, 64, 0.625),
-  dove: pixelPng("/pixel/mascot-dove.png", 64, 64, 0.625),
-  sprout: pixelPng("/pixel/mascot-sprout.png", 64, 64, 0.625),
-  key: pixelPng("/pixel/mascot-key.png", 64, 64, 0.625),
-  map: pixelPng("/pixel/mascot-map.png", 64, 64, 0.625),
-  campfire: pixelPng("/pixel/mascot-campfire.png", 64, 64, 0.625, "[animation:var(--animate-flicker)]"),
+  lamb: pixelPng("/pixel/mascot-lamb.png", 32, 32, 0.625, undefined, 128, 128),
+  lantern: pixelPng("/pixel/mascot-lantern.png", 32, 32, 0.625, "[animation:var(--animate-flicker)]", 128, 128),
+  scroll: pixelPng("/pixel/mascot-scroll.png", 32, 32, 0.625, undefined, 128, 128),
+  dove: pixelPng("/pixel/mascot-dove.png", 32, 32, 0.625, undefined, 128, 128),
+  sprout: pixelPng("/pixel/mascot-sprout.png", 32, 32, 0.625, undefined, 128, 128),
+  key: pixelPng("/pixel/mascot-key.png", 32, 32, 0.625, undefined, 128, 128),
+  map: pixelPng("/pixel/mascot-map.png", 32, 32, 0.625, undefined, 128, 128),
+  campfire: pixelPng("/pixel/mascot-campfire.png", 32, 32, 0.625, "[animation:var(--animate-flicker)]", 128, 128),
 });
 
 export const PIXEL_MASCOTS = defineAssets({

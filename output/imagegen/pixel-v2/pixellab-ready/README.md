@@ -12,15 +12,15 @@ family. Each file is:
 
 - exactly 128×128 pixels;
 - transparent outside the subject;
-- built on a 64×64 logical art grid, with every logical pixel exported as one
-  uniform 2×2 block;
-- limited to the approved BibleQuest palette;
+- built directly on the full 128×128 native art grid with no resolution
+  bottleneck;
+- limited to a reviewed source-faithful indexed palette;
 - outlined with one exact-black (`#000000`) contour;
 - free of disconnected fragments and partial-alpha edge pixels.
 
-Every file in `catalogue/` follows the same contract. Mascots use uniform 2×2
-physical blocks; small sprites and trees use uniform 4×4 blocks. The candle
-sequence uses uniform 8×8 physical blocks.
+Every file in `catalogue/` follows the same artifact-free indexed-color
+contract. Mascots retain native one-pixel detail; small sprites and trees use
+uniform 4×4 blocks. The candle sequence uses uniform 8×8 physical blocks.
 
 For onboarding, animate `mascot-map`, `mascot-scroll`, `mascot-lantern`,
 `mascot-campfire`, `mascot-dove`, and `mascot-sprout`. `mascot-lamb` and
