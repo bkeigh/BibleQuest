@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 5,
   "project": "BibleQuest",
   "status": "required production contract",
   "totalFiles": 63,
@@ -14,7 +14,7 @@
   "pipeline": {
     "sourceArt": "Reference-conditioned ImageGen staging using the approved PixelArtReferenceSheet and UI subject anchors",
     "promotionRule": "Never place unreviewed generated output directly in public/pixel",
-    "normalization": "Deterministic reconstruction onto one uniform 128x128 physical canvas, fixed palette, binary alpha, transparent padding, and nearest-neighbor scaling",
+    "normalization": "Deterministic reconstruction on one native 128x128 art grid, source-faithful capped indexed palettes, binary alpha, transparent padding, and nearest-neighbor-only source fitting",
     "runtimeGeneration": false,
     "buildCredentialRequired": false
   },
@@ -24,23 +24,16 @@
     "alphaValues": [0, 255],
     "dithering": false,
     "antialiasing": false,
-    "outline": "one continuous dark-evergreen pixel outline",
+    "outline": "one continuous exact-black (#000000) pixel outline",
     "lightDirection": "upper-left",
     "background": "transparent with clear corners and safe padding",
     "text": "no readable text or letter-like noise inside sprites",
-    "palette": "only the canonical BibleQuest palette shared by process-production-128.mjs and scripts/process-pixel-sprites.mjs",
+    "palette": "reviewed source-faithful adaptive palettes capped at 32 opaque colors for every sprite",
     "opaqueColorBudgets": {
-      "smallAndCandlesDefault": 16,
-      "treesDefault": 24,
-      "mascotsDefault": 20,
-      "reviewedPerFileExceptions": {
-        "chapel.png": 20,
-        "fountain.png": 18,
-        "people.png": 24,
-        "mascot-dove.png": 24,
-        "mascot-map.png": 24,
-        "mascot-scroll.png": 24
-      }
+      "smallAndCandlesDefault": 32,
+      "treesDefault": 32,
+      "mascotsDefault": 32,
+      "reviewedPerFileExceptions": {}
     }
   },
   "families": [
@@ -49,6 +42,7 @@
       "count": 30,
       "physicalPixels": { "width": 128, "height": 128 },
       "logicalGrid": { "columns": 32, "rows": 32 },
+      "nativeArtGrid": { "columns": 128, "rows": 128 },
       "cellScale": 0.2,
       "files": [
         "bird.png",
@@ -88,6 +82,7 @@
       "count": 5,
       "physicalPixels": { "width": 128, "height": 128 },
       "logicalGrid": { "columns": 16, "rows": 16 },
+      "nativeArtGrid": { "columns": 128, "rows": 128 },
       "cellScale": 0.75,
       "files": [
         "candle-unlit.png",
@@ -103,6 +98,7 @@
       "count": 20,
       "physicalPixels": { "width": 128, "height": 128 },
       "logicalGrid": { "columns": 32, "rows": 32 },
+      "nativeArtGrid": { "columns": 128, "rows": 128 },
       "cellScale": 1,
       "filePattern": "tree-stage-{0..19}.png",
       "orderedStages": [
@@ -134,6 +130,7 @@
       "count": 8,
       "physicalPixels": { "width": 128, "height": 128 },
       "logicalGrid": { "columns": 32, "rows": 32 },
+      "nativeArtGrid": { "columns": 128, "rows": 128 },
       "cellScale": 0.625,
       "files": [
         "mascot-campfire.png",

@@ -21,113 +21,8 @@ const UI_ROOT = path.resolve(
     "/Users/brendankenney/Pictures/BibleQuest-Assets/UI-ASSETS"
 );
 const SIZE = 128;
-const LOGICAL_SIZE = 32;
-const MASCOT_SOURCE = "mascot-atlas-strict-source.png";
-
-// The canonical BibleQuest palette. Every production sprite is written as an
-// indexed PNG using only these colors plus one fully transparent entry.
-const PALETTE = [
-  [0x10, 0x2b, 0x21], // deepest evergreen outline
-  [0x2c, 0x2c, 0x2c], // ink charcoal
-  [0x17, 0x3e, 0x2b], // Rolex-green shadow
-  [0x1f, 0x5e, 0x3a], // Rolex green
-  [0x3f, 0x75, 0x48], // Rolex-green light
-  [0x52, 0x6f, 0x3e], // moss shadow
-  [0x6b, 0x8f, 0x4e], // moss green
-  [0x9a, 0xb9, 0x5c], // moss light
-  [0x4c, 0x2f, 0x1d], // leather shadow
-  [0x8b, 0x5e, 0x34], // leather brown
-  [0xb9, 0x82, 0x43], // leather light
-  [0x8f, 0x65, 0x1a], // gold shadow
-  [0xda, 0xaf, 0x37], // gold
-  [0xf5, 0xd4, 0x6a], // gold light
-  [0xd5, 0xb9, 0x82], // parchment shadow
-  [0xf6, 0xe9, 0xd1], // parchment
-  [0xff, 0xf4, 0xde], // parchment highlight
-  [0x18, 0x3a, 0x55], // prayer-blue shadow
-  [0x29, 0x54, 0x70], // prayer blue
-  [0x5d, 0x89, 0xa3], // prayer-blue light
-  [0x8a, 0x4f, 0x32], // skin shadow
-  [0xc9, 0x82, 0x55], // skin
-  [0xf0, 0xb6, 0x81], // skin light
-  [0xf7, 0xd3, 0xa9], // skin highlight
-  [0x7c, 0x30, 0x28], // warm accent shadow
-  [0xc6, 0x5b, 0x3f], // warm accent
-  [0xef, 0x97, 0x38], // flame amber
-  [0xf7, 0xc8, 0x4b], // flame light
-  [0x77, 0x74, 0x68], // stone shadow
-  [0xaa, 0xa2, 0x8f], // stone
-  [0xd8, 0xcf, 0xb8], // stone light
-];
-
-const MATERIAL = {
-  outline: [0, 1],
-  green: [2, 3, 4, 5, 6, 7],
-  leather: [8, 9, 10],
-  gold: [11, 12, 13],
-  parchment: [14, 15, 16],
-  blue: [17, 18, 19],
-  skin: [20, 21, 22, 23],
-  warm: [24, 25, 26, 27],
-  stone: [28, 29, 30],
-};
-
-const materialSet = (...names) => [...new Set(names.flatMap((name) => MATERIAL[name]))];
-
-const ALLOWED = {
-  candle: materialSet("outline", "leather", "gold", "parchment", "warm"),
-  leaf: materialSet("outline", "green", "gold"),
-  star: materialSet("outline", "gold", "warm"),
-  bird: materialSet("outline", "leather", "parchment", "gold"),
-  flower: materialSet("outline", "parchment", "gold", "green"),
-  chapel: materialSet("outline", "leather", "parchment", "gold", "green", "blue"),
-  book: materialSet("outline", "green", "gold", "parchment"),
-  "open-book": materialSet("outline", "green", "gold", "parchment", "leather"),
-  bookmark: materialSet("outline", "green", "gold"),
-  lantern: materialSet("outline", "leather", "gold", "parchment", "warm"),
-  path: materialSet("outline", "stone", "green", "leather"),
-  tree: materialSet("outline", "green", "leather", "gold"),
-  sun: materialSet("outline", "green", "gold", "warm"),
-  heart: materialSet("outline", "warm", "gold"),
-  hands: materialSet("outline", "skin", "green", "gold", "parchment"),
-  "praying-hands": materialSet("outline", "skin", "green", "gold", "parchment"),
-  wheat: materialSet("outline", "gold", "leather", "warm"),
-  dove: materialSet("outline", "parchment", "green", "gold"),
-  cross: materialSet("outline", "leather", "gold"),
-  door: materialSet("outline", "leather", "parchment", "gold"),
-  key: materialSet("outline", "gold", "leather"),
-  scroll: materialSet("outline", "leather", "parchment", "gold", "green"),
-  compass: materialSet("outline", "gold", "blue", "parchment"),
-  crown: materialSet("outline", "gold", "warm"),
-  mountain: materialSet("outline", "green", "leather", "parchment", "gold"),
-  moon: materialSet("outline", "blue", "parchment"),
-  "service-basket": materialSet("outline", "leather", "gold", "warm"),
-  links: materialSet("outline", "leather", "gold", "parchment", "stone"),
-  people: materialSet("outline", "green", "leather", "gold", "blue", "skin", "parchment"),
-  fountain: materialSet("outline", "stone", "blue", "green", "parchment"),
-  mascot: materialSet("outline", "green", "leather", "gold", "parchment", "blue", "skin", "warm"),
-  trees: materialSet("outline", "green", "leather", "gold", "parchment"),
-  candles: materialSet("outline", "leather", "gold", "parchment", "warm"),
-};
-
-// Mascots deliberately use smaller subject-specific ramps than the general
-// catalogue. This prevents a parchment highlight from becoming a green fleck
-// (or vice versa) and keeps the large onboarding art calm at native size.
-const mascotMaterialSet = (...names) => [
-  1, // one charcoal contour; greens are reserved for subject interiors
-  ...materialSet(...names.filter((name) => name !== "outline")),
-];
-
-const MASCOT_ALLOWED = {
-  "mascot-lamb": mascotMaterialSet("parchment", "leather", "skin"),
-  "mascot-lantern": mascotMaterialSet("leather", "gold", "parchment", "warm"),
-  "mascot-scroll": mascotMaterialSet("leather", "gold", "parchment", "green"),
-  "mascot-dove": mascotMaterialSet("parchment", "gold", "green"),
-  "mascot-sprout": mascotMaterialSet("green", "leather", "gold"),
-  "mascot-key": mascotMaterialSet("gold", "leather"),
-  "mascot-map": mascotMaterialSet("leather", "gold", "parchment", "green"),
-  "mascot-campfire": mascotMaterialSet("leather", "gold", "warm"),
-};
+const MASCOT_SOURCE = "mascot-atlas-rich-black-source.png";
+const BLACK = [0, 0, 0];
 
 const SMALL_SPRITES = [
   "candle", "leaf", "star", "bird", "flower", "chapel", "book", "open-book",
@@ -217,35 +112,13 @@ function isWhiteBackdrop(r, g, b) {
   return min >= 180 && max - min <= 70;
 }
 
-function distanceSquared(r, g, b, color) {
-  const dr = r - color[0];
-  const dg = g - color[1];
-  const db = b - color[2];
-  return dr * dr * 0.8 + dg * dg * 1.2 + db * db * 0.7;
-}
-
-function mapToAllowed(buffer, allowed) {
-  const colors = allowed.map((index) => PALETTE[index]);
-  for (let offset = 0; offset < buffer.length; offset += 4) {
-    if (buffer[offset + 3] === 0) {
-      buffer.fill(0, offset, offset + 4);
-      continue;
-    }
-    let best = colors[0];
-    let bestDistance = Number.POSITIVE_INFINITY;
-    for (const color of colors) {
-      const distance = distanceSquared(buffer[offset], buffer[offset + 1], buffer[offset + 2], color);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        best = color;
-      }
-    }
-    buffer[offset] = best[0];
-    buffer[offset + 1] = best[1];
-    buffer[offset + 2] = best[2];
-    buffer[offset + 3] = 255;
-  }
-  return buffer;
+async function quantizeAdaptive(buffer, width, height, colors = 31) {
+  const indexed = await sharp(buffer, {
+    raw: { width, height, channels: 4 },
+  })
+    .png({ palette: true, colours: colors, dither: 0, effort: 10 })
+    .toBuffer();
+  return sharp(indexed).ensureAlpha().raw().toBuffer();
 }
 
 async function magentaToAlpha(input) {
@@ -457,7 +330,12 @@ async function fitRaw(source, { maxVisible = 112, alignment = "center", bottom =
 
 async function fitLogicalRaw(
   source,
-  { maxVisible = 28, alignment = "center", bottom = 30 } = {}
+  {
+    logicalSize = SIZE,
+    maxVisible = logicalSize - 4,
+    alignment = "center",
+    bottom = logicalSize - 2,
+  } = {}
 ) {
   const trimmed = await trimRaw(source);
   const scale = Math.min(
@@ -470,15 +348,15 @@ async function fitLogicalRaw(
     .resize(width, height, { kernel: "nearest", fit: "fill" })
     .raw()
     .toBuffer();
-  const left = Math.floor((LOGICAL_SIZE - width) / 2);
+  const left = Math.floor((logicalSize - width) / 2);
   const top =
     alignment === "bottom"
       ? bottom - height
-      : Math.floor((LOGICAL_SIZE - height) / 2);
+      : Math.floor((logicalSize - height) / 2);
   return sharp({
     create: {
-      width: LOGICAL_SIZE,
-      height: LOGICAL_SIZE,
+      width: logicalSize,
+      height: logicalSize,
       channels: 4,
       background: [0, 0, 0, 0],
     },
@@ -493,49 +371,6 @@ async function fitLogicalRaw(
     ])
     .raw()
     .toBuffer();
-}
-
-function removeIsolatedColorSpecks(buffer, width, height) {
-  const outlineColors = new Set(MATERIAL.outline.map((index) => PALETTE[index].join(",")));
-  const colorAt = (point) => {
-    const offset = point * 4;
-    return buffer[offset + 3] === 0
-      ? null
-      : `${buffer[offset]},${buffer[offset + 1]},${buffer[offset + 2]}`;
-  };
-
-  // Two conservative passes remove salt-and-pepper highlights while keeping
-  // outline pixels, eyes, route lines, flame tips, and transparent contours.
-  for (let pass = 0; pass < 2; pass += 1) {
-    const replacements = [];
-    for (let y = 1; y < height - 1; y += 1) {
-      for (let x = 1; x < width - 1; x += 1) {
-        const point = y * width + x;
-        const color = colorAt(point);
-        if (!color || outlineColors.has(color)) continue;
-        const neighbors = [point - 1, point + 1, point - width, point + width]
-          .map(colorAt)
-          .filter(Boolean);
-        if (neighbors.length !== 4 || neighbors.includes(color)) continue;
-        const counts = new Map();
-        for (const neighbor of neighbors) {
-          counts.set(neighbor, (counts.get(neighbor) ?? 0) + 1);
-        }
-        const [replacement, count] = [...counts.entries()].sort(
-          (a, b) => b[1] - a[1]
-        )[0] ?? [];
-        if (replacement && count >= 3) replacements.push([point, replacement]);
-      }
-    }
-    for (const [point, replacement] of replacements) {
-      const offset = point * 4;
-      const [r, g, b] = replacement.split(",").map(Number);
-      buffer[offset] = r;
-      buffer[offset + 1] = g;
-      buffer[offset + 2] = b;
-    }
-  }
-  return buffer;
 }
 
 function keepLargestOpaqueComponent(buffer, width, height) {
@@ -574,13 +409,39 @@ function keepLargestOpaqueComponent(buffer, width, height) {
   return buffer;
 }
 
-function applyCharcoalContour(buffer, width, height) {
-  const charcoal = PALETTE[1];
+function applyBlackContour(buffer, width, height, minimumComponentArea = 1) {
+  const black = BLACK;
   const boundary = [];
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const point = y * width + x;
-      if (buffer[point * 4 + 3] === 0) continue;
+  const visited = new Uint8Array(width * height);
+  for (let start = 0; start < width * height; start += 1) {
+    if (visited[start] || buffer[start * 4 + 3] === 0) continue;
+    const component = [];
+    const stack = [start];
+    visited[start] = 1;
+    while (stack.length > 0) {
+      const point = stack.pop();
+      component.push(point);
+      const x = point % width;
+      const y = Math.floor(point / width);
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          const next = ny * width + nx;
+          if (!visited[next] && buffer[next * 4 + 3] !== 0) {
+            visited[next] = 1;
+            stack.push(next);
+          }
+        }
+      }
+    }
+    if (component.length < minimumComponentArea) continue;
+    const componentSet = new Set(component);
+    for (const point of component) {
+      const x = point % width;
+      const y = Math.floor(point / width);
       let touchesTransparent = false;
       for (const [dx, dy] of [
         [1, 0],
@@ -595,7 +456,7 @@ function applyCharcoalContour(buffer, width, height) {
             ny < 0 ||
             nx >= width ||
             ny >= height ||
-            buffer[(ny * width + nx) * 4 + 3] === 0
+            !componentSet.has(ny * width + nx)
           ) {
             touchesTransparent = true;
             break;
@@ -606,85 +467,26 @@ function applyCharcoalContour(buffer, width, height) {
   }
   for (const point of boundary) {
     const offset = point * 4;
-    buffer[offset] = charcoal[0];
-    buffer[offset + 1] = charcoal[1];
-    buffer[offset + 2] = charcoal[2];
+    buffer[offset] = black[0];
+    buffer[offset + 1] = black[1];
+    buffer[offset + 2] = black[2];
     buffer[offset + 3] = 255;
   }
   return buffer;
 }
 
-function removeInteriorColorSpecks(buffer, width, height) {
-  const outlineColors = new Set(MATERIAL.outline.map((index) => PALETTE[index].join(",")));
-  const colorAt = (point) => {
-    const offset = point * 4;
-    return buffer[offset + 3] === 0
-      ? null
-      : `${buffer[offset]},${buffer[offset + 1]},${buffer[offset + 2]}`;
-  };
-  const replacements = [];
-  for (let y = 1; y < height - 1; y += 1) {
-    for (let x = 1; x < width - 1; x += 1) {
-      const point = y * width + x;
-      const color = colorAt(point);
-      if (!color || outlineColors.has(color)) continue;
-      const neighbors = [];
-      for (let dy = -1; dy <= 1; dy += 1) {
-        for (let dx = -1; dx <= 1; dx += 1) {
-          if (dx === 0 && dy === 0) continue;
-          const neighbor = colorAt((y + dy) * width + x + dx);
-          if (neighbor) neighbors.push(neighbor);
-        }
-      }
-      // Only touch fully enclosed pixels. Edge stairs and small meaningful
-      // details remain intact, while isolated dots inside a flat material are
-      // folded into the surrounding contiguous shade cluster.
-      if (neighbors.length < 7) continue;
-      const sameColor = neighbors.filter((neighbor) => neighbor === color).length;
-      if (sameColor > 1) continue;
-      const counts = new Map();
-      for (const neighbor of neighbors) {
-        if (outlineColors.has(neighbor)) continue;
-        counts.set(neighbor, (counts.get(neighbor) ?? 0) + 1);
-      }
-      const [replacement, count] = [...counts.entries()].sort(
-        (a, b) => b[1] - a[1]
-      )[0] ?? [];
-      if (replacement && count >= 3) replacements.push([point, replacement]);
-    }
-  }
-  for (const [point, replacement] of replacements) {
-    const offset = point * 4;
-    const [r, g, b] = replacement.split(",").map(Number);
-    buffer[offset] = r;
-    buffer[offset + 1] = g;
-    buffer[offset + 2] = b;
-  }
-  return buffer;
+async function normalizeStrictMascot(source, alignment) {
+  let logical = await fitLogicalRaw(source, {
+    logicalSize: SIZE,
+    maxVisible: 112,
+    alignment,
+    bottom: 120,
+  });
+  logical = removeSmallComponents(logical, SIZE, SIZE, 2);
+  return keepLargestOpaqueComponent(logical, SIZE, SIZE);
 }
 
-async function normalizeStrictMascot(source, name, alignment) {
-  let logical = await fitLogicalRaw(source, { alignment });
-  logical = mapToAllowed(logical, MASCOT_ALLOWED[name]);
-  logical = removeSmallComponents(
-    logical,
-    LOGICAL_SIZE,
-    LOGICAL_SIZE,
-    2
-  );
-  logical = keepLargestOpaqueComponent(logical, LOGICAL_SIZE, LOGICAL_SIZE);
-  logical = applyCharcoalContour(logical, LOGICAL_SIZE, LOGICAL_SIZE);
-  logical = removeIsolatedColorSpecks(logical, LOGICAL_SIZE, LOGICAL_SIZE);
-  logical = removeInteriorColorSpecks(logical, LOGICAL_SIZE, LOGICAL_SIZE);
-  return sharp(logical, {
-    raw: { width: LOGICAL_SIZE, height: LOGICAL_SIZE, channels: 4 },
-  })
-    .resize(SIZE, SIZE, { kernel: "nearest", fit: "fill" })
-    .raw()
-    .toBuffer();
-}
-
-async function normalizeOne(source, name, alignment = "center", allowed = ALLOWED[name]) {
+async function normalizeOne(source, alignment = "center") {
   let output = await fitRaw(source, { alignment });
   output = removeThinEdgeFragments(removeSmallComponents(output, SIZE, SIZE, 12), SIZE, SIZE);
   const visible = visibleBounds(output, SIZE, SIZE);
@@ -695,13 +497,21 @@ async function normalizeOne(source, name, alignment = "center", allowed = ALLOWE
     );
     output = removeThinEdgeFragments(removeSmallComponents(output, SIZE, SIZE, 12), SIZE, SIZE);
   }
-  return mapToAllowed(output, allowed);
+  return output;
+}
+
+async function strictifyProductionBuffer(buffer) {
+  let strict = await quantizeAdaptive(buffer, SIZE, SIZE, 31);
+  strict = applyBlackContour(strict, SIZE, SIZE, 1);
+  return strict;
 }
 
 async function writeProduction(name, buffer) {
   const file = `${name}.png`;
+  const strict = await strictifyProductionBuffer(buffer);
   await fs.mkdir(PRODUCTION_ROOT, { recursive: true });
-  await writeIndexed(buffer, SIZE, SIZE, path.join(PRODUCTION_ROOT, file));
+  const output = path.join(PRODUCTION_ROOT, file);
+  await writeAdaptiveIndexed(strict, SIZE, SIZE, output);
 }
 
 async function processSmallSprites() {
@@ -732,7 +542,7 @@ async function processSmallSprites() {
     } else {
       throw new Error(`No high-resolution source mapping for ${name}`);
     }
-    const output = await normalizeOne(source, name, ALIGNMENT[name], ALLOWED[name]);
+    const output = await normalizeOne(source, ALIGNMENT[name]);
     await writeProduction(name, output);
   }
 }
@@ -816,11 +626,10 @@ async function processTrees() {
       .resize(width, height, { kernel: "nearest", fit: "fill" })
       .raw()
       .toBuffer();
-    let frame = await sharp({ create: { width: SIZE, height: SIZE, channels: 4, background: [0, 0, 0, 0] } })
+    const frame = await sharp({ create: { width: SIZE, height: SIZE, channels: 4, background: [0, 0, 0, 0] } })
       .composite([{ input: sprite, raw: { width, height, channels: 4 }, left: Math.floor((SIZE - width) / 2), top: 121 - height }])
       .raw()
       .toBuffer();
-    frame = mapToAllowed(frame, ALLOWED.trees);
     await writeProduction(`tree-stage-${index}`, frame);
   }
 }
@@ -843,11 +652,11 @@ async function processCandles() {
       .resize(width, height, { kernel: "nearest", fit: "fill" })
       .raw()
       .toBuffer();
-    let frame = await sharp({ create: { width: SIZE, height: SIZE, channels: 4, background: [0, 0, 0, 0] } })
+    const frame = await sharp({ create: { width: SIZE, height: SIZE, channels: 4, background: [0, 0, 0, 0] } })
       .composite([{ input: sprite, raw: { width, height, channels: 4 }, left: Math.floor((SIZE - width) / 2), top: 121 - height }])
       .raw()
       .toBuffer();
-    frames.push(mapToAllowed(frame, ALLOWED.candles));
+    frames.push(frame);
   }
 
   const rowCounts = Array.from({ length: SIZE }, (_, y) => {
@@ -871,14 +680,26 @@ async function processMascots() {
     const name = MASCOTS[index];
     const alignment = name === "mascot-dove" || name === "mascot-key" ? "center" : "bottom";
     const cell = await extractCell(source, 3, 3, index);
-    const frame = await normalizeStrictMascot(cell, name, alignment);
+    const frame = await normalizeStrictMascot(cell, alignment);
     await writeProduction(name, frame);
   }
 }
 
-async function writeIndexed(buffer, width, height, output) {
-  const palette = [[0, 0, 0], ...PALETTE];
-  const lookup = new Map(PALETTE.map((color, index) => [color.join(","), index + 1]));
+async function writeAdaptiveIndexed(buffer, width, height, output) {
+  const colors = [];
+  const lookup = new Map();
+  for (let offset = 0; offset < buffer.length; offset += 4) {
+    if (buffer[offset + 3] === 0) continue;
+    const key = `${buffer[offset]},${buffer[offset + 1]},${buffer[offset + 2]}`;
+    if (lookup.has(key)) continue;
+    lookup.set(key, colors.length + 1);
+    colors.push([buffer[offset], buffer[offset + 1], buffer[offset + 2]]);
+  }
+  if (colors.length > 255) {
+    throw new Error(`${output}: adaptive palette exceeds 255 opaque colors`);
+  }
+
+  const palette = [[0, 0, 0], ...colors];
   const scanlines = Buffer.alloc((width + 1) * height);
   for (let y = 0; y < height; y += 1) {
     const row = y * (width + 1);
@@ -887,11 +708,10 @@ async function writeIndexed(buffer, width, height, output) {
       const source = (y * width + x) * 4;
       if (buffer[source + 3] === 0) continue;
       const key = `${buffer[source]},${buffer[source + 1]},${buffer[source + 2]}`;
-      const index = lookup.get(key);
-      if (index == null) throw new Error(`${output}: color outside fixed palette: ${key}`);
-      scanlines[row + x + 1] = index;
+      scanlines[row + x + 1] = lookup.get(key);
     }
   }
+
   const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
@@ -902,7 +722,7 @@ async function writeIndexed(buffer, width, height, output) {
     signature,
     pngChunk("IHDR", ihdr),
     pngChunk("PLTE", Buffer.from(palette.flat())),
-    pngChunk("tRNS", Buffer.from([0, ...PALETTE.map(() => 255)])),
+    pngChunk("tRNS", Buffer.from([0, ...colors.map(() => 255)])),
     pngChunk("IDAT", deflateSync(scanlines, { level: 9 })),
     pngChunk("IEND", Buffer.alloc(0)),
   ]);
@@ -960,15 +780,18 @@ async function physicalQa() {
   if (JSON.stringify(files) !== JSON.stringify(expectedFiles)) {
     throw new Error("public/pixel does not match the exact 63-file production contract");
   }
-  const paletteSet = new Set(PALETTE.map((color) => color.join(",")));
-  const parchmentSet = new Set(MATERIAL.parchment.map((index) => PALETTE[index].join(",")));
+  const black = BLACK.join(",");
   const hashes = new Set();
   for (const file of files) {
     const full = path.join(PRODUCTION_ROOT, file);
     const { data, info } = await sharp(full).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
     if (info.width !== SIZE || info.height !== SIZE) throw new Error(`${file}: expected 128x128`);
     let opaque = 0;
-    let parchmentPixels = 0;
+    let blackPixels = 0;
+    let contourPixels = 0;
+    let nonBlackContourPixels = 0;
+    let lightPixels = 0;
+    const opaqueColors = new Set();
     for (let y = 0; y < SIZE; y += 1) {
       for (let x = 0; x < SIZE; x += 1) {
         const offset = (y * SIZE + x) * 4;
@@ -980,13 +803,45 @@ async function physicalQa() {
         if (alpha) {
           opaque += 1;
           const color = `${data[offset]},${data[offset + 1]},${data[offset + 2]}`;
-          if (!paletteSet.has(color)) throw new Error(`${file}: color outside master palette: ${color}`);
-          if (parchmentSet.has(color)) parchmentPixels += 1;
+          opaqueColors.add(color);
+          if (color === black) blackPixels += 1;
+          const isContour = [
+            [x - 1, y],
+            [x + 1, y],
+            [x, y - 1],
+            [x, y + 1],
+          ].some(([neighborX, neighborY]) => {
+            if (
+              neighborX < 0 ||
+              neighborY < 0 ||
+              neighborX >= SIZE ||
+              neighborY >= SIZE
+            ) {
+              return true;
+            }
+            return data[(neighborY * SIZE + neighborX) * 4 + 3] === 0;
+          });
+          if (isContour) {
+            contourPixels += 1;
+            if (color !== black) nonBlackContourPixels += 1;
+          }
+          if (data[offset] >= 180 && data[offset + 1] >= 165 && data[offset + 2] >= 120) {
+            lightPixels += 1;
+          }
         }
       }
     }
     if (opaque === 0) throw new Error(`${file}: empty sprite`);
-    if (file === "dove.png" && (opaque < 4000 || parchmentPixels / opaque < 0.4)) {
+    if (blackPixels === 0) throw new Error(`${file}: missing exact-black outline`);
+    if (opaqueColors.size > 32) {
+      throw new Error(`${file}: ${opaqueColors.size} opaque colors exceeds the 32-color budget`);
+    }
+    if (contourPixels === 0 || nonBlackContourPixels !== 0) {
+      throw new Error(
+        `${file}: exterior contour contains ${nonBlackContourPixels} non-black pixels`
+      );
+    }
+    if (file === "dove.png" && (opaque < 4000 || lightPixels / opaque < 0.4)) {
       throw new Error(`${file}: white body was lost while removing the source backdrop`);
     }
     const digest = await sharp(full).raw().toBuffer();

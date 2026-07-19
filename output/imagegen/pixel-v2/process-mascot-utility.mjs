@@ -6,7 +6,7 @@ import sharp from "sharp";
 const ROOT = path.resolve("output/imagegen/pixel-v2");
 
 const PALETTE = [
-  [0x1e, 0x33, 0x29], // deep evergreen outline
+  [0x00, 0x00, 0x00], // exact black outline
   [0x2c, 0x2c, 0x2c], // ink charcoal
   [0x0a, 0x3f, 0x2e], // deepest green
   [0x1f, 0x5e, 0x3a], // Rolex green

@@ -1,0 +1,24 @@
+Use case: precise-object-edit
+Asset type: authoritative BibleQuest production pixel-art mascot atlas
+Input image: edit target and absolute authority for all eight subjects,
+silhouettes, proportions, poses, positions, lighting, palette relationships,
+material detail, and 3x3 atlas layout.
+
+Primary request: preserve the image's rich, highly legible pixel-art quality
+while changing only the contour and pixel cleanliness. Replace the dark-green
+exterior outlines with visually pure solid #000000 black. Flatten every
+intentional square pixel block to one uniform RGB color while retaining the
+full existing range of deliberate highlights, midtones, shadows, and material
+depth.
+
+Constraints: keep the lamb, lantern, scroll, dove, sprout, key, map, and
+campfire exactly recognizable and in the same cells; retain the empty ninth
+cell; retain the exact warm detailed storybook-pixel style; preserve all useful
+interior shading and small meaningful details; continuous crisp black exterior
+contour; grid-aligned square blocks; no antialiasing; no blur; no within-block
+gradient; no green fringe at the silhouette; no chromatic noise; no stray
+pixels; no new objects; no changed anatomy; no changed symbols; no text; no
+watermark.
+
+Backdrop: perfectly flat uniform #ff00ff magenta, unchanged and unused inside
+any subject, for deterministic removal.

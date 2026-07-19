@@ -14,12 +14,17 @@ second strict-block reference. The untouched generated atlas is
 `sources/mascot-atlas-strict-source.png`; its complete prompt is preserved in
 `sources/mascot-atlas-strict-prompt.txt`.
 
-The production processor reconstructs these mascots on a 32×32 logical art
-grid and then scales each logical pixel exactly 4× with nearest-neighbor
-sampling onto the required 128×128 canvas. It applies a single charcoal outer
-contour, subject-specific palette ramps, connected-component cleanup, and a
-conservative interior-speck pass before export. PixelLab upload copies live in
-`pixellab-ready/mascots/`.
+The production processor now retains the full 128×128 native mascot art grid;
+there is no lower-resolution intermediary. The reference-preserving black
+outline refinement is stored as `sources/mascot-atlas-rich-black-source.png`,
+with its complete edit prompt in `sources/mascot-atlas-rich-black-prompt.txt`.
+
+The final catalogue pass applies exact-black (`#000000`) contours and preserves
+the full 128×128 native art grid for all 63 files. Every family retains native
+one-pixel detail with a source-faithful capped palette; no asset passes through
+a 16×16, 32×32, or 64×64 intermediary. Connected-component cleanup runs before
+export. PixelLab upload copies live in `pixellab-ready/catalogue/`, with the
+mascot subset duplicated in `pixellab-ready/mascots/`.
 
 ## References
 
@@ -84,9 +89,9 @@ conservative interior-speck pass before export. PixelLab upload copies live in
 
 The raw model outputs used near-magenta color variation instead of literal
 `#ff00ff`. The processor globally classifies that chroma family, gives it
-binary alpha, maps every opaque pixel to the fixed palette, and writes a
-separate normalized atlas with a truly uniform `#ff00ff` field. No soft matte
-or alpha feathering is used.
+binary alpha, maps every opaque pixel to a capped source-faithful palette, and
+writes a separate normalized atlas with a truly uniform `#ff00ff` field. No
+soft matte or alpha feathering is used.
 
 The tree source contains exactly twenty isolated connected components. They
 are ordered by atlas row and x-position, normalized with one shared scale, and
@@ -112,8 +117,10 @@ deterministically.
 ## Current production QA
 
 - 63/63 distinct indexed PNGs at exactly 128×128
-- binary alpha only, fully transparent outer borders, and 7–24 colors per file
-- every opaque color belongs to the shared 31-color BibleQuest palette
+- binary alpha only, fully transparent outer borders, and at most 32 opaque
+  colors per file
+- all four families use reviewed source-faithful local palettes at native
+  128×128 resolution
 - the guarded installer makes `production-128/` and `public/pixel/`
   byte-identical after review
 - all twenty tree stages, five candle states, and eight mascots remain distinct

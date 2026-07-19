@@ -13,19 +13,18 @@ file source and logical canvas.
 
 ## Production contract
 
-| Family | Files | Physical PNG | Registry grid |
-| --- | ---: | ---: | ---: |
-| Small interface/category sprites | 30 | 128×128 | 32×32 |
-| Streak-candle states | 5 | 128×128 | 16×16 |
-| Olive-tree stages | 20 | 128×128 | 32×32 |
-| Feature mascots | 8 | 128×128 | 32×32 |
+| Family | Files | Physical PNG | Native art grid | Registry layout grid |
+| --- | ---: | ---: | ---: | ---: |
+| Small interface/category sprites | 30 | 128×128 | 128×128 | 32×32 |
+| Streak-candle states | 5 | 128×128 | 128×128 | 16×16 |
+| Olive-tree stages | 20 | 128×128 | 128×128 | 32×32 |
+| Feature mascots | 8 | 128×128 | 128×128 | 32×32 |
 
-Physical and logical dimensions are separate contracts. Every shipped file is
-exactly 128×128; the smaller registry grids remain layout metadata so existing
-call sites keep their established rendered scale. Every logical row
-and column count must divide 128 evenly; current grids are 32×32 for small
-sprites, trees, and mascots, and 16×16 for candles. Transparent square padding
-preserves the candles' narrow silhouette within their square logical grid.
+Physical art and layout dimensions are separate contracts. Every shipped file
+is exactly 128×128. Native art grids control pixel cleanup; registry grids only
+control on-screen sizing, so a higher-fidelity mascot never inflates existing
+call sites. Transparent square padding preserves narrow subjects within their
+square canvas.
 
 Navigation and form controls remain clean vector icons. Pixel art is reserved
 for quests, growth, milestones, onboarding, and meaningful empty states. The
@@ -42,7 +41,7 @@ outline, and shading; it is not a production sprite to shrink automatically.
 For new or revised art:
 
 - state each reference image's role in the generation prompt;
-- request strict native pixel clusters, one dark-evergreen outline, upper-left
+- request strict native pixel clusters, one exact-black (`#000000`) outline, upper-left
   light, flat stepped shading, and the shared BibleQuest palette;
 - use a uniform removable chroma field (`#ff00ff` for green subjects);
 - prohibit text, frames, cast shadows, blur, soft glow, partial transparency,
@@ -57,9 +56,9 @@ generated files directly into `public/pixel/`.
 
 `output/imagegen/pixel-v2/process-production-128.mjs` is the canonical full-set
 production tool. It rebuilds every family from the high-resolution masters,
-removes connected opaque backdrops, reconstructs binary alpha, maps every
-opaque pixel to the fixed BibleQuest palette, uses transparent padding, and
-normalizes without soft resampling. Run it before review:
+removes connected opaque backdrops, reconstructs binary alpha, maps each asset
+to a source-faithful capped palette, uses transparent padding, and normalizes
+without soft resampling. Run it before review:
 
 ```sh
 node output/imagegen/pixel-v2/process-production-128.mjs \
@@ -96,10 +95,15 @@ node scripts/process-pixel-sprites.mjs qa-sheet \
 ```
 
 Atlas families may use a family-specific splitter in the staging directory,
-but it must finish with the same invariants: exact dimensions, fixed palette,
+but it must finish with the same invariants: exact dimensions, capped palette,
 binary alpha, nearest-neighbor reconstruction, shared baseline, and distinct
 frames. Keep that processing recipe beside its raw atlas and generation notes
 so the result remains reproducible.
+
+The final production pass preserves all 128×128 addressable pixels for every
+family. No sprite is reduced through a 16×16, 32×32, or 64×64 intermediary.
+Exterior contours are rewritten to exact `#000000` before each indexed PNG is
+written.
 
 The older mixed-size staging files remain as provenance only. The canonical
 processor supersedes those exports and writes the reviewed uniform set to
@@ -114,10 +118,9 @@ Required checks:
 
 - exactly 128×128 physical dimensions for all 63 files;
 - alpha values are only 0 or 255, with transparent corners and safe padding;
-- every opaque RGB value belongs to the shared production palette;
-- opaque-color budgets remain 16 for small sprites and candles, 20 for
-  mascots, and 24 for trees unless a reviewed per-file exception is recorded
-  in the manifest;
+- every opaque RGB value belongs to its reviewed source-faithful indexed
+  palette;
+- opaque-color budgets remain at or below 32 for every file;
 - no antialiased fringe, isolated noise, checkerboard residue, or chroma spill;
 - silhouettes remain unmistakable at the smallest call site;
 - category marks are visually distinct — especially `praying-hands`, `hands`,

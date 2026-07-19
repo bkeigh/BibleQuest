@@ -1,0 +1,5 @@
+Use case: precise-object-edit
+Asset type: production pixel-art mascot atlas for BibleQuest
+Input images: Image 1 is the edit target and authoritative source for all eight subjects, their exact order, silhouettes, proportions, palette, spacing, and 3x3 atlas composition. Image 2 shows the unwanted soft dark-green outline/interpolation artifact to correct.
+Primary request: change only the pixel treatment: replace every outer contour with a solid visually pure black outline and make every visible pixel a hard, square, flat-colored block.
+Constraints: preserve the eight mascot subjects, positions, silhouettes, poses, proportions, interior design, warm BibleQuest palette, magenta background, and empty ninth cell; continuous black contour; strict grid-aligned square blocks; flat color per block; no antialiasing; no blur; no gradients inside a block; no green tint in the outline; no softened edges; no noise; no dithering; no detached artifacts; no new details; no text; no watermark. Keep the background perfectly flat uniform magenta for deterministic removal.

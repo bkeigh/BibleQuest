@@ -8,9 +8,9 @@ rationed on purpose: when everything is pixelated, nothing is special.
 
 | Instrument | Component / utility | Scale | Use |
 |---|---|---|---|
-| Small sprites | `PixelIcon` (`design-system/PixelIcon.tsx`) | 128×128 physical PNG; 32×32 logical canvas | Quest category glyphs, milestone marks, tiny decorations |
-| Feature sprites | `PixelIcon` (same component) | 128×128 physical PNG; 16×16 logical candles or 32×32 logical trees | The streak candle set, the twenty-stage journey tree |
-| Mascots | `PixelMascot` (`design-system/PixelMascot.tsx`) | 128×128 physical PNG; 32×32 logical canvas | One per onboarding / sign-in page, big empty states |
+| Small sprites | `PixelIcon` (`design-system/PixelIcon.tsx`) | 128×128 native art; 32×32 layout grid | Quest category glyphs, milestone marks, tiny decorations |
+| Feature sprites | `PixelIcon` (same component) | 128×128 native art; 16×16 candle or 32×32 tree layout grids | The streak candle set, the twenty-stage journey tree |
+| Mascots | `PixelMascot` (`design-system/PixelMascot.tsx`) | 128×128 native art; 32×32 layout grid | One per onboarding / sign-in page, big empty states |
 
 Plus the accent font: `font-pixel` utility (Ithaca, SIL OFL), 14px minimum —
 short labels only (badges, quest tags, tiny decorative headings). And two
@@ -37,6 +37,8 @@ remains supported as a fallback and useful test fixture:
 - Every production PNG is exactly 128×128 physical pixels, regardless of
   family. The registry's logical columns and rows are independent rendering
   metadata, and each logical axis must divide 128 evenly.
+- PNG entries separately declare `artCols` / `artRows`. These describe the
+  authored pixel grid used by QA and never affect rendered UI dimensions.
 - The `size` prop always means **px per cell**. A png entry declares its
   logical grid (`cols`/`rows`), so rendered dimensions are identical to the
   grid it replaces — no call site ever changes.
@@ -45,7 +47,7 @@ remains supported as a fallback and useful test fixture:
   Production candles use `0.75`; mascots use `0.625` so size 7/8/9/10 call
   sites render at 128/160/192/192px without a 224px onboarding jump.
 - Palette colors come only from the named constants at the top of the file:
-  live-token dark outline (`#1e3329`), evergreen (`#0e533c`), olive, brand
+  exact black outline (`#000000`), evergreen (`#0e533c`), olive, brand
   gold (`#d3a336`), leather, parchment, charcoal, and restrained prayer blue,
   rose, stone, skin, and flame ramps. Lighter and darker material ramps are
   intentional pixel-art shades of those live brand anchors.
@@ -68,13 +70,15 @@ remains supported as a fallback and useful test fixture:
      128 128 alpha nearest
    ```
 
-   The processor supplies binary alpha, transparent padding, fixed-palette
-   mapping, and nearest-neighbor grid reconstruction. Use `clean-supplied` for
+   The processor supplies binary alpha, transparent padding, capped adaptive
+   palette mapping, and nearest-neighbor source fitting. Use `clean-supplied` for
    the approved opaque UI anchors and `qa-sheet` for a review contact sheet.
 4. Keep every export at exactly **128×128 physical pixels**. Logical columns
-   and rows must both divide 128 evenly: candles use 16×16; small sprites,
-   trees, and mascots use 32×32. Use transparent square padding for narrow or
-   tall subjects instead of introducing a non-square file or logical grid.
+   and rows must both divide 128 evenly. Every production family uses the full
+   128×128 native art grid. Layout grids remain 16×16 for candles and 32×32 for
+   every other family so higher fidelity does not change on-screen size. Use
+   transparent square padding for narrow or tall subjects instead of
+   introducing a non-square file.
 5. Name files after their registry keys:
    `public/pixel/<name>.png` for sprites, `public/pixel/mascot-<name>.png`
    for mascots (e.g. `candle-halo.png`, `tree-stage-4.png`,
@@ -103,16 +107,19 @@ file stay untouched.
 - Every sprite uses a whole-cell logical grid and `image-rendering: pixelated`
   (`pixelated` utility), whether its source is PNG or SVG rectangles. Never
   scale to fractional cell sizes; never blur, never rotate.
-- Every silhouette carries a single dark-green outline. Small icons keep it
+- Every silhouette carries a single exact-black (`#000000`) outline. Small icons keep it
   sparse; mascots and feature sprites use it continuously so they remain
   recognizable on parchment, linen, and candle-mode surfaces.
-- Light comes from the **upper left**: highlights top-left, shade
-  lower-right, 2–3 shade levels per material, minimal dithering.
-- Every shipped sprite uses only colors from the shared production palette in
-  `scripts/process-pixel-sprites.mjs`, with no adaptive per-file palette drift.
-  Use only the colors the subject needs: restrained small sprites, a coherent
-  tree-family ramp, and the same body colors across all five candles. Dithering
-  and partial alpha are forbidden.
+- Every production file uses each native 128×128 pixel directly. There is no
+  16×16, 32×32, or 64×64 reconstruction bottleneck. Gradients may be expressed
+  only as deliberate adjacent flat palette colors, never interpolation within
+  a pixel.
+- Light comes from the **upper left**: highlights top-left and shade
+  lower-right. Materials may use up to 5–7 deliberate ramp steps where the
+  subject needs depth; dithering and within-pixel blending remain forbidden.
+- Every sprite uses a reviewed source-faithful local palette so its material
+  shading survives at native resolution. Every palette is deterministic and
+  capped at 32 opaque colors; dithering and partial alpha are forbidden.
 
 ## Current inventory
 
@@ -133,7 +140,7 @@ file stay untouched.
   `tree-stage-19`. Every stage shares one olive species, soil base, light
   direction, forked-trunk language, outline, and palette; the silhouette and
   botanical details advance at every step.
-- **Mascots (8, 128×128 source / 32×32 logical)**: lamb, lantern, scroll, dove, sprout, key,
+- **Mascots (8, 128×128 native art / 32×32 layout)**: lamb, lantern, scroll, dove, sprout, key,
   map, campfire.
 
 ## Where pixel art is allowed

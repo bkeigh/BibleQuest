@@ -16,8 +16,8 @@ import path from "node:path";
 import sharp from "sharp";
 
 export const BIBLEQUEST_PIXEL_PALETTE = [
-  "#102b21", // deepest evergreen outline
-  "#2c2c2c", // ink charcoal
+  "#102b21", // legacy outline-mapping anchor; flattened before production export
+  "#000000", // exact production outline
   "#173e2b", // Rolex green shadow
   "#1f5e3a", // Rolex green
   "#3f7548", // Rolex green light
