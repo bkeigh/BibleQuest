@@ -18,6 +18,8 @@ template in [`../.env.example`](../.env.example).
 | `NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY` | Optional | RevenueCat public key — Test Store (`test_…`) in dev, Web Billing (`rcb_…`) in prod. |
 | `NEXT_PUBLIC_REVENUECAT_PLUS_ENTITLEMENT` | Optional | Only if the entitlement is renamed in the RevenueCat dashboard. |
 | `STRIPE_DONATION_URL` | Optional | **Server-only.** Exact `https://buy.stripe.com/...` Payment Link used for one-time support through the validated same-origin redirect. |
+| `API_BIBLE_API_KEY` | Optional | **Server-only.** Enables the licensed API.Bible adapter. Not needed for reviewed Free Use Bible API editions. |
+| `API_BIBLE_COMMERCIALLY_LICENSED_BIBLE_IDS` | Optional | Comma-separated API.Bible IDs explicitly licensed for BibleQuest's commercial use. Catalogue visibility alone is not permission. |
 | `RESEND_API_KEY` | Optional | Lifecycle email (later). |
 | `ANTHROPIC_API_KEY` | Future | AI Guide (scaffold-only in V1). |
 
@@ -35,6 +37,9 @@ template in [`../.env.example`](../.env.example).
   and use one exact HTTPS Stripe Payment Link with no credentials, query, or
   fragment. The app rejects every other host/shape, shows an unavailable state
   when invalid, and never sends a visitor through an unvalidated redirect.
+- The reviewed Free Use Bible API integration is keyless and requires no
+  environment variable. Its server-side allow-list is intentionally separate
+  from API.Bible's licensed-ID allow-list.
 
 ## Analytics configuration
 

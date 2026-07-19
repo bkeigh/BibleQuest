@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ApiBibleError, fetchApiBibleChapter } from "@/lib/bible/api-bible";
 import { providerBookId } from "@/lib/bible/provider-books";
+import {
+  bibleProviderErrorCode,
+  fetchBibleProviderChapter,
+  serializeBibleProviderChapter,
+} from "@/lib/bible/provider-dispatcher";
 import { getBookMeta } from "@/lib/bible";
 import { loadChapter } from "@/lib/bible/server";
 import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
@@ -8,7 +12,7 @@ import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
 export const dynamic = "force-dynamic";
 
 function errorResponse(error: unknown) {
-  const code = error instanceof ApiBibleError ? error.code : "content_unavailable";
+  const code = bibleProviderErrorCode(error);
   const status = code === "provider_not_configured" ? 503 : code === "translation_unavailable" ? 404 : 502;
   return NextResponse.json(
     { error: code },
@@ -45,7 +49,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const [provider, fallback] = await Promise.all([
-      fetchApiBibleChapter(translation, bookId, chapter),
+      fetchBibleProviderChapter(translation, bookId, chapter),
       loadChapter(book, chapter),
     ]);
     if (!fallback) {
@@ -54,11 +58,13 @@ export async function GET(request: NextRequest) {
         { status: 404, headers: { "Cache-Control": "private, no-store" } },
       );
     }
-    const verses = fallback.verses.map((_, index) => provider.verses.get(index + 1) ?? "");
+    const verses = serializeBibleProviderChapter(provider.verses);
     return NextResponse.json(
       {
         translation: provider.translation,
         verses,
+        requestedKey: provider.requestedKey,
+        fallbackReason: provider.fallbackReason,
         fumsToken: provider.fumsToken,
       },
       { headers: { "Cache-Control": "private, no-store" } },

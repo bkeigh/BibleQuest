@@ -145,9 +145,14 @@ docs/                   # Codex + setup/deployment/security/content/QA guides
   server-side Stripe Payment Link and stays unavailable until
   `STRIPE_DONATION_URL` is configured for the deployment.
 - Data lives in the browser (localStorage). Export/clear is in Settings.
-- The World English Bible is bundled offline. Translation preferences and a
-  server-only API.Bible adapter are included, but copyrighted editions activate
-  only when explicitly licensed. Configure `API_BIBLE_API_KEY` plus a
+- The World English Bible is bundled offline. Reviewed public-domain editions
+  are fetched server-side from the keyless
+  [Free Use Bible API](https://bible.helloao.org/docs/guide/) and fall back to
+  the bundled WEB when that service is unreachable. The allow-list is checked
+  into the app with each edition's source license; BibleQuest does not expose
+  the provider's entire catalogue automatically.
+- Copyrighted editions activate only when explicitly licensed through the
+  server-only API.Bible adapter. Configure `API_BIBLE_API_KEY` plus a
   comma-separated `API_BIBLE_COMMERCIALLY_LICENSED_BIBLE_IDS` containing only
   exact editions enabled for BibleQuest's commercial plan; catalog visibility
   alone is not proof of rights. The legacy `API_BIBLE_ALLOWED_BIBLE_IDS` name is

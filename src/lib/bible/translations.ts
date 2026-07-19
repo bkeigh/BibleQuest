@@ -9,9 +9,11 @@
 export const LOCAL_WEB_TRANSLATION_KEY = "web";
 export const DEFAULT_BIBLE_TRANSLATION_KEY = "niv";
 
-export type BibleTranslationSource = "local" | "api_bible";
+export type BibleTranslationSource = "local" | "api_bible" | "helloao";
+export type BibleContentUsePolicy = "public_domain" | "licensed_transient";
 export type BibleTranslationAvailability =
   | "bundled"
+  | "open"
   | "connected"
   | "provider_required"
   | "license_pending";
@@ -21,6 +23,8 @@ export interface BibleTranslation {
   key: string;
   /** Provider-specific id. Never used as the user-facing name. */
   providerId?: string;
+  /** Reviewed upstream text revision; the server fails closed if it changes. */
+  providerSha256?: string;
   name: string;
   abbreviation: string;
   /** ISO 639-3 when supplied by API.Bible; `eng` for bundled WEB. */
@@ -29,8 +33,18 @@ export interface BibleTranslation {
   languageNameLocal: string;
   direction: "ltr" | "rtl";
   source: BibleTranslationSource;
+  /** Explicit persistence/export boundary; never infer rights from provider. */
+  contentUsePolicy: BibleContentUsePolicy;
   availability: BibleTranslationAvailability;
   copyright?: string;
+  /** Publisher/source terms shown beside open or licensed Scripture. */
+  licenseUrl?: string;
+  licenseNotice?: string;
+  website?: string;
+  /** Completeness evidence captured when reviewing an open catalogue entry. */
+  numberOfBooks?: number;
+  totalNumberOfChapters?: number;
+  totalNumberOfVerses?: number;
   featured?: boolean;
 }
 
@@ -43,10 +57,139 @@ export const WEB_TRANSLATION: BibleTranslation = {
   languageNameLocal: "English",
   direction: "ltr",
   source: "local",
+  contentUsePolicy: "public_domain",
   availability: "bundled",
   copyright: "Public Domain. No copyright restrictions.",
   featured: true,
 };
+
+const BSB_TRANSLATION: BibleTranslation = {
+  key: "bsb",
+  providerId: "BSB",
+  providerSha256:
+    "6cc5238e442b4204b0f617cc5c932bc04f3bae4a0658e6393b0e319653ebe37f",
+  name: "Berean Standard Bible",
+  abbreviation: "BSB",
+  languageId: "eng",
+  languageName: "English",
+  languageNameLocal: "English",
+  direction: "ltr",
+  source: "helloao",
+  contentUsePolicy: "public_domain",
+  availability: "open",
+  copyright:
+    "Berean Standard Bible (BSB) · Public domain as of April 30, 2023. Served by the HelloAO Free Use Bible API.",
+  licenseNotice: "Public-domain open edition · HelloAO",
+  licenseUrl: "https://berean.bible/licensing.htm",
+  website: "https://berean.bible/",
+  numberOfBooks: 66,
+  totalNumberOfChapters: 1189,
+  totalNumberOfVerses: 31086,
+  featured: true,
+};
+
+/**
+ * Reviewed, complete open editions the server may request from HelloAO.
+ * This is deliberately a static allowlist: the public catalogue is discovery,
+ * not automatic permission to expose every entry in a commercial app.
+ */
+export const HELLOAO_OPEN_TRANSLATIONS: BibleTranslation[] = [
+  BSB_TRANSLATION,
+  {
+    key: "helloao:spa_r09",
+    providerId: "spa_r09",
+    providerSha256:
+      "94e154b2e6e56eda1702d9e9f664357a5f2aa82634b551111b0b698d124e97d5",
+    name: "Santa Biblia — Reina Valera 1909",
+    abbreviation: "R09",
+    languageId: "spa",
+    languageName: "Spanish",
+    languageNameLocal: "español",
+    direction: "ltr",
+    source: "helloao",
+    contentUsePolicy: "public_domain",
+    availability: "open",
+    copyright:
+      "Reina Valera 1909 · Public-domain open edition from eBible.org, served by HelloAO.",
+    licenseNotice: "Public-domain open edition · eBible.org via HelloAO",
+    licenseUrl: "https://ebible.org/Scriptures/details.php?id=spaRV1909",
+    website: "https://ebible.org/Scriptures/details.php?id=spaRV1909",
+    numberOfBooks: 66,
+    totalNumberOfChapters: 1189,
+    totalNumberOfVerses: 31102,
+  },
+  {
+    key: "helloao:deu_l12",
+    providerId: "deu_l12",
+    providerSha256:
+      "ab4c66104466c4978b1b2f9dcea944a5921959f5d38e467239e6757399eda6c6",
+    name: "Lutherbibel 1912",
+    abbreviation: "L12",
+    languageId: "deu",
+    languageName: "German",
+    languageNameLocal: "Deutsch",
+    direction: "ltr",
+    source: "helloao",
+    contentUsePolicy: "public_domain",
+    availability: "open",
+    copyright:
+      "Lutherbibel 1912 · Public-domain open edition from eBible.org, served by HelloAO.",
+    licenseNotice: "Public-domain open edition · eBible.org via HelloAO",
+    licenseUrl: "https://ebible.org/Scriptures/details.php?id=deu1912",
+    website: "https://ebible.org/Scriptures/details.php?id=deu1912",
+    numberOfBooks: 66,
+    totalNumberOfChapters: 1189,
+    totalNumberOfVerses: 31102,
+  },
+  {
+    key: "helloao:cmn_cu1",
+    providerId: "cmn_cu1",
+    providerSha256:
+      "695cd78273e0ae8b7d4d8652df136647b8176716ed7279584f6bd047574676ff",
+    name: "新标点和合本",
+    abbreviation: "CU1",
+    languageId: "cmn",
+    languageName: "Chinese",
+    languageNameLocal: "中文",
+    direction: "ltr",
+    source: "helloao",
+    contentUsePolicy: "public_domain",
+    availability: "open",
+    copyright:
+      "Chinese Union Version (Simplified) · Public-domain open edition from eBible.org, served by HelloAO.",
+    licenseNotice: "Public-domain open edition · eBible.org via HelloAO",
+    licenseUrl: "https://ebible.org/Scriptures/details.php?id=cmn-cu89s",
+    website: "https://ebible.org/Scriptures/details.php?id=cmn-cu89s",
+    numberOfBooks: 66,
+    totalNumberOfChapters: 1189,
+    totalNumberOfVerses: 31021,
+  },
+  {
+    key: "helloao:arb_vdv",
+    providerId: "arb_vdv",
+    providerSha256:
+      "a7dbde0da2118c438758bca1706ea71c5c2e4cec72eb996463e4c761c9f6bffb",
+    name: "الكتاب المقدس باللغة العربية، فان دايك",
+    abbreviation: "VDV",
+    languageId: "arb",
+    languageName: "Arabic",
+    languageNameLocal: "العربية",
+    // HelloAO currently reports this correctly, but direction remains reviewed
+    // client metadata so an upstream catalogue regression cannot flip Arabic.
+    direction: "rtl",
+    source: "helloao",
+    contentUsePolicy: "public_domain",
+    availability: "open",
+    copyright:
+      "Arabic Van Dyck Bible · Public-domain open edition from eBible.org, served by HelloAO.",
+    licenseNotice: "Public-domain open edition · eBible.org via HelloAO",
+    licenseUrl: "https://ebible.org/Scriptures/details.php?id=arb-vd",
+    website: "https://ebible.org/Scriptures/details.php?id=arb-vd",
+    numberOfBooks: 66,
+    totalNumberOfChapters: 1189,
+    totalNumberOfVerses: 31104,
+  },
+];
 
 /**
  * The editions requested for launch. Copyrighted rows are preferences and
@@ -63,9 +206,11 @@ export const FEATURED_TRANSLATIONS: BibleTranslation[] = [
     languageNameLocal: "English",
     direction: "ltr",
     source: "api_bible",
+    contentUsePolicy: "licensed_transient",
     availability: "provider_required",
     featured: true,
   },
+  BSB_TRANSLATION,
   {
     key: "kjv",
     name: "King James Version",
@@ -75,6 +220,7 @@ export const FEATURED_TRANSLATIONS: BibleTranslation[] = [
     languageNameLocal: "English",
     direction: "ltr",
     source: "api_bible",
+    contentUsePolicy: "licensed_transient",
     availability: "provider_required",
     featured: true,
   },
@@ -87,6 +233,7 @@ export const FEATURED_TRANSLATIONS: BibleTranslation[] = [
     languageNameLocal: "English",
     direction: "ltr",
     source: "api_bible",
+    contentUsePolicy: "licensed_transient",
     availability: "provider_required",
     featured: true,
   },
@@ -99,6 +246,7 @@ export const FEATURED_TRANSLATIONS: BibleTranslation[] = [
     languageNameLocal: "English",
     direction: "ltr",
     source: "api_bible",
+    contentUsePolicy: "licensed_transient",
     availability: "provider_required",
     featured: true,
   },
@@ -111,6 +259,7 @@ export const FEATURED_TRANSLATIONS: BibleTranslation[] = [
     languageNameLocal: "English",
     direction: "ltr",
     source: "api_bible",
+    contentUsePolicy: "licensed_transient",
     availability: "provider_required",
     featured: true,
   },
@@ -118,8 +267,23 @@ export const FEATURED_TRANSLATIONS: BibleTranslation[] = [
 ];
 
 const featuredByKey = new Map(FEATURED_TRANSLATIONS.map((item) => [item.key, item]));
+const helloAoByKey = new Map(
+  HELLOAO_OPEN_TRANSLATIONS.map((item) => [item.key, item]),
+);
 
 const CONNECTED_TRANSLATION_KEY = /^api:[a-f0-9]{16}-\d{2}$/i;
+const HELLOAO_TRANSLATION_KEY = /^helloao:[a-z0-9]+(?:_[a-z0-9]+)*$/;
+
+function parsedBibleTranslationKey(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const key = value.trim().toLowerCase();
+  if (!key || key.length > 80) return undefined;
+  if (featuredByKey.has(key) || CONNECTED_TRANSLATION_KEY.test(key)) return key;
+  // A syntactically valid provider id is not sufficient. Only the finite,
+  // reviewed open-edition allowlist may cross a client or server boundary.
+  if (HELLOAO_TRANSLATION_KEY.test(key) && helloAoByKey.has(key)) return key;
+  return undefined;
+}
 
 /**
  * Preferences can arrive from localStorage, an imported backup, or an
@@ -127,14 +291,21 @@ const CONNECTED_TRANSLATION_KEY = /^api:[a-f0-9]{16}-\d{2}$/i;
  * understands so malformed data cannot reach string helpers or API routes.
  */
 export function normalizeBibleTranslationKey(value: unknown): string {
-  if (typeof value !== "string") return DEFAULT_BIBLE_TRANSLATION_KEY;
-  const key = value.trim().toLowerCase();
-  if (featuredByKey.has(key) || CONNECTED_TRANSLATION_KEY.test(key)) return key;
-  return DEFAULT_BIBLE_TRANSLATION_KEY;
+  return parsedBibleTranslationKey(value) ?? DEFAULT_BIBLE_TRANSLATION_KEY;
 }
 
 export function featuredTranslation(key: string): BibleTranslation | undefined {
   return featuredByKey.get(key);
+}
+
+/** Metadata for every static client-safe edition, featured or otherwise. */
+export function translationMetadata(
+  key: string | null | undefined,
+): BibleTranslation | undefined {
+  const parsed = parsedBibleTranslationKey(key);
+  return parsed
+    ? featuredByKey.get(parsed) ?? helloAoByKey.get(parsed)
+    : undefined;
 }
 
 /**
@@ -145,21 +316,29 @@ export function featuredTranslation(key: string): BibleTranslation | undefined {
 export function bibleTranslationKey(
   value: string | null | undefined,
 ): string | undefined {
-  if (!value || value.length > 80) return undefined;
-  return featuredTranslation(value) || CONNECTED_TRANSLATION_KEY.test(value)
-    ? value
-    : undefined;
+  return parsedBibleTranslationKey(value);
 }
 
 export function translationPreferenceLabel(key: string): string {
   const normalized = normalizeBibleTranslationKey(key);
-  const featured = featuredTranslation(normalized);
-  if (featured) return featured.abbreviation;
+  const translation = translationMetadata(normalized);
+  if (translation) return translation.abbreviation;
   return normalized.startsWith("api:") ? "Connected translation" : "NIV";
 }
 
 export function isRemoteTranslationKey(key: string): boolean {
   return key !== LOCAL_WEB_TRANSLATION_KEY;
+}
+
+/**
+ * API.Bible text is intentionally transient. Bundled WEB and the reviewed
+ * HelloAO open editions may be persisted, exported, and shared with their
+ * edition attribution intact.
+ */
+export function isRedistributableBibleTranslation(
+  translation: BibleTranslation,
+): boolean {
+  return translation.contentUsePolicy === "public_domain";
 }
 
 /** Top-language order for the connected catalogue; all other languages follow. */

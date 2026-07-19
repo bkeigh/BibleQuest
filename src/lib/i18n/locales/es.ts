@@ -156,16 +156,29 @@ export const es: UIStrings = {
       preferenceDescription:
         "{translation} es tu preferencia. Si su conexión con licencia no está disponible, BibleQuest usa WEB, de dominio público, e indica claramente el cambio.",
       licensingNote:
-        "Las ediciones con derechos de autor solo aparecen cuando sus identificadores exactos del proveedor están aprobados para el uso comercial de BibleQuest; nunca se incluyen en la app ni se envían a la generación de misiones.",
+        "Las ediciones abiertas provienen de la lista revisada de HelloAO. Las ediciones con derechos de autor solo aparecen cuando sus identificadores exactos están aprobados para el uso comercial de BibleQuest; nunca se incluyen en la app ni se envían a la generación de misiones.",
       availableOffline: "Disponible sin conexión",
       connected: "Conectada",
+      openOnline: "Abierta en línea",
+      licensedConnection: "Conexión con licencia",
+      bundledPreferenceDescription:
+        "{translation} está incluida en BibleQuest y disponible sin conexión.",
+      openPreferenceDescription:
+        "{translation} es una edición abierta en línea. Si no se puede cargar, BibleQuest usa WEB, de dominio público, e indica claramente el cambio.",
+      licensedPreferenceDescription:
+        "{translation} usa una conexión con licencia. Si no está disponible, BibleQuest muestra una edición abierta con atribución o la alternativa WEB de dominio público.",
+      sourceLicense: "Fuente y licencia",
+      openProviderError:
+        "No se pudieron comprobar las ediciones abiertas en línea. WEB sigue disponible sin conexión.",
+      licensedProviderError:
+        "No se pudieron comprobar las ediciones con licencia. Las ediciones abiertas y WEB siguen disponibles.",
       licensePending: "Licencia pendiente",
-      providerRequired: "Se requiere conectar un proveedor",
-      checking: "Comprobando ediciones conectadas…",
-      providerError: "No se pudieron comprobar las ediciones conectadas. WEB sigue disponible.",
-      searchLabel: "Buscar idiomas y ediciones conectados",
-      searchPlaceholder: "Español, chino, hindi…",
-      noMatches: "Ninguna edición conectada coincide con la búsqueda.",
+      providerRequired: "Se requiere una conexión con licencia",
+      checking: "Comprobando ediciones abiertas y con licencia…",
+      providerError: "No se pudieron comprobar las ediciones en línea. WEB sigue disponible.",
+      searchLabel: "Buscar idiomas y ediciones en línea",
+      searchPlaceholder: "Español, chino, árabe…",
+      noMatches: "Ninguna edición en línea coincide con la búsqueda.",
     },
     appearance: "Apariencia",
     theme: "Tema",

@@ -21,7 +21,10 @@ import type { ChapterContent } from "@/lib/bible/server";
 import { cn } from "@/lib/utils/cn";
 import { ApiBibleViewTracker } from "@/components/bible/ApiBibleViewTracker";
 import { usePreferredBibleChapter } from "@/lib/bible/use-preferred-scripture";
-import { LOCAL_WEB_TRANSLATION_KEY } from "@/lib/bible/translations";
+import {
+  isRedistributableBibleTranslation,
+  LOCAL_WEB_TRANSLATION_KEY,
+} from "@/lib/bible/translations";
 
 interface VerseRange {
   start: number;
@@ -77,6 +80,9 @@ function ReaderInner({
   const verseRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const instructionsId = useId();
   const resolved = usePreferredBibleChapter(content, translationOverride);
+  const mayPersistEffectiveText = isRedistributableBibleTranslation(
+    resolved.effectiveTranslation,
+  );
 
   // Record reading position + chapter read on open.
   useEffect(() => {
@@ -97,21 +103,30 @@ function ReaderInner({
     let frame = 0;
 
     function applyLocationTarget() {
-      const range = targetFromLocation(content.verses.length);
+      const range = targetFromLocation(resolved.verses.length);
       setTargeted(range);
       if (!range) return;
       setFocusedVerse(range.start);
-      recordRecentVerse({
-        bookSlug: content.bookSlug,
-        bookName: content.bookName,
-        chapter: content.chapter,
-        verseStart: range.start,
-        verseEnd: range.end,
-        reference: `${content.bookName} ${content.chapter}:${range.start}${
-          range.end > range.start ? `–${range.end}` : ""
-        }`,
-        text: content.verses.slice(range.start - 1, range.end).join(" "),
-      });
+      // RecentVerse does not yet carry edition provenance, so its synced text
+      // remains the bundled WEB snapshot. Bookmarks do retain reviewed open
+      // edition keys and wording through the separate save action below.
+      const safeSnapshot = content.verses.slice(range.start - 1, range.end);
+      if (
+        safeSnapshot.length === range.end - range.start + 1 &&
+        safeSnapshot.every(Boolean)
+      ) {
+        recordRecentVerse({
+          bookSlug: content.bookSlug,
+          bookName: content.bookName,
+          chapter: content.chapter,
+          verseStart: range.start,
+          verseEnd: range.end,
+          reference: `${content.bookName} ${content.chapter}:${range.start}${
+            range.end > range.start ? `–${range.end}` : ""
+          }`,
+          text: safeSnapshot.join(" "),
+        });
+      }
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
         const node = verseRefs.current[range.start - 1];
@@ -139,6 +154,7 @@ function ReaderInner({
     content.verses,
     recordRecentVerse,
     resolved.loading,
+    resolved.verses,
   ]);
 
   const bookmarkedVerses = new Set(
@@ -159,9 +175,16 @@ function ReaderInner({
     : "";
 
   function moveVerseFocus(nextVerse: number) {
-    const bounded = Math.min(content.verses.length, Math.max(1, nextVerse));
+    const bounded = Math.min(resolved.verses.length, Math.max(1, nextVerse));
     setFocusedVerse(bounded);
     window.requestAnimationFrame(() => verseRefs.current[bounded - 1]?.focus());
+  }
+
+  function persistableVerseText(index: number): string | undefined {
+    const text = mayPersistEffectiveText
+      ? resolved.verses[index]
+      : content.verses[index];
+    return text?.trim() ? text : undefined;
   }
 
   return (
@@ -202,7 +225,12 @@ function ReaderInner({
         resolved.requestedKey !== LOCAL_WEB_TRANSLATION_KEY && (
           <p className="mt-2 rounded-[10px] bg-linen px-3 py-2 text-caption leading-relaxed text-ash">
             {resolved.preferredTranslation?.abbreviation ?? "Your preferred edition"}{" "}
-            is preferred. This chapter is using WEB until its licensed connection is available.
+            preferred · {resolved.effectiveTranslation.abbreviation} shown{" "}
+            {resolved.preferredTranslation?.source === "helloao"
+              ? "because the open online edition could not be loaded."
+              : resolved.fallbackReason === "content_unavailable"
+                ? "because the preferred text could not be loaded."
+                : "because its licensed connection is unavailable."}
           </p>
         )}
       <ApiBibleViewTracker token={resolved.fumsToken} />
@@ -212,6 +240,8 @@ function ReaderInner({
       <div
         className="measure-reading mt-5"
         role="group"
+        dir={resolved.effectiveTranslation.direction}
+        lang={resolved.effectiveTranslation.languageId}
         aria-busy={resolved.loading}
         aria-label={`${content.bookName} ${content.chapter} verses`}
         aria-describedby={instructionsId}
@@ -231,17 +261,19 @@ function ReaderInner({
             setFocusedVerse(num);
             setSelected(isSel ? null : num);
             if (!isSel) {
-              recordRecentVerse({
-                bookSlug: content.bookSlug,
-                bookName: content.bookName,
-                chapter: content.chapter,
-                verseStart: num,
-                verseEnd: num,
-                reference: `${content.bookName} ${content.chapter}:${num}`,
-                // Persist only the bundled public-domain fallback. Licensed
-                // provider text remains transient and is refreshed on view.
-                text: content.verses[i],
-              });
+              const safeVerseText = content.verses[i]?.trim();
+              if (safeVerseText) {
+                recordRecentVerse({
+                  bookSlug: content.bookSlug,
+                  bookName: content.bookName,
+                  chapter: content.chapter,
+                  verseStart: num,
+                  verseEnd: num,
+                  reference: `${content.bookName} ${content.chapter}:${num}`,
+                  // RecentVerse has no translation key, so retain WEB here.
+                  text: safeVerseText,
+                });
+              }
             }
           };
           return (
@@ -276,7 +308,7 @@ function ReaderInner({
                   moveVerseFocus(1);
                 } else if (e.key === "End") {
                   e.preventDefault();
-                  moveVerseFocus(content.verses.length);
+                  moveVerseFocus(resolved.verses.length);
                 }
               }}
               className={cn(
@@ -309,20 +341,24 @@ function ReaderInner({
           </span>
           <button
             onClick={() => {
+              const safeVerseText = persistableVerseText(selected - 1);
+              if (!safeVerseText) return;
               const nowSaved = toggleBookmark({
                 bookSlug: content.bookSlug,
                 bookName: content.bookName,
                 chapter: content.chapter,
                 verse: selected,
-                // Keep saved/exported/account text public-domain. The chosen
-                // edition is resolved afresh whenever Scripture is viewed.
-                text: content.verses[selected - 1],
+                // Keep licensed provider text transient; reviewed open
+                // editions can be saved with their own edition key.
+                text: safeVerseText,
                 translationKey: resolved.effectiveTranslation.key,
               });
               toast(nowSaved ? "Verse saved." : "Removed.");
             }}
             aria-pressed={bookmarkedVerses.has(selected)}
-            disabled={resolved.loading}
+            disabled={
+              resolved.loading || !persistableVerseText(selected - 1)
+            }
             className="inline-flex items-center gap-1.5 text-[0.875rem] text-accent"
           >
             {bookmarkedVerses.has(selected) ? (
@@ -332,6 +368,8 @@ function ReaderInner({
             )}
             {resolved.loading
               ? "Loading…"
+              : !persistableVerseText(selected - 1)
+                ? "Not available to save"
               : bookmarkedVerses.has(selected)
                 ? "Saved"
                 : "Save"}
@@ -372,6 +410,21 @@ function ReaderInner({
             lang={resolved.effectiveTranslation.languageId}
           >
             {resolved.effectiveTranslation.copyright}
+            {resolved.effectiveTranslation.licenseUrl && (
+              <>
+                {" "}
+                <a
+                  href={resolved.effectiveTranslation.licenseUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  dir="ltr"
+                  lang="en"
+                  className="underline decoration-fog underline-offset-2 hover:text-charcoal"
+                >
+                  Source &amp; license
+                </a>
+              </>
+            )}
           </p>
         )}
     </div>

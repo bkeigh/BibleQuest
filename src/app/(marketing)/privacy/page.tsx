@@ -48,13 +48,16 @@ export default function PrivacyPage() {
         journal content.
       </Prose>
 
-      <ProseHeading>If you choose a connected Bible edition</ProseHeading>
+      <ProseHeading>If you choose an online Bible edition</ProseHeading>
       <Prose>
-        The licensed Scripture provider receives the requested passage plus
-        random device and session identifiers required to report that the text
-        was viewed. BibleQuest does not send your name, contact details, prayers,
-        reflections, or account ID with that report. Choosing the bundled WEB
-        edition keeps Scripture reading entirely on BibleQuest’s own service.
+        For a reviewed public-domain online edition, BibleQuest’s server asks
+        the HelloAO Free Use Bible API for the requested book and chapter. It
+        does not send your name, contact details, account ID, prayers, or
+        reflections. For a separately licensed edition, API.Bible receives the
+        requested passage plus random device and session identifiers required
+        to report that its text was viewed; it receives none of that personal or
+        spiritual content either. Choosing bundled WEB avoids either third-party
+        Scripture request.
       </Prose>
 
       <ProseHeading>If you create an account</ProseHeading>

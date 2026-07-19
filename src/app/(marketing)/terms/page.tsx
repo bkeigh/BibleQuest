@@ -37,11 +37,13 @@ export default function TermsPage() {
 
       <ProseHeading>Scripture</ProseHeading>
       <Prose>
-        BibleQuest bundles the public-domain World English Bible. A selected
-        copyrighted edition is shown only through a separately licensed provider,
-        with its source and copyright notice displayed in context. If that
-        connection is unavailable, the app clearly returns to WEB; it never labels
-        WEB text as another edition.
+        BibleQuest bundles the public-domain World English Bible. Additional
+        public-domain editions come only from a reviewed, revision-pinned
+        HelloAO allowlist and display their source and license. A selected
+        copyrighted edition is shown only through a separately licensed
+        provider, with its copyright notice displayed in context. If an online
+        source is unavailable, the app labels the attributed open edition or WEB
+        fallback honestly; it never labels fallback text as the requested edition.
       </Prose>
     </MarketingPage>
   );

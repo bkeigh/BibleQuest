@@ -155,16 +155,29 @@ export const zh: UIStrings = {
       preferenceDescription:
         "你首选 {translation}。如果授权连接不可用，BibleQuest 会改用公版 WEB，并清楚标明这一替代。",
       licensingNote:
-        "受版权保护的译本仅会在其确切提供商 ID 获准用于 BibleQuest 商业服务时显示；这些文本不会内置到应用中，也不会发送给任务生成功能。",
+        "开放译本来自 BibleQuest 审核过的 HelloAO 清单。受版权保护的译本仅会在其确切提供商 ID 获准用于商业服务时显示；这些文本不会内置到应用中，也不会发送给任务生成功能。",
       availableOffline: "可离线使用",
       connected: "已连接",
+      openOnline: "开放在线版",
+      licensedConnection: "授权连接",
+      bundledPreferenceDescription:
+        "{translation} 已内置于 BibleQuest，可离线使用。",
+      openPreferenceDescription:
+        "{translation} 是开放在线译本。如果无法加载，BibleQuest 会改用公版 WEB，并清楚标明这一替代。",
+      licensedPreferenceDescription:
+        "{translation} 使用授权连接。如果连接不可用，BibleQuest 会显示注明来源的开放译本或公版 WEB。",
+      sourceLicense: "来源与许可",
+      openProviderError:
+        "无法检查开放在线译本。WEB 仍可离线使用。",
+      licensedProviderError:
+        "无法检查授权译本。开放译本和 WEB 仍可使用。",
       licensePending: "授权待定",
-      providerRequired: "需要连接提供商",
-      checking: "正在检查已连接的译本…",
-      providerError: "无法检查已连接的译本。WEB 仍可使用。",
-      searchLabel: "搜索已连接的语言和译本",
-      searchPlaceholder: "西班牙语、中文、印地语…",
-      noMatches: "没有符合搜索条件的已连接译本。",
+      providerRequired: "需要授权连接",
+      checking: "正在检查开放和授权译本…",
+      providerError: "无法检查在线译本。WEB 仍可使用。",
+      searchLabel: "搜索在线语言和译本",
+      searchPlaceholder: "西班牙语、中文、阿拉伯语…",
+      noMatches: "没有符合搜索条件的在线译本。",
     },
     appearance: "外观",
     theme: "主题",

@@ -28,6 +28,7 @@ import { IconCheck } from "@/components/design-system/icons";
 import { cn } from "@/lib/utils/cn";
 import {
   FEATURED_TRANSLATIONS,
+  translationMetadata,
   translationPreferenceLabel,
   type BibleTranslation,
 } from "@/lib/bible/translations";
@@ -208,6 +209,14 @@ interface BibleTranslationCopy {
   licensingNote: string;
   availableOffline: string;
   connected: string;
+  openOnline: string;
+  licensedConnection: string;
+  bundledPreferenceDescription: string;
+  openPreferenceDescription: string;
+  licensedPreferenceDescription: string;
+  sourceLicense: string;
+  openProviderError: string;
+  licensedProviderError: string;
   licensePending: string;
   providerRequired: string;
   checking: string;
@@ -223,16 +232,29 @@ const DEFAULT_BIBLE_TRANSLATION_COPY: BibleTranslationCopy = {
   preferenceDescription:
     "{translation} is your preference. If its licensed connection is unavailable, BibleQuest uses the public-domain WEB and labels the fallback clearly.",
   licensingNote:
-    "Copyrighted editions appear only when their exact provider IDs are approved for BibleQuest’s commercial use; they are never bundled or sent to quest generation.",
+    "Open editions come from BibleQuest’s reviewed HelloAO allowlist. Copyrighted editions appear only when their exact provider IDs are approved for BibleQuest’s commercial use; they are never bundled or sent to quest generation.",
   availableOffline: "Available offline",
   connected: "Connected",
+  openOnline: "Open online",
+  licensedConnection: "Licensed connection",
+  bundledPreferenceDescription:
+    "{translation} is bundled with BibleQuest and available offline.",
+  openPreferenceDescription:
+    "{translation} is an open online edition. If it cannot load, BibleQuest uses the public-domain WEB and labels the fallback clearly.",
+  licensedPreferenceDescription:
+    "{translation} uses a licensed provider connection. If it is unavailable, BibleQuest shows an attributed open edition or the public-domain WEB fallback.",
+  sourceLicense: "Source & license",
+  openProviderError:
+    "Open online editions could not be checked. WEB remains available offline.",
+  licensedProviderError:
+    "Licensed editions could not be checked. Open editions and WEB remain available.",
   licensePending: "License pending",
-  providerRequired: "Provider connection required",
-  checking: "Checking connected editions…",
-  providerError: "Connected editions could not be checked. WEB remains available.",
-  searchLabel: "Search connected languages and editions",
-  searchPlaceholder: "Spanish, Chinese, Hindi…",
-  noMatches: "No connected edition matches that search.",
+  providerRequired: "Licensed connection required",
+  checking: "Checking open and licensed editions…",
+  providerError: "Online editions could not be checked. WEB remains available.",
+  searchLabel: "Search online languages and editions",
+  searchPlaceholder: "Spanish, Chinese, Arabic…",
+  noMatches: "No online edition matches that search.",
 };
 
 function translationStatus(
@@ -242,13 +264,22 @@ function translationStatus(
   switch (translation.availability) {
     case "bundled":
       return copy.availableOffline;
+    case "open":
+      return copy.openOnline;
     case "connected":
-      return copy.connected;
+      return copy.licensedConnection;
     case "license_pending":
       return copy.licensePending;
     default:
       return copy.providerRequired;
   }
+}
+
+function translationSourceNotice(translation: BibleTranslation): string {
+  if (translation.licenseNotice) return translation.licenseNotice;
+  if (translation.source === "local") return "BibleQuest bundled · Public domain";
+  if (translation.source === "helloao") return "Open edition · HelloAO";
+  return "Licensed edition · API.Bible";
 }
 
 function TranslationRow({
@@ -298,6 +329,9 @@ function TranslationRow({
             </span>{" "}
             · {status}
           </span>
+          <span className="mt-0.5 block text-caption leading-relaxed text-ash">
+            {translationSourceNotice(translation)}
+          </span>
         </span>
         {checked && (
           <IconCheck size={16} className="mt-0.5 shrink-0 text-accent" />
@@ -323,7 +357,11 @@ function BibleTranslationPicker({
     FEATURED_TRANSLATIONS,
   );
   const [loading, setLoading] = useState(true);
-  const [providerError, setProviderError] = useState(false);
+  const [providers, setProviders] = useState<{
+    apiBible?: { name: string; configured: boolean; error: boolean };
+    helloAo?: { name: string; configured: boolean; error: boolean };
+  }>({});
+  const [catalogueError, setCatalogueError] = useState(false);
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -335,14 +373,56 @@ function BibleTranslationPicker({
       .then(async (response) => {
         const body = (await response.json()) as {
           translations?: BibleTranslation[];
-          provider?: { error?: boolean };
+          provider?: {
+            name?: unknown;
+            configured?: unknown;
+            error?: unknown;
+          };
+          providers?: {
+            apiBible?: {
+              name?: unknown;
+              configured?: unknown;
+              error?: unknown;
+            };
+            helloAo?: {
+              name?: unknown;
+              configured?: unknown;
+              error?: unknown;
+            };
+          };
         };
         if (!response.ok || !Array.isArray(body.translations)) throw new Error();
         setTranslations(body.translations);
-        setProviderError(Boolean(body.provider?.error));
+        const apiBible = body.providers?.apiBible ?? body.provider;
+        const helloAo = body.providers?.helloAo;
+        setProviders({
+          apiBible: apiBible
+            ? {
+                name:
+                  typeof apiBible.name === "string"
+                    ? apiBible.name
+                    : "API.Bible",
+                configured: Boolean(apiBible.configured),
+                error: Boolean(apiBible.error),
+              }
+            : undefined,
+          helloAo: helloAo
+            ? {
+                name:
+                  typeof helloAo.name === "string" ? helloAo.name : "HelloAO",
+                configured: Boolean(helloAo.configured),
+                error: Boolean(helloAo.error),
+              }
+            : {
+                name: "HelloAO",
+                configured: true,
+                error: false,
+              },
+        });
+        setCatalogueError(false);
       })
       .catch(() => {
-        if (!controller.signal.aborted) setProviderError(true);
+        if (!controller.signal.aborted) setCatalogueError(true);
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -351,12 +431,13 @@ function BibleTranslationPicker({
   }, []);
 
   const featured = translations.filter((item) => item.featured);
-  const connectedLanguages = useMemo(() => {
+  const onlineLanguages = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
-    const connected = translations.filter(
+    const online = translations.filter(
       (item) =>
         !item.featured &&
-        item.availability === "connected" &&
+        (item.availability === "open" ||
+          item.availability === "connected") &&
         (!needle ||
           item.key === value ||
           `${item.name} ${item.abbreviation} ${item.languageName} ${item.languageNameLocal}`
@@ -364,7 +445,7 @@ function BibleTranslationPicker({
             .includes(needle)),
     );
     const groups = new Map<string, BibleTranslation[]>();
-    for (const translation of connected) {
+    for (const translation of online) {
       const group = groups.get(translation.languageName) ?? [];
       group.push(translation);
       groups.set(translation.languageName, group);
@@ -372,21 +453,43 @@ function BibleTranslationPicker({
     return [...groups.entries()];
   }, [query, translations, value]);
 
-  const selected = translations.find((item) => item.key === value);
-  const hasConnected = translations.some(
-    (item) => !item.featured && item.availability === "connected",
+  const selected =
+    translations.find((item) => item.key === value) ??
+    translationMetadata(value);
+  const hasOnlineCatalogue = translations.some(
+    (item) =>
+      !item.featured &&
+      (item.availability === "open" || item.availability === "connected"),
   );
+  const preferenceDescription =
+    selected?.source === "local"
+      ? copy.bundledPreferenceDescription
+      : selected?.source === "helloao"
+        ? copy.openPreferenceDescription
+        : copy.licensedPreferenceDescription;
 
   return (
     <fieldset>
       <legend className="sr-only">{copy.label}</legend>
       <div className="rounded-[10px] bg-linen px-3.5 py-3">
         <p className="text-[0.875rem] leading-relaxed text-charcoal">
-          {fmt(copy.preferenceDescription, {
+          {fmt(preferenceDescription, {
             translation:
               selected?.abbreviation ?? translationPreferenceLabel(value),
           })}
         </p>
+        {selected?.licenseUrl && (
+          <a
+            href={selected.licenseUrl}
+            target="_blank"
+            rel="noreferrer"
+            dir="ltr"
+            lang="en"
+            className="mt-1.5 inline-flex min-h-11 items-center text-caption text-accent underline decoration-accent/30 underline-offset-2"
+          >
+            {copy.sourceLicense} · {selected.abbreviation}
+          </a>
+        )}
         <p className="mt-1.5 text-caption leading-relaxed text-ash">
           {copy.licensingNote}
         </p>
@@ -409,13 +512,23 @@ function BibleTranslationPicker({
           {copy.checking}
         </p>
       )}
-      {providerError && (
+      {catalogueError && (
         <p role="status" className="mt-3 text-caption leading-relaxed text-ash">
           {copy.providerError}
         </p>
       )}
+      {!catalogueError && providers.helloAo?.error && (
+        <p role="status" className="mt-3 text-caption leading-relaxed text-ash">
+          {copy.openProviderError}
+        </p>
+      )}
+      {!catalogueError && providers.apiBible?.error && (
+        <p role="status" className="mt-3 text-caption leading-relaxed text-ash">
+          {copy.licensedProviderError}
+        </p>
+      )}
 
-      {hasConnected && (
+      {hasOnlineCatalogue && (
         <div className="mt-4 border-t border-mist/70 pt-4">
           <label htmlFor="translation-search" className="text-caption text-ash">
             {copy.searchLabel}
@@ -429,7 +542,7 @@ function BibleTranslationPicker({
             className="mt-1.5 w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-[0.9375rem] text-graphite outline-none focus:border-accent/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           />
           <div className="mt-3 max-h-80 space-y-4 overflow-y-auto pr-1">
-            {connectedLanguages.map(([language, editions]) => (
+            {onlineLanguages.map(([language, editions]) => (
               <div key={language}>
                 <p
                   className="px-2 text-caption uppercase tracking-[0.12em] text-accent"
@@ -450,7 +563,7 @@ function BibleTranslationPicker({
                 </div>
               </div>
             ))}
-            {connectedLanguages.length === 0 && (
+            {onlineLanguages.length === 0 && (
               <p className="text-caption text-ash">{copy.noMatches}</p>
             )}
           </div>

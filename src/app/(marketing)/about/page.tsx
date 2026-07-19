@@ -49,8 +49,9 @@ export default function AboutPage() {
         BibleQuest is a Christian product that aims to be humble and broadly
         welcoming — Catholic, Orthodox, Protestant, non-denominational, or simply
         exploring. Scripture is presented plainly (with the public-domain World
-        English Bible bundled offline and optional licensed editions clearly
-        attributed). Any future AI features will be a study companion,
+        English Bible bundled offline, reviewed public-domain online editions,
+        and optional licensed editions all clearly attributed). Any future AI
+        features will be a study companion,
         never a stand-in for God, clergy, or a counselor — and we’ll say so
         clearly.
       </Prose>

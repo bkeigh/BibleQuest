@@ -159,16 +159,29 @@ export const fr: UIStrings = {
       preferenceDescription:
         "{translation} est votre préférence. Si sa connexion sous licence est indisponible, BibleQuest utilise la WEB, dans le domaine public, et signale clairement ce remplacement.",
       licensingNote:
-        "Les éditions protégées ne s’affichent que lorsque leurs identifiants fournisseur exacts sont approuvés pour l’usage commercial de BibleQuest ; elles ne sont jamais intégrées à l’app ni envoyées à la génération de quêtes.",
+        "Les éditions ouvertes proviennent de la liste HelloAO vérifiée par BibleQuest. Les éditions protégées ne s’affichent que lorsque leurs identifiants exacts sont approuvés pour un usage commercial ; elles ne sont jamais intégrées à l’app ni envoyées à la génération de quêtes.",
       availableOffline: "Disponible hors ligne",
       connected: "Connectée",
+      openOnline: "Ouverte en ligne",
+      licensedConnection: "Connexion sous licence",
+      bundledPreferenceDescription:
+        "{translation} est intégrée à BibleQuest et disponible hors ligne.",
+      openPreferenceDescription:
+        "{translation} est une édition ouverte en ligne. Si elle ne peut pas être chargée, BibleQuest utilise la WEB, dans le domaine public, et signale clairement ce remplacement.",
+      licensedPreferenceDescription:
+        "{translation} utilise une connexion sous licence. Si elle est indisponible, BibleQuest affiche une édition ouverte attribuée ou la WEB, dans le domaine public.",
+      sourceLicense: "Source et licence",
+      openProviderError:
+        "Impossible de vérifier les éditions ouvertes en ligne. La WEB reste disponible hors ligne.",
+      licensedProviderError:
+        "Impossible de vérifier les éditions sous licence. Les éditions ouvertes et la WEB restent disponibles.",
       licensePending: "Licence en attente",
-      providerRequired: "Connexion à un fournisseur requise",
-      checking: "Vérification des éditions connectées…",
-      providerError: "Impossible de vérifier les éditions connectées. La WEB reste disponible.",
-      searchLabel: "Rechercher des langues et éditions connectées",
-      searchPlaceholder: "Espagnol, chinois, hindi…",
-      noMatches: "Aucune édition connectée ne correspond à cette recherche.",
+      providerRequired: "Connexion sous licence requise",
+      checking: "Vérification des éditions ouvertes et sous licence…",
+      providerError: "Impossible de vérifier les éditions en ligne. La WEB reste disponible.",
+      searchLabel: "Rechercher des langues et éditions en ligne",
+      searchPlaceholder: "Espagnol, chinois, arabe…",
+      noMatches: "Aucune édition en ligne ne correspond à cette recherche.",
     },
     appearance: "Apparence",
     theme: "Thème",

@@ -10,8 +10,11 @@ import {
 import {
   DEFAULT_BIBLE_TRANSLATION_KEY,
   FEATURED_TRANSLATIONS,
+  HELLOAO_OPEN_TRANSLATIONS,
   WEB_TRANSLATION,
   bibleTranslationKey,
+  normalizeBibleTranslationKey,
+  translationMetadata,
   translationPreferenceLabel,
 } from "@/lib/bible/translations";
 import { DEFAULT_SETTINGS } from "@/lib/questos/types";
@@ -50,6 +53,31 @@ describe("Bible translation preference and licensing boundary", () => {
     expect(bibleTranslationKey("api:not-a-provider-id")).toBeUndefined();
     expect(bibleTranslationKey("javascript:alert(1)")).toBeUndefined();
     expect(bibleTranslationKey("x".repeat(81))).toBeUndefined();
+  });
+
+  it("accepts only reviewed HelloAO keys and keeps KJV on the licensed boundary", () => {
+    expect(HELLOAO_OPEN_TRANSLATIONS.map((item) => item.key)).toEqual([
+      "bsb",
+      "helloao:spa_r09",
+      "helloao:deu_l12",
+      "helloao:cmn_cu1",
+      "helloao:arb_vdv",
+    ]);
+    expect(bibleTranslationKey(" HELLOAO:SPA_R09 ")).toBe(
+      "helloao:spa_r09",
+    );
+    expect(bibleTranslationKey("helloao:eng_kjv")).toBeUndefined();
+    expect(normalizeBibleTranslationKey("helloao:not_reviewed")).toBe("niv");
+    expect(translationMetadata("bsb")).toMatchObject({
+      source: "helloao",
+      contentUsePolicy: "public_domain",
+      availability: "open",
+    });
+    expect(translationMetadata("kjv")).toMatchObject({
+      source: "api_bible",
+      contentUsePolicy: "licensed_transient",
+      availability: "provider_required",
+    });
   });
 
   it("parses provider JSON by verse without leaking section headings", () => {

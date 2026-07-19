@@ -36,6 +36,7 @@ function SavedVerseCard({
     },
     true,
     savedTranslationKey,
+    savedTranslationKey,
   );
   const href = `/app/bible/${bookmark.bookSlug}/${bookmark.chapter}?translation=${encodeURIComponent(savedTranslationKey)}&verse=${bookmark.verse}#verse-${bookmark.verse}`;
 
@@ -63,13 +64,21 @@ function SavedVerseCard({
             className="text-ash"
           >
             {resolved.loading
-              ? `WEB · checking ${resolved.preferredTranslation?.abbreviation ?? "saved edition"}…`
+              ? `${resolved.effectiveTranslation.abbreviation} · checking ${resolved.preferredTranslation?.source === "helloao" ? "open source" : "saved edition"}…`
               : resolved.effectiveTranslation.abbreviation}
           </span>
         </cite>
         {!resolved.loading && resolved.fallbackReason && (
           <p className="mt-1 text-caption leading-relaxed text-ash">
-            The saved edition is unavailable, so this copy is shown in WEB.
+            {resolved.usingStoredSnapshot
+              ? `Your saved ${resolved.effectiveTranslation.abbreviation} copy is shown because its open online source could not refresh.`
+              : `${resolved.preferredTranslation?.abbreviation ?? "The saved edition"} preferred · ${resolved.effectiveTranslation.abbreviation} shown because ${
+                  resolved.preferredTranslation?.source === "helloao"
+                    ? "the open online edition could not be loaded."
+                    : resolved.fallbackReason === "content_unavailable"
+                      ? "the preferred text could not be loaded."
+                      : "its licensed connection is unavailable."
+                }`}
           </p>
         )}
         {!resolved.loading &&
@@ -84,6 +93,18 @@ function SavedVerseCard({
             </p>
           )}
       </Link>
+      {!resolved.loading && resolved.effectiveTranslation.licenseUrl && (
+        <a
+          href={resolved.effectiveTranslation.licenseUrl}
+          target="_blank"
+          rel="noreferrer"
+          dir="ltr"
+          lang="en"
+          className="mt-1 inline-flex min-h-11 items-center text-[0.8125rem] text-ash underline decoration-fog underline-offset-2 transition-colors hover:text-charcoal"
+        >
+          Open source &amp; license
+        </a>
+      )}
       <ApiBibleViewTracker token={resolved.fumsToken} />
       <button
         type="button"

@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ApiBibleError, fetchApiBiblePassage } from "@/lib/bible/api-bible";
 import { providerBookId } from "@/lib/bible/provider-books";
+import {
+  bibleProviderErrorCode,
+  fetchBibleProviderPassage,
+} from "@/lib/bible/provider-dispatcher";
 import { getBookMeta } from "@/lib/bible";
 import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
 
 export const dynamic = "force-dynamic";
 
 function errorResponse(error: unknown) {
-  const code = error instanceof ApiBibleError ? error.code : "content_unavailable";
+  const code = bibleProviderErrorCode(error);
   const status = code === "provider_not_configured" ? 503 : code === "translation_unavailable" ? 404 : 502;
   return NextResponse.json(
     { error: code },
@@ -29,7 +32,6 @@ export async function GET(request: NextRequest) {
   const end = Number(request.nextUrl.searchParams.get("end"));
   const meta = getBookMeta(book);
   const bookId = providerBookId(book);
-  const verseCount = meta?.verseCounts[chapter - 1] ?? 0;
   if (
     !translation ||
     translation.length > 80 ||
@@ -42,7 +44,7 @@ export async function GET(request: NextRequest) {
     chapter > meta.chapterCount ||
     start < 1 ||
     end < start ||
-    end > verseCount ||
+    end > 200 ||
     // Current app passages are one saved verse or a daily passage (maximum 4
     // verses). A small margin supports future curated passages without leaving
     // a broad consecutive-text extraction endpoint.
@@ -55,7 +57,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const provider = await fetchApiBiblePassage(
+    const provider = await fetchBibleProviderPassage(
       translation,
       bookId,
       chapter,

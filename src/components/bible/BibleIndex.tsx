@@ -13,7 +13,10 @@ import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosure";
 import { IconChevronRight } from "@/components/design-system/icons";
 import type { BibleBookMeta } from "@/lib/questos/types";
-import { translationPreferenceLabel } from "@/lib/bible/translations";
+import {
+  translationMetadata,
+  translationPreferenceLabel,
+} from "@/lib/bible/translations";
 
 function BibleIndexInner() {
   const readingPosition = useQuestOS((s) => s.readingPosition);
@@ -22,6 +25,7 @@ function BibleIndexInner() {
   const preferredBibleTranslation = useQuestOS(
     (state) => state.settings.preferredBibleTranslation,
   );
+  const preferredEdition = translationMetadata(preferredBibleTranslation);
 
   // Open the testament the reader is currently in; default to New Testament.
   const readingTestament = useMemo(() => {
@@ -90,9 +94,11 @@ function BibleIndexInner() {
         </DisclosureGroup>
 
         <p className="mt-6 pb-4 text-center text-[0.75rem] text-ash">
-          {preferredBibleTranslation === "web"
-            ? "World English Bible · Public Domain"
-            : `${translationPreferenceLabel(preferredBibleTranslation)} preferred · WEB offline fallback`}
+          {preferredEdition?.source === "local"
+            ? "World English Bible · Available offline · Public Domain"
+            : preferredEdition?.source === "helloao"
+              ? `${preferredEdition.abbreviation} preferred · Open online · WEB offline fallback`
+              : `${translationPreferenceLabel(preferredBibleTranslation)} preferred · Licensed connection · WEB offline fallback`}
         </p>
       </PageContainer>
     </>

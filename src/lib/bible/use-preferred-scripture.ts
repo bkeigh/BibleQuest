@@ -7,7 +7,9 @@ import type { ChapterContent } from "@/lib/bible/server";
 import {
   LOCAL_WEB_TRANSLATION_KEY,
   WEB_TRANSLATION,
-  featuredTranslation,
+  isRedistributableBibleTranslation,
+  normalizeBibleTranslationKey,
+  translationMetadata,
   type BibleTranslation,
   type ResolvedBiblePassage,
 } from "./translations";
@@ -25,32 +27,52 @@ function errorCode(value: unknown): FallbackReason {
   return "content_unavailable";
 }
 
+function fallbackReason(value: unknown): FallbackReason | undefined {
+  return value === "provider_not_configured" ||
+    value === "translation_unavailable" ||
+    value === "content_unavailable"
+    ? value
+    : undefined;
+}
+
 export interface PreferredPassageResult extends ResolvedBiblePassage {
   loading: boolean;
   preferredTranslation?: BibleTranslation;
+  /** A persisted open-edition copy is visible while its online source refreshes. */
+  usingStoredSnapshot?: boolean;
 }
 
 export function usePreferredBiblePassage(
   passage: DailyVerse,
   enabled = true,
   preferenceOverride?: string,
+  snapshotTranslationKey?: string,
 ): PreferredPassageResult {
   const storedPreference = useQuestOS(
     (state) => state.settings.preferredBibleTranslation,
   );
   const requestedKey = enabled
-    ? preferenceOverride || storedPreference || LOCAL_WEB_TRANSLATION_KEY
+    ? normalizeBibleTranslationKey(
+        preferenceOverride || storedPreference || LOCAL_WEB_TRANSLATION_KEY,
+      )
     : LOCAL_WEB_TRANSLATION_KEY;
-  const preferredTranslation = featuredTranslation(requestedKey);
+  const preferredTranslation = translationMetadata(requestedKey);
+  const snapshotTranslation = translationMetadata(snapshotTranslationKey);
+  const storedSnapshotTranslation =
+    snapshotTranslation?.key === requestedKey &&
+    isRedistributableBibleTranslation(snapshotTranslation)
+      ? snapshotTranslation
+      : undefined;
   const fallback = useMemo<PreferredPassageResult>(
     () => ({
       text: passage.text,
       requestedKey,
-      effectiveTranslation: WEB_TRANSLATION,
+      effectiveTranslation: storedSnapshotTranslation ?? WEB_TRANSLATION,
       preferredTranslation,
+      usingStoredSnapshot: Boolean(storedSnapshotTranslation),
       loading: requestedKey !== LOCAL_WEB_TRANSLATION_KEY,
     }),
-    [passage.text, preferredTranslation, requestedKey],
+    [passage.text, preferredTranslation, requestedKey, storedSnapshotTranslation],
   );
   const requestId = `${requestedKey}:${passage.bookSlug}:${passage.chapter}:${passage.verseStart}:${passage.verseEnd}`;
   const [remote, setRemote] = useState<{
@@ -79,6 +101,8 @@ export function usePreferredBiblePassage(
           text?: unknown;
           translation?: BibleTranslation;
           fumsToken?: string;
+          fallbackReason?: unknown;
+          requestedKey?: unknown;
         };
         if (!response.ok || typeof body.text !== "string" || !body.translation) {
           throw body.error;
@@ -89,8 +113,18 @@ export function usePreferredBiblePassage(
             text: body.text,
             requestedKey,
             effectiveTranslation: body.translation,
-            preferredTranslation: body.translation,
+            preferredTranslation:
+              preferredTranslation ??
+              (body.translation.key === requestedKey
+                ? body.translation
+                : undefined),
+            fallbackReason:
+              fallbackReason(body.fallbackReason) ??
+              (body.translation.key !== requestedKey
+                ? "content_unavailable"
+                : undefined),
             fumsToken: body.fumsToken,
+            usingStoredSnapshot: false,
             loading: false,
           },
         });
@@ -113,6 +147,7 @@ export function usePreferredBiblePassage(
     passage.chapter,
     passage.verseEnd,
     passage.verseStart,
+    preferredTranslation,
     requestId,
     requestedKey,
   ]);
@@ -137,9 +172,10 @@ export function usePreferredBibleChapter(
   const storedPreference = useQuestOS(
     (state) => state.settings.preferredBibleTranslation,
   );
-  const requestedKey =
-    preferenceOverride || storedPreference || LOCAL_WEB_TRANSLATION_KEY;
-  const preferredTranslation = featuredTranslation(requestedKey);
+  const requestedKey = normalizeBibleTranslationKey(
+    preferenceOverride || storedPreference || LOCAL_WEB_TRANSLATION_KEY,
+  );
+  const preferredTranslation = translationMetadata(requestedKey);
   const fallback = useMemo<PreferredChapterResult>(
     () => ({
       verses: chapter.verses,
@@ -174,6 +210,8 @@ export function usePreferredBibleChapter(
           verses?: unknown;
           translation?: BibleTranslation;
           fumsToken?: string;
+          fallbackReason?: unknown;
+          requestedKey?: unknown;
         };
         if (
           !response.ok ||
@@ -189,7 +227,16 @@ export function usePreferredBibleChapter(
             verses: body.verses,
             requestedKey,
             effectiveTranslation: body.translation,
-            preferredTranslation: body.translation,
+            preferredTranslation:
+              preferredTranslation ??
+              (body.translation.key === requestedKey
+                ? body.translation
+                : undefined),
+            fallbackReason:
+              fallbackReason(body.fallbackReason) ??
+              (body.translation.key !== requestedKey
+                ? "content_unavailable"
+                : undefined),
             fumsToken: body.fumsToken,
             loading: false,
           },
@@ -207,7 +254,14 @@ export function usePreferredBibleChapter(
         });
       });
     return () => controller.abort();
-  }, [chapter.bookSlug, chapter.chapter, fallback, requestId, requestedKey]);
+  }, [
+    chapter.bookSlug,
+    chapter.chapter,
+    fallback,
+    preferredTranslation,
+    requestId,
+    requestedKey,
+  ]);
 
   return remote?.requestId === requestId ? remote.result : fallback;
 }

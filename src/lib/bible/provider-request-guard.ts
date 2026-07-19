@@ -1,5 +1,5 @@
 /**
- * Lightweight abuse guard for the unauthenticated licensed-Scripture proxy.
+ * Lightweight abuse guard for unauthenticated online-Scripture requests.
  *
  * BibleQuest supports guest reading, so these routes cannot require an account.
  * Fetch Metadata blocks browser hot-linking, while a bounded per-IP window
@@ -110,6 +110,20 @@ export function guardProviderRequest(
     return noStoreJson({ error: "forbidden" }, { status: 403 });
   }
 
+  return rateLimitProviderRequest(request, scope, policy, now);
+}
+
+/**
+ * Apply only the bounded per-IP windows. Public Scripture share pages must
+ * allow top-level cross-site navigation, so their proxy cannot use the Fetch
+ * Metadata rejection that protects same-origin JSON endpoints.
+ */
+export function rateLimitProviderRequest(
+  request: Request,
+  scope: string,
+  policy: ProviderGuardPolicy | readonly ProviderGuardPolicy[],
+  now = Date.now(),
+): Response | null {
   const state = store();
   sweepExpiredWindows(state, now);
   const ip = requestIp(request);

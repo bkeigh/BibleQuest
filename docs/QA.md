@@ -196,7 +196,15 @@ Storage. Cache Storage contains route shells and build assets, never user data.
 
 - [ ] No shame / streak-loss / guilt copy anywhere.
 - [ ] No prayer or reflection text appears in console, network analytics, or logs.
-- [ ] Scripture is labeled "World English Bible".
+- [ ] Scripture always labels the edition actually shown; a preferred edition
+      is never used as the label for BSB or WEB fallback text.
+- [ ] Select BSB, Spanish R09, German L12, Chinese CU1, and Arabic VDV in turn;
+      confirm chapter text, direction, source/license link, save, and share.
+- [ ] Disconnect the network after loading an open edition and confirm saved
+      verses use their attributed stored snapshot while unsaved readings fall
+      back to bundled WEB with a visible explanation.
+- [ ] Open a BSB public verse URL and confirm its canonical/share metadata keeps
+      `translation=bsb`; invalid or licensed translation query values show WEB.
 - [ ] Nothing implies paid users are closer to God.
 - [ ] The UI never looks like a generic Tailwind/shadcn dashboard.
 

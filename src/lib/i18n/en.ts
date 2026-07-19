@@ -156,16 +156,29 @@ export const en: UIStrings = {
       preferenceDescription:
         "{translation} is your preference. If its licensed connection is unavailable, BibleQuest uses the public-domain WEB and labels the fallback clearly.",
       licensingNote:
-        "Copyrighted editions appear only when their exact provider IDs are approved for BibleQuest’s commercial use; they are never bundled or sent to quest generation.",
+        "Open editions come from BibleQuest’s reviewed HelloAO allowlist. Copyrighted editions appear only when their exact provider IDs are approved for BibleQuest’s commercial use; they are never bundled or sent to quest generation.",
       availableOffline: "Available offline",
       connected: "Connected",
+      openOnline: "Open online",
+      licensedConnection: "Licensed connection",
+      bundledPreferenceDescription:
+        "{translation} is bundled with BibleQuest and available offline.",
+      openPreferenceDescription:
+        "{translation} is an open online edition. If it cannot load, BibleQuest uses the public-domain WEB and labels the fallback clearly.",
+      licensedPreferenceDescription:
+        "{translation} uses a licensed provider connection. If it is unavailable, BibleQuest shows an attributed open edition or the public-domain WEB fallback.",
+      sourceLicense: "Source & license",
+      openProviderError:
+        "Open online editions could not be checked. WEB remains available offline.",
+      licensedProviderError:
+        "Licensed editions could not be checked. Open editions and WEB remain available.",
       licensePending: "License pending",
-      providerRequired: "Provider connection required",
-      checking: "Checking connected editions…",
-      providerError: "Connected editions could not be checked. WEB remains available.",
-      searchLabel: "Search connected languages and editions",
-      searchPlaceholder: "Spanish, Chinese, Hindi…",
-      noMatches: "No connected edition matches that search.",
+      providerRequired: "Licensed connection required",
+      checking: "Checking open and licensed editions…",
+      providerError: "Online editions could not be checked. WEB remains available.",
+      searchLabel: "Search online languages and editions",
+      searchPlaceholder: "Spanish, Chinese, Arabic…",
+      noMatches: "No online edition matches that search.",
     },
     appearance: "Appearance",
     theme: "Theme",

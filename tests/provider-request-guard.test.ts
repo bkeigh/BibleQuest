@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST as reportBibleView } from "@/app/api/bible/view/route";
-import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
+import {
+  guardProviderRequest,
+  rateLimitProviderRequest,
+} from "@/lib/bible/provider-request-guard";
 
 function request(
   path: string,
@@ -62,6 +65,23 @@ describe("licensed Scripture request guard", () => {
     expect(limited?.status).toBe(429);
     expect(limited?.headers.get("retry-after")).toBe("1");
     expect(guardProviderRequest(make(), scope, policy, 11_001)).toBeNull();
+  });
+
+  it("allows top-level public share navigation while still rate limiting it", () => {
+    const scope = `public-rate-${crypto.randomUUID()}`;
+    const make = () =>
+      request("/verse/john/3/16?translation=bsb", {
+        "sec-fetch-site": "cross-site",
+      });
+
+    expect(
+      rateLimitProviderRequest(make(), scope, { limit: 1, windowMs: 60_000 }),
+    ).toBeNull();
+    const limited = rateLimitProviderRequest(make(), scope, {
+      limit: 1,
+      windowMs: 60_000,
+    });
+    expect(limited?.status).toBe(429);
   });
 });
 

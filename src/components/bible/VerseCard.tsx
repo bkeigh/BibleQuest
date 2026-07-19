@@ -20,7 +20,10 @@ import { riseIn } from "@/lib/motion";
 import { VerseShareSheet } from "@/components/bible/VerseShareSheet";
 import { ApiBibleViewTracker } from "@/components/bible/ApiBibleViewTracker";
 import { usePreferredBiblePassage } from "@/lib/bible/use-preferred-scripture";
-import { LOCAL_WEB_TRANSLATION_KEY } from "@/lib/bible/translations";
+import {
+  isRedistributableBibleTranslation,
+  LOCAL_WEB_TRANSLATION_KEY,
+} from "@/lib/bible/translations";
 
 /**
  * VerseCard — today's verse as a devotional card / margin note.
@@ -53,6 +56,9 @@ export function VerseCard({
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
   const resolved = usePreferredBiblePassage(verse, !preview);
+  const mayPersistEffectiveText = isRedistributableBibleTranslation(
+    resolved.effectiveTranslation,
+  );
 
   const closeShareSheet = useCallback(() => setShareSheetOpen(false), []);
 
@@ -61,10 +67,22 @@ export function VerseCard({
       ? `${verse.verseStart}-${verse.verseEnd}`
       : `${verse.verseStart}`;
   const shareTitle = `${verse.reference} — BibleQuest`;
-  // Public share pages intentionally remain WEB: licensed provider text is
-  // transient and must not leak into public metadata, exports, or URLs.
-  const shareText = `“${cleanVerseText(verse.text)}” — ${verse.reference} (WEB)`;
-  const sharePath = `/verse/${verse.bookSlug}/${verse.chapter}/${verseSegment}`;
+  // Open editions can travel with their attribution. API.Bible content stays
+  // transient, so licensed readings share the bundled WEB snapshot instead.
+  const sharedVerseText =
+    !resolved.loading && mayPersistEffectiveText ? resolved.text : verse.text;
+  const sharedEdition =
+    !resolved.loading && mayPersistEffectiveText
+      ? resolved.effectiveTranslation.abbreviation
+      : "WEB";
+  const shareText = `“${cleanVerseText(sharedVerseText)}” — ${verse.reference} (${sharedEdition})`;
+  const sharePath = `/verse/${verse.bookSlug}/${verse.chapter}/${verseSegment}${
+    !resolved.loading &&
+    mayPersistEffectiveText &&
+    resolved.effectiveTranslation.key !== LOCAL_WEB_TRANSLATION_KEY
+      ? `?translation=${encodeURIComponent(resolved.effectiveTranslation.key)}`
+      : ""
+  }`;
 
   function shareVerse() {
     const url = new URL(sharePath, window.location.origin).toString();
@@ -161,7 +179,12 @@ export function VerseCard({
             resolved.requestedKey !== LOCAL_WEB_TRANSLATION_KEY && (
               <p className="mt-1.5 text-caption leading-relaxed text-ash">
                 {resolved.preferredTranslation?.abbreviation ?? "Your preferred edition"}{" "}
-                is preferred. WEB is active until its licensed connection is available.
+                preferred · {resolved.effectiveTranslation.abbreviation} shown{" "}
+                {resolved.preferredTranslation?.source === "helloao"
+                  ? "because the open online edition could not be loaded."
+                  : resolved.fallbackReason === "content_unavailable"
+                    ? "because the preferred text could not be loaded."
+                    : "because its licensed connection is unavailable."}
               </p>
             )}
           {!preview &&
@@ -174,6 +197,21 @@ export function VerseCard({
                 lang={resolved.effectiveTranslation.languageId}
               >
                 {resolved.effectiveTranslation.copyright}
+                {resolved.effectiveTranslation.licenseUrl && (
+                  <>
+                    {" "}
+                    <a
+                      href={resolved.effectiveTranslation.licenseUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      dir="ltr"
+                      lang="en"
+                      className="underline decoration-fog underline-offset-2 hover:text-charcoal"
+                    >
+                      Source &amp; license
+                    </a>
+                  </>
+                )}
               </p>
             )}
         </motion.div>
@@ -191,7 +229,7 @@ export function VerseCard({
                 bookName,
                 chapter: verse.chapter,
                 verse: verse.verseStart,
-                text: verse.text,
+                text: mayPersistEffectiveText ? resolved.text : verse.text,
                 translationKey: resolved.effectiveTranslation.key,
               });
               toast(nowSaved ? "Saved to your verses." : "Removed from your verses.");
@@ -231,7 +269,7 @@ export function VerseCard({
         url={shareUrl || sharePath}
         notice={
           !resolved.loading &&
-          resolved.effectiveTranslation.key !== LOCAL_WEB_TRANSLATION_KEY
+          !mayPersistEffectiveText
             ? `You’re reading ${resolved.effectiveTranslation.abbreviation}. Sharing uses the public-domain WEB wording so licensed text stays inside BibleQuest.`
             : undefined
         }

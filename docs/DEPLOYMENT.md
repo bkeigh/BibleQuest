@@ -105,8 +105,19 @@ needed — just don't remove that config.
 - [ ] Configure analytics (privacy-first) and Sentry, if desired.
 - [ ] Keep RevenueCat in `coming-soon` unless every sandbox-to-production gate
       in [`REVENUECAT.md`](REVENUECAT.md) has evidence and explicit approval.
-- [ ] **Verify Bible translation licensing** before adding any non-public-domain
-      translation. WEB is public domain and needs none.
+- [ ] Keep the Free Use Bible API catalogue constrained to the reviewed
+      public-domain allow-list in `src/lib/bible/translations.ts`. A provider
+      catalogue entry is not, by itself, approval to expose that edition.
+- [ ] Verify each open edition's source license URL and attribution whenever the
+      allow-list or pinned upstream SHA-256 changes. An unexpected provider
+      revision fails closed until it is reviewed and deployed; WEB remains the
+      bundled offline fallback.
+- [ ] Mirror the app's online-Scripture limits in Vercel Firewall (fixed window,
+      per IP, deny on exceed): 60/minute for path prefix `/api/bible/`, plus
+      40/minute for `GET /verse/*` with a `translation` query. If the plan has
+      only one custom rate rule, combine both path condition groups at
+      40/minute. The app also has per-instance windows; over-limit public share
+      pages fall back to WEB.
 - [ ] For API.Bible, configure server-only `API_BIBLE_API_KEY` and
       `API_BIBLE_COMMERCIALLY_LICENSED_BIBLE_IDS` only after each exact id is
       licensed for commercial BibleQuest use. Catalog access alone is not

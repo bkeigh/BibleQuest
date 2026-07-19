@@ -196,6 +196,14 @@ export interface UIStrings {
       licensingNote: string;
       availableOffline: string;
       connected: string;
+      openOnline?: string;
+      licensedConnection?: string;
+      bundledPreferenceDescription?: string;
+      openPreferenceDescription?: string;
+      licensedPreferenceDescription?: string;
+      sourceLicense?: string;
+      openProviderError?: string;
+      licensedProviderError?: string;
       licensePending: string;
       providerRequired: string;
       checking: string;

@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
+import { API_BIBLE_FUMS_TOKEN } from "@/lib/bible/fums";
 
 export const dynamic = "force-dynamic";
 
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;
-const TOKEN = /^[a-zA-Z0-9_-]{20,2000}$/;
 
 export async function POST(request: Request) {
   const blocked = guardProviderRequest(request, "bible-view", [
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     typeof value.token !== "string" ||
     typeof value.deviceId !== "string" ||
     typeof value.sessionId !== "string" ||
-    !TOKEN.test(value.token) ||
+    !API_BIBLE_FUMS_TOKEN.test(value.token) ||
     !ID.test(value.deviceId) ||
     !ID.test(value.sessionId)
   ) {
