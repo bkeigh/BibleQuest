@@ -473,9 +473,9 @@ const GRID_PIXEL_SPRITES = defineAssets({
  * approved BibleQuest reference sheet and anchors, then reconstructed on the
  * native grid with the deterministic processor. The grid recipes above stay
  * as an editable fallback/reference language. All PNGs share one physical
- * 128px square canvas while their logical layout grids preserve intended UI
- * scale. Keeping those concepts separate prevents source-size changes from
- * inflating or distorting call sites.
+ * and authored 128px square canvas while their logical layout grids preserve
+ * intended UI scale. Keeping those concepts separate prevents source-detail
+ * changes from inflating or distorting call sites.
  */
 const pixelPng = (
   src: string,
@@ -483,8 +483,8 @@ const pixelPng = (
   rows: number,
   cellScale?: number,
   ambientClassName?: string,
-  artCols = cols,
-  artRows = rows
+  artCols = PRODUCTION_PIXEL_NATIVE_SIZE,
+  artRows = PRODUCTION_PIXEL_NATIVE_SIZE
 ): PixelAsset => ({
   kind: "png",
   src,

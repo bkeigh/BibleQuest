@@ -15,9 +15,9 @@ file source and logical canvas.
 
 | Family | Files | Physical PNG | Native art grid | Registry layout grid |
 | --- | ---: | ---: | ---: | ---: |
-| Small interface/category sprites | 30 | 128×128 | 32×32 | 32×32 |
-| Streak-candle states | 5 | 128×128 | 16×16 | 16×16 |
-| Olive-tree stages | 20 | 128×128 | 32×32 | 32×32 |
+| Small interface/category sprites | 30 | 128×128 | 128×128 | 32×32 |
+| Streak-candle states | 5 | 128×128 | 128×128 | 16×16 |
+| Olive-tree stages | 20 | 128×128 | 128×128 | 32×32 |
 | Feature mascots | 8 | 128×128 | 128×128 | 32×32 |
 
 Physical art and layout dimensions are separate contracts. Every shipped file
@@ -56,9 +56,9 @@ generated files directly into `public/pixel/`.
 
 `output/imagegen/pixel-v2/process-production-128.mjs` is the canonical full-set
 production tool. It rebuilds every family from the high-resolution masters,
-removes connected opaque backdrops, reconstructs binary alpha, maps every
-opaque pixel to the fixed BibleQuest palette, uses transparent padding, and
-normalizes without soft resampling. Run it before review:
+removes connected opaque backdrops, reconstructs binary alpha, maps each asset
+to a source-faithful capped palette, uses transparent padding, and normalizes
+without soft resampling. Run it before review:
 
 ```sh
 node output/imagegen/pixel-v2/process-production-128.mjs \
@@ -95,15 +95,15 @@ node scripts/process-pixel-sprites.mjs qa-sheet \
 ```
 
 Atlas families may use a family-specific splitter in the staging directory,
-but it must finish with the same invariants: exact dimensions, fixed palette,
+but it must finish with the same invariants: exact dimensions, capped palette,
 binary alpha, nearest-neighbor reconstruction, shared baseline, and distinct
 frames. Keep that processing recipe beside its raw atlas and generation notes
 so the result remains reproducible.
 
-The final production pass snaps every family to its declared native art grid.
-Mascots retain all 128×128 addressable pixels; 32×32 art becomes uniform 4×4
-blocks; and 16×16 candle art becomes uniform 8×8 blocks. Exterior contours are
-rewritten to exact `#000000` before each indexed PNG is written.
+The final production pass preserves all 128×128 addressable pixels for every
+family. No sprite is reduced through a 16×16, 32×32, or 64×64 intermediary.
+Exterior contours are rewritten to exact `#000000` before each indexed PNG is
+written.
 
 The older mixed-size staging files remain as provenance only. The canonical
 processor supersedes those exports and writes the reviewed uniform set to
@@ -118,11 +118,9 @@ Required checks:
 
 - exactly 128×128 physical dimensions for all 63 files;
 - alpha values are only 0 or 255, with transparent corners and safe padding;
-- every opaque RGB value belongs either to the shared production palette or a
-  reviewed source-faithful mascot palette;
-- opaque-color budgets remain 22 for small sprites and candles, 24 for
-  mascots, and 28 for trees unless a reviewed per-file exception is recorded
-  in the manifest;
+- every opaque RGB value belongs to its reviewed source-faithful indexed
+  palette;
+- opaque-color budgets remain at or below 32 for every file;
 - no antialiased fringe, isolated noise, checkerboard residue, or chroma spill;
 - silhouettes remain unmistakable at the smallest call site;
 - category marks are visually distinct — especially `praying-hands`, `hands`,

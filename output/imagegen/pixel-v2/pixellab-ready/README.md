@@ -7,8 +7,7 @@ for the most common animation workflow.
 Both directories are refreshed automatically by
 `node scripts/install-imagegen-sprites.mjs` after a reviewed production build.
 
-The files in `mascots/` are clean animation inputs for the BibleQuest mascot
-family. Each file is:
+Every file is a clean animation input for its BibleQuest subject. Each file is:
 
 - exactly 128×128 pixels;
 - transparent outside the subject;
@@ -19,8 +18,8 @@ family. Each file is:
 - free of disconnected fragments and partial-alpha edge pixels.
 
 Every file in `catalogue/` follows the same artifact-free indexed-color
-contract. Mascots retain native one-pixel detail; small sprites and trees use
-uniform 4×4 blocks. The candle sequence uses uniform 8×8 physical blocks.
+contract and retains native one-pixel detail. No file is enlarged from a
+smaller 16×16, 32×32, or 64×64 art grid.
 
 For onboarding, animate `mascot-map`, `mascot-scroll`, `mascot-lantern`,
 `mascot-campfire`, `mascot-dove`, and `mascot-sprout`. `mascot-lamb` and

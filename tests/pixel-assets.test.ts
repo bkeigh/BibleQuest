@@ -24,26 +24,8 @@ type PngSpec = {
   maxOpaqueColors: number;
 };
 
-const OPAQUE_COLOR_BUDGET_OVERRIDES = new Map<string, number>([
-  ["chapel.png", 28],
-  ["fountain.png", 22],
-  ["people.png", 28],
-  ["mascot-dove.png", 24],
-  ["mascot-map.png", 24],
-  ["mascot-scroll.png", 28],
-]);
-
-function physicalPngSpec(src: string): PngSpec {
-  const filename = path.basename(src);
-  const override = OPAQUE_COLOR_BUDGET_OVERRIDES.get(filename);
-  if (override != null) return { maxOpaqueColors: override };
-  if (filename.startsWith("mascot-")) {
-    return { maxOpaqueColors: 24 };
-  }
-  if (/^tree-stage-(?:[0-9]|1[0-9])\.png$/.test(filename)) {
-    return { maxOpaqueColors: 28 };
-  }
-  return { maxOpaqueColors: 22 };
+function physicalPngSpec(): PngSpec {
+  return { maxOpaqueColors: 32 };
 }
 
 function registryPngSources() {
@@ -158,7 +140,7 @@ async function expectProductionPng(
   asset: Extract<PixelAsset, { kind: "png" }>
 ) {
   const bytes = pngFile(name, asset);
-  const expected = physicalPngSpec(asset.src);
+  const expected = physicalPngSpec();
   const metadata = await sharp(bytes).metadata();
 
   expect.soft(metadata.format, `${name} physical format`).toBe("png");
@@ -177,7 +159,6 @@ async function expectProductionPng(
   let opaquePixels = 0;
   let transparentPixels = 0;
   let blackPixels = 0;
-  let legacyGreenOutlinePixels = 0;
   let contourPixels = 0;
   let nonBlackContourPixels = 0;
   const opaqueBorderPixels: Array<[number, number]> = [];
@@ -219,13 +200,6 @@ async function expectProductionPng(
         if (isContour) {
           contourPixels += 1;
           if (!isBlack) nonBlackContourPixels += 1;
-        }
-        if (
-          data[offset] === 0x10 &&
-          data[offset + 1] === 0x2b &&
-          data[offset + 2] === 0x21
-        ) {
-          legacyGreenOutlinePixels += 1;
         }
         opaqueColors.add(
           `${data[offset]},${data[offset + 1]},${data[offset + 2]}`
@@ -269,18 +243,10 @@ async function expectProductionPng(
     .toBeLessThanOrEqual(expected.maxOpaqueColors);
   expect.soft(blackPixels, `${name} must use a true-black outline`).toBeGreaterThan(0);
   expect.soft(contourPixels, `${name} must have a visible contour`).toBeGreaterThan(0);
-  if (name.startsWith("mascot-")) {
-    expect
-      .soft(
-        nonBlackContourPixels,
-        `${name} exterior contour must be pure #000000`
-      )
-      .toBe(0);
-  }
   expect
     .soft(
-      legacyGreenOutlinePixels,
-      `${name} must not retain the legacy green outline`
+      nonBlackContourPixels,
+      `${name} exterior contour must be pure #000000`
     )
     .toBe(0);
 
@@ -358,19 +324,17 @@ describe("BibleQuest pixel art system", () => {
       }>;
     };
 
-    expect(manifest.schemaVersion).toBe(4);
+    expect(manifest.schemaVersion).toBe(5);
     expect(manifest.totalFiles).toBe(EXPECTED_PRODUCTION_PNGS);
     expect(manifest.qualityContract.nativeCanvas).toEqual({
       width: NATIVE_CANVAS,
       height: NATIVE_CANVAS,
     });
     expect(manifest.qualityContract.opaqueColorBudgets).toEqual({
-      smallAndCandlesDefault: 22,
-      treesDefault: 28,
-      mascotsDefault: 24,
-      reviewedPerFileExceptions: Object.fromEntries(
-        OPAQUE_COLOR_BUDGET_OVERRIDES
-      ),
+      smallAndCandlesDefault: 32,
+      treesDefault: 32,
+      mascotsDefault: 32,
+      reviewedPerFileExceptions: {},
     });
     expect(manifest.families.reduce((sum, family) => sum + family.count, 0)).toBe(
       EXPECTED_PRODUCTION_PNGS
@@ -394,19 +358,19 @@ describe("BibleQuest pixel art system", () => {
       {
         id: "small-sprites",
         logicalGrid: { columns: 32, rows: 32 },
-        nativeArtGrid: { columns: 32, rows: 32 },
+        nativeArtGrid: { columns: 128, rows: 128 },
         cellScale: 0.2,
       },
       {
         id: "streak-candles",
         logicalGrid: { columns: 16, rows: 16 },
-        nativeArtGrid: { columns: 16, rows: 16 },
+        nativeArtGrid: { columns: 128, rows: 128 },
         cellScale: 0.75,
       },
       {
         id: "tree-stages",
         logicalGrid: { columns: 32, rows: 32 },
-        nativeArtGrid: { columns: 32, rows: 32 },
+        nativeArtGrid: { columns: 128, rows: 128 },
         cellScale: 1,
       },
       {
@@ -418,10 +382,14 @@ describe("BibleQuest pixel art system", () => {
     ]);
   });
 
-  it("keeps every production PNG on a pixel-safe 128x128 canvas", async () => {
+  it("keeps every production PNG on a native-detail 128x128 canvas", async () => {
     for (const [name, asset] of Object.entries(PIXEL_SPRITES)) {
       expect(asset.kind, `${name} must use a production PNG`).toBe("png");
-      if (asset.kind === "png") await expectProductionPng(name, asset);
+      if (asset.kind === "png") {
+        expect(asset.artCols, `${name} native art width`).toBe(128);
+        expect(asset.artRows, `${name} native art height`).toBe(128);
+        await expectProductionPng(name, asset);
+      }
     }
     for (const [name, asset] of Object.entries(PIXEL_MASCOTS)) {
       expect(asset.kind, `mascot-${name} must use a production PNG`).toBe(
