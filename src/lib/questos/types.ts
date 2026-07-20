@@ -5,6 +5,7 @@
  * faith provider ("christianity"). These types deliberately avoid hard-coding
  * Christianity into the platform layer where a generic name works.
  */
+import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
 
 // ---------------------------------------------------------------------------
 // Quests
@@ -245,7 +246,7 @@ export interface ChapterRead {
 /**
  * A verse the person intentionally viewed or selected. This is navigation
  * history, not a bookmark: entries are deduplicated by passage and capped by
- * the store so Home can offer a small, useful "Recent verses" shelf.
+ * the store so the Bible hub can offer a small, useful "Recent verses" shelf.
  */
 export interface RecentVerse {
   bookSlug: string;
@@ -570,7 +571,7 @@ export const DEFAULT_SETTINGS: Settings = {
     boldText: false,
   },
   language: "en",
-  preferredBibleTranslation: "niv",
+  preferredBibleTranslation: DEFAULT_BIBLE_TRANSLATION_KEY,
   notifications: {
     dailyVerse: false,
     dailyQuest: false,

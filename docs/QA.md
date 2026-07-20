@@ -72,9 +72,9 @@ the evidence.
       and Google are visually primary; “Not now — continue on this device” is
       available as a quiet local-first escape without losing profile choices.
 - [ ] Onboarding completes in under two minutes; optional steps are skippable.
-- [ ] Home shows greeting, today's verse, today's quest, quick prayer, tree
-      preview, continue reading, recent activity.
-- [ ] "Something else?" rerolls the daily quest without shame language.
+- [ ] Home shows greeting and active/ready/completed quests before the compact
+      “View Today's Verse” invitation; the button opens the Bible hub.
+- [ ] Quest suggestions and rolling quest windows work without shame language.
 - [ ] Quest detail shows scripture text, why-it-matters, prayer-to-begin, and a
       safety note for sensitive quests.
 - [ ] Begin → reflect → complete works; reflection is optional.
@@ -99,8 +99,11 @@ the evidence.
       is recovered. Save or discard and confirm its draft key is removed.
 - [ ] Reflection: create standalone and from a verse; prompt, mood, and verse
       context survive edit and appear in the journal.
-- [ ] Bible: open a book → chapter; verses render in serif with real WEB text;
-      bookmark a verse; "Continue reading" returns to it.
+- [ ] Bible: daily KJV resolves through HelloAO; search finds any book; testament
+      switching, recent verses, saved verses, and chapter progress are accurate.
+- [ ] Reader: verses remain stable serif text; keyboard selection, save/share/
+      reflect actions, focus mode, progress, previous/next, dark mode, large text,
+      reduced motion, and clearly-labelled WEB offline fallback all work.
 - [ ] Journey: tree stage + growth breakdown + markers + timeline all correct.
 - [ ] Settings: theme (incl. Candle/dark), text size, reduced motion apply live;
       export downloads JSON; clear-data returns to onboarding.

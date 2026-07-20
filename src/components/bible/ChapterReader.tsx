@@ -7,6 +7,7 @@
  */
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
+import { AnimatePresence, motion } from "framer-motion";
 import { useQuestOS } from "@/lib/questos/store";
 import { useToast } from "@/components/design-system/Toast";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
@@ -16,6 +17,9 @@ import {
   IconArrowRight,
   IconBookmark,
   IconBookmarkFilled,
+  IconClose,
+  IconEye,
+  IconShare,
 } from "@/components/design-system/icons";
 import type { ChapterContent } from "@/lib/bible/server";
 import { cn } from "@/lib/utils/cn";
@@ -25,6 +29,8 @@ import {
   isRedistributableBibleTranslation,
   LOCAL_WEB_TRANSLATION_KEY,
 } from "@/lib/bible/translations";
+import { VerseShareSheet } from "@/components/bible/VerseShareSheet";
+import { formatVerseShareText } from "@/lib/utils/scripture";
 
 interface VerseRange {
   start: number;
@@ -77,7 +83,12 @@ function ReaderInner({
   const [selected, setSelected] = useState<number | null>(null);
   const [focusedVerse, setFocusedVerse] = useState(1);
   const [targeted, setTargeted] = useState<VerseRange | null>(null);
+  const [focusMode, setFocusMode] = useState(false);
+  const [readingProgress, setReadingProgress] = useState(0);
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
   const verseRefs = useRef<Array<HTMLSpanElement | null>>([]);
+  const readingRef = useRef<HTMLDivElement>(null);
   const instructionsId = useId();
   const resolved = usePreferredBibleChapter(content, translationOverride);
   const mayPersistEffectiveText = isRedistributableBibleTranslation(
@@ -92,8 +103,61 @@ function ReaderInner({
       chapter: content.chapter,
     });
     markChapterRead(content.bookSlug, content.bookName, content.chapter);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [content.bookSlug, content.chapter]);
+  }, [
+    content.bookName,
+    content.bookSlug,
+    content.chapter,
+    markChapterRead,
+    setReadingPosition,
+  ]);
+
+  // Focus mode is page-scoped. The root class moves app chrome away, while
+  // inert + aria-hidden keep its invisible links out of keyboard and assistive
+  // technology navigation until the reader exits focus mode.
+  useEffect(() => {
+    const bottomNav = document.querySelector<HTMLElement>(
+      "[data-app-bottom-nav]",
+    );
+    document.documentElement.classList.toggle("bible-focus-mode", focusMode);
+    bottomNav?.toggleAttribute("inert", focusMode);
+    if (focusMode) bottomNav?.setAttribute("aria-hidden", "true");
+    else bottomNav?.removeAttribute("aria-hidden");
+
+    return () => {
+      document.documentElement.classList.remove("bible-focus-mode");
+      bottomNav?.removeAttribute("inert");
+      bottomNav?.removeAttribute("aria-hidden");
+    };
+  }, [focusMode]);
+
+  // A slim progress line orients long-chapter readers without adding another
+  // counter to the Scripture surface. Scroll work is coalesced to one frame.
+  useEffect(() => {
+    let frame = 0;
+    function updateProgress() {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const node = readingRef.current;
+        if (!node) return;
+        const rect = node.getBoundingClientRect();
+        const viewport = window.innerHeight;
+        const readableDistance = Math.max(1, rect.height - viewport * 0.45);
+        const traveled = viewport * 0.32 - rect.top;
+        const next = Math.min(1, Math.max(0, traveled / readableDistance));
+        setReadingProgress((current) =>
+          Math.abs(current - next) < 0.005 ? current : next,
+        );
+      });
+    }
+    updateProgress();
+    window.addEventListener("scroll", updateProgress, { passive: true });
+    window.addEventListener("resize", updateProgress);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", updateProgress);
+      window.removeEventListener("resize", updateProgress);
+    };
+  }, [resolved.loading, resolved.verses.length]);
 
   // Public share links and in-app recent-verse links identify a stable verse
   // with both ?verse=7-8 and #verse-7. Focus the first verse for assistive
@@ -187,40 +251,100 @@ function ReaderInner({
     return text?.trim() ? text : undefined;
   }
 
+  const selectedReference = selected
+    ? `${content.bookName} ${content.chapter}:${selected}`
+    : `${content.bookName} ${content.chapter}`;
+  const selectedVerseText = selected
+    ? persistableVerseText(selected - 1) ?? ""
+    : "";
+  const selectedShareText = formatVerseShareText(
+    selectedVerseText,
+    selectedReference,
+  );
+  const selectedSharePath = selected
+    ? `/verse/${content.bookSlug}/${content.chapter}/${selected}${
+        mayPersistEffectiveText &&
+        resolved.effectiveTranslation.key !== LOCAL_WEB_TRANSLATION_KEY
+          ? `?translation=${encodeURIComponent(resolved.effectiveTranslation.key)}`
+          : ""
+      }`
+    : "/app/bible";
+
+  function shareSelectedVerse() {
+    if (!selected || !selectedVerseText) return;
+    setShareUrl(new URL(selectedSharePath, window.location.origin).toString());
+    setShareSheetOpen(true);
+  }
+
   return (
-    <div className="mx-auto w-full max-w-2xl px-5 pt-safe sm:px-8">
-      {/* Header */}
-      <div className="flex items-center justify-between pt-6">
-        <Link
-          href={`/app/bible/${content.bookSlug}`}
-          className="inline-flex items-center gap-1.5 text-[0.875rem] text-ash transition-colors hover:text-charcoal"
+    <div
+      className={cn(
+        "mx-auto w-full px-5 pt-safe transition-[max-width] duration-500 sm:px-8",
+        focusMode ? "max-w-3xl" : "max-w-2xl",
+      )}
+    >
+      {/* The quiet top rail stays reachable in long chapters. Focus mode only
+          removes app chrome; edition identity and an exit always remain. */}
+      <header className="sticky top-[env(safe-area-inset-top)] z-20 -mx-5 border-b border-mist/70 bg-parchment/92 px-5 pt-3 pb-2 backdrop-blur-md sm:-mx-8 sm:px-8">
+        <div className="flex min-h-11 items-center justify-between gap-3">
+          <Link
+            href={`/app/bible/${content.bookSlug}`}
+            aria-label={`Back to ${content.bookName} chapters`}
+            className="inline-flex min-h-11 items-center gap-1.5 text-[0.875rem] text-ash transition-colors hover:text-charcoal"
+          >
+            <IconArrowLeft size={16} /> {content.bookName}
+          </Link>
+          <button
+            type="button"
+            aria-pressed={focusMode}
+            onClick={() => setFocusMode((enabled) => !enabled)}
+            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-caption font-medium text-accent transition-colors hover:bg-accent-surface"
+          >
+            {focusMode ? <IconClose size={16} /> : <IconEye size={16} />}
+            {focusMode ? "Exit focus" : "Focus"}
+          </button>
+        </div>
+        <div
+          role="progressbar"
+          aria-label="Chapter reading progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(readingProgress * 100)}
+          className="absolute inset-x-0 bottom-0 h-0.5 bg-mist/40"
         >
-          <IconArrowLeft size={16} /> {content.bookName}
-        </Link>
+          <motion.div
+            className="h-full origin-left bg-accent"
+            animate={{ scaleX: readingProgress }}
+            transition={{ duration: 0.2 }}
+          />
+        </div>
+      </header>
+
+      <div className="mt-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+        <h1 className="font-display text-editorial text-graphite">
+          {content.bookName} {content.chapter}
+        </h1>
         <span
           role="status"
           aria-live="polite"
           aria-atomic="true"
-          className="text-right text-[0.75rem] text-ash"
+          className="pb-0.5 text-right text-caption text-ash"
         >
-          {resolved.loading
-            ? `World English Bible · checking ${resolved.preferredTranslation?.abbreviation ?? "saved edition"}…`
-            : (
-                <span
-                  dir={resolved.effectiveTranslation.direction}
-                  lang={resolved.effectiveTranslation.languageId}
-                >
-                  {resolved.effectiveTranslation.name}
-                </span>
-              )}
+          {resolved.loading ? (
+            `WEB · checking ${resolved.preferredTranslation?.abbreviation ?? "saved edition"}…`
+          ) : (
+            <span
+              dir={resolved.effectiveTranslation.direction}
+              lang={resolved.effectiveTranslation.languageId}
+            >
+              {resolved.effectiveTranslation.name}
+            </span>
+          )}
         </span>
       </div>
 
-      <h1 className="mt-5 font-display text-editorial text-graphite">
-        {content.bookName} {content.chapter}
-      </h1>
-
-      {!resolved.loading &&
+      {!focusMode &&
+        !resolved.loading &&
         resolved.fallbackReason &&
         resolved.requestedKey !== LOCAL_WEB_TRANSLATION_KEY && (
           <p className="mt-2 rounded-[10px] bg-linen px-3 py-2 text-caption leading-relaxed text-ash">
@@ -238,7 +362,8 @@ function ReaderInner({
       {/* Verses remain continuous text, while a roving Tab stop avoids forcing
           keyboard users through every verse before they can leave the chapter. */}
       <div
-        className="measure-reading mt-5"
+        ref={readingRef}
+        className="measure-reading mx-auto mt-7 sm:mt-9"
         role="group"
         dir={resolved.effectiveTranslation.direction}
         lang={resolved.effectiveTranslation.languageId}
@@ -248,7 +373,7 @@ function ReaderInner({
       >
         <p id={instructionsId} className="sr-only">
           Use the arrow keys to move between verses. Press Enter or Space to
-          select a verse and show its save action.
+          select a verse and show its save, share, and reflection actions.
         </p>
         {resolved.verses.map((text, i) => {
           const num = i + 1;
@@ -333,49 +458,83 @@ function ReaderInner({
         })}
       </div>
 
-      {/* Verse action bar */}
-      {selected !== null && (
-        <div className="sticky bottom-24 z-10 mt-6 flex items-center justify-between rounded-full border border-mist bg-paper px-4 py-2.5 paper-shadow-lg">
-          <span className="text-[0.875rem] text-ash">
-            {content.bookName} {content.chapter}:{selected}
-          </span>
-          <button
-            onClick={() => {
-              const safeVerseText = persistableVerseText(selected - 1);
-              if (!safeVerseText) return;
-              const nowSaved = toggleBookmark({
-                bookSlug: content.bookSlug,
-                bookName: content.bookName,
-                chapter: content.chapter,
-                verse: selected,
-                // Keep licensed provider text transient; reviewed open
-                // editions can be saved with their own edition key.
-                text: safeVerseText,
-                translationKey: resolved.effectiveTranslation.key,
-              });
-              toast(nowSaved ? "Verse saved." : "Removed.");
-            }}
-            aria-pressed={bookmarkedVerses.has(selected)}
-            disabled={
-              resolved.loading || !persistableVerseText(selected - 1)
-            }
-            className="inline-flex items-center gap-1.5 text-[0.875rem] text-accent"
-          >
-            {bookmarkedVerses.has(selected) ? (
-              <IconBookmarkFilled size={16} />
-            ) : (
-              <IconBookmark size={16} />
+      {/* Selection actions arrive as one stable surface; Scripture lines never
+          move or animate individually when the toolbar opens. */}
+      <AnimatePresence>
+        {selected !== null && (
+          <motion.div
+            role="toolbar"
+            aria-label={`Actions for ${selectedReference}`}
+            initial={{ opacity: 0, y: 10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.98 }}
+            transition={{ duration: 0.25 }}
+            className={cn(
+              "sticky z-30 mt-7 rounded-[var(--radius-card)] border border-mist bg-paper/95 p-2.5 paper-shadow-lg backdrop-blur-md",
+              focusMode
+                ? "bottom-[calc(1rem+env(safe-area-inset-bottom))]"
+                : "bottom-[calc(6rem+env(safe-area-inset-bottom))]",
             )}
-            {resolved.loading
-              ? "Loading…"
-              : !persistableVerseText(selected - 1)
-                ? "Not available to save"
-              : bookmarkedVerses.has(selected)
-                ? "Saved"
-                : "Save"}
-          </button>
-        </div>
-      )}
+          >
+            <div className="flex min-h-9 items-center justify-between gap-3 px-1.5">
+              <span className="truncate text-caption font-medium text-graphite">
+                {selectedReference}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                aria-label="Close verse actions"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ash transition-colors hover:bg-linen hover:text-charcoal"
+              >
+                <IconClose size={16} />
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!selectedVerseText) return;
+                  const nowSaved = toggleBookmark({
+                    bookSlug: content.bookSlug,
+                    bookName: content.bookName,
+                    chapter: content.chapter,
+                    verse: selected,
+                    // Licensed wording remains transient; in that case the
+                    // bookmark retains the safe bundled WEB snapshot.
+                    text: selectedVerseText,
+                    translationKey: resolved.effectiveTranslation.key,
+                  });
+                  toast(nowSaved ? "Verse saved." : "Removed.");
+                }}
+                aria-pressed={bookmarkedVerses.has(selected)}
+                disabled={resolved.loading || !selectedVerseText}
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[9px] px-2 text-small font-medium text-accent transition-colors hover:bg-accent-surface disabled:pointer-events-none disabled:opacity-50"
+              >
+                {bookmarkedVerses.has(selected) ? (
+                  <IconBookmarkFilled size={16} />
+                ) : (
+                  <IconBookmark size={16} />
+                )}
+                {bookmarkedVerses.has(selected) ? "Saved" : "Save"}
+              </button>
+              <button
+                type="button"
+                onClick={shareSelectedVerse}
+                disabled={resolved.loading || !selectedVerseText}
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[9px] px-2 text-small font-medium text-charcoal transition-colors hover:bg-linen disabled:pointer-events-none disabled:opacity-50"
+              >
+                <IconShare size={16} /> Share
+              </button>
+              <Link
+                href={`/app/prayer/reflection/new?verse=${encodeURIComponent(selectedReference)}`}
+                className="inline-flex min-h-11 items-center justify-center rounded-[9px] px-2 text-small font-medium text-charcoal transition-colors hover:bg-linen"
+              >
+                Reflect
+              </Link>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Chapter navigation */}
       <div className="mt-8 flex items-center justify-between gap-3 pb-8">
@@ -427,6 +586,18 @@ function ReaderInner({
             )}
           </p>
         )}
+      <VerseShareSheet
+        open={shareSheetOpen}
+        title={`${selectedReference} — BibleQuest`}
+        text={selectedShareText}
+        url={shareUrl || selectedSharePath}
+        notice={
+          !resolved.loading && !mayPersistEffectiveText
+            ? "The shared wording may differ from what you’re reading so licensed text stays inside BibleQuest."
+            : undefined
+        }
+        onClose={() => setShareSheetOpen(false)}
+      />
     </div>
   );
 }

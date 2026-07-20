@@ -427,6 +427,8 @@ Second-pass decision: premium monetization must never imply paid users are close
 
 Second-pass decision: the MVP should prioritize the complete daily loop over feature sprawl. If Claude Code must reduce scope, preserve this loop: onboarding → Home → daily verse → daily quest → quest completion → reflection → prayer → growth tree → journey timeline.
 
+Current-contract decision (July 2026; supersedes older Home requirements throughout this document): Home prioritizes active and completed quests. It uses a compact, lively “View Today’s Verse” action that opens the Bible hub; the full daily verse card, verse actions, and recent-verse history live on the Bible page. This keeps Scripture in the daily loop without letting it compete with the user’s quests on Home.
+
   
 
 Second-pass decision: the visual identity is non-negotiable. BibleQuest should not look like a generic Tailwind dashboard, a default shadcn app, a cheap Bible template, or a mobile game casino. The design language is Living Editorial: Paper + Pixel + Prayer.

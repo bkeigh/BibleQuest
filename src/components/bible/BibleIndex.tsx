@@ -1,147 +1,493 @@
 "use client";
 
-import { useMemo } from "react";
+/**
+ * The Bible landing page is a reading hub rather than a static index. It keeps
+ * the daily verse, reading history, saved Scripture, and all 66 books close
+ * without allowing navigation controls to compete with the text itself.
+ */
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useQuestOS } from "@/lib/questos/store";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  selectVerseRefreshCount,
+  useQuestOS,
+} from "@/lib/questos/store";
 import { getDailyVerse } from "@/lib/questos/verse-engine";
-import { oldTestament, newTestament } from "@/lib/bible/index";
+import {
+  bibleBooks,
+  getBookMeta,
+  newTestament,
+  oldTestament,
+} from "@/lib/bible/index";
+import { toDateKey } from "@/lib/utils/dates";
+import { cleanVerseText } from "@/lib/utils/scripture";
+import { riseIn } from "@/lib/motion";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { VerseCard } from "@/components/bible/VerseCard";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
-import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosure";
-import { IconChevronRight } from "@/components/design-system/icons";
-import type { BibleBookMeta } from "@/lib/questos/types";
+import {
+  IconBookmark,
+  IconChevronRight,
+  IconSearch,
+  IconSettings,
+} from "@/components/design-system/icons";
+import { cn } from "@/lib/utils/cn";
 import {
   translationMetadata,
   translationPreferenceLabel,
 } from "@/lib/bible/translations";
 
+type Testament = "new" | "old";
+
+/** Re-evaluate daily content when a long-lived PWA crosses local midnight. */
+function useCurrentDayKey() {
+  const [dayKey, setDayKey] = useState(() => toDateKey());
+
+  useEffect(() => {
+    function refreshDay() {
+      const current = toDateKey();
+      setDayKey((previous) => (previous === current ? previous : current));
+    }
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshDay();
+    };
+    const interval = window.setInterval(refreshDay, 60_000);
+    window.addEventListener("focus", refreshDay);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshDay);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+
+  return dayKey;
+}
+
 function BibleIndexInner() {
-  const readingPosition = useQuestOS((s) => s.readingPosition);
-  const bookmarks = useQuestOS((s) => s.bookmarks);
-  const verse = useMemo(() => getDailyVerse(), []);
+  const readingPosition = useQuestOS((state) => state.readingPosition);
+  const bookmarks = useQuestOS((state) => state.bookmarks);
+  const chaptersRead = useQuestOS((state) => state.chaptersRead);
+  const recentVerses = useQuestOS((state) => state.recentVerses);
+  const recordRecentVerse = useQuestOS((state) => state.recordRecentVerse);
   const preferredBibleTranslation = useQuestOS(
     (state) => state.settings.preferredBibleTranslation,
   );
+  const verseRefreshCount = useQuestOS(selectVerseRefreshCount);
+  const refreshVerse = useQuestOS((state) => state.refreshVerse);
+  const dayKey = useCurrentDayKey();
+  const recordedVerseRef = useRef<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [testament, setTestament] = useState<Testament>(() =>
+    readingPosition &&
+    oldTestament.some((book) => book.slug === readingPosition.bookSlug)
+      ? "old"
+      : "new",
+  );
+
+  const verse = useMemo(
+    () => getDailyVerse(dayKey, verseRefreshCount),
+    [dayKey, verseRefreshCount],
+  );
+  const verseBookName = useMemo(
+    () =>
+      getBookMeta(verse.bookSlug)?.name ??
+      verse.reference.replace(/\s+\d+:.*$/, ""),
+    [verse.bookSlug, verse.reference],
+  );
   const preferredEdition = translationMetadata(preferredBibleTranslation);
 
-  // Open the testament the reader is currently in; default to New Testament.
-  const readingTestament = useMemo(() => {
-    if (!readingPosition) return "new";
-    return oldTestament.some((b) => b.slug === readingPosition.bookSlug)
-      ? "old"
-      : "new";
-  }, [readingPosition]);
+  // Only a page that actually presents the verse should add it to reading
+  // history. This keeps ordinary Home visits from fabricating Bible activity.
+  useEffect(() => {
+    const passageKey = `${verse.bookSlug}:${verse.chapter}:${verse.verseStart}-${verse.verseEnd}`;
+    if (recordedVerseRef.current === passageKey) return;
+    recordedVerseRef.current = passageKey;
+    recordRecentVerse({
+      bookSlug: verse.bookSlug,
+      bookName: verseBookName,
+      chapter: verse.chapter,
+      verseStart: verse.verseStart,
+      verseEnd: verse.verseEnd,
+      reference: verse.reference,
+      text: verse.text,
+    });
+  }, [recordRecentVerse, verse, verseBookName]);
+
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const visibleBooks = useMemo(() => {
+    if (normalizedQuery) {
+      return bibleBooks.filter((book) =>
+        book.name.toLocaleLowerCase().includes(normalizedQuery),
+      );
+    }
+    return testament === "new" ? newTestament : oldTestament;
+  }, [normalizedQuery, testament]);
+
+  const readCountByBook = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const chapter of chaptersRead) {
+      counts.set(chapter.bookSlug, (counts.get(chapter.bookSlug) ?? 0) + 1);
+    }
+    return counts;
+  }, [chaptersRead]);
+
+  const previousVerses = recentVerses
+    .filter(
+      (recent) =>
+        !(
+          recent.bookSlug === verse.bookSlug &&
+          recent.chapter === verse.chapter &&
+          recent.verseStart === verse.verseStart &&
+          recent.verseEnd === verse.verseEnd
+        ),
+    )
+    .slice(0, 8);
+
+  const editionSummary =
+    preferredEdition?.source === "local"
+      ? "Available offline"
+      : preferredEdition?.source === "helloao"
+        ? "Open edition · WEB offline fallback"
+        : "Preferred edition · open fallback available";
 
   return (
-    <>
+    <div className="relative overflow-hidden">
+      <div
+        aria-hidden="true"
+        className="ambient pointer-events-none absolute -right-20 top-10 h-56 w-56 rounded-full bg-gold-300/10 blur-3xl [animation:var(--animate-twinkle)]"
+      />
       <PageHeader title="Bible" subtitle="Read slowly. Let one verse land." />
-      <PageContainer>
-        {readingPosition && (
+      <PageContainer className="relative pb-6">
+        <motion.section
+          id="todays-verse"
+          aria-label="Today's verse"
+          variants={riseIn}
+          initial="hidden"
+          animate="visible"
+          className="scroll-mt-6"
+        >
+          <VerseCard
+            verse={verse}
+            onAnotherVerse={refreshVerse}
+            showOpenInChapter
+          />
+        </motion.section>
+
+        <motion.section
+          aria-labelledby="reading-shortcuts"
+          variants={riseIn}
+          initial="hidden"
+          animate="visible"
+          transition={{ delay: 0.08 }}
+          className="mt-6"
+        >
+          <div className="mb-2.5 flex items-end justify-between gap-3 px-1">
+            <h2
+              id="reading-shortcuts"
+              className="font-pixel text-[1.375rem] uppercase tracking-[0.05em] text-accent"
+            >
+              Your reading
+            </h2>
+            <p className="text-caption text-ash">
+              {chaptersRead.length} {chaptersRead.length === 1 ? "chapter" : "chapters"} read
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <QuickLink
+              href={
+                readingPosition
+                  ? `/app/bible/${readingPosition.bookSlug}/${readingPosition.chapter}`
+                  : "/app/bible/john/1"
+              }
+              icon={<PixelIcon name="bookmark" size={4} />}
+              eyebrow={readingPosition ? "Continue" : "A place to begin"}
+              title={
+                readingPosition
+                  ? `${readingPosition.bookName} ${readingPosition.chapter}`
+                  : "John 1"
+              }
+            />
+            <QuickLink
+              href="/app/bible/saved"
+              icon={<IconBookmark size={20} />}
+              eyebrow="Saved verses"
+              title={`${bookmarks.length} saved`}
+            />
+          </div>
+
           <Link
-            href={`/app/bible/${readingPosition.bookSlug}/${readingPosition.chapter}`}
-            className="block"
+            href="/app/settings"
+            className="mt-3 flex min-h-12 items-center gap-3 rounded-[var(--radius-card)] border border-mist bg-paper/70 px-4 py-2.5 transition-colors hover:border-accent/35 hover:bg-paper"
           >
-            <PaperCard interactive padding="sm" className="mb-4 flex items-center gap-3.5">
-              <span className="rounded-[10px] bg-linen p-2 ring-1 ring-mist">
-                <PixelIcon name="bookmark" size={5} />
+            <IconSettings size={18} className="text-accent" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-small text-graphite">
+                {preferredEdition?.name ??
+                  translationPreferenceLabel(preferredBibleTranslation)}
               </span>
-              <div className="flex-1">
-                <p className="text-[0.75rem] uppercase tracking-wide text-accent">
-                  Continue reading
-                </p>
-                <p className="text-[1.0625rem] text-graphite">
-                  {readingPosition.bookName} {readingPosition.chapter}
-                </p>
-              </div>
-              <IconChevronRight className="text-fog" />
-            </PaperCard>
+              <span className="block truncate text-caption text-ash">
+                {editionSummary}
+              </span>
+            </span>
+            <span className="shrink-0 rounded-full bg-accent-surface px-2.5 py-1 text-caption font-medium text-accent">
+              {preferredEdition?.abbreviation ??
+                translationPreferenceLabel(preferredBibleTranslation)}
+            </span>
           </Link>
+        </motion.section>
+
+        {previousVerses.length > 0 && (
+          <motion.section
+            aria-labelledby="recent-scripture"
+            variants={riseIn}
+            initial="hidden"
+            animate="visible"
+            transition={{ delay: 0.14 }}
+            className="mt-7"
+          >
+            <div className="mb-2.5 flex items-center justify-between gap-3 px-1">
+              <h2
+                id="recent-scripture"
+                className="font-pixel text-[1.375rem] uppercase tracking-[0.05em] text-accent"
+              >
+                Recently read
+              </h2>
+              <span className="text-caption text-ash">Swipe to revisit</span>
+            </div>
+            <ul className="-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-8 sm:px-8">
+              {previousVerses.map((recentVerse) => {
+                const verseSegment =
+                  recentVerse.verseEnd > recentVerse.verseStart
+                    ? `${recentVerse.verseStart}-${recentVerse.verseEnd}`
+                    : `${recentVerse.verseStart}`;
+                return (
+                  <li
+                    key={`${recentVerse.bookSlug}:${recentVerse.chapter}:${verseSegment}`}
+                    className="w-[min(76vw,18rem)] shrink-0 snap-start"
+                  >
+                    <Link
+                      href={`/app/bible/${recentVerse.bookSlug}/${recentVerse.chapter}?verse=${verseSegment}#verse-${recentVerse.verseStart}`}
+                      aria-label={`Open ${recentVerse.reference}`}
+                      className="block h-full rounded-[var(--radius-card)]"
+                    >
+                      <PaperCard
+                        interactive
+                        variant="quiet"
+                        padding="sm"
+                        className="flex h-full min-h-28 flex-col"
+                      >
+                        <div className="flex items-center gap-2">
+                          <PixelIcon name="open-book" size={3} />
+                          <p className="font-display text-[1.0625rem] text-graphite">
+                            {recentVerse.reference}
+                          </p>
+                          <IconChevronRight className="ml-auto text-fog" />
+                        </div>
+                        <p className="mt-2 line-clamp-2 text-caption leading-relaxed text-ash">
+                          “{cleanVerseText(recentVerse.text)}”
+                        </p>
+                      </PaperCard>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </motion.section>
         )}
 
-        <VerseCard verse={verse} />
+        <motion.section
+          aria-labelledby="find-a-book"
+          variants={riseIn}
+          initial="hidden"
+          animate="visible"
+          transition={{ delay: 0.2 }}
+          className="mt-7"
+        >
+          <div className="px-1">
+            <h2
+              id="find-a-book"
+              className="font-pixel text-[1.5rem] uppercase tracking-[0.05em] text-accent"
+            >
+              Find a book
+            </h2>
+            <p className="mt-1 text-small text-ash">
+              Search all 66 books or browse by testament.
+            </p>
+          </div>
 
-        {bookmarks.length > 0 && (
-          <Link href="/app/bible/saved" className="mt-4 block">
-            <PaperCard interactive padding="sm" className="flex items-center gap-3.5">
-              <span className="rounded-[10px] bg-linen p-2 ring-1 ring-mist">
-                <PixelIcon name="star" size={5} />
-              </span>
-              <div className="flex-1">
-                <p className="text-[1rem] text-graphite">Saved verses</p>
-                <p className="text-[0.8125rem] text-ash">
-                  {bookmarks.length} saved
-                </p>
-              </div>
-              <IconChevronRight className="text-fog" />
+          <label className="relative mt-3 block">
+            <span className="sr-only">Search Bible books</span>
+            <IconSearch
+              size={18}
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ash"
+            />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search Genesis, John, Psalms…"
+              autoComplete="off"
+              className="min-h-12 w-full rounded-[var(--radius-card)] border border-mist bg-paper pl-11 pr-4 text-small text-graphite outline-none paper-shadow transition-colors placeholder:text-fog focus:border-accent/50"
+            />
+          </label>
+
+          {!normalizedQuery && (
+            <div
+              role="group"
+              aria-label="Choose a testament"
+              className="mt-3 grid grid-cols-2 rounded-[var(--radius-button)] border border-mist bg-linen p-1"
+            >
+              {(
+                [
+                  ["new", "New Testament", newTestament.length],
+                  ["old", "Old Testament", oldTestament.length],
+                ] as const
+              ).map(([value, label, count]) => {
+                const active = testament === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setTestament(value)}
+                    className={cn(
+                      "relative min-h-11 rounded-[7px] px-3 text-small transition-colors",
+                      active ? "text-graphite" : "text-ash hover:text-charcoal",
+                    )}
+                  >
+                    {active && (
+                      <motion.span
+                        aria-hidden="true"
+                        layoutId="active-testament"
+                        className="pointer-events-none absolute inset-0 rounded-[7px] bg-paper paper-shadow"
+                        transition={{ duration: 0.3 }}
+                      />
+                    )}
+                    <span className="relative z-10">
+                      {label} <span className="text-caption text-ash">{count}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <p role="status" aria-live="polite" className="sr-only">
+            {visibleBooks.length} {visibleBooks.length === 1 ? "book" : "books"} shown
+          </p>
+
+          <motion.ul layout className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            <AnimatePresence initial={false} mode="popLayout">
+              {visibleBooks.map((book, index) => {
+                const readCount = readCountByBook.get(book.slug) ?? 0;
+                const isCurrent = readingPosition?.bookSlug === book.slug;
+                return (
+                  <motion.li
+                    layout
+                    key={book.slug}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.25, delay: Math.min(index, 8) * 0.025 }}
+                  >
+                    <Link
+                      href={`/app/bible/${book.slug}`}
+                      className={cn(
+                        "group flex min-h-[5.25rem] h-full flex-col justify-between rounded-[var(--radius-card)] border bg-paper p-3.5 paper-shadow transition-all duration-300 [transition-timing-function:var(--ease-gentle)] hover:-translate-y-0.5 hover:border-accent/45 hover:paper-shadow-lg",
+                        isCurrent ? "border-accent/45 bg-accent-surface/40" : "border-mist",
+                      )}
+                    >
+                      <span className="flex items-start justify-between gap-2">
+                        <span className="font-display text-[1.0625rem] leading-tight text-graphite">
+                          {book.name}
+                        </span>
+                        {isCurrent && (
+                          <>
+                            <span
+                              aria-hidden="true"
+                              className="h-2 w-2 shrink-0 rounded-full bg-accent"
+                            />
+                            <span className="sr-only">Current reading book</span>
+                          </>
+                        )}
+                      </span>
+                      <span className="mt-2 flex items-center justify-between gap-2 text-caption text-ash">
+                        <span>{book.chapterCount} ch.</span>
+                        <span>{readCount > 0 ? `${readCount} read` : "Open"}</span>
+                      </span>
+                    </Link>
+                  </motion.li>
+                );
+              })}
+            </AnimatePresence>
+          </motion.ul>
+
+          {visibleBooks.length === 0 && (
+            <PaperCard variant="quiet" padding="md" className="mt-3 text-center">
+              <p className="text-small text-ash">
+                No Bible book matches “{query.trim()}”.
+              </p>
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="mt-2 min-h-11 text-small font-medium text-accent underline-offset-4 hover:underline"
+              >
+                Clear search
+              </button>
             </PaperCard>
-          </Link>
-        )}
+          )}
+        </motion.section>
 
-        <DisclosureGroup className="mt-7">
-          <BookList
-            title="New Testament"
-            books={newTestament}
-            defaultOpen={readingTestament === "new"}
-          />
-          <BookList
-            title="Old Testament"
-            books={oldTestament}
-            defaultOpen={readingTestament === "old"}
-          />
-        </DisclosureGroup>
-
-        <p className="mt-6 pb-4 text-center text-[0.75rem] text-ash">
+        <p className="mt-7 pb-4 text-center text-caption leading-relaxed text-ash">
           {preferredEdition?.source === "local"
-            ? "World English Bible · Available offline · Public Domain"
+            ? "World English Bible · Available offline · Public domain"
             : preferredEdition?.source === "helloao"
               ? `${preferredEdition.abbreviation} preferred · Open online · WEB offline fallback`
-              : `${translationPreferenceLabel(preferredBibleTranslation)} preferred · Licensed connection · WEB offline fallback`}
+              : `${translationPreferenceLabel(preferredBibleTranslation)} preferred · Open edition fallback · WEB offline`}
         </p>
       </PageContainer>
-    </>
+    </div>
   );
 }
 
-function BookList({
+function QuickLink({
+  href,
+  icon,
+  eyebrow,
   title,
-  books,
-  defaultOpen,
 }: {
+  href: string;
+  icon: React.ReactNode;
+  eyebrow: string;
   title: string;
-  books: BibleBookMeta[];
-  defaultOpen?: boolean;
 }) {
   return (
-    <Disclosure
-      defaultOpen={defaultOpen}
-      count={books.length}
-      label={
-        <span className="text-[0.75rem] uppercase tracking-[0.16em] text-accent">
-          {title}
-        </span>
-      }
-    >
-      <PaperCard variant="paper" padding="none" className="overflow-hidden">
-        <ul className="divide-y divide-mist/70">
-          {books.map((b) => (
-            <li key={b.slug}>
-              <Link
-                href={`/app/bible/${b.slug}`}
-                className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-linen"
-              >
-                <span className="text-[1rem] text-charcoal">{b.name}</span>
-                <span className="text-[0.8125rem] text-ash">
-                  {b.chapterCount} {b.chapterCount === 1 ? "chapter" : "chapters"}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </PaperCard>
-    </Disclosure>
+    <motion.div className="h-full" whileHover={{ y: -2 }} whileTap={{ y: 0 }}>
+      <Link href={href} className="block h-full rounded-[var(--radius-card)]">
+        <PaperCard
+          interactive
+          padding="sm"
+          className="flex h-full min-h-28 flex-col justify-between"
+        >
+          <span className="flex h-9 w-9 items-center justify-center rounded-[9px] bg-linen text-accent ring-1 ring-mist">
+            {icon}
+          </span>
+          <span className="mt-3">
+            <span className="block text-caption uppercase tracking-[0.1em] text-accent">
+              {eyebrow}
+            </span>
+            <span className="mt-0.5 flex items-center gap-1 font-display text-[1.0625rem] leading-tight text-graphite">
+              <span className="min-w-0 truncate">{title}</span>
+              <IconChevronRight size={16} className="ml-auto text-fog" />
+            </span>
+          </span>
+        </PaperCard>
+      </Link>
+    </motion.div>
   );
 }
 

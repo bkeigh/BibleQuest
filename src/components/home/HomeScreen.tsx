@@ -2,18 +2,17 @@
 
 /**
  * The daily landing screen. It composes the local-first QuestOS state into one
- * calm sequence: welcome and candle, verse, today's quest choices, growth,
- * active walks, and private next steps. Day-bound content refreshes in place
- * when a long-lived tab crosses local midnight.
+ * calm sequence: welcome and candle, today's quest choices, growth, and
+ * private next steps. Scripture discovery stays one tap away without competing
+ * with the quests that anchor the daily experience.
  */
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   useQuestOS,
   selectStreak,
-  selectVerseRefreshCount,
-  MAX_DAILY_PICKS,
+  FREE_QUEST_SLOTS,
 } from "@/lib/questos/store";
 import { calculateTreeState, stageProgress } from "@/lib/questos/growth-engine";
 import {
@@ -24,17 +23,13 @@ import {
   questSlotsRemaining,
   selectSuggestedQuests,
 } from "@/lib/questos/quest-engine";
-import { getDailyVerse } from "@/lib/questos/verse-engine";
-import { getBookMeta } from "@/lib/bible";
 import { timeOfDay, toDateKey } from "@/lib/utils/dates";
-import { cleanVerseText } from "@/lib/utils/scripture";
 import { useStrings, fmt } from "@/lib/i18n";
 import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
-import { celebrationScale } from "@/lib/motion";
+import { celebrationScale, riseIn } from "@/lib/motion";
 import { PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleLink } from "@/components/design-system/GentleButton";
-import { VerseCard } from "@/components/bible/VerseCard";
 import {
   CATEGORY_LABEL,
   formatDuration,
@@ -61,22 +56,15 @@ function HomeInner() {
   const settings = useQuestOS((s) => s.settings);
   const growthEvents = useQuestOS((s) => s.growthEvents);
   const readingPosition = useQuestOS((s) => s.readingPosition);
-  const recentVerses = useQuestOS((s) => s.recentVerses);
-  const recordRecentVerse = useQuestOS((s) => s.recordRecentVerse);
   const completions = useQuestOS((s) => s.completions);
   const assignments = useQuestOS((s) => s.assignments);
   const { isPlus } = usePlus();
   // The candle. Stable ref — the stored object itself.
   const streak = useQuestOS(selectStreak);
-  // Today's "Another verse" count (primitive) + the action that grows it.
-  const verseRefreshCount = useQuestOS(selectVerseRefreshCount);
-  const refreshVerse = useQuestOS((s) => s.refreshVerse);
-  // Keep day-scoped content fresh when the local day rolls over while the app
-  // is left open (or the tab regains focus) — otherwise the verse and date
-  // silently show "yesterday".
+  // Keep day-scoped quest suggestions and rolling countdowns fresh when a
+  // long-lived tab crosses midnight or returns from the background.
   const [dayKey, setDayKey] = useState(() => toDateKey());
   const [now, setNow] = useState(() => Date.now());
-  const recordedVerseRef = useRef<string | null>(null);
 
   // Watch for a local day rollover: re-check on an interval, on focus, and on
   // visibility change. setDayKey is a no-op when the day hasn't changed.
@@ -101,35 +89,6 @@ function HomeInner() {
 
   const tree = useMemo(() => calculateTreeState(growthEvents), [growthEvents]);
   const progress = useMemo(() => stageProgress(tree), [tree]);
-  const verse = useMemo(
-    () => getDailyVerse(dayKey, verseRefreshCount),
-    [dayKey, verseRefreshCount]
-  );
-  const verseBookName = useMemo(
-    () =>
-      getBookMeta(verse.bookSlug)?.name ??
-      verse.reference.replace(/\s+\d+:.*$/, ""),
-    [verse.bookSlug, verse.reference]
-  );
-
-  // Home is a real verse view, so keep it in the same persistent history as
-  // chapter-reader visits. The ref prevents the store write from retriggering
-  // on the recent-verses render it causes; the store remains the authority for
-  // cross-session dedupe and the 20-entry cap.
-  useEffect(() => {
-    const passageKey = `${verse.bookSlug}:${verse.chapter}:${verse.verseStart}-${verse.verseEnd}`;
-    if (recordedVerseRef.current === passageKey) return;
-    recordedVerseRef.current = passageKey;
-    recordRecentVerse({
-      bookSlug: verse.bookSlug,
-      bookName: verseBookName,
-      chapter: verse.chapter,
-      verseStart: verse.verseStart,
-      verseEnd: verse.verseEnd,
-      reference: verse.reference,
-      text: verse.text,
-    });
-  }, [recordRecentVerse, verse, verseBookName]);
   const season = useMemo(() => getCurrentSeason(), []);
   const name = profile?.displayName?.trim();
   const time = timeOfDay();
@@ -190,7 +149,7 @@ function HomeInner() {
     },
   ].filter((group) => group.items.length > 0);
   const allDone = pickCount >= 1 && completedCount === pickCount;
-  const useCompactQuestRail = pickCount > MAX_DAILY_PICKS;
+  const useCompactQuestRail = pickCount > FREE_QUEST_SLOTS;
   const hiddenReservationCount = Math.max(
     0,
     occupiedPicks.length - pickCount
@@ -266,9 +225,6 @@ function HomeInner() {
         </header>
 
         <div className="space-y-4 pb-4">
-          {/* Today's verse */}
-          <VerseCard verse={verse} onAnotherVerse={refreshVerse} />
-
           {/* Today's quests — empty, picked (1-3), or day complete */}
           <section
             id="active-quests"
@@ -284,7 +240,7 @@ function HomeInner() {
               {pickCount === 0 ? (
                 hiddenReservationCount > 0 ? (
                   <p className="text-caption text-ash">
-                    {occupiedPicks.length}/{MAX_DAILY_PICKS} slots reserved
+                    {occupiedPicks.length}/{FREE_QUEST_SLOTS} slots reserved
                   </p>
                 ) : (
                   <PixelIcon name="scroll" size={5} />
@@ -436,12 +392,18 @@ function HomeInner() {
             )}
           </section>
 
+          {/* Keep Scripture close, but let the day's quests own Home's visual
+              hierarchy. The complete devotional card now lives in Bible. */}
+          <TodaysVerseLink />
+
           {/* Growth preview — the journey, one glance */}
           <Link href="/app/journey" className="block">
             <PaperCard interactive variant="linen" padding="md" className="flex items-center gap-3 min-[380px]:gap-4">
               <GrowthTree state={tree} size={76} showGround={false} />
               <div className="min-w-0 flex-1">
-                <SectionLabel pixel>{t.home.yourGrowth}</SectionLabel>
+                <h2 className="mb-2.5 font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
+                  {t.home.yourGrowth}
+                </h2>
                 <p className="font-display text-subheading text-graphite">
                   {tree.stageLabel}
                 </p>
@@ -511,77 +473,37 @@ function HomeInner() {
             />
           </div>
 
-          {/* Recent Scripture history — persistent, deduplicated, and linked
-              back to the exact range in its chapter. */}
-          {recentVerses.length > 0 && (
-            <section aria-label="Recent Verses" className="pt-1">
-              <SectionLabel pixel>{t.home.recently}</SectionLabel>
-              <ul className="-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-8 sm:px-8">
-                {recentVerses.slice(0, 8).map((recentVerse) => {
-                  const verseSegment =
-                    recentVerse.verseEnd > recentVerse.verseStart
-                      ? `${recentVerse.verseStart}-${recentVerse.verseEnd}`
-                      : `${recentVerse.verseStart}`;
-                  const href = `/app/bible/${recentVerse.bookSlug}/${recentVerse.chapter}?verse=${verseSegment}#verse-${recentVerse.verseStart}`;
-                  return (
-                    <li
-                      key={`${recentVerse.bookSlug}:${recentVerse.chapter}:${verseSegment}`}
-                      className="w-[min(78vw,18rem)] shrink-0 snap-start"
-                    >
-                      <Link
-                        href={href}
-                        aria-label={`Open ${recentVerse.reference} in the Bible`}
-                        className="block h-full rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                      >
-                        <PaperCard
-                          interactive
-                          variant="quiet"
-                          padding="sm"
-                          className="flex h-full min-h-28 flex-col"
-                        >
-                          <div className="flex items-center gap-2">
-                            <PixelIcon name="book" size={4} />
-                            <p className="font-display text-[1.0625rem] text-graphite">
-                              {recentVerse.reference}
-                            </p>
-                            <IconChevronRight className="ml-auto shrink-0 text-fog" />
-                          </div>
-                          <p className="mt-2 line-clamp-2 text-caption leading-relaxed text-ash">
-                            “{cleanVerseText(recentVerse.text)}”
-                          </p>
-                        </PaperCard>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          )}
         </div>
       </PageContainer>
     </div>
   );
 }
 
-function SectionLabel({
-  children,
-  pixel,
-}: {
-  children: React.ReactNode;
-  /** Ithaca header voice — larger, and a real heading over its content. */
-  pixel?: boolean;
-}) {
-  if (pixel) {
-    return (
-      <h2 className="mb-2.5 font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
-        {children}
-      </h2>
-    );
-  }
+function TodaysVerseLink() {
   return (
-    <p className="mb-2 text-caption uppercase tracking-[0.16em] text-accent">
-      {children}
-    </p>
+    <motion.div variants={riseIn} initial="hidden" animate="visible">
+      <Link
+        href="/app/bible"
+        className="group relative isolate flex min-h-16 items-center gap-3 overflow-hidden rounded-[var(--radius-card)] border border-evergreen-600 bg-evergreen-700 px-4 py-3 text-[#fdfbf3] paper-shadow-lg transition-all duration-300 [transition-timing-function:var(--ease-gentle)] hover:-translate-y-0.5 hover:bg-evergreen-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0"
+      >
+        <span
+          aria-hidden="true"
+          className="ambient absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gold-300/15 blur-2xl [animation:var(--animate-twinkle)]"
+        />
+        <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-[#fdfbf3]/10 ring-1 ring-[#fdfbf3]/20">
+          <PixelIcon name="open-book" size={4} animate />
+        </span>
+        <span className="relative min-w-0 flex-1">
+          <span className="block font-display text-[1.125rem] leading-tight">
+            View Today&apos;s Verse
+          </span>
+          <span className="mt-1 block text-caption text-[#fdfbf3]/70">
+            A quiet word is waiting in the Bible.
+          </span>
+        </span>
+        <IconArrowRight className="relative shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
+      </Link>
+    </motion.div>
   );
 }
 

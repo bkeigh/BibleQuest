@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Client-side Scripture resolution boundary. The bundled WEB text paints
+ * immediately and remains the offline/safe snapshot; reviewed HelloAO editions
+ * may replace it and be persisted with attribution; licensed API.Bible wording
+ * may be displayed transiently but is never stored or exported by these hooks.
+ */
+
 import { useEffect, useMemo, useState } from "react";
 import { useQuestOS } from "@/lib/questos/store";
 import type { DailyVerse } from "@/lib/questos/types";
@@ -102,7 +109,6 @@ export function usePreferredBiblePassage(
           translation?: BibleTranslation;
           fumsToken?: string;
           fallbackReason?: unknown;
-          requestedKey?: unknown;
         };
         if (!response.ok || typeof body.text !== "string" || !body.translation) {
           throw body.error;
@@ -211,7 +217,6 @@ export function usePreferredBibleChapter(
           translation?: BibleTranslation;
           fumsToken?: string;
           fallbackReason?: unknown;
-          requestedKey?: unknown;
         };
         if (
           !response.ok ||
