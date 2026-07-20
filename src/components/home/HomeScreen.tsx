@@ -225,6 +225,10 @@ function HomeInner() {
         </header>
 
         <div className="space-y-4 pb-4">
+          {/* Scripture stays directly beneath the personal account surface,
+              while the compact treatment leaves quests as Home's main work. */}
+          <TodaysVerseLink />
+
           {/* Today's quests — empty, picked (1-3), or day complete */}
           <section
             id="active-quests"
@@ -391,10 +395,6 @@ function HomeInner() {
               </motion.div>
             )}
           </section>
-
-          {/* Keep Scripture close, but let the day's quests own Home's visual
-              hierarchy. The complete devotional card now lives in Bible. */}
-          <TodaysVerseLink />
 
           {/* Growth preview — the journey, one glance */}
           <Link href="/app/journey" className="block">

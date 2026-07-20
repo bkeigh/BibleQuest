@@ -253,18 +253,10 @@ html.force-reduce-motion *::after {
 }
 
 /* Chapter focus mode leaves Scripture and its exit control in place while the
-   app navigation quietly makes room. The reader owns the temporary root class
-   and always removes it on unmount. */
+   app navigation makes room. Avoid transforming the fixed, blurred nav: that
+   compositor combination can flicker or drift during iOS/PWA scrolling. */
 html.bible-focus-mode [data-app-bottom-nav] {
-  transform: translateY(110%);
-  opacity: 0;
-  pointer-events: none;
-}
-
-[data-app-bottom-nav] {
-  transition:
-    transform 0.4s var(--ease-gentle),
-    opacity 0.3s var(--ease-gentle);
+  display: none;
 }
 
 html {

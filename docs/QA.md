@@ -72,8 +72,9 @@ the evidence.
       and Google are visually primary; “Not now — continue on this device” is
       available as a quiet local-first escape without losing profile choices.
 - [ ] Onboarding completes in under two minutes; optional steps are skippable.
-- [ ] Home shows greeting and active/ready/completed quests before the compact
-      “View Today's Verse” invitation; the button opens the Bible hub.
+- [ ] Home shows the greeting/account surface, then the compact “View Today's
+      Verse” invitation, then active/ready/completed quests; the button opens
+      the Bible hub and quests remain the strongest section heading.
 - [ ] Quest suggestions and rolling quest windows work without shame language.
 - [ ] Quest detail shows scripture text, why-it-matters, prayer-to-begin, and a
       safety note for sensitive quests.

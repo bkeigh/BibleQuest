@@ -427,7 +427,7 @@ Second-pass decision: premium monetization must never imply paid users are close
 
 Second-pass decision: the MVP should prioritize the complete daily loop over feature sprawl. If Claude Code must reduce scope, preserve this loop: onboarding → Home → daily verse → daily quest → quest completion → reflection → prayer → growth tree → journey timeline.
 
-Current-contract decision (July 2026; supersedes older Home requirements throughout this document): Home prioritizes active and completed quests. It uses a compact, lively “View Today’s Verse” action that opens the Bible hub; the full daily verse card, verse actions, and recent-verse history live on the Bible page. This keeps Scripture in the daily loop without letting it compete with the user’s quests on Home.
+Current-contract decision (July 2026; supersedes older Home requirements throughout this document): Home opens with the personal account surface, places a compact, lively “View Today’s Verse” action directly beneath it, then presents active and completed quests as the strongest content section. The action opens the Bible hub; the full daily verse card, verse actions, and recent-verse history live on the Bible page. This keeps Scripture in the daily loop without letting it compete with the user’s quests on Home.
 
   
 
