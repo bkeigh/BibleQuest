@@ -66,3 +66,14 @@ Sanitized example:
 
 The payload contains an event name, normalized route, and bounded enums only—no
 private text or identifiers.
+
+## Auth round-trip counting
+
+A successful server auth callback sets the five-minute, one-shot
+`biblequest_auth_completed=1` cookie. It contains no provider, email, user ID,
+token, or destination. The first authenticated client session consumes and
+deletes it, allowing `INITIAL_SESSION` after a full-page callback to emit the
+same single `sign_in_completed` event as an in-page `SIGNED_IN`. Existing
+cross-tab deduplication still applies. Account/first-quest resume stages are
+bounded non-PII strings, and resuming either stage does not emit a second
+`onboarding_started` event.

@@ -50,6 +50,7 @@ export interface PrayerRow {
   status: string;
   answered_at: string | null;
   answer_reflection: string | null;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -62,6 +63,7 @@ export interface ReflectionRow {
   mood: string | null;
   related_quest_slug: string | null;
   related_verse_reference: string | null;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -202,15 +204,17 @@ export interface NotificationPrefsRow {
 // ---------------------------------------------------------------------------
 
 export function prayerToRow(uid: string, p: Prayer): PrayerRow {
+  const legacyArchived = p.status === "archived";
   return {
     id: p.id,
     user_id: uid,
     title: p.title ?? null,
     body: p.body,
     category: p.category,
-    status: p.status,
+    status: legacyArchived ? (p.answeredAt ? "answered" : "active") : p.status,
     answered_at: p.answeredAt ?? null,
     answer_reflection: p.answerReflection ?? null,
+    archived_at: p.archivedAt ?? (legacyArchived ? p.updatedAt : null),
     created_at: p.createdAt,
     updated_at: p.updatedAt,
   };
@@ -225,6 +229,7 @@ export function reflectionToRow(uid: string, r: Reflection): ReflectionRow {
     mood: r.mood ?? null,
     related_quest_slug: r.relatedQuestSlug ?? null,
     related_verse_reference: r.relatedVerseReference ?? null,
+    archived_at: r.archivedAt ?? null,
     created_at: r.createdAt,
     updated_at: r.updatedAt,
   };
@@ -399,14 +404,21 @@ export function settingsToRows(
 // ---------------------------------------------------------------------------
 
 export function rowToPrayer(row: PrayerRow): Prayer {
+  const legacyArchived = row.status === "archived";
   return {
     id: row.id,
     title: row.title ?? undefined,
     body: row.body,
     category: row.category as PrayerCategory,
-    status: row.status as PrayerStatus,
+    status: (legacyArchived
+      ? row.answered_at
+        ? "answered"
+        : "active"
+      : row.status) as PrayerStatus,
     answeredAt: row.answered_at ?? undefined,
     answerReflection: row.answer_reflection ?? undefined,
+    archivedAt:
+      row.archived_at ?? (legacyArchived ? row.updated_at : undefined),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -420,6 +432,7 @@ export function rowToReflection(row: ReflectionRow): Reflection {
     mood: (row.mood ?? undefined) as ReflectionMood | undefined,
     relatedQuestSlug: row.related_quest_slug ?? undefined,
     relatedVerseReference: row.related_verse_reference ?? undefined,
+    archivedAt: row.archived_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

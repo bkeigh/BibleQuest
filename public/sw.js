@@ -4,7 +4,7 @@
  * validated build assets. Prayers, reflections, and other user data continue
  * to live in the persisted Zustand store; this worker never handles that data.
  */
-const CACHE_VERSION = "biblequest-v13";
+const CACHE_VERSION = "biblequest-v14";
 const CACHE_OWNER_PREFIX = "biblequest-";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
@@ -84,8 +84,8 @@ const OFFLINE_SAFE_NAVIGATION_PATHS = new Set([
   "/onboarding",
   "/app/prayer",
   "/app/prayer/new",
-  "/app/reflection",
-  "/app/reflection/new",
+  "/app/prayer/reflections",
+  "/app/prayer/reflection/new",
   "/app/journey",
   "/app/quests",
   "/app/bible",

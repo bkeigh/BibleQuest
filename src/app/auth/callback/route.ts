@@ -5,6 +5,11 @@ import {
   isSupabaseConfigured,
 } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/auth/redirect";
+import {
+  authFailureReason,
+  type AuthFailureReason,
+} from "@/lib/auth/errors";
+import { AUTH_COMPLETION_COOKIE } from "@/lib/auth/completion-signal";
 
 /**
  * Email OTP types we accept on the token_hash path. An allow-list, not a cast:
@@ -48,23 +53,60 @@ export async function GET(request: Request) {
   const tokenHash = url.searchParams.get("token_hash");
   const type = asEmailOtpType(url.searchParams.get("type"));
   const next = safeNextPath(url.searchParams.get("next"));
+  const providerError =
+    url.searchParams.get("error_code") ?? url.searchParams.get("error");
+  let failure: AuthFailureReason = "unknown";
 
-  if (isSupabaseConfigured() && (code || (tokenHash && type))) {
-    const supabase = await createServerSupabase();
-    const { error } = code
-      ? await supabase.auth.exchangeCodeForSession(code)
-      : await supabase.auth.verifyOtp({ type: type!, token_hash: tokenHash! });
-    if (!error) {
-      return NextResponse.redirect(new URL(next, url.origin));
+  if (!isSupabaseConfigured()) {
+    failure = "configuration";
+  } else if (providerError) {
+    failure = authFailureReason(null, providerError);
+  } else if (code || (tokenHash && type)) {
+    try {
+      const supabase = await createServerSupabase();
+      const { error } = code
+        ? await supabase.auth.exchangeCodeForSession(code)
+        : await supabase.auth.verifyOtp({ type: type!, token_hash: tokenHash! });
+      if (!error) {
+        return privateRedirect(new URL(next, url.origin), true);
+      }
+      failure = authFailureReason(error);
+    } catch (error) {
+      failure = authFailureReason(error);
     }
+  } else {
+    // A token hash with a missing/unapproved type, a stripped callback, or a
+    // direct visit cannot be verified. Keep that distinct from an expiry.
+    failure = "invalid";
   }
 
   // A failed returning-user sign-in must stay on the public onboarding route;
   // sending a fresh device to /app/account would put it behind the very gate
   // that is waiting for account restoration. Other account invitations keep
   // the established in-app recovery screen.
-  const errorPath = new URL(next, url.origin).pathname === "/onboarding"
-    ? "/onboarding?error=signin"
-    : "/app/account?error=signin";
-  return NextResponse.redirect(new URL(errorPath, url.origin));
+  const errorUrl = new URL(
+    new URL(next, url.origin).pathname === "/onboarding"
+      ? "/onboarding"
+      : "/app/account",
+    url.origin,
+  );
+  errorUrl.searchParams.set("error", failure);
+  return privateRedirect(errorUrl);
+}
+
+function privateRedirect(url: URL, authCompleted = false) {
+  const response = NextResponse.redirect(url);
+  if (authCompleted) {
+    response.cookies.set(AUTH_COMPLETION_COOKIE, "1", {
+      httpOnly: false,
+      maxAge: 5 * 60,
+      path: "/",
+      sameSite: "lax",
+      secure: url.protocol === "https:",
+    });
+  }
+  // Auth URLs and their error reasons should never enter an intermediary or
+  // service-worker cache, including failure paths that set no session cookie.
+  response.headers.set("Cache-Control", "private, no-store");
+  return response;
 }

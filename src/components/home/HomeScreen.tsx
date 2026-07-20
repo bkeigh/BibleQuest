@@ -224,7 +224,7 @@ function HomeInner() {
       <PageContainer className="relative pt-safe">
         {/* Personal welcome — one framed devotional surface with today's
             candle, echoing a bookplate rather than a dashboard header. */}
-        <header className="sacred-frame mt-7 mb-5 bg-paper/90 px-5 py-5 max-[360px]:px-4 sm:px-6">
+        <header className="sacred-frame mt-4 mb-4 bg-paper/90 px-5 py-4 max-[360px]:px-4 sm:mt-5 sm:px-6 sm:py-5">
           <div className="relative z-10 flex min-w-0 items-center gap-3 max-[360px]:gap-2.5 min-[361px]:gap-3.5">
             <Link
               href="/app/settings"
@@ -254,7 +254,7 @@ function HomeInner() {
           </div>
           <Link
             href="/app/settings"
-            className="relative z-10 mt-4 flex min-h-11 items-center gap-2.5 rounded-[10px] bg-linen/80 px-3 text-small font-medium text-charcoal ring-1 ring-mist transition-colors hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="relative z-10 mt-3 flex min-h-11 items-center gap-2.5 rounded-[10px] bg-linen/80 px-3 text-small font-medium text-charcoal ring-1 ring-mist transition-colors hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:mt-4"
           >
             <IconSettings size={18} className="shrink-0 text-accent" />
             <span>Settings</span>
@@ -483,7 +483,7 @@ function HomeInner() {
               href="/app/prayer/new"
               sprite="candle"
               title="One minute of prayer"
-              subtitle="Say what’s on your mind. It stays private."
+              subtitle="Say what’s on your mind. Save it in your private-by-default journal."
             />
             <QuickRow
               href={
@@ -504,7 +504,7 @@ function HomeInner() {
               }
             />
             <QuickRow
-              href="/app/reflection"
+              href="/app/prayer/reflections"
               sprite="sun"
               title={t.titles.reflections}
               subtitle={t.home.reflectionHint}

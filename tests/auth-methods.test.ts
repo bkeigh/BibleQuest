@@ -9,7 +9,7 @@ describe("production sign-in methods", () => {
       createElement(SignInMethods, { source: "account" }),
     );
 
-    expect(markup).toContain("Send a sign-in link");
+    expect(markup).toContain("Email me a sign-in link");
     expect(markup).toContain("Continue with Google");
     expect(markup).not.toContain("Text me a code");
     expect(markup).not.toContain('type="tel"');

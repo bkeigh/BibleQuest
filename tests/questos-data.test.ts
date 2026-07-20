@@ -43,6 +43,50 @@ describe("QuestOS clearing, restore, and deletion tombstones", () => {
     expect(state.tombstones.myQuests).toContain("fixture-walk");
   });
 
+  it("keeps answered state when prayers are archived and restored", () => {
+    useQuestOS.getState().importData(currentSnapshot());
+    const prayerId = currentSnapshot().prayers[0].id;
+
+    useQuestOS.getState().markPrayerAnswered(prayerId, "The door opened.");
+    useQuestOS.getState().archivePrayer(prayerId);
+
+    let prayer = useQuestOS.getState().prayers[0];
+    expect(prayer.status).toBe("answered");
+    expect(prayer.archivedAt).toBe(FIXED_NOW);
+
+    useQuestOS.getState().unarchivePrayer(prayerId);
+    prayer = useQuestOS.getState().prayers[0];
+    expect(prayer.status).toBe("answered");
+    expect(prayer.archivedAt).toBeUndefined();
+    expect(prayer.answerReflection).toBe("The door opened.");
+  });
+
+  it("archives and restores reflections without deleting them", () => {
+    useQuestOS.getState().importData(currentSnapshot());
+    const reflectionId = currentSnapshot().reflections[0].id;
+
+    useQuestOS.getState().archiveReflection(reflectionId);
+    expect(useQuestOS.getState().reflections[0].archivedAt).toBe(FIXED_NOW);
+
+    useQuestOS.getState().unarchiveReflection(reflectionId);
+    expect(useQuestOS.getState().reflections[0].archivedAt).toBeUndefined();
+  });
+
+  it("normalizes legacy archive-as-status records during import", () => {
+    const legacy = currentSnapshot();
+    legacy.prayers[0] = {
+      ...legacy.prayers[0],
+      status: "archived",
+    };
+
+    useQuestOS.getState().importData(legacy);
+
+    expect(useQuestOS.getState().prayers[0]).toMatchObject({
+      status: "active",
+      archivedAt: FIXED_NOW,
+    });
+  });
+
   it("preserves account-purge intent while clearing local data", () => {
     useQuestOS.getState().importData(currentSnapshot());
     useQuestOS.getState().clearAllData({ purgeAccount: "account-a" });

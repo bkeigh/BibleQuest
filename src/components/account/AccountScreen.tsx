@@ -14,6 +14,10 @@ import { useToast } from "@/components/design-system/Toast";
 import { IconCheck } from "@/components/design-system/icons";
 import { SignInMethods } from "./SignInMethods";
 import { track } from "@/lib/analytics/events";
+import {
+  authFailureMessage,
+  parseAuthFailureReason,
+} from "@/lib/auth/errors";
 
 function AccountInner() {
   const router = useRouter();
@@ -24,17 +28,18 @@ function AccountInner() {
   // A failed magic link / OAuth round-trip lands here as ?error=signin
   // (src/app/auth/callback/route.ts). This component only renders on the
   // client (ClientOnly), so the URL is readable at first render.
-  const [callbackFailed] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).get("error") === "signin"
+  const [callbackFailure] = useState(() =>
+    typeof window === "undefined"
+      ? null
+      : parseAuthFailureReason(
+          new URLSearchParams(window.location.search).get("error"),
+        ),
   );
 
   // Clean the error out of the URL so a refresh doesn't re-show it.
   useEffect(() => {
-    if (!callbackFailed) return;
+    if (!callbackFailure) return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("error") !== "signin") return;
     params.delete("error");
     const qs = params.toString();
     window.history.replaceState(
@@ -42,15 +47,15 @@ function AccountInner() {
       "",
       window.location.pathname + (qs ? `?${qs}` : "")
     );
-  }, [callbackFailed]);
+  }, [callbackFailure]);
 
   if (!configured) {
     return (
       <Frame title="Your account">
         <PaperCard variant="quiet" padding="lg" className="text-center">
           <p className="text-small leading-relaxed text-ash">
-            Cross-device sync isn’t available yet. Everything stays private on
-            this device.
+            Cross-device sync isn’t available yet. Your journey is stored in
+            this browser on this device.
           </p>
         </PaperCard>
       </Frame>
@@ -101,8 +106,9 @@ function AccountInner() {
                   : "Sync starts shortly."}
           </p>
           <p className="mt-3 text-small leading-relaxed text-ash">
-            Your prayers and reflections stay private — kept only for you, never
-            shared.
+            Your prayers and reflections sync only to your BibleQuest account
+            behind per-user access controls. Journal text is excluded from
+            analytics and is not sent to AI.
           </p>
           <GentleButton
             variant="outline"
@@ -124,28 +130,31 @@ function AccountInner() {
     >
       <PixelMascot name="key" size={9} title="Sign in" className="mb-6" />
 
-      {callbackFailed && (
+      {callbackFailure && (
         <div
           role="alert"
           className="mb-4 rounded-[var(--radius-card)] border border-rose-300 px-4 py-3"
         >
           <p className="text-small leading-relaxed text-rose-700">
-            That sign-in link didn’t work — it may have expired. Send yourself
-            a fresh one below.
+            {authFailureMessage(callbackFailure)}
+          </p>
+          <p className="mt-1 text-[0.6875rem] uppercase tracking-[0.08em] text-ash">
+            Reference: AUTH-CALLBACK-{callbackFailure.replaceAll("_", "-")}
           </p>
         </div>
       )}
 
       <PaperCard variant="paper" padding="lg">
         <p className="text-small leading-relaxed text-charcoal">
-          Everything you do here lives on this device. A free account simply
-          keeps it safe — your prayers and reflections stay private, always.
+          Without an account, your journey stays in this browser. A free
+          account syncs it across devices behind per-user access controls;
+          journal text stays out of analytics and AI.
         </p>
 
         <ul className="mt-4 space-y-2">
           {[
             "Your quest progress, streaks, and milestones carry across devices.",
-            "Prayers and reflections back up privately, only for you.",
+            "Prayers and reflections sync to your protected account.",
             "Reinstall or switch phones without losing your journey.",
             "Pick up on any device, right where you left off.",
           ].map((benefit) => (

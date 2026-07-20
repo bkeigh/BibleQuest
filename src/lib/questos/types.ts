@@ -287,6 +287,8 @@ export interface Prayer {
   status: PrayerStatus;
   answeredAt?: string;
   answerReflection?: string;
+  /** Archival is independent from whether a prayer is active or answered. */
+  archivedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -328,6 +330,7 @@ export interface Reflection {
   mood?: ReflectionMood;
   relatedQuestSlug?: string;
   relatedVerseReference?: string;
+  archivedAt?: string;
   createdAt: string;
   updatedAt: string;
 }

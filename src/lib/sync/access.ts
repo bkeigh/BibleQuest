@@ -10,7 +10,33 @@ interface AccountRestoreInput {
   syncState: SyncState;
   initialSyncComplete: boolean;
   handoffPending: boolean;
-  trustedLocalCopy: boolean;
+  safeLocalJourney: boolean;
+}
+
+interface SafeLocalJourneyInput {
+  localOnboardingCompleted: boolean;
+  lastSyncedUserId: string | null;
+  userId: string | null;
+  initialSyncPending?: boolean;
+}
+
+/**
+ * Only a journey already stamped to this exact account can open before a new
+ * initial sync completes. First-account guest adoption must finish its pull →
+ * merge → push before UI mutations can race the subscriber attachment.
+ */
+export function hasSafeLocalJourney({
+  localOnboardingCompleted,
+  lastSyncedUserId,
+  userId,
+  initialSyncPending = false,
+}: SafeLocalJourneyInput): boolean {
+  return Boolean(
+    localOnboardingCompleted &&
+      userId &&
+      lastSyncedUserId === userId &&
+      !initialSyncPending,
+  );
 }
 
 /**
@@ -29,7 +55,7 @@ export function accountRestorePhase({
   syncState,
   initialSyncComplete,
   handoffPending,
-  trustedLocalCopy,
+  safeLocalJourney,
 }: AccountRestoreInput): AccountRestorePhase {
   if (!configured) return "ready";
   if (sessionLoading) return "loading";
@@ -38,7 +64,7 @@ export function accountRestorePhase({
   // Once this exact account has successfully owned the hydrated journey, the
   // app remains local-first on reload. A background pull may retry offline;
   // only a genuinely fresh browser needs the hard restore boundary.
-  if (trustedLocalCopy) return "ready";
+  if (safeLocalJourney) return "ready";
   if (syncUserId !== userId) return "loading";
   if (initialSyncComplete) return "ready";
   return syncState === "error" ? "initial-sync-error" : "loading";

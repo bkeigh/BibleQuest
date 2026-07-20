@@ -159,3 +159,32 @@ export const IconLeaf = (p: IconProps) => (
     <path d="M5 19C8 14 12 11 16 9.5" />
   </Svg>
 );
+
+export const IconSearch = (p: IconProps) => (
+  <Svg {...p} size={p.size ?? 18}>
+    <circle cx="10.5" cy="10.5" r="6.5" />
+    <path d="m15.5 15.5 4 4" />
+  </Svg>
+);
+
+export const IconEye = (p: IconProps) => (
+  <Svg {...p} size={p.size ?? 18}>
+    <path d="M3.5 12s3-5 8.5-5 8.5 5 8.5 5-3 5-8.5 5-8.5-5-8.5-5Z" />
+    <circle cx="12" cy="12" r="2.25" />
+  </Svg>
+);
+
+export const IconEyeOff = (p: IconProps) => (
+  <Svg {...p} size={p.size ?? 18}>
+    <path d="m4 4 16 16" />
+    <path d="M9.7 7.3A8.7 8.7 0 0 1 12 7c5.5 0 8.5 5 8.5 5a13 13 0 0 1-2.1 2.6M6.3 8.2A13.6 13.6 0 0 0 3.5 12s3 5 8.5 5c.9 0 1.7-.1 2.4-.3" />
+  </Svg>
+);
+
+export const IconSliders = (p: IconProps) => (
+  <Svg {...p} size={p.size ?? 18}>
+    <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
+    <circle cx="15" cy="7" r="2" />
+    <circle cx="9" cy="17" r="2" />
+  </Svg>
+);

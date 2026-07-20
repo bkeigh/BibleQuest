@@ -1,12 +1,8 @@
 "use client";
 
-/**
- * Private prayer-journal index. It derives active, answered, and archived
- * views from the local-first store and keeps filtering, editing, and deletion
- * controls close to the journal entries they affect.
- */
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useQuestOS } from "@/lib/questos/store";
 import { useToast } from "@/components/design-system/Toast";
@@ -16,209 +12,378 @@ import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { PixelMascot } from "@/components/design-system/PixelMascot";
-import { Disclosure } from "@/components/design-system/Disclosure";
+import { JournalEntryBody } from "@/components/journal/JournalEntryBody";
+import { JournalPrivacyNote } from "@/components/journal/JournalPrivacyNote";
+import { JournalComposeMenu } from "@/components/journal/JournalComposeMenu";
 import { CATEGORY_LABEL } from "@/components/prayer/PrayerComposer";
-import { IconPlus } from "@/components/design-system/icons";
+import { ReflectionCard } from "@/components/reflection/ReflectionScreen";
+import {
+  IconEye,
+  IconEyeOff,
+  IconPlus,
+  IconSearch,
+} from "@/components/design-system/icons";
 import { expander } from "@/lib/motion";
-import { emptyStates } from "@/lib/questos/copy";
-import { formatShortDate } from "@/lib/utils/dates";
-import type { Prayer, PrayerCategory, PrayerStatus } from "@/lib/questos/types";
+import { formatShortDate, hashString, toDateKey } from "@/lib/utils/dates";
+import { reflectionPrompts } from "@/data/seed/reflection-prompts";
+import {
+  deriveJournalTimeline,
+  type JournalEntry,
+  type JournalFilter,
+} from "@/lib/questos/journal";
+import type { Prayer, PrayerStatus } from "@/lib/questos/types";
 import { cn } from "@/lib/utils/cn";
-import { useStrings } from "@/lib/i18n";
 
-type Tab = "active" | "answered" | "archived";
-const TABS: Tab[] = ["active", "answered", "archived"];
-const TAB_LABEL: Record<Tab, string> = {
-  active: "Active",
-  answered: "Answered",
-  archived: "Archived",
-};
+const PRIMARY_FILTERS: Array<{ value: JournalFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "prayers", label: "Prayers" },
+  { value: "reflections", label: "Reflections" },
+];
+
+const SECONDARY_FILTERS: Array<{ value: JournalFilter; label: string }> = [
+  { value: "answered", label: "Answered" },
+  { value: "archived", label: "Archived" },
+];
 
 function PrayerScreenInner() {
-  const t = useStrings();
-  const prayers = useQuestOS((s) => s.prayers);
-  const [tab, setTab] = useState<Tab>("active");
-  const [category, setCategory] = useState<PrayerCategory | null>(null);
-  const tabRefs = useRef<Map<Tab, HTMLButtonElement>>(new Map());
-
-  const inTab = useMemo(
-    () =>
-      prayers
-        .filter((p) => p.status === tab)
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    [prayers, tab]
+  const pathname = usePathname();
+  const prayers = useQuestOS((state) => state.prayers);
+  const reflections = useQuestOS((state) => state.reflections);
+  const [filter, setFilter] = useState<JournalFilter>(() =>
+    pathname === "/app/prayer/reflections" ? "reflections" : "all",
   );
+  const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [entriesHidden, setEntriesHidden] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const closeComposeMenu = useCallback(() => setComposeOpen(false), []);
+  const hideJournal = useCallback(() => {
+    setComposeOpen(false);
+    setSearchOpen(false);
+    setQuery("");
+    setEntriesHidden(true);
+  }, []);
 
-  // Topics present in the current tab — the filter only appears when it
-  // would actually narrow something.
-  const categories = useMemo(() => {
-    const set = new Set<PrayerCategory>();
-    for (const p of inTab) set.add(p.category);
-    return [...set];
-  }, [inTab]);
+  const prompt = useMemo(
+    () => reflectionPrompts[hashString(toDateKey()) % reflectionPrompts.length],
+    [],
+  );
+  const timeline = useMemo(
+    () => deriveJournalTimeline(prayers, reflections, { filter, query }),
+    [filter, prayers, query, reflections],
+  );
+  const visibleCount = timeline.groups.reduce(
+    (count, group) => count + group.entries.length,
+    0,
+  );
+  const totalCount = prayers.length + reflections.length;
 
-  // Only apply (and advertise) the topic filter when it exists in this tab.
-  const activeCategory =
-    category && categories.includes(category) ? category : null;
-  const visible = activeCategory
-    ? inTab.filter((p) => p.category === activeCategory)
-    : inTab;
+  useEffect(() => {
+    function hideWhenBackgrounded() {
+      if (document.visibilityState === "hidden") hideJournal();
+    }
+    document.addEventListener("visibilitychange", hideWhenBackgrounded);
+    return () =>
+      document.removeEventListener("visibilitychange", hideWhenBackgrounded);
+  }, [hideJournal]);
 
-  function onTabKeyDown(e: React.KeyboardEvent) {
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-    e.preventDefault();
-    const i = TABS.indexOf(tab);
-    const next =
-      e.key === "ArrowRight"
-        ? TABS[(i + 1) % TABS.length]
-        : TABS[(i + TABS.length - 1) % TABS.length];
-    setTab(next);
-    tabRefs.current.get(next)?.focus();
+  function revealSearch() {
+    setSearchOpen(true);
+    requestAnimationFrame(() => searchRef.current?.focus());
   }
 
   return (
     <>
-      <PageHeader
-        title={t.nav.prayer}
-        subtitle="What you’re praying for, in one place."
-        action={
-          <GentleLink variant="outline" size="sm" href="/app/prayer/new">
-            <IconPlus size={16} /> New
-          </GentleLink>
-        }
-      />
-      <PageContainer>
-        <div
-          role="tablist"
-          aria-label="Prayer status"
-          onKeyDown={onTabKeyDown}
-          className="mb-4 flex gap-1 rounded-full border border-mist bg-linen p-1"
-        >
-          {TABS.map((t) => (
-            <button
-              key={t}
-              role="tab"
-              id={`prayer-tab-${t}`}
-              aria-selected={tab === t}
-              aria-controls="prayer-tabpanel"
-              tabIndex={tab === t ? 0 : -1}
-              ref={(el) => {
-                if (el) tabRefs.current.set(t, el);
-              }}
-              onClick={() => setTab(t)}
-              className={cn(
-                "flex-1 rounded-full py-2 text-[0.875rem] transition-all duration-300",
-                tab === t
-                  ? "bg-paper text-graphite paper-shadow"
-                  : "text-ash hover:text-charcoal"
-              )}
+      <div
+        aria-hidden={composeOpen ? true : undefined}
+        inert={composeOpen ? true : undefined}
+      >
+        <PageHeader
+          title="Prayer Journal"
+          subtitle="Prayers, reflections, and what you want to remember."
+          action={
+            <GentleButton
+              variant="primary"
+              size="sm"
+              onClick={() => setComposeOpen(true)}
+              aria-haspopup="dialog"
             >
-              {TAB_LABEL[t]}
-            </button>
-          ))}
-        </div>
+              <IconPlus size={17} /> New
+            </GentleButton>
+          }
+        />
+        <PageContainer className="pb-6">
+        <JournalPrivacyNote />
 
-        {categories.length > 1 && (
-          <Disclosure
-            label={
-              <span className="text-[0.875rem] font-normal text-ash">
-                Filter by topic
-              </span>
-            }
-            summary={
-              activeCategory ? (
-                <span className="rounded-full bg-accent-surface px-2 py-0.5 text-[0.8125rem] font-medium text-accent">
-                  {CATEGORY_LABEL[activeCategory]}
-                </span>
-              ) : undefined
-            }
-            className="mb-3"
-          >
-            <div className="flex flex-wrap gap-2">
-              {categories.map((c) => (
+        {!entriesHidden && (
+        <div>
+        <div className="mt-4 flex items-center gap-2">
+          <div role="group" aria-label="Filter journal entries" className="min-w-0 flex-1">
+            <div className="grid grid-cols-3 gap-1 rounded-full border border-mist bg-linen p-1">
+              {PRIMARY_FILTERS.map((item) => (
                 <button
-                  key={c}
+                  key={item.value}
                   type="button"
-                  aria-pressed={category === c}
-                  onClick={() => setCategory(category === c ? null : c)}
+                  aria-pressed={filter === item.value}
+                  onClick={() => setFilter(item.value)}
                   className={cn(
-                    "rounded-full border px-3 py-1.5 text-[0.8125rem] transition-all duration-300",
-                    category === c
-                      ? "border-accent bg-accent-surface text-accent"
-                      : "border-mist bg-paper text-ash hover:border-accent/50"
+                    "min-h-11 rounded-full px-1 text-[0.8125rem] transition-all",
+                    filter === item.value
+                      ? "bg-paper font-medium text-graphite paper-shadow"
+                      : "text-ash hover:text-charcoal",
                   )}
                 >
-                  {CATEGORY_LABEL[c]}
+                  {item.label}
                 </button>
               ))}
             </div>
-          </Disclosure>
+          </div>
+          <button
+            type="button"
+            aria-label={searchOpen ? "Close journal search" : "Search journal"}
+            aria-expanded={searchOpen}
+            onClick={() => {
+              if (searchOpen) {
+                setSearchOpen(false);
+                setQuery("");
+              } else {
+                revealSearch();
+              }
+            }}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-mist bg-paper text-ash hover:text-graphite"
+          >
+            <IconSearch />
+          </button>
+          <button
+            type="button"
+            aria-label="Hide journal entries"
+            aria-pressed="false"
+            onClick={hideJournal}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-mist bg-paper text-ash hover:text-graphite"
+          >
+            <IconEyeOff />
+          </button>
+        </div>
+
+        {(timeline.counts.answered > 0 || timeline.counts.archived > 0) && (
+          <div
+            role="group"
+            aria-label="Prayer status filters"
+            className="mt-2 flex flex-wrap gap-2 px-1"
+          >
+            {SECONDARY_FILTERS.map((item) => {
+              const count = timeline.counts[item.value];
+              if (!count) return null;
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  aria-pressed={filter === item.value}
+                  onClick={() =>
+                    setFilter((current) =>
+                      current === item.value ? "all" : item.value,
+                    )
+                  }
+                  className={cn(
+                    "min-h-11 rounded-full border px-3 text-[0.8125rem] transition-colors",
+                    filter === item.value
+                      ? "border-accent bg-accent-surface font-medium text-accent"
+                      : "border-mist bg-paper text-ash hover:border-accent/50 hover:text-charcoal",
+                  )}
+                >
+                  {item.label} <span className="tabular-nums">{count}</span>
+                </button>
+              );
+            })}
+          </div>
         )}
 
-        <div
-          role="tabpanel"
-          id="prayer-tabpanel"
-          aria-labelledby={`prayer-tab-${tab}`}
-        >
-          {visible.length === 0 ? (
-            <EmptyPrayer tab={tab} filtered={inTab.length > 0} />
-          ) : (
-            <div className="space-y-3 pb-6">
-              {visible.map((p) => (
-                <PrayerCard key={p.id} prayer={p} />
-              ))}
-            </div>
+        <AnimatePresence initial={false}>
+          {searchOpen && (
+            <motion.div
+              variants={expander}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+              className="overflow-hidden"
+            >
+              <div className="relative mt-3">
+                <IconSearch
+                  size={18}
+                  className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-fog"
+                />
+                <label htmlFor="journal-search" className="sr-only">
+                  Search prayers and reflections
+                </label>
+                <input
+                  ref={searchRef}
+                  id="journal-search"
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search your journal"
+                  autoComplete="off"
+                  className="h-12 w-full rounded-[var(--radius-button)] border border-mist bg-paper pl-10 pr-4 text-[0.9375rem] text-graphite outline-none placeholder:text-fog focus:border-accent"
+                />
+              </div>
+            </motion.div>
           )}
+        </AnimatePresence>
+
+        <p className="sr-only" aria-live="polite">
+          {visibleCount} {visibleCount === 1 ? "entry" : "entries"} shown
+        </p>
         </div>
-      </PageContainer>
+        )}
+
+        {entriesHidden ? (
+          <HiddenJournal onReveal={() => setEntriesHidden(false)} />
+        ) : totalCount === 0 ? (
+          <EmptyJournal prompt={prompt} onNew={() => setComposeOpen(true)} />
+        ) : visibleCount === 0 ? (
+          <EmptyResults
+            query={query}
+            onClear={() => {
+              setQuery("");
+              setFilter("all");
+            }}
+          />
+        ) : (
+          <div className="mt-6 space-y-7">
+            {timeline.groups.map((group) => (
+              <section key={group.key} aria-labelledby={`journal-day-${group.key}`}>
+                <div className="mb-2.5 flex items-baseline justify-between gap-3 px-1">
+                  <h2
+                    id={`journal-day-${group.key}`}
+                    className="font-display text-[1.125rem] text-graphite"
+                  >
+                    {group.label}
+                  </h2>
+                  <span className="text-[0.75rem] tabular-nums text-ash">
+                    {group.entries.length} {group.entries.length === 1 ? "entry" : "entries"}
+                  </span>
+                </div>
+                <div className="space-y-3">
+                  {group.entries.map((entry) => (
+                    <JournalCard key={entry.key} entry={entry} />
+                  ))}
+                </div>
+              </section>
+            ))}
+
+            <PaperCard variant="quiet" padding="sm" className="text-center">
+              <p className="text-[0.875rem] text-ash">
+                A few honest lines are enough.
+              </p>
+              <GentleButton
+                variant="text"
+                size="sm"
+                className="mt-1 min-h-11"
+                onClick={() => setComposeOpen(true)}
+              >
+                <IconPlus size={16} /> New entry
+              </GentleButton>
+            </PaperCard>
+          </div>
+        )}
+        </PageContainer>
+      </div>
+
+      <JournalComposeMenu
+        open={composeOpen}
+        onClose={closeComposeMenu}
+        prompt={prompt}
+      />
     </>
   );
 }
 
-function EmptyPrayer({ tab, filtered }: { tab: Tab; filtered: boolean }) {
-  // Prayers exist in this tab, but the topic filter excluded them all.
-  if (filtered) {
-    return (
-      <PaperCard variant="quiet" padding="lg" className="text-center">
-        <p className="text-[0.9375rem] text-ash">
-          Nothing under that topic here. Clear the filter to see everything.
-        </p>
-      </PaperCard>
-    );
-  }
-  if (tab === "answered") {
-    return (
-      <PaperCard variant="quiet" padding="lg" className="text-center">
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gold-500/15">
-          <PixelIcon name="flower" size={5} />
-        </div>
-        <p className="text-[0.9375rem] text-ash">
-          Answered prayers will collect here.
-        </p>
-      </PaperCard>
-    );
-  }
-  if (tab === "archived") {
-    return (
-      <PaperCard variant="quiet" padding="lg" className="text-center">
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-linen ring-1 ring-mist">
-          <PixelIcon name="leaf" size={5} />
-        </div>
-        <p className="text-[0.9375rem] text-ash">
-          Archived prayers stay here. Bring one back anytime.
-        </p>
-      </PaperCard>
-    );
-  }
+function JournalCard({ entry }: { entry: JournalEntry }) {
+  return entry.kind === "prayer" ? (
+    <PrayerCard prayer={entry.entry} />
+  ) : (
+    <ReflectionCard reflection={entry.entry} showDate={false} />
+  );
+}
+
+function HiddenJournal({ onReveal }: { onReveal: () => void }) {
   return (
-    <PaperCard variant="atmospheric" padding="lg" className="text-center">
-      <PixelMascot name="dove" size={8} className="mb-4" />
-      <p className="mx-auto max-w-xs text-[1rem] leading-relaxed text-charcoal">
-        {emptyStates.prayer}
+    <PaperCard variant="atmospheric" padding="lg" className="mt-6 text-center">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-linen ring-1 ring-mist">
+        <IconEyeOff size={24} className="text-accent" />
+      </div>
+      <h2 className="mt-4 font-display text-[1.25rem] text-graphite">
+        Your entries are hidden
+      </h2>
+      <p className="mx-auto mt-1.5 max-w-sm text-[0.875rem] leading-relaxed text-ash">
+        BibleQuest obscures this journal whenever the app leaves the foreground.
+        This privacy screen does not encrypt browser storage.
       </p>
-      <GentleLink variant="primary" size="md" href="/app/prayer/new" className="mt-5">
-        Write your first prayer
-      </GentleLink>
+      <GentleButton variant="primary" size="md" className="mt-5" onClick={onReveal}>
+        <IconEye size={18} /> Show my entries
+      </GentleButton>
+    </PaperCard>
+  );
+}
+
+function EmptyJournal({
+  prompt,
+  onNew,
+}: {
+  prompt: { id: string; text: string };
+  onNew: () => void;
+}) {
+  return (
+    <div className="mt-6 space-y-3">
+      <PaperCard variant="atmospheric" padding="lg" className="text-center">
+        <PixelMascot name="dove" size={8} className="mb-4" />
+        <h2 className="font-display text-[1.25rem] text-graphite">
+          Make space for what matters
+        </h2>
+        <p className="mx-auto mt-1.5 max-w-sm text-[0.9375rem] leading-relaxed text-ash">
+          Pray honestly, reflect on Scripture, and return to what you want to
+          remember.
+        </p>
+        <GentleButton variant="primary" size="md" className="mt-5" onClick={onNew}>
+          <IconPlus size={17} /> Write your first entry
+        </GentleButton>
+      </PaperCard>
+      <PaperCard variant="quiet" padding="md">
+        <p className="text-[0.75rem] uppercase tracking-[0.12em] text-gilt">
+          A prompt for today
+        </p>
+        <p className="mt-1.5 font-display text-[1.0625rem] leading-snug text-graphite">
+          {prompt.text}
+        </p>
+        <GentleLink
+          variant="text"
+          size="sm"
+          className="mt-2 min-h-11"
+          href={`/app/prayer/reflection/new?prompt=${encodeURIComponent(prompt.id)}`}
+        >
+          Write about this
+        </GentleLink>
+      </PaperCard>
+    </div>
+  );
+}
+
+function EmptyResults({ query, onClear }: { query: string; onClear: () => void }) {
+  return (
+    <PaperCard variant="quiet" padding="lg" className="mt-6 text-center">
+      <PixelIcon name="leaf" size={6} />
+      <h2 className="mt-3 font-display text-[1.125rem] text-graphite">
+        No entries here
+      </h2>
+      <p className="mt-1 text-[0.875rem] leading-relaxed text-ash">
+        {query.trim()
+          ? "Try a different search or look across your whole journal."
+          : "Choose another filter to return to your journal."}
+      </p>
+      <GentleButton variant="outline" size="sm" className="mt-4" onClick={onClear}>
+        Clear filters
+      </GentleButton>
     </PaperCard>
   );
 }
@@ -229,7 +394,6 @@ const STATUS_ICON: Record<PrayerStatus, "candle" | "flower" | "leaf"> = {
   archived: "leaf",
 };
 
-/** A quiet text button for the inline card actions. */
 function CardAction({
   onClick,
   tone = "accent",
@@ -241,12 +405,13 @@ function CardAction({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={cn(
-        "text-[0.875rem] transition-colors",
+        "min-h-11 text-[0.875rem] transition-colors",
         tone === "accent" && "text-accent hover:text-accent/80",
         tone === "ash" && "text-ash hover:text-charcoal",
-        tone === "rose" && "text-ash hover:text-rose-700"
+        tone === "rose" && "text-ash hover:text-rose-700",
       )}
     >
       {children}
@@ -256,23 +421,25 @@ function CardAction({
 
 function PrayerCard({ prayer }: { prayer: Prayer }) {
   const { toast } = useToast();
-  const markAnswered = useQuestOS((s) => s.markPrayerAnswered);
-  const archivePrayer = useQuestOS((s) => s.archivePrayer);
-  const unarchivePrayer = useQuestOS((s) => s.unarchivePrayer);
-  const deletePrayer = useQuestOS((s) => s.deletePrayer);
+  const markAnswered = useQuestOS((state) => state.markPrayerAnswered);
+  const archivePrayer = useQuestOS((state) => state.archivePrayer);
+  const unarchivePrayer = useQuestOS((state) => state.unarchivePrayer);
+  const deletePrayer = useQuestOS((state) => state.deletePrayer);
   const [answering, setAnswering] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [note, setNote] = useState("");
   const noteId = `prayer-note-${prayer.id}`;
-
-  // The expanders are mutually exclusive; hide the action row while either is open.
+  const longEntry = prayer.body.length > 300 || prayer.body.split("\n").length > 6;
+  const archived = Boolean(prayer.archivedAt) || prayer.status === "archived";
+  const icon = archived ? "leaf" : STATUS_ICON[prayer.status];
   const showActions = !answering && !confirmingDelete;
 
   return (
-    <PaperCard variant="paper" padding="md">
+    <PaperCard as="article" variant="paper" padding="md">
       <div className="flex items-start gap-3">
         <span className="mt-0.5 shrink-0">
-          <PixelIcon name={STATUS_ICON[prayer.status]} size={5} />
+          <PixelIcon name={icon} size={5} />
         </span>
         <div className="min-w-0 flex-1">
           {prayer.title && (
@@ -280,57 +447,81 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
               {prayer.title}
             </h3>
           )}
-          <p className="mt-0.5 whitespace-pre-wrap text-[1rem] leading-relaxed text-charcoal">
-            {prayer.body}
-          </p>
+          <div
+            className={cn(
+              "relative mt-0.5",
+              longEntry && !expanded && "max-h-36 overflow-hidden",
+            )}
+          >
+            <JournalEntryBody className="text-[1rem] leading-relaxed text-charcoal">
+              {prayer.body}
+            </JournalEntryBody>
+            {longEntry && !expanded && (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-paper to-transparent"
+              />
+            )}
+          </div>
+          {longEntry && (
+            <button
+              type="button"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((value) => !value)}
+              className="mt-1 min-h-11 text-[0.8125rem] font-medium text-accent"
+            >
+              {expanded ? "Show less" : "Read more"}
+            </button>
+          )}
+
           {prayer.status === "answered" && prayer.answerReflection && (
             <div className="mt-3 rounded-[var(--radius-button)] bg-gold-500/12 px-3.5 py-2.5">
               <p className="text-[0.75rem] uppercase tracking-wide text-gilt">
                 How it was answered
               </p>
-              <p className="mt-1 text-[0.9375rem] text-charcoal">
+              <JournalEntryBody className="mt-1 text-[0.9375rem] text-charcoal">
                 {prayer.answerReflection}
-              </p>
+              </JournalEntryBody>
             </div>
           )}
           <p className="mt-2 text-[0.75rem] text-ash">
-            {prayer.status === "answered" && prayer.answeredAt
-              ? `Answered ${formatShortDate(prayer.answeredAt)}`
-              : formatShortDate(prayer.createdAt)}
+            {archived
+              ? "Archived"
+              : prayer.status === "answered" && prayer.answeredAt
+                ? `Answered ${formatShortDate(prayer.answeredAt)}`
+                : "Prayer"}
             {" · "}
             {CATEGORY_LABEL[prayer.category]}
           </p>
 
           {showActions && (
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-              {prayer.status === "active" && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-4">
+              {prayer.status === "active" && !archived && (
                 <CardAction onClick={() => setAnswering(true)}>
-                  Mark as answered
+                  Mark answered
                 </CardAction>
               )}
-              {prayer.status !== "archived" && (
-                <Link
-                  href={`/app/prayer/new?edit=${prayer.id}`}
-                  className="text-[0.875rem] text-accent transition-colors hover:text-accent/80"
-                >
-                  Edit
-                </Link>
-              )}
-              {prayer.status === "archived" ? (
+              <Link
+                href={`/app/prayer/new?edit=${prayer.id}`}
+                className="inline-flex min-h-11 items-center text-[0.875rem] text-accent transition-colors hover:text-accent/80"
+              >
+                Edit
+              </Link>
+              {archived ? (
                 <CardAction
                   onClick={() => {
                     unarchivePrayer(prayer.id);
-                    toast("Restored.");
+                    toast("Prayer restored.");
                   }}
                 >
-                  Bring back
+                  Restore
                 </CardAction>
               ) : (
                 <CardAction
                   tone="ash"
                   onClick={() => {
                     archivePrayer(prayer.id);
-                    toast("Archived.", {
+                    toast("Prayer archived.", {
                       action: {
                         label: "Undo",
                         onClick: () => unarchivePrayer(prayer.id),
@@ -357,19 +548,16 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
                 className="overflow-hidden"
               >
                 <div className="mt-3">
-                  <label
-                    htmlFor={noteId}
-                    className="mb-2 block text-[0.875rem] text-charcoal"
-                  >
-                    How would you like to remember this? (optional)
+                  <label htmlFor={noteId} className="mb-2 block text-[0.875rem] text-charcoal">
+                    How was this prayer answered? (optional)
                   </label>
                   <textarea
                     id={noteId}
                     value={note}
-                    onChange={(e) => setNote(e.target.value)}
+                    onChange={(event) => setNote(event.target.value)}
                     rows={3}
-                    placeholder="What happened…"
-                    className="w-full resize-none rounded-[var(--radius-button)] border border-mist bg-linen px-3 py-2.5 text-[0.9375rem] outline-none focus:border-accent"
+                    placeholder="What happened?"
+                    className="w-full resize-y rounded-[var(--radius-button)] border border-mist bg-linen px-3 py-2.5 text-[0.9375rem] outline-none focus:border-accent"
                   />
                   <div className="mt-2.5 flex gap-2">
                     <GentleButton
@@ -377,17 +565,13 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
                       size="sm"
                       onClick={() => {
                         markAnswered(prayer.id, note);
-                        toast("Marked answered.", { variant: "celebrate" });
+                        toast("Prayer marked answered.", { variant: "celebrate" });
                         setAnswering(false);
                       }}
                     >
-                      Save
+                      Save answer
                     </GentleButton>
-                    <GentleButton
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setAnswering(false)}
-                    >
+                    <GentleButton variant="ghost" size="sm" onClick={() => setAnswering(false)}>
                       Cancel
                     </GentleButton>
                   </div>
@@ -407,7 +591,7 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
               >
                 <div className="mt-3 rounded-[var(--radius-button)] bg-linen px-3.5 py-3">
                   <p className="text-[0.875rem] text-charcoal">
-                    Delete this prayer? It can’t be undone.
+                    Permanently delete this prayer? This cannot be undone.
                   </p>
                   <div className="mt-2.5 flex gap-2">
                     <GentleButton
@@ -415,7 +599,7 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
                       size="sm"
                       onClick={() => {
                         deletePrayer(prayer.id);
-                        toast("Deleted.");
+                        toast("Prayer deleted.");
                       }}
                     >
                       Delete

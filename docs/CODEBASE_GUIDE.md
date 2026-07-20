@@ -80,6 +80,10 @@ flowchart LR
   reflection bodies must never be sent to analytics or logs.
 - `quest-engine.ts` filters and deterministically suggests quests.
 - `quest-feed.ts` groups the persistent quest shelf for display.
+- `journal.ts` derives the mixed, date-grouped Prayer Journal timeline and
+  performs in-memory search/filtering without persisting a search index.
+- `journal-drafts.ts` keeps scoped, expiring unfinished prayer/reflection
+  drafts in device-local browser storage. Drafts never enter account sync.
 - `quest-steps.ts` defines the four-part quest walk.
 - `growth-engine.ts`, `streak-engine.ts`, and `milestone-engine.ts` derive
   journey progress without UI dependencies.
@@ -164,15 +168,16 @@ When the worker policy changes, increment `CACHE_VERSION` and update
 | Route family | Screen or purpose |
 | --- | --- |
 | `/` and marketing pages | Public acquisition and policy pages. |
-| `/onboarding` | First-run profile and rhythm setup. |
+| `/onboarding` | First-run profile and rhythm setup; prioritizes an account immediately before the first-quest reveal while preserving a quiet local-only path. |
 | `/app` | Daily home: verse, quests, candle, growth, and next steps. |
 | `/app/quests` | Browse, filter, and pick quests. |
 | `/app/quests/[slug]` | Read, start, walk, complete, save, or archive one quest. |
 | `/app/bible` | Bible index and reading progress. |
 | `/app/bible/[book]/[chapter]` | Server-loaded WEB chapter reader. |
 | `/app/bible/saved` | Saved verse bookmarks. |
-| `/app/prayer` and `/new` | Private prayer journal and composer. |
-| `/app/reflection` and `/new` | Private reflection journal and composer. |
+| `/app/prayer`, `/app/prayer/reflections`, and `/app/prayer/new` | Unified, date-grouped Prayer Journal with local search, filters, privacy screen, prompts, and the prayer composer. The reflections URL opens the same journal prefiltered. |
+| `/app/prayer/reflection/new` | Focused reflection composer with prompts, mood, safe plain-text formatting, and device draft recovery. |
+| `/app/reflection` and `/new` | Legacy redirects retained for bookmarks and older app links. |
 | `/app/journey` | Growth tree, milestones, and journey history. |
 | `/app/account` | Optional sign-in, identity, and sync controls. |
 | `/app/plus` | Plus status, purchase, and customer-management entry points. |

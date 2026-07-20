@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useQuestOS } from "@/lib/questos/store";
 import { useSession } from "@/lib/supabase/useSession";
 import { createClient } from "@/lib/supabase/client";
@@ -9,9 +9,20 @@ import { retrySync } from "@/lib/sync/engine";
 import { useSyncStatus } from "@/lib/sync/status";
 import {
   getLastSyncedUserId,
+  initialSyncIsPending,
   localDataBelongsToOtherUser,
 } from "@/lib/sync/last-user";
-import { accountRestorePhase } from "@/lib/sync/access";
+import {
+  accountRestorePhase,
+  hasSafeLocalJourney,
+} from "@/lib/sync/access";
+import {
+  clearOnboardingResumeStage,
+  getOnboardingResumeStage,
+  isOnboardingResumePending,
+  onboardingLaunchDestination,
+  shouldRedirectAppToOnboarding,
+} from "@/lib/auth/onboarding-resume";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PixelMascot } from "@/components/design-system/PixelMascot";
 import { PaperCard } from "@/components/design-system/PaperCard";
@@ -23,15 +34,32 @@ import { GentleButton } from "@/components/design-system/GentleButton";
  */
 function Gate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const completed = useQuestOS((s) => s.profile?.onboardingCompleted ?? false);
+  const resumeStage = getOnboardingResumeStage();
+  const redirectToOnboarding = shouldRedirectAppToOnboarding(
+    completed,
+    resumeStage,
+  );
+  const launchDestination = onboardingLaunchDestination(resumeStage);
+  const redirectToLaunch = Boolean(
+    launchDestination && pathname !== launchDestination,
+  );
 
   useEffect(() => {
-    if (!completed) router.replace("/onboarding");
-  }, [completed, router]);
+    if (redirectToOnboarding) {
+      router.replace("/onboarding");
+      return;
+    }
+    // A launch stage is written only by a first-quest CTA immediately before
+    // its intentional app navigation. Account/quest never reach this line.
+    if (launchDestination) {
+      clearOnboardingResumeStage();
+      if (redirectToLaunch) router.replace(launchDestination);
+    }
+  }, [launchDestination, redirectToLaunch, redirectToOnboarding, router]);
 
-  if (!completed) {
-    return <LoadingVeil />;
-  }
+  if (redirectToOnboarding || redirectToLaunch) return <LoadingVeil />;
   return <>{children}</>;
 }
 
@@ -39,12 +67,22 @@ function Gate({ children }: { children: React.ReactNode }) {
 function OnboardingRouteGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const completed = useQuestOS((s) => s.profile?.onboardingCompleted ?? false);
+  const resumeStage = getOnboardingResumeStage();
+  const finishingAccountOnboarding =
+    completed && isOnboardingResumePending(resumeStage);
+  const launchDestination = onboardingLaunchDestination(resumeStage);
 
   useEffect(() => {
-    if (completed) router.replace("/app");
-  }, [completed, router]);
+    if (completed && !finishingAccountOnboarding) {
+      router.replace(launchDestination ?? "/app");
+    }
+  }, [completed, finishingAccountOnboarding, launchDestination, router]);
 
-  return completed ? <LoadingVeil /> : <>{children}</>;
+  return completed && !finishingAccountOnboarding ? (
+    <LoadingVeil />
+  ) : (
+    <>{children}</>
+  );
 }
 
 function LoadingVeil() {
@@ -66,6 +104,19 @@ function LoadingVeil() {
 function RestoreError({ userId }: { userId: string }) {
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
+  const [online, setOnline] = useState(
+    () => typeof navigator === "undefined" || navigator.onLine !== false,
+  );
+
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine !== false);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
 
   async function signOut() {
     setSigningOut(true);
@@ -86,9 +137,13 @@ function RestoreError({ userId }: { userId: string }) {
             We couldn’t restore your journey
           </h1>
           <p role="alert" className="mt-2 text-small leading-relaxed text-charcoal">
-            Your account is still signed in, but BibleQuest couldn’t safely
-            check its saved progress. Nothing has been replaced. Check your
-            connection and try again.
+            {online
+              ? "Your account is signed in, but BibleQuest couldn’t safely check its saved progress. Nothing has been replaced, and we’ll retry automatically."
+              : "You’re offline, so BibleQuest can’t check this account’s saved journey yet. Reconnect, then try again."}
+          </p>
+          <p className="mt-2 text-caption leading-relaxed text-ash">
+            If this continues while you’re online, mention reference
+            SYNC-RESTORE when reporting it.
           </p>
           <GentleButton
             variant="primary"
@@ -135,11 +190,12 @@ function AccountRestoreBoundary({ children }: { children: React.ReactNode }) {
   const handoffPending = Boolean(
     configured && userId && localDataBelongsToOtherUser(userId)
   );
-  const trustedLocalCopy = Boolean(
-    userId &&
-      localOnboardingCompleted &&
-      getLastSyncedUserId() === userId,
-  );
+  const safeLocalJourney = hasSafeLocalJourney({
+    localOnboardingCompleted,
+    lastSyncedUserId: getLastSyncedUserId(),
+    userId,
+    initialSyncPending: userId ? initialSyncIsPending(userId) : false,
+  });
   const phase = accountRestorePhase({
     configured,
     sessionLoading: loading,
@@ -148,7 +204,7 @@ function AccountRestoreBoundary({ children }: { children: React.ReactNode }) {
     syncState: sync.state,
     initialSyncComplete: sync.initialSyncComplete,
     handoffPending,
-    trustedLocalCopy,
+    safeLocalJourney,
   });
 
   if (phase === "loading") return <LoadingVeil />;

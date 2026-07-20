@@ -298,6 +298,8 @@ const SAFE_STATIC_PATHS = new Set([
   "/app/plus",
   "/app/prayer",
   "/app/prayer/new",
+  "/app/prayer/reflections",
+  "/app/prayer/reflection/new",
   "/app/quests",
   "/app/reflection",
   "/app/reflection/new",

@@ -128,6 +128,7 @@ docs/                   # Codex + setup/deployment/security/content/QA guides
 - [`docs/CODEBASE_GUIDE.md`](docs/CODEBASE_GUIDE.md) — architecture map and change guide
 - [`docs/BIBLEQUEST_CODEX.md`](docs/BIBLEQUEST_CODEX.md) — the source of truth
 - [`docs/SETUP.md`](docs/SETUP.md) — Supabase, auth, migrations, seeding
+- [`docs/FOUNDER_API_SETUP.md`](docs/FOUNDER_API_SETUP.md) — concise provider, API-key, email, donation, and subscription setup
 - [`docs/ACCOUNT_SYNC_RUNBOOK.md`](docs/ACCOUNT_SYNC_RUNBOOK.md) — production sync, SMTP, auth-link, schema, and content recovery
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Vercel + domain
 - [`docs/ENV.md`](docs/ENV.md) — environment variables

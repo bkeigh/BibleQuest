@@ -24,6 +24,14 @@ import { seedQuests } from "@/data/seed/quests";
 import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
 import { toDateKey } from "@/lib/utils/dates";
 import { track } from "@/lib/analytics/events";
+import { authFailureMessage, type AuthFailureReason } from "@/lib/auth/errors";
+import {
+  clearOnboardingResumeStage,
+  getOnboardingResumeStage,
+  isOnboardingResumePending,
+  setOnboardingResumeStage,
+  shouldTrackOnboardingStarted,
+} from "@/lib/auth/onboarding-resume";
 import { riseIn, stepTransition } from "@/lib/motion";
 import { DEFAULT_SETTINGS } from "@/lib/questos/types";
 import type {
@@ -100,40 +108,70 @@ interface Draft {
 }
 
 const TOTAL_STEPS = 8;
-/** The final step: the account invitation, reached only after the journey is
- *  already committed to the device (see commit()). */
-const ACCOUNT_STEP = 7;
+/** Account creation is deliberately the last gate before the first quest. */
+const ACCOUNT_STEP = 6;
+const FIRST_QUEST_STEP = 7;
 
 /** The one heading rendered per step — focus lands here on step change. */
 const STEP_HEADING_ID = "onboarding-step-heading";
 
-function OnboardingInner({ signInFailed }: { signInFailed: boolean }) {
+function OnboardingInner({
+  authFailure,
+}: {
+  authFailure: AuthFailureReason | null;
+}) {
   const router = useRouter();
   const { user, configured } = useSession();
   const completeOnboarding = useQuestOS((s) => s.completeOnboarding);
   const pickQuest = useQuestOS((s) => s.pickQuest);
   const markAccountNudgeShown = useQuestOS((s) => s.markAccountNudgeShown);
-  const alreadyDone = useQuestOS((s) => s.profile?.onboardingCompleted ?? false);
-  const [step, setStep] = useState(0);
-  const [draft, setDraft] = useState<Draft>({ displayName: "" });
-  // Where the user lands once they leave onboarding — captured at commit()
-  // (Home vs. the quest browser) so the account step and post-sign-in both
-  // route to the right place.
-  const [pendingDest, setPendingDest] = useState("/app");
+  const profile = useQuestOS((s) => s.profile);
+  const alreadyDone = profile?.onboardingCompleted ?? false;
+  const resumeStage = getOnboardingResumeStage();
+  const resumingAccountOnboarding =
+    alreadyDone && isOnboardingResumePending(resumeStage);
+  const trackOnboardingStart = shouldTrackOnboardingStarted(
+    alreadyDone,
+    resumeStage,
+  );
+  const [step, setStep] = useState(() =>
+    resumingAccountOnboarding
+      ? resumeStage === "quest" || user || !configured
+        ? FIRST_QUEST_STEP
+        : ACCOUNT_STEP
+      : 0,
+  );
+  const [draft, setDraft] = useState<Draft>(() =>
+    resumingAccountOnboarding && profile
+      ? {
+          displayName: profile.displayName,
+          primaryGoal: profile.primaryGoal,
+          tradition: profile.tradition,
+          dailyRhythm: profile.dailyRhythm,
+          questStyle: profile.questStyle,
+          calling: profile.calling,
+        }
+      : { displayName: "" },
+  );
+  const visibleStep = step === ACCOUNT_STEP && user ? FIRST_QUEST_STEP : step;
   // Only move focus after the user navigates — never on first paint.
   const hasNavigated = useRef(false);
-  // Set inside commit(): completing onboarding flips `alreadyDone`, and without
-  // this guard the redirect effect below would race commit() and skip the
-  // account step, sending the user straight to the app.
-  const finishing = useRef(false);
 
   useEffect(() => {
-    if (alreadyDone && !finishing.current) router.replace("/app");
-  }, [alreadyDone, router]);
+    if (!alreadyDone && resumeStage) {
+      clearOnboardingResumeStage();
+    }
+  }, [alreadyDone, resumeStage]);
 
   useEffect(() => {
-    track("onboarding_started");
-  }, []);
+    if (step === ACCOUNT_STEP && user && resumeStage === "account") {
+      setOnboardingResumeStage("quest");
+    }
+  }, [resumeStage, step, user]);
+
+  useEffect(() => {
+    if (trackOnboardingStart) track("onboarding_started");
+  }, [trackOnboardingStart]);
 
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
   const next = () => {
@@ -165,58 +203,56 @@ function OnboardingInner({ signInFailed }: { signInFailed: boolean }) {
   );
   const previewVerse = useMemo(() => getDailyVerse(), []);
 
-  /**
-   * Commit the journey to this device, then invite an account (the final step).
-   *
-   * "Commit before invite" is load-bearing: the profile and picked quest are
-   * persisted BEFORE any auth round-trip can leave the page, so returning from
-   * Google / a magic link passes the OnboardingGate cleanly and the guest
-   * journey is already on disk, ready for the first sync to push up. Optionally
-   * picks the suggested quest first (a failed pick never blocks entry) and
-   * remembers where to land afterwards.
-   */
-  function commit(opts?: { pickSlug?: string; destination?: string }) {
-    finishing.current = true;
-    const rhythm = draft.dailyRhythm ?? "flexible";
+  function saveProfile(nextDraft: Draft) {
+    const rhythm = nextDraft.dailyRhythm ?? "flexible";
     completeOnboarding(
       {
-        displayName: draft.displayName.trim() || "friend",
-        primaryGoal: draft.primaryGoal,
-        tradition: draft.tradition,
-        dailyRhythm: draft.dailyRhythm,
-        questStyle: draft.questStyle,
-        calling: draft.calling,
+        displayName: nextDraft.displayName.trim() || "friend",
+        primaryGoal: nextDraft.primaryGoal,
+        tradition: nextDraft.tradition,
+        dailyRhythm: nextDraft.dailyRhythm,
+        questStyle: nextDraft.questStyle,
+        calling: nextDraft.calling,
       },
       { notifications: { ...DEFAULT_SETTINGS.notifications, preferredTime: rhythm } }
     );
+  }
+
+  /**
+   * Persist profile setup before an external auth round trip. The separate,
+   * non-personal marker keeps /onboarding at this account/quest hand-off rather
+   * than letting the completed profile skip straight into the app.
+   */
+  function prioritizeAccount(patch?: Partial<Draft>) {
+    const nextDraft = { ...draft, ...patch };
+    setDraft(nextDraft);
+    hasNavigated.current = true;
+    const nextStep = configured && !user ? ACCOUNT_STEP : FIRST_QUEST_STEP;
+    setOnboardingResumeStage(
+      nextStep === ACCOUNT_STEP ? "account" : "quest",
+    );
+    saveProfile(nextDraft);
+    setStep(nextStep);
+  }
+
+  function finish(opts?: { pickSlug?: string; destination?: string }) {
+    if (!alreadyDone) {
+      setOnboardingResumeStage("quest");
+      saveProfile(draft);
+    }
     if (opts?.pickSlug) {
       // Returns false when the day is full or the slug is unknown — either
       // way the user still lands in the app with a working day.
       pickQuest(opts.pickSlug);
     }
-    const dest = opts?.destination ?? "/app";
-    setPendingDest(dest);
-    // No account layer on this deployment, or already signed in → skip the
-    // invitation and go straight in.
-    if (!configured || user) {
-      router.replace(dest);
-      return;
-    }
-    hasNavigated.current = true;
-    setStep(ACCOUNT_STEP);
-  }
-
-  /**
-   * Leave onboarding for the app, recording that the account invitation was
-   * already shown so Home's AccountPrompt doesn't immediately repeat it. Used
-   * by "Continue as guest" and by the "Open BibleQuest" exit after a magic
-   * link is sent. Deliberately does NOT call dismissAccountNudge() — that would
-   * open a 14-day quiet period and burn a lifetime dismissal, suppressing the
-   * higher-intent first-quest prompt later.
-   */
-  function proceed() {
     markAccountNudgeShown("onboarding");
-    router.replace(pendingDest);
+    const destination = opts?.destination ?? "/app";
+    // Launch stages distinguish an intentional destination from closing and
+    // reopening while the account or quest screen is still pending.
+    setOnboardingResumeStage(
+      destination === "/app/quests" ? "launch_quests" : "launch",
+    );
+    router.replace(destination);
   }
 
   return (
@@ -227,8 +263,8 @@ function OnboardingInner({ signInFailed }: { signInFailed: boolean }) {
           role="progressbar"
           aria-valuemin={1}
           aria-valuemax={TOTAL_STEPS}
-          aria-valuenow={step + 1}
-          aria-valuetext={`Step ${step + 1} of ${TOTAL_STEPS}`}
+          aria-valuenow={visibleStep + 1}
+          aria-valuetext={`Step ${visibleStep + 1} of ${TOTAL_STEPS}`}
           className="mx-auto flex w-full max-w-md items-center justify-center gap-1.5 pt-6"
         >
           {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
@@ -236,9 +272,9 @@ function OnboardingInner({ signInFailed }: { signInFailed: boolean }) {
               key={i}
               aria-hidden
               className={`h-1.5 rounded-full transition-all duration-500 ${
-                i === step
+                i === visibleStep
                   ? "w-6 bg-accent"
-                  : i < step
+                  : i < visibleStep
                     ? "w-1.5 bg-accent/40"
                     : "w-1.5 bg-mist"
               }`}
@@ -249,7 +285,7 @@ function OnboardingInner({ signInFailed }: { signInFailed: boolean }) {
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-5">
           <AnimatePresence mode="wait">
             <motion.div
-              key={step}
+              key={visibleStep}
               variants={stepTransition}
               initial="enter"
               animate="center"
@@ -260,16 +296,16 @@ function OnboardingInner({ signInFailed }: { signInFailed: boolean }) {
                 }
               }}
             >
-              {step === 0 && (
+              {visibleStep === 0 && (
                 <StepWelcome
                   name={draft.displayName}
                   onName={(displayName) => set({ displayName })}
                   onNext={next}
                   accountEnabled={configured}
-                  signInFailed={signInFailed}
+                  authFailure={authFailure}
                 />
               )}
-              {step === 1 && (
+              {visibleStep === 1 && (
                 <StepChoice
                   mascot="map"
                   title="What brings you here?"
@@ -282,7 +318,7 @@ function OnboardingInner({ signInFailed }: { signInFailed: boolean }) {
                   }}
                 />
               )}
-              {step === 2 && (
+              {visibleStep === 2 && (
                 <StepChoice
                   mascot="scroll"
                   title="Your tradition"
@@ -295,7 +331,7 @@ function OnboardingInner({ signInFailed }: { signInFailed: boolean }) {
                   }}
                 />
               )}
-              {step === 3 && (
+              {visibleStep === 3 && (
                 <StepChoice
                   mascot="lantern"
                   title="When’s a good time for your daily quest?"
@@ -308,7 +344,7 @@ function OnboardingInner({ signInFailed }: { signInFailed: boolean }) {
                   }}
                 />
               )}
-              {step === 4 && (
+              {visibleStep === 4 && (
                 <StepChoice
                   mascot="campfire"
                   title="What kind of quests fit you?"
@@ -321,47 +357,47 @@ function OnboardingInner({ signInFailed }: { signInFailed: boolean }) {
                   }}
                 />
               )}
-              {step === 5 && (
+              {visibleStep === 5 && (
                 <StepChoice
                   mascot="dove"
                   title="What’s your day-to-day?"
                   hint="Optional. It helps quests fit your real life."
                   choices={CALLINGS}
                   value={draft.calling}
-                  onSelect={(calling) => {
-                    set({ calling });
-                    next();
+                  onSelect={(calling) => prioritizeAccount({ calling })}
+                />
+              )}
+              {visibleStep === ACCOUNT_STEP && (
+                <StepAccount
+                  name={draft.displayName.trim() || "friend"}
+                  authFailure={authFailure}
+                  onContinueOffline={() => {
+                    hasNavigated.current = true;
+                    setOnboardingResumeStage("quest");
+                    setStep(FIRST_QUEST_STEP);
                   }}
                 />
               )}
-              {step === 6 && (
+              {visibleStep === FIRST_QUEST_STEP && (
                 <StepFirstQuest
                   name={draft.displayName.trim() || "friend"}
                   verse={previewVerse}
                   quest={suggestedQuest}
                   onStart={() =>
-                    commit(
+                    finish(
                       suggestedQuest ? { pickSlug: suggestedQuest.slug } : undefined
                     )
                   }
-                  onBrowse={() => commit({ destination: "/app/quests" })}
-                />
-              )}
-              {step === ACCOUNT_STEP && (
-                <StepAccount
-                  name={draft.displayName.trim() || "friend"}
-                  onProceed={proceed}
-                  nextPath={pendingDest}
+                  onBrowse={() => finish({ destination: "/app/quests" })}
                 />
               )}
             </motion.div>
           </AnimatePresence>
         </div>
 
-        {/* Footer nav — hidden on the account step: the journey is already
-            committed there, so there's nothing to go back to. */}
+        {/* Account and first-quest steps are intentional forward hand-offs. */}
         <div className="mx-auto flex w-full max-w-md items-center justify-between">
-          {step > 0 && step < ACCOUNT_STEP ? (
+          {visibleStep > 0 && visibleStep < ACCOUNT_STEP ? (
             <button
               onClick={back}
               className="text-small text-ash transition-colors hover:text-charcoal"
@@ -371,9 +407,11 @@ function OnboardingInner({ signInFailed }: { signInFailed: boolean }) {
           ) : (
             <span />
           )}
-          {step > 0 && step < 6 && (
+          {visibleStep > 0 && visibleStep < ACCOUNT_STEP && (
             <button
-              onClick={next}
+              onClick={() =>
+                visibleStep === 5 ? prioritizeAccount() : next()
+              }
               className="text-small text-ash transition-colors hover:text-charcoal"
             >
               Skip
@@ -404,15 +442,15 @@ function StepWelcome({
   onName,
   onNext,
   accountEnabled,
-  signInFailed,
+  authFailure,
 }: {
   name: string;
   onName: (v: string) => void;
   onNext: () => void;
   accountEnabled: boolean;
-  signInFailed: boolean;
+  authFailure: AuthFailureReason | null;
 }) {
-  const [signInOpen, setSignInOpen] = useState(signInFailed);
+  const [signInOpen, setSignInOpen] = useState(Boolean(authFailure));
 
   return (
     <div className="text-center">
@@ -468,17 +506,7 @@ function StepWelcome({
 
           {signInOpen && (
             <div id="returning-user-sign-in" className="mt-4 text-left">
-              {signInFailed && (
-                <div
-                  role="alert"
-                  className="mb-3 rounded-[var(--radius-card)] border border-rose-300 px-4 py-3"
-                >
-                  <p className="text-small leading-relaxed text-rose-700">
-                    That sign-in link didn’t work — it may have expired. Send
-                    yourself a fresh one below.
-                  </p>
-                </div>
-              )}
+              {authFailure && <CallbackFailureNotice reason={authFailure} />}
               <PaperCard variant="paper" padding="md">
                 <h2 className="text-[1.0625rem] font-medium text-graphite">
                   Welcome back
@@ -610,22 +638,33 @@ function StepFirstQuest({
   );
 }
 
-/**
- * The final step: a gentle, skippable invitation to save the journey to an
- * account. Reached only after commit() has already persisted everything, so
- * "Continue as guest" and any sign-in both leave with the journey intact. Never
- * a wall — the full-width escape is always present and equal in weight.
- */
+/** Account creation is the final setup step before revealing the first quest. */
 function StepAccount({
   name,
-  onProceed,
-  nextPath,
+  authFailure,
+  onContinueOffline,
 }: {
   name: string;
-  onProceed: () => void;
-  nextPath: string;
+  authFailure: AuthFailureReason | null;
+  onContinueOffline: () => void;
 }) {
-  const [emailSent, setEmailSent] = useState(false);
+  const [offline, setOffline] = useState(
+    () => typeof navigator !== "undefined" && navigator.onLine === false,
+  );
+  const [authUnavailable, setAuthUnavailable] = useState(
+    authFailure === "configuration",
+  );
+
+  useEffect(() => {
+    const update = () => setOffline(navigator.onLine === false);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+
   return (
     <div>
       <div className="text-center">
@@ -635,37 +674,72 @@ function StepAccount({
           tabIndex={-1}
           className="font-display text-[1.375rem] leading-snug text-graphite outline-none"
         >
-          One last thing, {name}
+          Save your journey, {name}
         </h2>
         <p className="mx-auto mt-1.5 max-w-sm text-caption leading-relaxed text-ash">
-          Your journey is saved on this device. A free account keeps it safe
-          across devices — your prayers and reflections stay private, always.
-          Optional, and you can always do it later.
+          Create your free account now, before your first quest. It keeps your
+          progress with you across devices. Prayer and reflection text stays
+          out of analytics and AI.
         </p>
       </div>
+
+      {authFailure && (
+        <div className="mt-4">
+          <CallbackFailureNotice reason={authFailure} />
+        </div>
+      )}
 
       <PaperCard variant="paper" padding="md" className="mt-4">
         <SignInMethods
           source="onboarding"
-          nextPath={nextPath}
-          onEmailSent={() => setEmailSent(true)}
+          nextPath="/onboarding"
+          onUnavailable={() => setAuthUnavailable(true)}
         />
       </PaperCard>
 
+      {(offline || authUnavailable) && (
+        <div className="mt-3 rounded-[var(--radius-card)] border border-mist p-3 text-center">
+          <p className="text-caption leading-relaxed text-ash">
+            Account sign-in isn’t available right now. Your setup is saved on
+            this device, so you can continue locally and sign in later.
+          </p>
+        </div>
+      )}
+
       <GentleButton
-        variant={emailSent ? "primary" : "outline"}
-        size="lg"
+        variant="ghost"
+        size="sm"
         fullWidth
-        className="mt-3"
-        onClick={onProceed}
+        className="mt-3 min-h-11 text-ash"
+        onClick={onContinueOffline}
       >
-        {emailSent ? "Open BibleQuest" : "Continue as guest"}
+        Not now — continue on this device
       </GentleButton>
     </div>
   );
 }
 
-export function OnboardingFlow({ signInFailed = false }: { signInFailed?: boolean }) {
+function CallbackFailureNotice({ reason }: { reason: AuthFailureReason }) {
+  return (
+    <div
+      role="alert"
+      className="rounded-[var(--radius-card)] border border-rose-300 px-4 py-3"
+    >
+      <p className="text-small leading-relaxed text-rose-700">
+        {authFailureMessage(reason)}
+      </p>
+      <p className="mt-1 text-[0.6875rem] uppercase tracking-[0.08em] text-ash">
+        Reference: AUTH-CALLBACK-{reason.replaceAll("_", "-")}
+      </p>
+    </div>
+  );
+}
+
+export function OnboardingFlow({
+  authFailure = null,
+}: {
+  authFailure?: AuthFailureReason | null;
+}) {
   return (
     <ClientOnly
       fallback={
@@ -674,7 +748,7 @@ export function OnboardingFlow({ signInFailed = false }: { signInFailed?: boolea
         </div>
       }
     >
-      <OnboardingInner signInFailed={signInFailed} />
+      <OnboardingInner authFailure={authFailure} />
     </ClientOnly>
   );
 }

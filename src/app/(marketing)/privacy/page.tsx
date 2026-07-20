@@ -15,8 +15,9 @@ export default function PrivacyPage() {
     >
       <ProseHeading>Where your data lives</ProseHeading>
       <Prose>
-        Today, BibleQuest runs on your device. Your prayers, reflections, quests,
-        bookmarks, and journey are stored locally in your browser — for you. You
+        When you use BibleQuest without an account, your prayers, reflections,
+        quests, bookmarks, and journey are stored in this browser on your device.
+        If you sign in, saved app data also syncs to your BibleQuest account. You
         can export everything to a file, or clear it entirely, from Settings.
       </Prose>
 
@@ -62,10 +63,12 @@ export default function PrivacyPage() {
 
       <ProseHeading>If you create an account</ProseHeading>
       <Prose>
-        Synced private content is protected by database-level security so that
-        only you can read it. The
-        keys that could bypass that protection are server-only and never reach
-        your browser.
+        Synced journal content is protected by per-user database access controls,
+        so one account cannot read another account’s rows. Server credentials
+        that can administer the database never reach your browser. Account sync
+        is not end-to-end encrypted, so we do not claim that infrastructure
+        operators or someone with access to your unlocked device could never
+        access readable content.
       </Prose>
 
       <ProseHeading>Sensitive moments</ProseHeading>

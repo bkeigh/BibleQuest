@@ -125,6 +125,26 @@ describe("privacy-first analytics", () => {
     );
   });
 
+  it("recognizes the canonical reflection composer without retaining its query", async () => {
+    installBrowser(
+      "https://biblequest.test/app/prayer/reflection/new?verse=private-reference#draft"
+    );
+    localStorage.setItem(CONSENT_KEY, "1");
+    const fetchMock = vi.fn().mockResolvedValue(response());
+    vi.stubGlobal("fetch", fetchMock);
+    const { track } = await loadAnalytics();
+
+    track("reflection_created");
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect(body.url).toBe(
+      "https://biblequest.test/app/prayer/reflection/new"
+    );
+    expect(JSON.stringify(body)).not.toMatch(/private-reference|draft|\?|#/);
+  });
+
   it("silently denies disabled, incomplete, and malformed configurations", async () => {
     const states = [
       { enabled: "false", domain: "biblequest.test" },

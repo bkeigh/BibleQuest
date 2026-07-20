@@ -116,4 +116,22 @@ describe("journey import and export", () => {
     if (invalid.ok) return;
     expect(invalid.error.includes(marker)).toBe(false);
   });
+
+  it("rejects malformed journal archive metadata without echoing content", () => {
+    const snapshot = currentSnapshot();
+    const marker = "fixture-private-archive-marker";
+    const malformed = {
+      ...snapshot,
+      prayers: [{ ...snapshot.prayers[0], archivedAt: { marker } }],
+      reflections: [{ ...snapshot.reflections[0], archivedAt: 42 }],
+    };
+
+    const result = parseSnapshot(JSON.stringify(malformed));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.prayers).toEqual([]);
+    expect(result.data.reflections).toEqual([]);
+    expect(JSON.stringify(result.data)).not.toContain(marker);
+  });
 });

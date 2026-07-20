@@ -3,6 +3,7 @@ import { Fraunces, Inter } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 import { ServiceWorkerRegistrar } from "@/components/app-shell/ServiceWorkerRegistrar";
+import { JournalDraftJanitor } from "@/components/journal/JournalDraftJanitor";
 
 const fraunces = Fraunces({
   variable: "--font-fraunces",
@@ -86,6 +87,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-parchment text-charcoal">
         {children}
+        <JournalDraftJanitor />
         <ServiceWorkerRegistrar />
       </body>
     </html>

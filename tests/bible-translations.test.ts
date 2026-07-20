@@ -195,7 +195,8 @@ describe("Bible translation preference and licensing boundary", () => {
       ),
       "utf8",
     );
-    expect(store).toContain("version: 9");
+    expect(store).toContain("version: 10");
+    expect(store).toContain("if (version < 9)");
     expect(store).toContain('settings.preferredBibleTranslation = "niv"');
     expect(migration).toContain("preferred_bible_translation");
     expect(migration).not.toMatch(/insert\s+into\s+.*bible_(?:verses|chapters)/i);

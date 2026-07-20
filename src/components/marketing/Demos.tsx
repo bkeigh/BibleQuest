@@ -59,7 +59,7 @@ export function PrayerDemo() {
             Lord, give me the right words tomorrow — and the patience to
             listen first.
           </p>
-          <p className="mt-2 text-[0.75rem] text-ash">Private to you</p>
+          <p className="mt-2 text-[0.75rem] text-ash">Private by default</p>
         </div>
       </div>
     </PaperCard>

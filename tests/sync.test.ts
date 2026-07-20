@@ -30,6 +30,7 @@ import {
 import {
   clearLastSyncedUserId,
   getLastSyncedUserId,
+  initialSyncIsPending,
   setLastSyncedUserId,
 } from "@/lib/sync/last-user";
 import { useQuestOS } from "@/lib/questos/store";
@@ -360,6 +361,7 @@ describe("sync ownership, lifecycle, and merge safety", () => {
       userId: "account-a",
       initialSyncComplete: false,
     });
+    expect(initialSyncIsPending("account-a")).toBe(true);
 
     await retrySync("account-a");
     expect(mocks.createClient).toHaveBeenCalledTimes(2);
@@ -371,6 +373,30 @@ describe("sync ownership, lifecycle, and merge safety", () => {
       state: "idle",
       userId: "account-a",
       initialSyncComplete: true,
+    });
+    expect(initialSyncIsPending("account-a")).toBe(false);
+  });
+
+  it("keeps first-account adoption pending when its initial push fails", async () => {
+    useQuestOS.getState().importData(currentSnapshot());
+    mocks.createClient.mockReturnValue(
+      fakeClient(undefined, async (table) =>
+        table === "profiles"
+          ? {
+              data: null,
+              error: { code: "503", message: "fixture push unavailable" },
+            }
+          : OK,
+      ),
+    );
+
+    await startSync("account-a");
+
+    expect(getLastSyncedUserId()).toBe("account-a");
+    expect(initialSyncIsPending("account-a")).toBe(true);
+    expect(useSyncStatus.getState()).toMatchObject({
+      state: "error",
+      initialSyncComplete: false,
     });
   });
 

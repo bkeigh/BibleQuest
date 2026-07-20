@@ -14,7 +14,7 @@ import {
 } from "@/components/design-system/icons";
 import { useQuestOS } from "@/lib/questos/store";
 import { useToast } from "@/components/design-system/Toast";
-import { cleanVerseText } from "@/lib/utils/scripture";
+import { cleanVerseText, formatVerseShareText } from "@/lib/utils/scripture";
 import { useStrings } from "@/lib/i18n";
 import { riseIn } from "@/lib/motion";
 import { VerseShareSheet } from "@/components/bible/VerseShareSheet";
@@ -71,11 +71,7 @@ export function VerseCard({
   // transient, so licensed readings share the bundled WEB snapshot instead.
   const sharedVerseText =
     !resolved.loading && mayPersistEffectiveText ? resolved.text : verse.text;
-  const sharedEdition =
-    !resolved.loading && mayPersistEffectiveText
-      ? resolved.effectiveTranslation.abbreviation
-      : "WEB";
-  const shareText = `“${cleanVerseText(sharedVerseText)}” — ${verse.reference} (${sharedEdition})`;
+  const shareText = formatVerseShareText(sharedVerseText, verse.reference);
   const sharePath = `/verse/${verse.bookSlug}/${verse.chapter}/${verseSegment}${
     !resolved.loading &&
     mayPersistEffectiveText &&
@@ -135,9 +131,7 @@ export function VerseCard({
         )}
       </div>
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {resolved.loading
-          ? `${verse.reference} is shown in the World English Bible while BibleQuest checks ${resolved.preferredTranslation?.abbreviation ?? "your preferred edition"}.`
-          : `${verse.reference}, ${resolved.effectiveTranslation.name}. ${cleanVerseText(resolved.text)}`}
+        {`${verse.reference}, ${resolved.effectiveTranslation.name}. ${cleanVerseText(resolved.text)}`}
       </p>
       <div aria-busy={resolved.loading}>
         {/* Keyed by verse: a new pick settles in gently instead of snapping. */}
@@ -162,58 +156,13 @@ export function VerseCard({
             }`}
           >
             — {verse.reference} <span className="text-fog">·</span>{" "}
-            {resolved.loading
-              ? `World English Bible · checking ${resolved.preferredTranslation?.abbreviation ?? "preferred edition"}…`
-              : (
-                  <span
-                    dir={resolved.effectiveTranslation.direction}
-                    lang={resolved.effectiveTranslation.languageId}
-                  >
-                    {resolved.effectiveTranslation.name}
-                  </span>
-                )}
+            <span
+              dir={resolved.effectiveTranslation.direction}
+              lang={resolved.effectiveTranslation.languageId}
+            >
+              {resolved.effectiveTranslation.name}
+            </span>
           </cite>
-          {!preview &&
-            !resolved.loading &&
-            resolved.fallbackReason &&
-            resolved.requestedKey !== LOCAL_WEB_TRANSLATION_KEY && (
-              <p className="mt-1.5 text-caption leading-relaxed text-ash">
-                {resolved.preferredTranslation?.abbreviation ?? "Your preferred edition"}{" "}
-                preferred · {resolved.effectiveTranslation.abbreviation} shown{" "}
-                {resolved.preferredTranslation?.source === "helloao"
-                  ? "because the open online edition could not be loaded."
-                  : resolved.fallbackReason === "content_unavailable"
-                    ? "because the preferred text could not be loaded."
-                    : "because its licensed connection is unavailable."}
-              </p>
-            )}
-          {!preview &&
-            !resolved.loading &&
-            resolved.effectiveTranslation.copyright &&
-            resolved.effectiveTranslation.key !== LOCAL_WEB_TRANSLATION_KEY && (
-              <p
-                className="mt-2 text-caption leading-relaxed text-ash"
-                dir={resolved.effectiveTranslation.direction}
-                lang={resolved.effectiveTranslation.languageId}
-              >
-                {resolved.effectiveTranslation.copyright}
-                {resolved.effectiveTranslation.licenseUrl && (
-                  <>
-                    {" "}
-                    <a
-                      href={resolved.effectiveTranslation.licenseUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      dir="ltr"
-                      lang="en"
-                      className="underline decoration-fog underline-offset-2 hover:text-charcoal"
-                    >
-                      Source &amp; license
-                    </a>
-                  </>
-                )}
-              </p>
-            )}
         </motion.div>
       </div>
       <ApiBibleViewTracker token={resolved.fumsToken} />
@@ -255,7 +204,7 @@ export function VerseCard({
           </GentleButton>
           <GentleLink
             variant="text"
-            href={`/app/reflection/new?verse=${encodeURIComponent(verse.reference)}`}
+            href={`/app/prayer/reflection/new?verse=${encodeURIComponent(verse.reference)}`}
             className="min-h-11 max-[360px]:text-[0.875rem]"
           >
             Reflect on this
@@ -270,7 +219,7 @@ export function VerseCard({
         notice={
           !resolved.loading &&
           !mayPersistEffectiveText
-            ? `You’re reading ${resolved.effectiveTranslation.abbreviation}. Sharing uses the public-domain WEB wording so licensed text stays inside BibleQuest.`
+            ? "The shared wording may differ from what you’re reading so licensed text stays inside BibleQuest."
             : undefined
         }
         onClose={closeShareSheet}

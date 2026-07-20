@@ -60,7 +60,7 @@ the evidence.
 | Winterhill embed | Open the production BibleQuest iframe from both `https://winterhill.studio` and `https://www.winterhill.studio`; navigate within the preview and inspect the console/network panel. | BibleQuest renders and remains interactive on both hosts; no ancestor/XFO refusal occurs; the response still lists exactly self and those two hosts. | Winterhill integration owner |
 | Unapproved-origin denial | Serve `tests/manual/iframe-denied-origin.html` from an HTTPS origin that is not in the allowlist, point its iframe at the release candidate, and inspect the console. | The browser refuses to render BibleQuest because of `frame-ancestors`; opening BibleQuest directly still works. | Winterhill integration owner |
 | Supabase sign-in and sync | On a clean browser profile, sign in through each enabled method, create one non-sensitive test record, reload, and confirm the same account receives the synced record. | Auth calls reach only the configured Supabase project over HTTPS; the session survives; sync completes; no CSP errors or cross-account data appears. | Supabase owner |
-| Magic-link callback | Request a test magic link, open it in the intended same browser and in the supported token-hash/cross-device path, and observe `/auth/callback` through the final `/app` redirect. | Callback stays on the BibleQuest origin, sets/refreshes the session, is `private, no-store`, and no CSP or redirect error occurs. | Supabase owner |
+| Magic-link request + callback | Request a link for Gmail and iCloud addresses that are not Supabase organization members. Confirm the UI says the link was requested (not delivered), shows the target address, holds resend for 60 seconds, and keeps Google plus a local continuation available. Open the link in the intended same browser and in the supported token-hash/cross-device path, and observe `/auth/callback` through the first-quest hand-off. | Both messages have matching Supabase and SMTP-provider delivery events; callback stays on the BibleQuest origin, sets/refreshes the session, is `private, no-store`, and expired/used/browser-mismatch links show a bounded recovery reason with no raw token or provider text. | Supabase owner |
 | PWA | Install from the release candidate, launch standalone, inspect `/sw.js` headers and Cache Storage, then repeat the documented online/offline/reconnect flow. | Install/launch works; only the documented self-hosted shell/build assets are cached; forbidden/private routes are absent; worker update and streaming navigation remain functional. | Repository owner |
 | RevenueCat sandbox paywall | Use the Test Store public key and a published sandbox paywall; open Plus, exercise paywall/package fallback, close/reopen, and complete a simulated purchase. | Offerings, branding image/font/media, entitlement refresh, and management action work without CSP errors; no Stripe request occurs for Test Store. | Billing owner |
 | Stripe 3DS | Use RevenueCat Web Billing in Stripe test mode with an official 3DS challenge test payment method; complete and cancel separate challenges while watching frames and requests. | Stripe.js loads from its allowed JS origin, API calls use `api.stripe.com`, 3DS renders through allowed Stripe/hooks frames, success updates entitlement, cancel returns safely, and no CSP source was broadened ad hoc. | Billing owner |
@@ -68,6 +68,9 @@ the evidence.
 ## Manual — core daily loop
 
 - [ ] A new visitor to `/app` is routed to onboarding.
+- [ ] Onboarding shows the account card before revealing the first quest. Email
+      and Google are visually primary; “Not now — continue on this device” is
+      available as a quiet local-first escape without losing profile choices.
 - [ ] Onboarding completes in under two minutes; optional steps are skippable.
 - [ ] Home shows greeting, today's verse, today's quest, quick prayer, tree
       preview, continue reading, recent activity.
@@ -80,8 +83,22 @@ the evidence.
 
 ## Manual — sections
 
-- [ ] Prayer: create, mark answered (with note), archive. Content feels private.
-- [ ] Reflection: create standalone and from a verse; appears in the list.
+- [ ] Prayer Journal: prayers and reflections share one newest-first timeline,
+      grouped under Today/Yesterday/calendar dates; the legacy reflections URL
+      opens the same timeline prefiltered.
+- [ ] Journal search matches body, title/prompt, category/mood, answer note, and
+      verse context without putting the query in the URL, analytics, or network.
+- [ ] All, Prayers, Reflections, Answered, and Archived filters return the right
+      records. Archiving/restoring an answered prayer preserves Answered state;
+      reflections archive and restore without deletion.
+- [ ] Hide entries obscures journal cards. Background the PWA and return; entries
+      remain obscured until the user reveals them. Copy does not claim encryption.
+- [ ] Prayer and reflection composers hide the bottom tabs, format bold/italic/
+      lists/quotes safely, report word count, rotate built-in prompts, and save.
+- [ ] Close a non-empty composer, reopen it, and confirm the scoped device draft
+      is recovered. Save or discard and confirm its draft key is removed.
+- [ ] Reflection: create standalone and from a verse; prompt, mood, and verse
+      context survive edit and appear in the journal.
 - [ ] Bible: open a book → chapter; verses render in serif with real WEB text;
       bookmark a verse; "Continue reading" returns to it.
 - [ ] Journey: tree stage + growth breakdown + markers + timeline all correct.
@@ -129,13 +146,18 @@ dashboard gates in [`REVENUECAT.md`](REVENUECAT.md) first.
 ### Intended offline surface
 
 Cache Storage is intentionally limited. Queryless navigations may be retained
-for `/app`, `/onboarding`, prayer (`/app/prayer`, `/app/prayer/new`), reflection
-(`/app/reflection`, `/app/reflection/new`), `/app/journey`, quests
+for `/app`, `/onboarding`, the Prayer hub (`/app/prayer`,
+`/app/prayer/reflections`, `/app/prayer/new`, `/app/prayer/reflection/new`),
+`/app/journey`, quests
 (`/app/quests`, `/app/quests/[slug]`), Bible reading (`/app/bible`,
 `/app/bible/saved`, `/app/bible/[book]`, `/app/bible/[book]/[chapter]`), and
 `/app/settings`. The `/offline` page and generic `/app` and `/onboarding` shells
 are installed up front. Visited allowlisted pages use network-first behavior;
 only a network failure may fall back to their exact cached URL, then `/offline`.
+
+Legacy `/app/reflection*` bookmarks redirect to the integrated Prayer routes
+while online. Redirect responses are intentionally never cached, so an old
+unvisited bookmark uses the honest `/offline` fallback when disconnected.
 
 `/auth/*`, `/app/account`, `/api/*`, `/app/plus`, marketing pages, unlisted
 routes, query-bearing URLs, non-GET requests, and cross-origin requests are
@@ -146,11 +168,15 @@ Only hashed `/_next/static/*` build assets use stale-while-revalidate.
 Prayer and reflection records created offline stay in the persisted Zustand
 store (`localStorage` key `biblequest:v1`). They are not written to Cache
 Storage. Cache Storage contains route shells and build assets, never user data.
+Unfinished journal drafts use scoped `biblequest:journal-draft:*` localStorage
+keys, stay off account sync, and clear after save/discard, “clear everything,”
+or a cross-account “start fresh.” Drafts older than 30 days are purged the next
+time BibleQuest opens.
 
 ### Physical iPhone offline check
 
 - [ ] In Safari while online, open `/app`, complete onboarding, and visit one
-      prayer, reflection, quest, and Bible chapter screen.
+      prayer, reflection (inside the Prayer tab), quest, and Bible chapter screen.
 - [ ] Add BibleQuest to the Home Screen, launch it once online, then fully close
       the standalone app.
 - [ ] Enable Airplane Mode (with Wi-Fi off), relaunch from the Home Screen, and

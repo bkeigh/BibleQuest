@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 
 const RHYTHM = [
   { sprite: "book", title: "Read", body: "One verse, chosen for today. Slow enough to actually land." },
-  { sprite: "candle", title: "Pray", body: "A private place to speak honestly. No one else sees it." },
+  { sprite: "candle", title: "Pray", body: "A private-by-default place to speak honestly and remember." },
   { sprite: "sun", title: "Reflect", body: "One short question that helps the day land." },
   { sprite: "heart", title: "Act", body: "Pick up to three small quests that take faith into your actual day." },
 ] as const;
@@ -44,7 +44,7 @@ const FAQ = [
   },
   {
     q: "Will my prayers be private?",
-    a: "Prayer and reflection are private by default. We never sell your data, and analytics never include your prayer or journal text.",
+    a: "Yes—private by default. Signed-out entries stay in your browser; signed-in entries sync to your protected BibleQuest account. We never sell personal data, and analytics never include prayer or journal text.",
   },
 ];
 
@@ -74,7 +74,7 @@ export default function LandingPage() {
           <SeasonalAtmosphere density={14} />
         </div>
         <div className="pointer-events-none absolute inset-x-0 -top-20 h-80 bg-[radial-gradient(60%_60%_at_50%_0%,var(--color-gold-50),transparent)]" />
-        <div className="relative mx-auto flex min-h-[88vh] max-w-3xl flex-col items-center justify-center px-5 pb-20 pt-32 text-center sm:px-8">
+        <div className="relative mx-auto flex min-h-[min(46rem,92svh)] max-w-3xl flex-col items-center justify-center px-5 pb-6 pt-20 text-center sm:px-8 sm:pb-10 sm:pt-28">
           <Reveal>
             <span className="inline-flex items-center gap-2 rounded-full border border-mist bg-paper/70 px-3.5 py-1.5 text-[0.8125rem] text-accent backdrop-blur">
               <PixelIcon name="candle" size={3} animate /> Your candle is waiting.
@@ -84,18 +84,18 @@ export default function LandingPage() {
             <h1
               id="homepage-heading"
               tabIndex={-1}
-              className="mt-6 font-display text-heading text-graphite outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent sm:text-display"
+              className="mt-5 font-display text-heading text-graphite outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent sm:text-display"
             >
               Faith, one small step at a time.
             </h1>
           </Reveal>
           <Reveal delay={0.16}>
-            <p className="mx-auto mt-5 max-w-xl text-[1.125rem] leading-relaxed text-charcoal">
+            <p className="mx-auto mt-3 max-w-xl text-[1.125rem] leading-relaxed text-charcoal">
               One verse, one prayer, and a small step you can live out today.
             </p>
           </Reveal>
           <Reveal delay={0.24}>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <GentleLink variant="primary" size="lg" href="/onboarding">
                 Start today — it’s free <IconArrowRight />
               </GentleLink>
@@ -104,14 +104,36 @@ export default function LandingPage() {
               </GentleLink>
             </div>
           </Reveal>
-          <Reveal delay={0.34} className="mt-14 w-full max-w-md">
+          <Reveal delay={0.34} className="mt-8 w-full max-w-md sm:mt-9">
             <VerseDemo verse={verse} />
+          </Reveal>
+          <Reveal delay={0.4} className="mt-3 sm:mt-5">
+            <a
+              href="#why"
+              aria-label="Continue to learn more about BibleQuest"
+              className="group flex h-11 w-11 items-center justify-center rounded-full border border-mist/80 bg-paper/55 text-fog backdrop-blur-sm transition-colors hover:border-olive-300 hover:text-accent"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                className="transition-transform group-hover:translate-y-0.5"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </a>
           </Reveal>
         </div>
       </section>
 
       {/* Problem */}
-      <EditorialSection spacing="loose">
+      <EditorialSection id="why" className="scroll-mt-20" spacing="compact">
         <Reveal>
           <div className="mx-auto max-w-2xl text-center">
             <Eyebrow>The real problem</Eyebrow>
@@ -129,7 +151,7 @@ export default function LandingPage() {
       </EditorialSection>
 
       {/* The daily rhythm */}
-      <EditorialSection id="how" className="bg-linen" spacing="loose">
+      <EditorialSection id="how" className="scroll-mt-20 bg-linen" spacing="compact">
         <Reveal>
           <div className="text-center">
             <PixelMascot name="map" size={8} className="mb-6" />
@@ -142,7 +164,7 @@ export default function LandingPage() {
             </p>
           </div>
         </Reveal>
-        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-8 grid gap-4 sm:mt-10 sm:grid-cols-2 lg:grid-cols-4">
           {RHYTHM.map((r, i) => (
             <Reveal key={r.title} delay={i * 0.06}>
               <PaperCard variant="paper" padding="lg" className="h-full text-center">
@@ -158,8 +180,8 @@ export default function LandingPage() {
       </EditorialSection>
 
       {/* Product demonstration */}
-      <EditorialSection spacing="loose">
-        <div className="grid items-center gap-10 lg:grid-cols-2">
+      <EditorialSection spacing="compact">
+        <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-10">
           <Reveal>
             <div>
               <Eyebrow>Quests</Eyebrow>
@@ -185,8 +207,8 @@ export default function LandingPage() {
 
       {/* Ethos — the deep-green band */}
       <section className="relative overflow-hidden bg-dusk">
-        <div className="mx-auto w-full max-w-5xl px-5 py-20 sm:px-8 sm:py-28">
-          <div className="grid items-center gap-10 lg:grid-cols-2">
+        <div className="mx-auto w-full max-w-5xl px-5 py-14 sm:px-8 sm:py-20">
+          <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-10">
             <Reveal className="order-2 lg:order-1">
               <PaperCard variant="atmospheric" padding="lg" className="relative overflow-hidden text-center">
                 <div className="pointer-events-none absolute inset-0">
@@ -222,8 +244,8 @@ export default function LandingPage() {
       </section>
 
       {/* Living journal */}
-      <EditorialSection spacing="loose">
-        <div className="grid items-center gap-10 lg:grid-cols-2">
+      <EditorialSection spacing="compact">
+        <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-10">
           <Reveal>
             <div>
               <Eyebrow>A living journal</Eyebrow>
@@ -233,7 +255,8 @@ export default function LandingPage() {
               <p className="mt-4 text-[1.0625rem] leading-relaxed text-ash">
                 Write honestly. Mark prayers answered when they are. Over the
                 years, this journal becomes one of the most meaningful things
-                you own — and it stays private by default, always.
+                you own. Journal text stays out of analytics and is never sent
+                to AI.
               </p>
             </div>
           </Reveal>
@@ -244,7 +267,7 @@ export default function LandingPage() {
       </EditorialSection>
 
       {/* Free promise */}
-      <EditorialSection className="bg-linen" spacing="loose">
+      <EditorialSection className="bg-linen" spacing="compact">
         <Reveal>
           <PaperCard variant="paper" padding="lg" className="mx-auto max-w-2xl text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-accent-surface">
@@ -266,14 +289,14 @@ export default function LandingPage() {
       </EditorialSection>
 
       {/* FAQ */}
-      <EditorialSection spacing="loose">
+      <EditorialSection spacing="compact">
         <div className="mx-auto max-w-2xl">
           <Reveal>
             <h2 className="text-center font-display text-editorial text-graphite">
               Common questions
             </h2>
           </Reveal>
-          <DisclosureGroup className="mt-8">
+          <DisclosureGroup className="mt-6 sm:mt-8">
             {FAQ.map((f, i) => (
               <Reveal key={f.q} delay={i * 0.05}>
                 <Disclosure
@@ -296,7 +319,7 @@ export default function LandingPage() {
         <div className="pointer-events-none absolute inset-0">
           <SeasonalAtmosphere density={10} />
         </div>
-        <div className="relative mx-auto max-w-2xl px-5 py-24 text-center sm:px-8 sm:py-32">
+        <div className="relative mx-auto max-w-2xl px-5 py-16 text-center sm:px-8 sm:py-20">
           <Reveal>
             <PixelIcon name="lantern" size={8} animate className="mx-auto" />
             <h2 className="mt-6 font-display text-editorial text-graphite sm:text-heading">

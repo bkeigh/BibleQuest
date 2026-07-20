@@ -7,7 +7,7 @@ export const en: UIStrings = {
     home: "Home",
     quests: "Quests",
     bible: "Bible",
-    prayer: "Prayer",
+    prayer: "Prayers",
     journey: "Journey",
   },
   titles: {
@@ -134,7 +134,7 @@ export const en: UIStrings = {
     dismiss: "Maybe later",
   },
   empty: {
-    prayer: "Write what’s actually on your mind. It stays private.",
+    prayer: "Write what’s actually on your mind. Save it in your private-by-default journal.",
     reflections: "Your reflections will collect here.",
     journey: "Nothing here yet. Your first quest will show up here.",
     bookmarks: "Save verses you want to come back to.",

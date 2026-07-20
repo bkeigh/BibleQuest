@@ -1,35 +1,35 @@
 "use client";
 
 /**
- * SignInMethods — the actual sign-in affordances (magic link and Google),
- * extracted from AccountScreen so the onboarding account step can reuse them
- * verbatim rather than duplicating auth logic. This is the single place any
- * signInWithOtp / signInWithOAuth call is made.
- *
- * It renders ONLY the method controls and their transient states. Surrounding
- * chrome — page header, benefits copy, the signed-in card, the callback-error
- * banner — stays with whoever hosts it.
+ * Shared passwordless sign-in controls. A successful OTP request only means
+ * Supabase accepted the request; provider-side SMTP still determines whether
+ * the message reaches the inbox, so the requested state explains recovery and
+ * offers a rate-limit-aware resend.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { track } from "@/lib/analytics/events";
 import { authCallbackPath } from "@/lib/auth/redirect";
+import {
+  emailRequestFailure,
+  oauthRequestFailure,
+  type AuthRequestFailure,
+} from "@/lib/auth/errors";
 
-type EmailStatus = "idle" | "sending" | "sent";
+type EmailStatus = "idle" | "sending" | "requested";
 
-// Loose email shape check — the real validation is the link arriving.
+// A quick client-side affordance. Supabase remains the source of truth.
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+/** Supabase's default per-address magic-link window is 60 seconds. */
+const RESEND_COOLDOWN_SECONDS = 60;
 
 interface SignInMethodsProps {
-  /** Where these controls live — flows into analytics as the funnel source. */
   source: "account" | "onboarding";
-  /**
-   * Fired once the magic-link email is successfully sent. Onboarding uses it
-   * to reveal an "Open BibleQuest" exit so the user isn't stranded on the
-   * "check your email" panel (its flow has no other way forward from here).
-   */
+  /** Fired after Supabase accepts a magic-link request (not a delivery claim). */
   onEmailSent?: () => void;
+  /** Lets onboarding expose its local fallback after auth is unavailable. */
+  onUnavailable?: () => void;
   /** Safe same-origin destination after the auth callback completes. */
   nextPath?: string;
 }
@@ -37,37 +37,73 @@ interface SignInMethodsProps {
 export function SignInMethods({
   source,
   onEmailSent,
+  onUnavailable,
   nextPath = "/app",
 }: SignInMethodsProps) {
   const [email, setEmail] = useState("");
+  const [requestedEmail, setRequestedEmail] = useState("");
   const [emailStatus, setEmailStatus] = useState<EmailStatus>("idle");
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resending, setResending] = useState(false);
   const [oauthPending, setOauthPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AuthRequestFailure | null>(null);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = window.setTimeout(
+      () => setResendCooldown((seconds) => Math.max(0, seconds - 1)),
+      1_000,
+    );
+    return () => window.clearTimeout(timer);
+  }, [resendCooldown]);
 
   const emailValid = EMAIL.test(email.trim());
+  const online = () =>
+    typeof navigator === "undefined" || navigator.onLine !== false;
 
   function callbackUrl() {
-    return new URL(
-      authCallbackPath(nextPath),
-      window.location.origin
-    ).toString();
+    return new URL(authCallbackPath(nextPath), window.location.origin).toString();
   }
 
-  async function sendLink() {
-    if (!EMAIL.test(email.trim())) return;
+  function showFailure(failure: AuthRequestFailure) {
+    setError(failure);
+    if (failure.unavailable) onUnavailable?.();
+  }
+
+  async function requestLink(resend = false) {
+    const address = email.trim();
+    if (!EMAIL.test(address) || (resend && resendCooldown > 0)) return;
+
     setError(null);
-    setEmailStatus("sending");
-    track("sign_in_started", { method: "magic_link", source });
-    const { error } = await createClient().auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: callbackUrl() },
-    });
-    if (error) {
-      setError("We couldn’t send the link. Please try again in a moment.");
-      setEmailStatus("idle");
-    } else {
-      setEmailStatus("sent");
+    if (resend) setResending(true);
+    else {
+      setEmailStatus("sending");
+      track("sign_in_started", { method: "magic_link", source });
+    }
+
+    try {
+      const { error: requestError } = await createClient().auth.signInWithOtp({
+        email: address,
+        options: {
+          emailRedirectTo: callbackUrl(),
+          shouldCreateUser: true,
+        },
+      });
+      if (requestError) {
+        showFailure(emailRequestFailure(requestError, online()));
+        if (!resend) setEmailStatus("idle");
+        return;
+      }
+
+      setRequestedEmail(address);
+      setEmailStatus("requested");
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
       onEmailSent?.();
+    } catch (requestError) {
+      showFailure(emailRequestFailure(requestError, online()));
+      if (!resend) setEmailStatus("idle");
+    } finally {
+      if (resend) setResending(false);
     }
   }
 
@@ -75,32 +111,83 @@ export function SignInMethods({
     setError(null);
     setOauthPending(true);
     track("sign_in_started", { method: "google", source });
-    const { error } = await createClient().auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: callbackUrl() },
-    });
-    if (error) {
+    try {
+      const { error: requestError } = await createClient().auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: callbackUrl() },
+      });
+      if (requestError) {
+        setOauthPending(false);
+        showFailure(oauthRequestFailure(requestError, online()));
+      }
+      // On success the browser navigates away; pending intentionally remains.
+    } catch (requestError) {
       setOauthPending(false);
-      setError("We couldn’t start sign-in. Please try again.");
+      showFailure(oauthRequestFailure(requestError, online()));
     }
-    // On success the browser navigates away; the pending state holds until then.
   }
 
-  if (emailStatus === "sent") {
+  if (emailStatus === "requested") {
     return (
       <div>
-        <div className="rounded-[var(--radius-card)] bg-accent-surface p-4 text-center">
-          <p className="text-small leading-relaxed text-accent-ink">
-            Check your email for a sign-in link. You can close this page.
+        <div
+          role="status"
+          aria-live="polite"
+          className="rounded-[var(--radius-card)] bg-accent-surface p-4"
+        >
+          <p className="text-center text-small font-medium text-accent-ink">
+            Check your email
+          </p>
+          <p className="mt-1 break-all text-center text-caption text-accent-ink">
+            We requested a sign-in link for {requestedEmail}.
+          </p>
+          <p className="mt-2 text-center text-caption leading-relaxed text-ash">
+            Delivery can take a minute. Check Spam or Junk, and search for
+            “BibleQuest.” The link can only be used once.
           </p>
         </div>
+
+        {error && <FailureNotice failure={error} />}
+
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+          <GentleButton
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => void requestLink(true)}
+            disabled={resendCooldown > 0 || resending}
+          >
+            {resending
+              ? "Requesting…"
+              : resendCooldown > 0
+                ? `Request another (${resendCooldown}s)`
+                : "Request another link"}
+          </GentleButton>
+          <GentleButton
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setEmailStatus("idle");
+              setError(null);
+            }}
+          >
+            Change email
+          </GentleButton>
+        </div>
+
+        <Divider />
+
         <GentleButton
-          variant="ghost"
-          size="sm"
-          className="mt-3"
-          onClick={() => setEmailStatus("idle")}
+          type="button"
+          variant="outline"
+          size="md"
+          fullWidth
+          onClick={() => void oauth("google")}
+          disabled={oauthPending || resending}
+          aria-busy={oauthPending}
         >
-          Use a different method
+          {oauthPending ? "Opening Google…" : "Continue with Google instead"}
         </GentleButton>
       </div>
     );
@@ -108,11 +195,10 @@ export function SignInMethods({
 
   return (
     <>
-      {/* Email magic link */}
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          void sendLink();
+          void requestLink();
         }}
       >
         <label
@@ -126,9 +212,15 @@ export function SignInMethods({
           type="email"
           enterKeyHint="send"
           autoComplete="email"
+          spellCheck={false}
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(event) => {
+            setEmail(event.target.value);
+            setError(null);
+          }}
           placeholder="you@example.com"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? "signin-error" : undefined}
           className="w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-body text-graphite outline-none focus:border-accent/50"
         />
         <GentleButton
@@ -137,10 +229,12 @@ export function SignInMethods({
           size="md"
           fullWidth
           className="mt-3"
-          disabled={!emailValid || emailStatus === "sending"}
+          disabled={!emailValid || emailStatus === "sending" || oauthPending}
           aria-busy={emailStatus === "sending"}
         >
-          {emailStatus === "sending" ? "Sending…" : "Send a sign-in link"}
+          {emailStatus === "sending"
+            ? "Requesting…"
+            : "Email me a sign-in link"}
         </GentleButton>
       </form>
 
@@ -151,18 +245,32 @@ export function SignInMethods({
         variant="outline"
         size="md"
         fullWidth
-        onClick={() => oauth("google")}
-        disabled={oauthPending}
+        onClick={() => void oauth("google")}
+        disabled={oauthPending || emailStatus === "sending"}
+        aria-busy={oauthPending}
       >
         {oauthPending ? "Opening Google…" : "Continue with Google"}
       </GentleButton>
 
-      {error && (
-        <p role="alert" className="mt-3 text-caption text-rose-700">
-          {error}
-        </p>
-      )}
+      {error && <FailureNotice failure={error} />}
     </>
+  );
+}
+
+function FailureNotice({ failure }: { failure: AuthRequestFailure }) {
+  return (
+    <div
+      id="signin-error"
+      role="alert"
+      className="mt-3 rounded-[var(--radius-button)] border border-rose-300 px-3 py-2.5"
+    >
+      <p className="text-caption leading-relaxed text-rose-700">
+        {failure.message}
+      </p>
+      <p className="mt-1 text-[0.6875rem] uppercase tracking-[0.08em] text-ash">
+        Reference: {failure.reference}
+      </p>
+    </div>
   );
 }
 

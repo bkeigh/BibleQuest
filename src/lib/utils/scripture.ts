@@ -13,3 +13,12 @@ const TRAIL_QUOTE = /\s*[“”‘’"']+$/;
 export function cleanVerseText(text: string): string {
   return text.trim().replace(LEAD_QUOTE, "").replace(TRAIL_QUOTE, "").trim();
 }
+
+/**
+ * Plain-language share copy for a verse. Bible editions stay visible in the
+ * reading UI, while the portable share text remains focused on the Scripture
+ * and its reference.
+ */
+export function formatVerseShareText(text: string, reference: string): string {
+  return `“${cleanVerseText(text)}” — ${reference}`;
+}

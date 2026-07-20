@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { PrayerComposer } from "@/components/prayer/PrayerComposer";
 
-export const metadata = { title: "A prayer" };
+export const metadata = { title: "New Prayer" };
 
 export default function NewPrayerPage() {
   return (

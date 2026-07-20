@@ -52,10 +52,12 @@ const ACCOUNT_NUDGE_CONTEXTS = new Set<AccountNudgeContext>([
 const isPrayer = (o: unknown) =>
   isObj(o) && str(o.id) && str(o.body) && str(o.status) &&
   PRAYER_STATUSES.has(o.status) && str(o.category) &&
-  PRAYER_CATEGORY_SET.has(o.category) && str(o.createdAt) && str(o.updatedAt);
+  PRAYER_CATEGORY_SET.has(o.category) && str(o.createdAt) && str(o.updatedAt) &&
+  (o.archivedAt === undefined || str(o.archivedAt));
 const isReflection = (o: unknown) =>
   isObj(o) && str(o.id) && str(o.body) && str(o.createdAt) && str(o.updatedAt) &&
-  (o.mood === undefined || (str(o.mood) && REFLECTION_MOOD_SET.has(o.mood)));
+  (o.mood === undefined || (str(o.mood) && REFLECTION_MOOD_SET.has(o.mood))) &&
+  (o.archivedAt === undefined || str(o.archivedAt));
 const isGrowthEvent = (o: unknown) => isObj(o) && str(o.growthType) && num(o.amount);
 const isCompletion = (o: unknown) =>
   isObj(o) && str(o.id) && str(o.questSlug) && str(o.dateKey) && str(o.completedAt);

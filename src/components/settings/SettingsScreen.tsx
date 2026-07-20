@@ -20,6 +20,7 @@ import { applyAppearance } from "@/lib/theme";
 import { saveAvatar, clearAvatar } from "@/lib/utils/avatar";
 import { parseSnapshot } from "@/lib/questos/import-schema";
 import { createExportSnapshot } from "@/lib/questos/snapshot";
+import { clearAllDeviceLocalJournalDrafts } from "@/lib/questos/journal-drafts";
 import { clearLastSyncedUserId } from "@/lib/sync/last-user";
 import { useSession } from "@/lib/supabase/useSession";
 import type { QuestOSSnapshot } from "@/lib/questos/types";
@@ -650,7 +651,7 @@ function SettingsInner() {
     a.download = "biblequest-journey.json";
     a.click();
     URL.revokeObjectURL(url);
-    toast("Exported. Keep the file somewhere safe.");
+    toast("Exported. The file contains readable journal text—store it securely.");
   }
 
   async function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
@@ -953,6 +954,10 @@ function SettingsInner() {
                 Privacy policy
               </Link>
             </div>
+            <p className="mt-2 text-[0.75rem] leading-relaxed text-ash">
+              Exports contain readable prayers and reflections. Store the file
+              somewhere secure.
+            </p>
             {importError && (
               <p role="alert" className="mt-2 text-[0.875rem] text-rose-700">
                 {importError}
@@ -1051,6 +1056,7 @@ function SettingsInner() {
                     // too; the sync engine deletes it on the next push or
                     // initial sync, even if that happens after a reload.
                     clearAllData(user ? { purgeAccount: user.id } : undefined);
+                    clearAllDeviceLocalJournalDrafts();
                     // "Everything on this device" includes the profile photo,
                     // which lives beside the store in IndexedDB.
                     void clearAvatar();

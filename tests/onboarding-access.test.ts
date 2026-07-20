@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { accountRestorePhase } from "@/lib/sync/access";
+import {
+  accountRestorePhase,
+  hasSafeLocalJourney,
+} from "@/lib/sync/access";
 
 const signedIn = {
   configured: true,
@@ -9,7 +12,7 @@ const signedIn = {
   syncState: "idle" as const,
   initialSyncComplete: true,
   handoffPending: false,
-  trustedLocalCopy: false,
+  safeLocalJourney: false,
 };
 
 describe("onboarding account restoration boundary", () => {
@@ -68,7 +71,7 @@ describe("onboarding account restoration boundary", () => {
         syncUserId: null,
         syncState: "error",
         initialSyncComplete: false,
-        trustedLocalCopy: true,
+        safeLocalJourney: true,
       }),
     ).toBe("ready");
   });
@@ -77,5 +80,58 @@ describe("onboarding account restoration boundary", () => {
     expect(
       accountRestorePhase({ ...signedIn, handoffPending: true })
     ).toBe("loading");
+  });
+});
+
+describe("safe local journey detection", () => {
+  it("waits for initial sync before a guest journey adopts its first account", () => {
+    expect(
+      hasSafeLocalJourney({
+        localOnboardingCompleted: true,
+        lastSyncedUserId: null,
+        userId: "account-a",
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps a completed journey available for its existing account", () => {
+    expect(
+      hasSafeLocalJourney({
+        localOnboardingCompleted: true,
+        lastSyncedUserId: "account-a",
+        userId: "account-a",
+      }),
+    ).toBe(true);
+  });
+
+  it("blocks first adoption after ownership lands but initial sync is pending", () => {
+    expect(
+      hasSafeLocalJourney({
+        localOnboardingCompleted: true,
+        lastSyncedUserId: "account-a",
+        userId: "account-a",
+        initialSyncPending: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("never opens a journey stamped to a different account", () => {
+    expect(
+      hasSafeLocalJourney({
+        localOnboardingCompleted: true,
+        lastSyncedUserId: "account-b",
+        userId: "account-a",
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps a fresh browser behind the restore boundary", () => {
+    expect(
+      hasSafeLocalJourney({
+        localOnboardingCompleted: false,
+        lastSyncedUserId: null,
+        userId: "account-a",
+      }),
+    ).toBe(false);
   });
 });

@@ -76,6 +76,15 @@ function id(): string {
   });
 }
 
+function normalizePrayerArchive(prayer: Prayer): Prayer {
+  if (prayer.status !== "archived") return prayer;
+  return {
+    ...prayer,
+    status: prayer.answeredAt ? "answered" : "active",
+    archivedAt: prayer.archivedAt ?? prayer.updatedAt,
+  };
+}
+
 interface QuestOSState {
   profile: Profile | null;
   settings: Settings;
@@ -186,7 +195,9 @@ interface QuestOSState {
 
   // -- reflection
   addReflection: (data: { body: string; prompt?: string; mood?: ReflectionMood; relatedQuestSlug?: string; relatedVerseReference?: string }) => { reflection: Reflection; newMilestones: MilestoneSeed[] };
-  updateReflection: (reflectionId: string, patch: Partial<Pick<Reflection, "body" | "mood">>) => void;
+  updateReflection: (reflectionId: string, patch: Partial<Pick<Reflection, "body" | "mood" | "prompt">>) => void;
+  archiveReflection: (reflectionId: string) => void;
+  unarchiveReflection: (reflectionId: string) => void;
   deleteReflection: (reflectionId: string) => void;
 
   // -- scripture
@@ -736,7 +747,7 @@ export const useQuestOS = create<QuestOSState>()(
                 snapshot.assignments ?? {}
               ),
             completions: snapshot.completions ?? [],
-            prayers: snapshot.prayers ?? [],
+            prayers: (snapshot.prayers ?? []).map(normalizePrayerArchive),
             reflections: snapshot.reflections ?? [],
             journeyEvents: snapshot.journeyEvents ?? [],
             growthEvents: snapshot.growthEvents ?? [],
@@ -1110,20 +1121,34 @@ export const useQuestOS = create<QuestOSState>()(
         },
 
         archivePrayer: (prayerId) => {
+          const now = new Date().toISOString();
           set({
             prayers: get().prayers.map((p) =>
               p.id === prayerId
-                ? { ...p, status: "archived" as const, updatedAt: new Date().toISOString() }
+                ? { ...p, archivedAt: now, updatedAt: now }
                 : p
             ),
           });
         },
 
         unarchivePrayer: (prayerId) => {
+          const now = new Date().toISOString();
           set({
             prayers: get().prayers.map((p) =>
               p.id === prayerId
-                ? { ...p, status: "active" as const, updatedAt: new Date().toISOString() }
+                ? {
+                    ...p,
+                    // Old clients encoded archive inside status. Recover the
+                    // most specific state the surviving fields can prove.
+                    status:
+                      p.status === "archived"
+                        ? p.answeredAt
+                          ? "answered"
+                          : "active"
+                        : p.status,
+                    archivedAt: undefined,
+                    updatedAt: now,
+                  }
                 : p
             ),
           });
@@ -1190,6 +1215,28 @@ export const useQuestOS = create<QuestOSState>()(
               r.id === reflectionId
                 ? { ...r, ...patch, updatedAt: new Date().toISOString() }
                 : r
+            ),
+          });
+        },
+
+        archiveReflection: (reflectionId) => {
+          const now = new Date().toISOString();
+          set({
+            reflections: get().reflections.map((reflection) =>
+              reflection.id === reflectionId
+                ? { ...reflection, archivedAt: now, updatedAt: now }
+                : reflection,
+            ),
+          });
+        },
+
+        unarchiveReflection: (reflectionId) => {
+          const now = new Date().toISOString();
+          set({
+            reflections: get().reflections.map((reflection) =>
+              reflection.id === reflectionId
+                ? { ...reflection, archivedAt: undefined, updatedAt: now }
+                : reflection,
             ),
           });
         },
@@ -1359,7 +1406,7 @@ export const useQuestOS = create<QuestOSState>()(
     {
       name: "biblequest:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 9,
+      version: 10,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
@@ -1463,6 +1510,13 @@ export const useQuestOS = create<QuestOSState>()(
               ...bookmark,
               translationKey: bookmark.translationKey ?? "web",
             }),
+          );
+        }
+        if (version < 10) {
+          // Archive used to overwrite prayer status. Make it orthogonal so an
+          // answered prayer stays answered after archive and restore.
+          state.prayers = ((state.prayers ?? []) as Prayer[]).map(
+            normalizePrayerArchive,
           );
         }
         return state as unknown as QuestOSState;

@@ -4,11 +4,12 @@ interface EditorialSectionProps {
   children: React.ReactNode;
   className?: string;
   /** Vertical rhythm for landing/marketing sections. */
-  spacing?: "normal" | "loose" | "atmospheric";
+  spacing?: "compact" | "normal" | "loose" | "atmospheric";
   id?: string;
 }
 
 const SPACING = {
+  compact: "py-12 sm:py-16",
   normal: "py-16 sm:py-20",
   loose: "py-20 sm:py-28",
   atmospheric: "py-24 sm:py-36",

@@ -1,7 +1,7 @@
-import { ReflectionScreen } from "@/components/reflection/ReflectionScreen";
+import { redirect } from "next/navigation";
 
 export const metadata = { title: "Reflections" };
 
 export default function ReflectionPage() {
-  return <ReflectionScreen />;
+  redirect("/app/prayer/reflections");
 }

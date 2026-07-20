@@ -24,7 +24,8 @@ A read-only check using the browser-safe Supabase publishable key found:
 | Active milestones | 38 | 22 | DRIFTED |
 | Prayer / reflection prompts | 32 / 32 | 32 / 32 | MATCHED |
 | Auth methods | Email + Google on; phone off | Email + Google on; phone off | MATCHED |
-| Canonical metadata | `https://www.biblequest.co` | Apex URL while traffic redirects to `www` | DRIFTED |
+| Canonical metadata | `https://www.biblequest.co` | `www` canonical and Open Graph URL | MATCHED |
+| Auth email delivery | Custom SMTP with a verified sender | Not proven by the public readiness probe | MANUAL GATE |
 
 Run the same non-mutating probe at any time:
 
@@ -45,6 +46,15 @@ Supabase’s built-in sender is a testing service with restricted recipients,
 low rate limits, and no delivery SLA. Configure a custom sender before inviting
 more testers.
 
+This is the most likely explanation when a non-team tester requests a link and
+nothing reaches their inbox: without custom SMTP, Supabase currently refuses
+delivery to addresses that are not members of the project’s organization. The
+browser can report that an OTP request was accepted, but that is not proof of
+SMTP delivery. BibleQuest labels this state **“requested,”** waits for the
+provider’s default 60-second per-address resend window, and surfaces bounded
+references such as `AUTH-EMAIL-SETUP` and `AUTH-RATE-LIMIT`; provider setup is
+still required.
+
 1. Open [Resend Domains](https://resend.com/domains), add an auth-only subdomain
    such as `auth.biblequest.co`, and add the exact SPF and DKIM records Resend
    gives you. Add DMARC after SPF and DKIM verify. Do not invent or copy DNS
@@ -58,6 +68,8 @@ more testers.
 4. Send a real magic link to Gmail and iCloud test inboxes. Record delivery,
    spam placement, link completion, and the matching Supabase Auth log entry;
    never save the link token in launch evidence.
+5. Repeat with an address that is **not** a Supabase organization member. An
+   organization-member-only success does not prove production delivery.
 
 Provider references:
 
@@ -68,6 +80,13 @@ Provider references:
 The repository’s old `RESEND_API_KEY` placeholder was for a future lifecycle
 email integration and was never read by Supabase Auth. SMTP credentials belong
 in the Supabase/Resend integration, not in Vercel and not in `.env.local`.
+
+After the provider is connected, use Supabase → Authentication → Logs and the
+Resend delivery log together when diagnosing a missing message. A successful
+Auth request with no Resend event points to Supabase/provider configuration; a
+Resend event marked bounced, suppressed, or delivered points to sender/domain
+reputation or the receiving mailbox. Do not paste email addresses or magic-link
+tokens into issue trackers.
 
 ## Founder action 2 — verify email links and advertised providers
 
@@ -112,6 +131,10 @@ scanners can consume single-use links, so record that risk and consider a
 user-confirmed intermediate page if it appears in real testing. See
 [Supabase email templates](https://supabase.com/docs/guides/auth/auth-email-templates)
 and [redirect URL guidance](https://supabase.com/docs/guides/auth/redirect-urls).
+
+The callback maps expired, malformed, provider, and same-browser PKCE failures
+to safe user-facing reasons and always sends `Cache-Control: private, no-store`.
+It never puts raw provider error text or a token in the destination URL.
 
 ## Founder action 3 — reconcile staging, then production schema
 

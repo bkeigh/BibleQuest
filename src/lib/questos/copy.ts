@@ -23,7 +23,7 @@ export function completionLine(seed: number): string {
 }
 
 export const emptyStates = {
-  prayer: "Write what's actually on your mind. It stays private.",
+  prayer: "Write what’s actually on your mind. Save it in your private-by-default journal.",
   reflections: "Your reflections will collect here.",
   journey: "Nothing here yet. Your first quest will show up here.",
   bookmarks: "Save verses you want to come back to.",

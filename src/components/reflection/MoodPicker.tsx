@@ -22,7 +22,7 @@ export function MoodPicker({
   return (
     <div>
       <p id="mood-picker-label" className="mb-2 text-[0.8125rem] text-ash">
-        How are you, honestly?
+        How did this moment feel? (optional)
       </p>
       <div
         role="group"
@@ -36,7 +36,7 @@ export function MoodPicker({
             aria-pressed={value === m}
             onClick={() => onChange(value === m ? undefined : m)}
             className={cn(
-              "rounded-full border px-3 py-1.5 text-[0.8125rem] transition-all duration-300",
+              "min-h-11 rounded-full border px-3 text-[0.8125rem] transition-all duration-300",
               value === m
                 ? "border-accent bg-accent-surface text-accent"
                 : "border-mist bg-paper text-ash hover:border-accent/50"

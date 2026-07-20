@@ -34,7 +34,7 @@ export function VerseDemo({ verse: initial }: { verse: DailyVerse }) {
   }
 
   return (
-    <PaperCard variant="atmospheric" padding="lg" className="relative overflow-hidden">
+    <PaperCard variant="atmospheric" padding="md" className="relative overflow-hidden">
       <div className="pointer-events-none absolute -right-3 -top-2 opacity-30">
         <IconLeaf className="text-olive-300" size={64} />
       </div>
@@ -63,12 +63,13 @@ export function VerseDemo({ verse: initial }: { verse: DailyVerse }) {
           <blockquote className="verse-text verse-text-lead mt-3 text-left">
             “{cleanVerseText(verse.text)}”
           </blockquote>
-          <cite className="mt-4 block text-left text-[0.9375rem] not-italic text-ash">
-            — {verse.reference}
+          <cite className="mt-3 block text-left text-[0.9375rem] not-italic text-ash">
+            — {verse.reference} <span className="text-fog">·</span>{" "}
+            World English Bible
           </cite>
         </motion.div>
       </div>
-      <div className="mt-5 flex items-center gap-2 text-[0.875rem] text-ash">
+      <div className="mt-4 flex items-center gap-2 text-[0.875rem] text-ash">
         <IconBookmark size={17} /> Save
       </div>
     </PaperCard>

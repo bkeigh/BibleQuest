@@ -1,6 +1,7 @@
 import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
 import { SyncManager } from "@/components/app-shell/SyncManager";
 import { OnboardingAccountRestoreGate } from "@/components/onboarding/OnboardingGate";
+import { parseAuthFailureReason } from "@/lib/auth/errors";
 
 export const metadata = { title: "Welcome" };
 
@@ -14,7 +15,7 @@ export default async function OnboardingPage({
     <>
       <SyncManager />
       <OnboardingAccountRestoreGate>
-        <OnboardingFlow signInFailed={error === "signin"} />
+        <OnboardingFlow authFailure={parseAuthFailureReason(error)} />
       </OnboardingAccountRestoreGate>
     </>
   );

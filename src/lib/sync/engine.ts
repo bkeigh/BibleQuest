@@ -25,7 +25,13 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { useQuestOS } from "@/lib/questos/store";
 import type { QuestOSSnapshot, SyncTombstones } from "@/lib/questos/types";
 import { useSyncStatus } from "./status";
-import { localDataBelongsToOtherUser, setLastSyncedUserId } from "./last-user";
+import {
+  clearInitialSyncPending,
+  getLastSyncedUserId,
+  localDataBelongsToOtherUser,
+  markInitialSyncPending,
+  setLastSyncedUserId,
+} from "./last-user";
 import { track } from "@/lib/analytics/events";
 import {
   assignmentToRow,
@@ -201,6 +207,9 @@ export async function startSync(userId: string, retryingFailure = false) {
     stopSync();
     return;
   }
+  if (getLastSyncedUserId() !== userId) {
+    markInitialSyncPending(userId);
+  }
   const previousStatus = useSyncStatus.getState();
   const wasError =
     retryingFailure ||
@@ -216,6 +225,7 @@ export async function startSync(userId: string, retryingFailure = false) {
   try {
     await initialSync(createClient(), userId, isCurrent);
     if (!isCurrent()) return; // stopped/restarted mid-sync
+    clearInitialSyncPending(userId);
     setStatus("idle", { syncedNow: true, initialSyncComplete: true });
     track("sync_completed", { status: "initial" });
   } catch {

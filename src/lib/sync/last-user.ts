@@ -17,6 +17,7 @@
  */
 
 const KEY = "biblequest:last-sync-user";
+const INITIAL_SYNC_PENDING_KEY = "biblequest:initial-sync-pending-user";
 
 export function getLastSyncedUserId(): string | null {
   if (typeof window === "undefined") return null;
@@ -42,8 +43,44 @@ export function clearLastSyncedUserId() {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.removeItem(KEY);
+    window.localStorage.removeItem(INITIAL_SYNC_PENDING_KEY);
   } catch {
     // Ignore — see setLastSyncedUserId.
+  }
+}
+
+/**
+ * First-account adoption and explicit account hand-offs are not safe for early
+ * local access until their initial pull → merge → push fully succeeds. This
+ * separate marker survives a reload even though the ownership marker is set as
+ * soon as merged private data lands locally.
+ */
+export function markInitialSyncPending(userId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(INITIAL_SYNC_PENDING_KEY, userId);
+  } catch {
+    // See setLastSyncedUserId.
+  }
+}
+
+export function clearInitialSyncPending(userId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    if (window.localStorage.getItem(INITIAL_SYNC_PENDING_KEY) === userId) {
+      window.localStorage.removeItem(INITIAL_SYNC_PENDING_KEY);
+    }
+  } catch {
+    // See setLastSyncedUserId.
+  }
+}
+
+export function initialSyncIsPending(userId: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(INITIAL_SYNC_PENDING_KEY) === userId;
+  } catch {
+    return false;
   }
 }
 

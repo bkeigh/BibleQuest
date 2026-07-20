@@ -9,6 +9,10 @@ import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { createClient, isSupabaseConfigured } from "./client";
 import { track } from "@/lib/analytics/events";
+import {
+  authEventCompletesSignIn,
+  consumeAuthCompletionSignal,
+} from "@/lib/auth/completion-signal";
 
 // One funnel event per real sign-in — not per mounted hook instance
 // (several components subscribe at once) and not per open tab (supabase
@@ -37,6 +41,12 @@ interface SessionState {
   configured: boolean;
 }
 
+function trackCompletedSignIn(userId: string) {
+  if (signInTracked) return;
+  signInTracked = true;
+  if (firstTabToTrack(userId)) track("sign_in_completed");
+}
+
 /**
  * Subscribes to the Supabase auth state. When Supabase isn't configured it
  * returns a stable signed-out state so guest mode renders normally.
@@ -53,18 +63,25 @@ export function useSession(): SessionState {
 
     supabase.auth.getUser().then(({ data }) => {
       if (!active) return;
+      if (data.user && consumeAuthCompletionSignal()) {
+        trackCompletedSignIn(data.user.id);
+      }
       setUser(data.user ?? null);
       setLoading(false);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      // SIGNED_IN fires on genuine sign-ins (initial session restore
-      // arrives as INITIAL_SESSION) — the account-funnel completion.
-      if (event === "SIGNED_IN" && !signInTracked && session?.user) {
-        signInTracked = true;
-        if (firstTabToTrack(session.user.id)) {
-          track("sign_in_completed");
-        }
+      // Server callback round trips restore as INITIAL_SESSION, while in-page
+      // auth can emit SIGNED_IN. The one-shot cookie makes both paths count
+      // exactly once without putting identity or tokens in client state.
+      const callbackCompleted = session?.user
+        ? consumeAuthCompletionSignal()
+        : false;
+      if (
+        session?.user &&
+        authEventCompletesSignIn(event, callbackCompleted)
+      ) {
+        trackCompletedSignIn(session.user.id);
       }
       if (event === "SIGNED_OUT") signInTracked = false;
       setUser(session?.user ?? null);

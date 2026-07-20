@@ -42,6 +42,16 @@ export function BottomNav() {
   );
   const t = hydrated ? strings : en;
 
+  // Journal composers are intentional, full-page writing spaces. Keeping the
+  // tab bar onscreen competes with the editor and can be tapped accidentally
+  // while the keyboard is open; Close/Done provide the clear exits here.
+  if (
+    pathname === "/app/prayer/new" ||
+    pathname === "/app/prayer/reflection/new"
+  ) {
+    return null;
+  }
+
   return (
     <nav
       aria-label="Primary"
