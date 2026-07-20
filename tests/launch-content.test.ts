@@ -8,6 +8,40 @@ import { QUEST_CATEGORIES } from "@/lib/questos/types";
 import { createReviewedQuestProvider } from "@/lib/quest-generation/provider";
 
 describe("launch content catalog", () => {
+  it("keeps the Home verse entry beneath the account surface and the mobile nav scroll-stable", () => {
+    const home = readFileSync(
+      path.join(process.cwd(), "src/components/home/HomeScreen.tsx"),
+      "utf8",
+    );
+    const bottomNav = readFileSync(
+      path.join(process.cwd(), "src/components/app-shell/BottomNav.tsx"),
+      "utf8",
+    );
+    const globalStyles = readFileSync(
+      path.join(process.cwd(), "src/app/globals.css"),
+      "utf8",
+    );
+
+    const accountSurface = home.indexOf("Profile, preferences &amp; accessibility");
+    const verseEntry = home.indexOf("<TodaysVerseLink />");
+    const questSection = home.indexOf('id="active-quests"');
+    expect(accountSurface).toBeGreaterThan(-1);
+    expect(verseEntry).toBeGreaterThan(accountSurface);
+    expect(questSection).toBeGreaterThan(verseEntry);
+
+    // Mobile Safari is sensitive to fixed + blur + transform composition.
+    // Keep the base bar opaque and reserve blur for larger viewports.
+    expect(bottomNav).toContain(
+      "bg-parchment pb-safe sm:bg-parchment/90 sm:backdrop-blur-md",
+    );
+    const focusRule = globalStyles.slice(
+      globalStyles.indexOf("html.bible-focus-mode [data-app-bottom-nav]"),
+      globalStyles.indexOf("html {", globalStyles.indexOf("html.bible-focus-mode")),
+    );
+    expect(focusRule).toContain("display: none");
+    expect(focusRule).not.toContain("transform:");
+  });
+
   it("ships exactly 150 unique, reviewed free quests with useful depth", () => {
     expect(seedQuests).toHaveLength(150);
     expect(new Set(seedQuests.map((quest) => quest.slug))).toHaveLength(150);
