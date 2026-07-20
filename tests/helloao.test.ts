@@ -215,6 +215,32 @@ describe("HelloAO open Scripture provider", () => {
     expect(result.verses.get(2)).toBe("The earth was formless and void.");
   });
 
+  it("serves the default KJV from HelloAO without an API key", async () => {
+    const payload = chapterPayload({ translationId: "eng_kjv" });
+    Object.assign(payload.translation, {
+      id: "eng_kjv",
+      sha256:
+        "a847712eeaae26124d3f9db80a1a9274742981261961b49715f43809774eb43c",
+      name: "King James Version",
+      website: "https://ebible.org/Scriptures/details.php?id=eng-kjv2006",
+      licenseUrl: "https://ebible.org/Scriptures/details.php?id=eng-kjv2006",
+      totalNumberOfVerses: 31102,
+    });
+    fetchMock.mockResolvedValue(jsonResponse(payload));
+
+    const result = await fetchHelloAoChapter("kjv", "GEN", 1);
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "https://bible.helloao.org/api/eng_kjv/GEN/1.json",
+    );
+    expect(result.translation).toMatchObject({
+      key: "kjv",
+      providerId: "eng_kjv",
+      source: "helloao",
+      contentUsePolicy: "public_domain",
+    });
+  });
+
   it("rejects mismatched provider metadata and oversized bodies", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(chapterPayload({ translationId: "eng_kjv" })),

@@ -15,7 +15,6 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { questBySlug } from "@/data/seed/quests";
 import { seedMilestones } from "@/data/seed/milestones";
-import { getDailyVerse } from "./verse-engine";
 import {
   FREE_QUEST_SLOTS,
   isQuestWindowOpen,
@@ -27,6 +26,7 @@ import {
 import { computeMetrics, checkMilestones } from "./milestone-engine";
 import { toDateKey } from "@/lib/utils/dates";
 import { track, setAnalyticsConsent } from "@/lib/analytics/events";
+import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
 import {
   DEFAULT_SETTINGS,
   QUEST_STEP_KEYS,
@@ -1495,14 +1495,14 @@ export const useQuestOS = create<QuestOSState>()(
           state.recentVerses = [];
         }
         if (version < 9) {
-          // v9: preferred Bible edition. NIV is the requested default, while
-          // the resolver keeps WEB as an honestly-labelled fallback until a
-          // licensed provider is connected.
+          // v9: preferred Bible edition. Use the current product default for
+          // devices that never had a preference; never replace a real choice.
           const settings = state.settings as
             | { preferredBibleTranslation?: string }
             | undefined;
           if (settings && !settings.preferredBibleTranslation) {
-            settings.preferredBibleTranslation = "niv";
+            settings.preferredBibleTranslation =
+              DEFAULT_BIBLE_TRANSLATION_KEY;
           }
           // Every pre-v9 bookmark snapshot is exact bundled WEB text.
           state.bookmarks = ((state.bookmarks ?? []) as VerseBookmark[]).map(
@@ -1565,5 +1565,4 @@ export function selectVerseRefreshCount(s: QuestOSState): number {
   return r && r.dateKey === toDateKey() ? r.count : 0;
 }
 
-export { getDailyVerse };
-export { FREE_QUEST_SLOTS, FREE_QUEST_SLOTS as MAX_DAILY_PICKS };
+export { FREE_QUEST_SLOTS };

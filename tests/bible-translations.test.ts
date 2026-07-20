@@ -13,6 +13,7 @@ import {
   HELLOAO_OPEN_TRANSLATIONS,
   WEB_TRANSLATION,
   bibleTranslationKey,
+  featuredBibleTranslationOptions,
   normalizeBibleTranslationKey,
   translationMetadata,
   translationPreferenceLabel,
@@ -21,9 +22,9 @@ import { DEFAULT_SETTINGS } from "@/lib/questos/types";
 import { rowsToSettings, settingsToRows } from "@/lib/sync/mapping";
 
 describe("Bible translation preference and licensing boundary", () => {
-  it("stores NIV as the preferred default while keeping WEB as the only bundled edition", () => {
-    expect(DEFAULT_BIBLE_TRANSLATION_KEY).toBe("niv");
-    expect(DEFAULT_SETTINGS.preferredBibleTranslation).toBe("niv");
+  it("stores keyless KJV as the preferred default while keeping WEB bundled offline", () => {
+    expect(DEFAULT_BIBLE_TRANSLATION_KEY).toBe("kjv");
+    expect(DEFAULT_SETTINGS.preferredBibleTranslation).toBe("kjv");
     expect(WEB_TRANSLATION.availability).toBe("bundled");
     expect(WEB_TRANSLATION.name).toBe("World English Bible");
     expect(
@@ -34,7 +35,37 @@ describe("Bible translation preference and licensing boundary", () => {
     expect(FEATURED_TRANSLATIONS.map((item) => item.abbreviation)).toEqual(
       expect.arrayContaining(["NIV", "KJV", "NLT", "ESV", "NKJV", "WEB"]),
     );
-    expect(translationPreferenceLabel("niv")).toBe("NIV");
+    expect(translationPreferenceLabel("kjv")).toBe("KJV");
+  });
+
+  it("offers only usable featured editions while explaining a legacy licensed choice", () => {
+    const freeOptions = featuredBibleTranslationOptions(
+      FEATURED_TRANSLATIONS,
+      "kjv",
+    );
+    expect(
+      freeOptions.some(
+        ({ translation }) =>
+          translation.availability === "provider_required",
+      ),
+    ).toBe(false);
+
+    const legacyOptions = featuredBibleTranslationOptions(
+      FEATURED_TRANSLATIONS,
+      "niv",
+    );
+    expect(
+      legacyOptions.find(({ translation }) => translation.key === "niv"),
+    ).toMatchObject({
+      disabled: true,
+      translation: { availability: "provider_required" },
+    });
+    expect(
+      legacyOptions.some(
+        ({ translation }) =>
+          translation.key === "nlt" || translation.key === "esv",
+      ),
+    ).toBe(false);
   });
 
   it("maps every bundled Protestant-canon book to a provider id", () => {
@@ -55,8 +86,9 @@ describe("Bible translation preference and licensing boundary", () => {
     expect(bibleTranslationKey("x".repeat(81))).toBeUndefined();
   });
 
-  it("accepts only reviewed HelloAO keys and keeps KJV on the licensed boundary", () => {
+  it("accepts only reviewed HelloAO keys and exposes KJV through its stable preference key", () => {
     expect(HELLOAO_OPEN_TRANSLATIONS.map((item) => item.key)).toEqual([
+      "kjv",
       "bsb",
       "helloao:spa_r09",
       "helloao:deu_l12",
@@ -67,16 +99,17 @@ describe("Bible translation preference and licensing boundary", () => {
       "helloao:spa_r09",
     );
     expect(bibleTranslationKey("helloao:eng_kjv")).toBeUndefined();
-    expect(normalizeBibleTranslationKey("helloao:not_reviewed")).toBe("niv");
+    expect(normalizeBibleTranslationKey("helloao:not_reviewed")).toBe("kjv");
     expect(translationMetadata("bsb")).toMatchObject({
       source: "helloao",
       contentUsePolicy: "public_domain",
       availability: "open",
     });
     expect(translationMetadata("kjv")).toMatchObject({
-      source: "api_bible",
-      contentUsePolicy: "licensed_transient",
-      availability: "provider_required",
+      source: "helloao",
+      providerId: "eng_kjv",
+      contentUsePolicy: "public_domain",
+      availability: "open",
     });
   });
 
@@ -188,18 +221,30 @@ describe("Bible translation preference and licensing boundary", () => {
       path.join(process.cwd(), "src/lib/questos/store.ts"),
       "utf8",
     );
-    const migration = readFileSync(
+    const preferenceMigration = readFileSync(
       path.join(
         process.cwd(),
         "supabase/migrations/0011_bible_translation_preference.sql",
       ),
       "utf8",
     );
+    const defaultMigration = readFileSync(
+      path.join(
+        process.cwd(),
+        "supabase/migrations/0012_kjv_bible_translation_default.sql",
+      ),
+      "utf8",
+    );
     expect(store).toContain("version: 10");
     expect(store).toContain("if (version < 9)");
-    expect(store).toContain('settings.preferredBibleTranslation = "niv"');
-    expect(migration).toContain("preferred_bible_translation");
-    expect(migration).not.toMatch(/insert\s+into\s+.*bible_(?:verses|chapters)/i);
+    expect(store).toContain("DEFAULT_BIBLE_TRANSLATION_KEY");
+    expect(preferenceMigration).toContain("preferred_bible_translation");
+    expect(defaultMigration).toContain(
+      "alter column preferred_bible_translation set default 'kjv'",
+    );
+    expect(`${preferenceMigration}\n${defaultMigration}`).not.toMatch(
+      /insert\s+into\s+.*bible_(?:verses|chapters)/i,
+    );
   });
 
   it("keeps provider secrets server-only and requires an explicit commercial allow-list", () => {

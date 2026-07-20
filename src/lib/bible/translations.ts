@@ -2,12 +2,16 @@
  * Client-safe Bible translation metadata.
  *
  * A preference is deliberately separate from the translation that supplied a
- * rendered passage. BibleQuest may prefer NIV, but it must never label the
- * bundled WEB fallback as NIV while licensing/provider access is unavailable.
+ * rendered passage. BibleQuest may prefer a remote edition, but it must never
+ * label the bundled WEB fallback as that edition while provider access is
+ * unavailable.
  */
 
+import { DEFAULT_BIBLE_TRANSLATION_KEY } from "./defaults";
+
+export { DEFAULT_BIBLE_TRANSLATION_KEY } from "./defaults";
+
 export const LOCAL_WEB_TRANSLATION_KEY = "web";
-export const DEFAULT_BIBLE_TRANSLATION_KEY = "niv";
 
 export type BibleTranslationSource = "local" | "api_bible" | "helloao";
 export type BibleContentUsePolicy = "public_domain" | "licensed_transient";
@@ -88,12 +92,40 @@ const BSB_TRANSLATION: BibleTranslation = {
   featured: true,
 };
 
+const KJV_TRANSLATION: BibleTranslation = {
+  // Keep the established preference key stable while moving its source from
+  // the licensed adapter to HelloAO's reviewed, keyless open edition.
+  key: "kjv",
+  providerId: "eng_kjv",
+  providerSha256:
+    "a847712eeaae26124d3f9db80a1a9274742981261961b49715f43809774eb43c",
+  name: "King James Version",
+  abbreviation: "KJV",
+  languageId: "eng",
+  languageName: "English",
+  languageNameLocal: "English",
+  direction: "ltr",
+  source: "helloao",
+  contentUsePolicy: "public_domain",
+  availability: "open",
+  copyright:
+    "King James Version (KJV) · Public domain in the United States and most countries; UK Crown rights apply. From eBible.org via HelloAO.",
+  licenseNotice: "Public domain in the U.S.; UK Crown rights apply · eBible.org via HelloAO",
+  licenseUrl: "https://ebible.org/Scriptures/details.php?id=eng-kjv2006",
+  website: "https://ebible.org/Scriptures/details.php?id=eng-kjv2006",
+  numberOfBooks: 66,
+  totalNumberOfChapters: 1189,
+  totalNumberOfVerses: 31102,
+  featured: true,
+};
+
 /**
  * Reviewed, complete open editions the server may request from HelloAO.
  * This is deliberately a static allowlist: the public catalogue is discovery,
  * not automatic permission to expose every entry in a commercial app.
  */
 export const HELLOAO_OPEN_TRANSLATIONS: BibleTranslation[] = [
+  KJV_TRANSLATION,
   BSB_TRANSLATION,
   {
     key: "helloao:spa_r09",
@@ -197,6 +229,7 @@ export const HELLOAO_OPEN_TRANSLATIONS: BibleTranslation[] = [
  * server from an explicitly approved provider allow-list.
  */
 export const FEATURED_TRANSLATIONS: BibleTranslation[] = [
+  KJV_TRANSLATION,
   {
     key: "niv",
     name: "New International Version",
@@ -211,19 +244,6 @@ export const FEATURED_TRANSLATIONS: BibleTranslation[] = [
     featured: true,
   },
   BSB_TRANSLATION,
-  {
-    key: "kjv",
-    name: "King James Version",
-    abbreviation: "KJV",
-    languageId: "eng",
-    languageName: "English",
-    languageNameLocal: "English",
-    direction: "ltr",
-    source: "api_bible",
-    contentUsePolicy: "licensed_transient",
-    availability: "provider_required",
-    featured: true,
-  },
   {
     key: "nlt",
     name: "New Living Translation",
@@ -265,6 +285,33 @@ export const FEATURED_TRANSLATIONS: BibleTranslation[] = [
   },
   WEB_TRANSLATION,
 ];
+
+export interface BibleTranslationPickerOption {
+  translation: BibleTranslation;
+  disabled: boolean;
+}
+
+/**
+ * Keep unconnected licensed editions out of the usable picker. If an older
+ * account already selected one, retain a disabled row so the WEB fallback is
+ * understandable and the preference is never changed behind the user's back.
+ */
+export function featuredBibleTranslationOptions(
+  translations: readonly BibleTranslation[],
+  currentKey: string,
+): BibleTranslationPickerOption[] {
+  return translations
+    .filter(
+      (translation) =>
+        translation.featured &&
+        (translation.availability !== "provider_required" ||
+          translation.key === currentKey),
+    )
+    .map((translation) => ({
+      translation,
+      disabled: translation.availability === "provider_required",
+    }));
+}
 
 const featuredByKey = new Map(FEATURED_TRANSLATIONS.map((item) => [item.key, item]));
 const helloAoByKey = new Map(
@@ -323,7 +370,10 @@ export function translationPreferenceLabel(key: string): string {
   const normalized = normalizeBibleTranslationKey(key);
   const translation = translationMetadata(normalized);
   if (translation) return translation.abbreviation;
-  return normalized.startsWith("api:") ? "Connected translation" : "NIV";
+  return normalized.startsWith("api:")
+    ? "Connected translation"
+    : (translationMetadata(DEFAULT_BIBLE_TRANSLATION_KEY)?.abbreviation ??
+        "Bible");
 }
 
 /**

@@ -23,8 +23,6 @@ import type {
  * to midnight, so a late-night pick never disappears a few minutes later.
  */
 export const FREE_QUEST_SLOTS = 3;
-/** Backward-compatible UI name; new domain code should use FREE_QUEST_SLOTS. */
-export const MAX_DAILY_PICKS = FREE_QUEST_SLOTS;
 export const QUEST_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** Brief protection for an accidental tap before a free slot is reserved. */
 export const QUEST_PICK_UNDO_MS = 2 * 60 * 1000;
@@ -265,7 +263,7 @@ export function selectSuggestedQuests(options: {
   excludeSlugs?: string[];
   count?: number;
 }): QuestTemplate[] {
-  const { count = MAX_DAILY_PICKS, excludeSlugs = [], ...rest } = options;
+  const { count = FREE_QUEST_SLOTS, excludeSlugs = [], ...rest } = options;
   const picked: QuestTemplate[] = [];
   const exclude = [...excludeSlugs];
   for (let i = 0; i < count; i++) {

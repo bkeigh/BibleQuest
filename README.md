@@ -32,7 +32,7 @@ parchment, literary serif, hairline borders, gentle pixel art, calm motion.
 
 ## The daily loop
 
-`open → today's verse → today's quest → complete → reflect → pray → growth tree / journey → return`
+`open → today's quest → complete → reflect → pray → optional Scripture → growth tree / journey → return`
 
 Everything else is secondary.
 
@@ -46,7 +46,8 @@ Everything else is secondary.
 - **Zustand** (+ persist) guest-mode store — local-first, private by default
 - **Supabase** (Postgres, Auth, RLS) — optional, implemented account sync
 - PWA: web manifest, service worker (offline-capable), installable
-- Scripture: **World English Bible** (public domain) — full 66-book text
+- Scripture: **KJV via keyless HelloAO** by default, with the full public-domain
+  **World English Bible** bundled for immediate/offline fallback
 
 ---
 
@@ -111,7 +112,7 @@ src/
   components/           # design-system, app-shell, quests, bible, prayer, …
   lib/
     questos/            # domain engines + store (business logic lives here)
-    bible/              # server-only chapter loader
+    bible/              # local loader + reviewed server-only Bible providers
     analytics/          # privacy-first event wrapper
     supabase/           # client/server auth and account-sync adapters
   data/
@@ -129,6 +130,7 @@ docs/                   # Codex + setup/deployment/security/content/QA guides
 - [`docs/BIBLEQUEST_CODEX.md`](docs/BIBLEQUEST_CODEX.md) — the source of truth
 - [`docs/SETUP.md`](docs/SETUP.md) — Supabase, auth, migrations, seeding
 - [`docs/FOUNDER_API_SETUP.md`](docs/FOUNDER_API_SETUP.md) — concise provider, API-key, email, donation, and subscription setup
+- [`docs/FREE_BIBLE_API_SETUP.md`](docs/FREE_BIBLE_API_SETUP.md) — current KJV/HelloAO path and free-provider integration checklist
 - [`docs/ACCOUNT_SYNC_RUNBOOK.md`](docs/ACCOUNT_SYNC_RUNBOOK.md) — production sync, SMTP, auth-link, schema, and content recovery
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Vercel + domain
 - [`docs/ENV.md`](docs/ENV.md) — environment variables
@@ -153,7 +155,8 @@ docs/                   # Codex + setup/deployment/security/content/QA guides
 - Guest data lives in the browser (`localStorage`). After an explicit account
   connection, supported journey data also syncs to the user's RLS-protected
   Supabase rows. Export/clear controls are in Settings.
-- The World English Bible is bundled offline. Reviewed public-domain editions
+- KJV is the default online edition through HelloAO; the World English Bible is
+  bundled offline. Reviewed public-domain editions
   are fetched server-side from the keyless
   [Free Use Bible API](https://bible.helloao.org/docs/guide/) and fall back to
   the bundled WEB when that service is unreachable. The allow-list is checked

@@ -169,11 +169,11 @@ When the worker policy changes, increment `CACHE_VERSION` and update
 | --- | --- |
 | `/` and marketing pages | Public acquisition and policy pages. |
 | `/onboarding` | First-run profile and rhythm setup; prioritizes an account immediately before the first-quest reveal while preserving a quiet local-only path. |
-| `/app` | Daily home: verse, quests, candle, growth, and next steps. |
+| `/app` | Quest-first daily home: active work, a compact verse invitation, candle, growth, and next steps. |
 | `/app/quests` | Browse, filter, and pick quests. |
 | `/app/quests/[slug]` | Read, start, walk, complete, save, or archive one quest. |
-| `/app/bible` | Bible index and reading progress. |
-| `/app/bible/[book]/[chapter]` | Server-loaded WEB chapter reader. |
+| `/app/bible` | Daily verse, reading shortcuts/history, book search, and testament browser. |
+| `/app/bible/[book]/[chapter]` | Translation-aware chapter reader with WEB offline fallback. |
 | `/app/bible/saved` | Saved verse bookmarks. |
 | `/app/prayer`, `/app/prayer/reflections`, and `/app/prayer/new` | Unified, date-grouped Prayer Journal with local search, filters, privacy screen, prompts, and the prayer composer. The reflections URL opens the same journal prefiltered. |
 | `/app/prayer/reflection/new` | Focused reflection composer with prompts, mood, safe plain-text formatting, and device draft recovery. |

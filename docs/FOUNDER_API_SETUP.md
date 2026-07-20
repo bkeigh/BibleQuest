@@ -168,11 +168,18 @@ Official references: [RevenueCat Web SDK](https://www.revenuecat.com/docs/web/we
 [RevenueCat API key types](https://www.revenuecat.com/docs/projects/authentication),
 and [Stripe Billing connection](https://www.revenuecat.com/docs/web/integrations/stripe).
 
-## 4. Optional licensed Bible editions
+## 4. Bible editions: free now, licensed later
 
-The bundled World English Bible and the reviewed keyless editions need no key.
-Only configure API.Bible after the exact translation IDs are commercially
-licensed for a monetized BibleQuest app.
+KJV is already connected through the keyless HelloAO Free Use Bible API and WEB
+is bundled offline. Nothing needs to be added to `.env.local` or Vercel for the
+free production path. See [`FREE_BIBLE_API_SETUP.md`](FREE_BIBLE_API_SETUP.md)
+for verification, licensing notes, and the checklist for another free edition.
+
+### Optional licensed editions later
+
+The API.Bible Starter tier is non-commercial and is therefore not a free
+production option for monetized BibleQuest. Only configure this dormant adapter
+after exact translation IDs are commercially licensed and affordable.
 
 1. Register the BibleQuest application with
    [API.Bible](https://www.api.bible/sign-up/starter) and complete its commercial

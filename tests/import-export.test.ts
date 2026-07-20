@@ -54,7 +54,7 @@ describe("journey import and export", () => {
     );
     expect(invalid.ok).toBe(true);
     if (!invalid.ok) return;
-    expect(invalid.data.settings?.preferredBibleTranslation).toBe("niv");
+    expect(invalid.data.settings?.preferredBibleTranslation).toBe("kjv");
 
     const connected = parseSnapshot(
       JSON.stringify({

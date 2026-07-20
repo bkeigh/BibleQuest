@@ -29,10 +29,12 @@ import { IconCheck } from "@/components/design-system/icons";
 import { cn } from "@/lib/utils/cn";
 import {
   FEATURED_TRANSLATIONS,
+  featuredBibleTranslationOptions,
   translationMetadata,
   translationPreferenceLabel,
   type BibleTranslation,
 } from "@/lib/bible/translations";
+import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
 
 function Row({
   label,
@@ -286,11 +288,13 @@ function translationSourceNotice(translation: BibleTranslation): string {
 function TranslationRow({
   translation,
   checked,
+  disabled = false,
   status,
   onChange,
 }: {
   translation: BibleTranslation;
   checked: boolean;
+  disabled?: boolean;
   status: string;
   onChange: (key: string) => void;
 }) {
@@ -301,6 +305,7 @@ function TranslationRow({
         name="preferred-bible-translation"
         value={translation.key}
         checked={checked}
+        disabled={disabled}
         onChange={() => onChange(translation.key)}
         className="peer sr-only"
       />
@@ -309,6 +314,7 @@ function TranslationRow({
           "flex min-h-11 w-full items-start gap-3 rounded-[10px] px-2 py-3 text-left transition-colors",
           "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent",
           checked ? "bg-accent-surface" : "hover:bg-linen",
+          disabled && "cursor-not-allowed opacity-65 hover:bg-transparent",
         )}
       >
         <span className="min-w-0 flex-1">
@@ -431,7 +437,10 @@ function BibleTranslationPicker({
     return () => controller.abort();
   }, []);
 
-  const featured = translations.filter((item) => item.featured);
+  // Unconnected copyrighted editions are future integration targets, not
+  // usable choices. A legacy selection remains visible (disabled) so its
+  // fallback is understandable, while every available choice stays free.
+  const featured = featuredBibleTranslationOptions(translations, value);
   const onlineLanguages = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
     const online = translations.filter(
@@ -497,11 +506,12 @@ function BibleTranslationPicker({
       </div>
 
       <div className="mt-3 space-y-1">
-        {featured.map((translation) => (
+        {featured.map(({ translation, disabled }) => (
           <TranslationRow
             key={translation.key}
             translation={translation}
             checked={translation.key === value}
+            disabled={disabled}
             status={translationStatus(translation, copy)}
             onChange={onChange}
           />
@@ -605,7 +615,8 @@ function SettingsInner() {
     ...t.settings.bibleTranslation,
   };
   const language = settings.language ?? "en";
-  const bibleTranslation = settings.preferredBibleTranslation ?? "niv";
+  const bibleTranslation =
+    settings.preferredBibleTranslation ?? DEFAULT_BIBLE_TRANSLATION_KEY;
 
   function setAppearance(patch: Partial<typeof appearance>) {
     const next = { ...appearance, ...patch };

@@ -55,6 +55,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Primary"
+      data-app-bottom-nav
       className="fixed inset-x-0 bottom-0 z-40 border-t border-mist bg-parchment/90 backdrop-blur-md pb-safe"
     >
       <ul className="mx-auto flex max-w-lg items-stretch justify-around px-2">

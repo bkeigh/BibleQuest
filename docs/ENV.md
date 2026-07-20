@@ -40,9 +40,10 @@ template in [`../.env.example`](../.env.example).
   and use one exact HTTPS Stripe Payment Link with no credentials, query, or
   fragment. The app rejects every other host/shape, shows an unavailable state
   when invalid, and never sends a visitor through an unvalidated redirect.
-- The reviewed Free Use Bible API integration is keyless and requires no
-  environment variable. Its server-side allow-list is intentionally separate
-  from API.Bible's licensed-ID allow-list.
+- The default KJV and other reviewed Free Use Bible API editions are keyless and
+  require no environment variable. Their server-side allow-list is intentionally
+  separate from API.Bible's future licensed-ID allow-list. See
+  [`FREE_BIBLE_API_SETUP.md`](FREE_BIBLE_API_SETUP.md).
 
 ## Analytics configuration
 

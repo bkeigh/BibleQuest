@@ -8,6 +8,7 @@ import { GentleButton, GentleLink } from "@/components/design-system/GentleButto
 import {
   IconBookmark,
   IconBookmarkFilled,
+  IconArrowRight,
   IconLeaf,
   IconShare,
   IconSparkle,
@@ -32,11 +33,12 @@ export function VerseCard({
   verse,
   onAnotherVerse,
   preview,
+  showOpenInChapter = false,
 }: {
   verse: DailyVerse;
   /**
-   * Optional "Another verse" control in the kicker row. Home passes the
-   * store's refreshVerse so the swap holds steady for the day — a quiet
+   * Optional "Another verse" control in the kicker row. The Bible hub passes
+   * the store's refreshVerse so the swap holds steady for the day — a quiet
    * offer of a different word, never a slot machine.
    */
   onAnotherVerse?: () => void;
@@ -48,6 +50,8 @@ export function VerseCard({
    * Also tightens type and padding so the step fits a phone screen.
    */
   preview?: boolean;
+  /** Give Bible surfaces a direct path from the daily passage into context. */
+  showOpenInChapter?: boolean;
 }) {
   const { toast } = useToast();
   const t = useStrings();
@@ -79,6 +83,7 @@ export function VerseCard({
       ? `?translation=${encodeURIComponent(resolved.effectiveTranslation.key)}`
       : ""
   }`;
+  const chapterPath = `/app/bible/${verse.bookSlug}/${verse.chapter}?verse=${verseSegment}#verse-${verse.verseStart}`;
 
   function shareVerse() {
     const url = new URL(sharePath, window.location.origin).toString();
@@ -202,6 +207,17 @@ export function VerseCard({
             <IconShare size={16} />
             {t.home.share}
           </GentleButton>
+          {showOpenInChapter && (
+            <GentleLink
+              variant="ghost"
+              size="sm"
+              href={chapterPath}
+              className="min-h-11 max-[360px]:gap-1 max-[360px]:px-1 max-[360px]:text-[0.875rem]"
+            >
+              Open chapter
+              <IconArrowRight size={14} />
+            </GentleLink>
+          )}
           <GentleLink
             variant="text"
             href={`/app/prayer/reflection/new?verse=${encodeURIComponent(verse.reference)}`}
