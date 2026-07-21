@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useId, useState } from "react";
+import { useCallback, useState } from "react";
 import type { DailyVerse } from "@/lib/questos/types";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
@@ -31,8 +31,6 @@ export function VerseCard({
   verse,
   onAnotherVerse,
   anotherVerseLoading = false,
-  anotherVerseLocked = false,
-  anotherVerseHint,
   preview,
   showOpenInChapter = false,
 }: {
@@ -45,10 +43,6 @@ export function VerseCard({
   onAnotherVerse?: () => void;
   /** Prevent refreshes while the current account entitlement is unresolved. */
   anotherVerseLoading?: boolean;
-  /** Replace the refresh action with a clear Plus path once the free limit is used. */
-  anotherVerseLocked?: boolean;
-  /** Explain the current daily allowance without crowding the action label. */
-  anotherVerseHint?: string;
   /**
    * Display-only mode for surfaces OUTSIDE the app shell (onboarding).
    * Hides every action — Save writes to the store mid-setup, and
@@ -66,7 +60,6 @@ export function VerseCard({
   const toggleBookmark = useQuestOS((s) => s.toggleBookmark);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
-  const anotherVerseStatusId = useId();
   const resolved = usePreferredBiblePassage(verse, !preview);
   const mayPersistEffectiveText = isRedistributableBibleTranslation(
     resolved.effectiveTranslation,
@@ -115,95 +108,90 @@ export function VerseCard({
   return (
     <PaperCard
       variant="atmospheric"
-      padding="md"
+      padding={preview ? "md" : "sm"}
       className="relative overflow-hidden"
     >
       <div className="pointer-events-none absolute -right-3 -top-2 opacity-30">
-        <IconLeaf className="text-olive-300" size={64} />
+        <IconLeaf className="text-olive-300" size={preview ? 64 : 52} />
       </div>
       <div className="flex items-center justify-between gap-1.5 min-[380px]:gap-3">
         <h2
           className={`font-pixel leading-tight uppercase tracking-[0.05em] text-accent ${
             preview
               ? "text-[1.25rem]"
-              : "text-[1.125rem] min-[380px]:text-[1.5rem]"
+              : "text-[1.0625rem] min-[380px]:text-[1.25rem]"
           }`}
         >
           {t.home.todaysVerse}
         </h2>
-        {onAnotherVerse &&
-          (anotherVerseLocked ? (
-            <GentleLink
-              variant="text"
-              size="sm"
-              href="/app/plus"
-              aria-describedby={
-                anotherVerseHint ? anotherVerseStatusId : undefined
-              }
-              className="-my-2 min-h-11 shrink-0"
-            >
-              <IconSparkle size={15} />
-              Unlock with Plus
-            </GentleLink>
-          ) : (
-            <GentleButton
-              variant="text"
-              size="sm"
-              onClick={onAnotherVerse}
-              disabled={anotherVerseLoading}
-              aria-describedby={
-                anotherVerseHint ? anotherVerseStatusId : undefined
-              }
-              className="-my-2 min-h-11 shrink-0"
-            >
-              <IconSparkle size={15} />
-              {anotherVerseLoading ? "Checking…" : t.home.anotherVerse}
-            </GentleButton>
-          ))}
+        {onAnotherVerse && (
+          <GentleButton
+            variant="text"
+            size="sm"
+            onClick={onAnotherVerse}
+            disabled={anotherVerseLoading || resolved.loading}
+            className="-my-2 min-h-11 shrink-0 text-[0.875rem]"
+          >
+            <IconSparkle size={15} />
+            {resolved.loading
+              ? "Preparing…"
+              : anotherVerseLoading
+                ? "Checking…"
+                : t.home.anotherVerse}
+          </GentleButton>
+        )}
       </div>
-      {onAnotherVerse && anotherVerseHint && (
-        <p
-          id={anotherVerseStatusId}
-          aria-live="polite"
-          className="mt-1 text-right text-caption text-ash"
-        >
-          {anotherVerseHint}
-        </p>
-      )}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {`${verse.reference}, ${resolved.effectiveTranslation.name}. ${cleanVerseText(resolved.text)}`}
+        {resolved.loading
+          ? `Loading ${resolved.preferredTranslation?.name ?? "your preferred Bible edition"} for ${verse.reference}.`
+          : `${verse.reference}, ${resolved.effectiveTranslation.name}. ${cleanVerseText(resolved.text)}`}
       </p>
       <div aria-busy={resolved.loading}>
-        {/* Static passage content avoids replaying an entrance when an online
-            translation replaces the immediate offline fallback. */}
-        <div>
-          <blockquote
-            dir={resolved.effectiveTranslation.direction}
-            lang={resolved.effectiveTranslation.languageId}
-            className={
-              preview ? "verse-text mt-2.5" : "verse-text verse-text-lead mt-2.5"
-            }
-          >
-            “{cleanVerseText(resolved.text)}”
-          </blockquote>
-          <cite
-            className={`block text-[0.9375rem] not-italic text-ash ${
-              preview ? "mt-2" : "mt-3"
-            }`}
-          >
-            — {verse.reference} <span className="text-fog">·</span>{" "}
-            <span
+        {resolved.loading ? (
+          <div className="mt-2 min-h-[6.25rem] rounded-[10px] bg-linen/45 px-3 py-3">
+            <p className="text-caption text-ash">
+              Preparing {resolved.preferredTranslation?.name ?? "your preferred edition"}…
+            </p>
+            <div aria-hidden="true" className="mt-3 space-y-2.5">
+              <div className="h-2.5 w-full rounded-full bg-mist/80" />
+              <div className="h-2.5 w-[88%] rounded-full bg-mist/70" />
+              <div className="h-2.5 w-[62%] rounded-full bg-mist/60" />
+            </div>
+          </div>
+        ) : (
+          <div>
+            <blockquote
               dir={resolved.effectiveTranslation.direction}
               lang={resolved.effectiveTranslation.languageId}
+              className={
+                preview
+                  ? "verse-text mt-2.5"
+                  : "verse-text verse-text-card mt-2"
+              }
             >
-              {resolved.effectiveTranslation.name}
-            </span>
-          </cite>
-        </div>
+              “{cleanVerseText(resolved.text)}”
+            </blockquote>
+            <cite
+              className={`block not-italic text-ash ${
+                preview
+                  ? "mt-2 text-[0.9375rem]"
+                  : "mt-1.5 text-[0.8125rem]"
+              }`}
+            >
+              — {verse.reference} <span className="text-fog">·</span>{" "}
+              <span
+                dir={resolved.effectiveTranslation.direction}
+                lang={resolved.effectiveTranslation.languageId}
+              >
+                {resolved.effectiveTranslation.name}
+              </span>
+            </cite>
+          </div>
+        )}
       </div>
       <ApiBibleViewTracker token={resolved.fumsToken} />
       {!preview && (
-        <div className="mt-3 flex flex-wrap items-center gap-1 min-[380px]:mt-4 min-[380px]:gap-2">
+        <div className="mt-2 flex flex-wrap items-center gap-0.5 min-[380px]:gap-1">
           <GentleButton
             variant="ghost"
             size="sm"
@@ -234,6 +222,7 @@ export function VerseCard({
             className="min-h-11 max-[360px]:gap-1 max-[360px]:px-1 max-[360px]:text-[0.875rem]"
             onClick={shareVerse}
             aria-haspopup="dialog"
+            disabled={resolved.loading}
           >
             <IconShare size={16} />
             {t.home.share}

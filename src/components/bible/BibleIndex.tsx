@@ -5,17 +5,13 @@
  * the daily verse, reading history, saved Scripture, and all 66 books close
  * without allowing navigation controls to compete with the text itself.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   selectVerseRefreshCount,
   useQuestOS,
 } from "@/lib/questos/store";
-import {
-  canRefreshDailyVerse,
-  FREE_DAILY_VERSE_REFRESH_LIMIT,
-  getDailyVerse,
-} from "@/lib/questos/verse-engine";
+import { getDailyVerse } from "@/lib/questos/verse-engine";
 import {
   bibleBooks,
   getBookMeta,
@@ -28,6 +24,7 @@ import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { VerseCard } from "@/components/bible/VerseCard";
+import { VerseRefreshLimitDialog } from "@/components/bible/VerseRefreshLimitDialog";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import {
   IconBookmark,
@@ -86,6 +83,7 @@ function BibleIndexInner() {
   const dayKey = useCurrentDayKey();
   const recordedVerseRef = useRef<string | null>(null);
   const [query, setQuery] = useState("");
+  const [refreshLimitOpen, setRefreshLimitOpen] = useState(false);
   const [testament, setTestament] = useState<Testament>(() =>
     readingPosition &&
     oldTestament.some((book) => book.slug === readingPosition.bookSlug)
@@ -104,19 +102,20 @@ function BibleIndexInner() {
     [verse.bookSlug, verse.reference],
   );
   const preferredEdition = translationMetadata(preferredBibleTranslation);
-  const refreshAllowed =
-    !plus.loading && canRefreshDailyVerse(verseRefreshCount, plus.isPlus);
-  const freeRefreshesRemaining = Math.max(
-    0,
-    FREE_DAILY_VERSE_REFRESH_LIMIT - verseRefreshCount,
-  );
 
-  // Entitlements fail closed while loading, while the store independently
-  // enforces the same limit against rapid or stale clicks.
+  // Let the store make the final allowance decision so rapid clicks cannot
+  // spend a fourth refresh; only a denied free attempt reveals the Plus hint.
   function handleAnotherVerse() {
-    if (!refreshAllowed) return;
-    refreshVerse(plus.isPlus);
+    if (plus.loading) return;
+    const refreshed = refreshVerse(plus.isPlus);
+    if (!refreshed && !plus.isPlus) setRefreshLimitOpen(true);
   }
+
+  // Keep the dialog close callback stable while its focus trap is active.
+  const closeRefreshLimitDialog = useCallback(
+    () => setRefreshLimitOpen(false),
+    [],
+  );
 
   // Only a page that actually presents the verse should add it to reading
   // history. Defer the persisted write so it cannot contend with first paint.
@@ -202,21 +201,14 @@ function BibleIndexInner() {
             verse={verse}
             onAnotherVerse={handleAnotherVerse}
             anotherVerseLoading={plus.loading}
-            anotherVerseLocked={
-              !plus.loading && !plus.isPlus && !refreshAllowed
-            }
-            anotherVerseHint={
-              plus.loading
-                ? "Checking refresh access…"
-                : plus.isPlus
-                  ? "Unlimited verse refreshes with Plus."
-                  : refreshAllowed
-                    ? `${freeRefreshesRemaining} free ${freeRefreshesRemaining === 1 ? "refresh" : "refreshes"} left today.`
-                    : `${FREE_DAILY_VERSE_REFRESH_LIMIT} free refreshes used today.`
-            }
             showOpenInChapter
           />
         </section>
+
+        <VerseRefreshLimitDialog
+          open={refreshLimitOpen}
+          onClose={closeRefreshLimitDialog}
+        />
 
         <section
           aria-labelledby="reading-shortcuts"
