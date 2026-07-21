@@ -13,7 +13,7 @@ import { useToast } from "@/components/design-system/Toast";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
+import { GentleButton } from "@/components/design-system/GentleButton";
 import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosure";
 import { Avatar } from "@/components/profile/Avatar";
 import { applyAppearance } from "@/lib/theme";
@@ -37,6 +37,7 @@ import {
 import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
 import { WallpaperPicker } from "@/components/settings/WallpaperPicker";
 import { ExplorePlusLink } from "@/components/plus/ExplorePlusLink";
+import { DonationLink } from "@/components/plus/DonationLink";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 import {
   MAX_GLASS_OPACITY,
@@ -1168,15 +1169,7 @@ function SettingsInner() {
         <SectionTitle>Plus</SectionTitle>
         <div className="space-y-3">
           <ExplorePlusLink description="Discover the full wallpaper collection and extra ways to deepen your daily practice." />
-          <GentleLink
-            variant="outline"
-            size="sm"
-            href="/support"
-            fullWidth
-            className="min-h-11 app-glass-surface"
-          >
-            Make a one-time donation
-          </GentleLink>
+          <DonationLink />
         </div>
 
         {/* Danger zone — plain, calm, confirmed */}
