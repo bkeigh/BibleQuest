@@ -115,7 +115,7 @@ export function InstallPrompt() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 12 }}
           transition={{ duration: 0.4, ease: gentleEase }}
-          className="fixed inset-x-4 bottom-24 z-40 mx-auto max-w-md rounded-[var(--radius-card-lg)] border border-mist bg-paper p-4 paper-shadow-lg sm:bottom-6"
+          className="app-glass-surface fixed inset-x-4 bottom-24 z-40 mx-auto max-w-md rounded-[var(--radius-card-lg)] border border-mist bg-paper p-4 paper-shadow-lg sm:bottom-6"
         >
           <div className="flex items-start gap-3">
             <PixelIcon name="chapel" size={5} />

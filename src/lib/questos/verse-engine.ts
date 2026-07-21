@@ -20,18 +20,40 @@ import type { DailyVerse } from "./types";
 
 const POOL = dailyVerses as DailyVerse[];
 
+/** Limits free accounts to three successful daily-verse refreshes. */
+export const FREE_DAILY_VERSE_REFRESH_LIMIT = 3;
+
+/** Reports whether the next daily-verse refresh is allowed for this account. */
+export function canRefreshDailyVerse(
+  refreshCount: number,
+  isPlus: boolean,
+): boolean {
+  if (isPlus) return true;
+  return (
+    Number.isInteger(refreshCount) &&
+    refreshCount >= 0 &&
+    refreshCount < FREE_DAILY_VERSE_REFRESH_LIMIT
+  );
+}
+
 export function getDailyVerse(dateKey?: string, refresh = 0): DailyVerse {
   const key = dateKey ?? toDateKey();
   const day = dayNumber(fromDateKey(key));
   const len = POOL.length;
   const base = ((day % len) + len) % len;
-  if (refresh <= 0) return POOL[base];
+
+  // Wrap the refresh count across the complete daily order so Plus accounts
+  // can keep refreshing without sticking on the pool's final verse.
+  const normalizedRefresh = Number.isFinite(refresh)
+    ? Math.max(0, Math.floor(refresh))
+    : 0;
+  const steps = normalizedRefresh % len;
+  if (steps === 0) return POOL[base];
 
   // Walk the same deterministic path for any given (day, refresh) pair,
   // skipping verses already shown today so refreshing always changes it.
   const shown = new Set([base]);
   let index = base;
-  const steps = Math.min(refresh, len - 1);
   for (let i = 1; i <= steps; i++) {
     const rand = seededRandom(hashString(`${key}:verse:${i}`));
     let pick = Math.floor(rand() * len);

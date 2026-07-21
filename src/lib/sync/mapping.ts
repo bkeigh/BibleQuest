@@ -568,6 +568,9 @@ export function rowsToSettings(
       // Device-local; no remote column. mergeSnapshots preserves the local
       // value — this default only satisfies the shape.
       boldText: d.appearance.boldText,
+      wallpaperId: d.appearance.wallpaperId,
+      wallpaperMode: d.appearance.wallpaperMode,
+      glassSurfaces: d.appearance.glassSurfaces,
     },
     notifications: {
       dailyVerse: notifications?.daily_verse_enabled ?? d.notifications.dailyVerse,

@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { motion } from "framer-motion";
+import { useCallback, useId, useState } from "react";
 import type { DailyVerse } from "@/lib/questos/types";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
@@ -17,7 +16,6 @@ import { useQuestOS } from "@/lib/questos/store";
 import { useToast } from "@/components/design-system/Toast";
 import { cleanVerseText, formatVerseShareText } from "@/lib/utils/scripture";
 import { useStrings } from "@/lib/i18n";
-import { riseIn } from "@/lib/motion";
 import { VerseShareSheet } from "@/components/bible/VerseShareSheet";
 import { ApiBibleViewTracker } from "@/components/bible/ApiBibleViewTracker";
 import { usePreferredBiblePassage } from "@/lib/bible/use-preferred-scripture";
@@ -32,6 +30,9 @@ import {
 export function VerseCard({
   verse,
   onAnotherVerse,
+  anotherVerseLoading = false,
+  anotherVerseLocked = false,
+  anotherVerseHint,
   preview,
   showOpenInChapter = false,
 }: {
@@ -42,6 +43,12 @@ export function VerseCard({
    * offer of a different word, never a slot machine.
    */
   onAnotherVerse?: () => void;
+  /** Prevent refreshes while the current account entitlement is unresolved. */
+  anotherVerseLoading?: boolean;
+  /** Replace the refresh action with a clear Plus path once the free limit is used. */
+  anotherVerseLocked?: boolean;
+  /** Explain the current daily allowance without crowding the action label. */
+  anotherVerseHint?: string;
   /**
    * Display-only mode for surfaces OUTSIDE the app shell (onboarding).
    * Hides every action — Save writes to the store mid-setup, and
@@ -59,6 +66,7 @@ export function VerseCard({
   const toggleBookmark = useQuestOS((s) => s.toggleBookmark);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
+  const anotherVerseStatusId = useId();
   const resolved = usePreferredBiblePassage(verse, !preview);
   const mayPersistEffectiveText = isRedistributableBibleTranslation(
     resolved.effectiveTranslation,
@@ -123,29 +131,52 @@ export function VerseCard({
         >
           {t.home.todaysVerse}
         </h2>
-        {onAnotherVerse && (
-          <GentleButton
-            variant="text"
-            size="sm"
-            onClick={onAnotherVerse}
-            className="-my-2 min-h-11 shrink-0"
-          >
-            <IconSparkle size={15} />
-            {t.home.anotherVerse}
-          </GentleButton>
-        )}
+        {onAnotherVerse &&
+          (anotherVerseLocked ? (
+            <GentleLink
+              variant="text"
+              size="sm"
+              href="/app/plus"
+              aria-describedby={
+                anotherVerseHint ? anotherVerseStatusId : undefined
+              }
+              className="-my-2 min-h-11 shrink-0"
+            >
+              <IconSparkle size={15} />
+              Unlock with Plus
+            </GentleLink>
+          ) : (
+            <GentleButton
+              variant="text"
+              size="sm"
+              onClick={onAnotherVerse}
+              disabled={anotherVerseLoading}
+              aria-describedby={
+                anotherVerseHint ? anotherVerseStatusId : undefined
+              }
+              className="-my-2 min-h-11 shrink-0"
+            >
+              <IconSparkle size={15} />
+              {anotherVerseLoading ? "Checking…" : t.home.anotherVerse}
+            </GentleButton>
+          ))}
       </div>
+      {onAnotherVerse && anotherVerseHint && (
+        <p
+          id={anotherVerseStatusId}
+          aria-live="polite"
+          className="mt-1 text-right text-caption text-ash"
+        >
+          {anotherVerseHint}
+        </p>
+      )}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {`${verse.reference}, ${resolved.effectiveTranslation.name}. ${cleanVerseText(resolved.text)}`}
       </p>
       <div aria-busy={resolved.loading}>
-        {/* Keyed by verse: a new pick settles in gently instead of snapping. */}
-        <motion.div
-          key={`${verse.id}:${resolved.effectiveTranslation.key}`}
-          variants={riseIn}
-          initial="hidden"
-          animate="visible"
-        >
+        {/* Static passage content avoids replaying an entrance when an online
+            translation replaces the immediate offline fallback. */}
+        <div>
           <blockquote
             dir={resolved.effectiveTranslation.direction}
             lang={resolved.effectiveTranslation.languageId}
@@ -168,7 +199,7 @@ export function VerseCard({
               {resolved.effectiveTranslation.name}
             </span>
           </cite>
-        </motion.div>
+        </div>
       </div>
       <ApiBibleViewTracker token={resolved.fumsToken} />
       {!preview && (

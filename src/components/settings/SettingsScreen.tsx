@@ -35,6 +35,7 @@ import {
   type BibleTranslation,
 } from "@/lib/bible/translations";
 import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
+import { WallpaperPicker } from "@/components/settings/WallpaperPicker";
 
 function Row({
   label,
@@ -827,8 +828,34 @@ function SettingsInner() {
         {/* Always visible — text size and bold text are comfort settings
             people shouldn't have to hunt for behind a disclosure. */}
         <SectionTitle>{t.settings.appearance}</SectionTitle>
-        <PaperCard variant="paper" padding="none" className="px-4">
+        <PaperCard
+          variant="paper"
+          padding="none"
+          className="overflow-hidden px-4"
+        >
+          <WallpaperPicker
+            value={appearance.wallpaperId}
+            onChange={(wallpaperId) => setAppearance({ wallpaperId })}
+          />
           <div className="divide-y divide-mist/70">
+            <Row label="Wallpaper style">
+              <Segmented
+                label="Wallpaper style"
+                value={appearance.wallpaperMode}
+                onChange={(wallpaperMode) => setAppearance({ wallpaperMode })}
+                options={[
+                  { value: "still", label: "Still" },
+                  { value: "live", label: "Live" },
+                ]}
+              />
+            </Row>
+            <Row label="Glass surfaces">
+              <Toggle
+                label="Glass surfaces"
+                on={appearance.glassSurfaces}
+                onChange={(glassSurfaces) => setAppearance({ glassSurfaces })}
+              />
+            </Row>
             <Row label={t.settings.theme}>
               <Segmented
                 label={t.settings.theme}
@@ -867,6 +894,12 @@ function SettingsInner() {
               />
             </Row>
           </div>
+          {appearance.wallpaperMode === "live" && appearance.reducedMotion && (
+            <p className="border-t border-mist/70 py-3 text-caption leading-relaxed text-ash">
+              Live is saved as your preference. The matching still is shown
+              while Reduce Motion is on.
+            </p>
+          )}
         </PaperCard>
 
         <DisclosureGroup className="mt-6">

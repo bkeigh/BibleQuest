@@ -56,7 +56,7 @@ export function BottomNav() {
     <nav
       aria-label="Primary"
       data-app-bottom-nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-mist bg-parchment pb-safe sm:bg-parchment/90 sm:backdrop-blur-md"
+      className="app-glass-nav fixed inset-x-0 bottom-0 z-40 border-t border-mist bg-parchment pb-safe sm:bg-parchment/90 sm:backdrop-blur-md"
     >
       <ul className="mx-auto flex max-w-lg items-stretch justify-around px-2">
         {ITEMS.map(({ href, key, Icon, exact }) => {

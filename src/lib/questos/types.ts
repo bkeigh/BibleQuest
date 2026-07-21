@@ -6,6 +6,10 @@
  * Christianity into the platform layer where a generic name works.
  */
 import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
+import {
+  DEFAULT_WALLPAPER_ID,
+  type WallpaperId,
+} from "@/lib/wallpapers/catalog";
 
 // ---------------------------------------------------------------------------
 // Quests
@@ -512,6 +516,12 @@ export interface AppearanceSettings {
   textSize: "default" | "large";
   /** Accessibility: heavier weights across the UI (html.text-bold). */
   boldText: boolean;
+  /** Device-local artwork choice; "none" keeps the original parchment canvas. */
+  wallpaperId: WallpaperId | "none";
+  /** Live keeps the same poster visible whenever motion cannot safely play. */
+  wallpaperMode: "still" | "live";
+  /** Translucent, blurred shared surfaces inspired by native Apple materials. */
+  glassSurfaces: boolean;
 }
 
 /**
@@ -569,6 +579,9 @@ export const DEFAULT_SETTINGS: Settings = {
     reducedMotion: false,
     textSize: "default",
     boldText: false,
+    wallpaperId: DEFAULT_WALLPAPER_ID,
+    wallpaperMode: "still",
+    glassSurfaces: true,
   },
   language: "en",
   preferredBibleTranslation: DEFAULT_BIBLE_TRANSLATION_KEY,

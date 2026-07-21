@@ -10,6 +10,7 @@ import {
   flushAnalyticsQueue,
   subscribeToAnalyticsConsent,
 } from "@/lib/analytics/events";
+import { WallpaperBackdrop } from "./WallpaperBackdrop";
 
 /**
  * AppShell — container for the installed/private app experience.
@@ -57,9 +58,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ToastProvider>
-      <div className="relative flex min-h-dvh flex-col bg-parchment">
+      <div
+        data-app-shell
+        className="relative isolate flex min-h-dvh flex-col bg-parchment"
+      >
         <LanguageApplier />
-        <main className="flex-1 pb-28">{children}</main>
+        <WallpaperBackdrop />
+        <main className="relative z-10 flex-1 pb-28">{children}</main>
         <BottomNav />
         <InstallPrompt />
       </div>

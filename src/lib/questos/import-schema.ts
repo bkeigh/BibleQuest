@@ -18,6 +18,7 @@ import {
   type QuestOSSnapshot,
 } from "./types";
 import { normalizeBibleTranslationKey } from "@/lib/bible/translations";
+import { isWallpaperId } from "@/lib/wallpapers/catalog";
 
 function isObj(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -205,7 +206,30 @@ export function parseSnapshot(rawText: string): ParseResult {
   // is not an explicit choice to enable analytics on this browser.
   if (isObj(src.settings)) {
     const s = { ...src.settings };
-    if ("appearance" in s && !isObj(s.appearance)) delete s.appearance;
+    if ("appearance" in s && !isObj(s.appearance)) {
+      delete s.appearance;
+    } else if (isObj(s.appearance)) {
+      const appearance = { ...s.appearance };
+
+      // Wallpaper fields are device-local but may still ride through a manual
+      // backup. Drop unknown identifiers and modes before the typed store sees them.
+      if (
+        appearance.wallpaperId !== "none" &&
+        !isWallpaperId(appearance.wallpaperId)
+      ) {
+        delete appearance.wallpaperId;
+      }
+      if (
+        appearance.wallpaperMode !== "still" &&
+        appearance.wallpaperMode !== "live"
+      ) {
+        delete appearance.wallpaperMode;
+      }
+      if (typeof appearance.glassSurfaces !== "boolean") {
+        delete appearance.glassSurfaces;
+      }
+      s.appearance = appearance;
+    }
     if ("preferredBibleTranslation" in s) {
       s.preferredBibleTranslation = normalizeBibleTranslationKey(
         s.preferredBibleTranslation,

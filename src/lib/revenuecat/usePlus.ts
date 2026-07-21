@@ -5,7 +5,15 @@
  * Supabase identity, suppresses stale async responses during account changes,
  * and exposes a provider-neutral state/actions API to membership screens.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { Offering } from "@revenuecat/purchases-js";
 import { useSession } from "@/lib/supabase/useSession";
 import type { PlanKey } from "@/lib/questos/types";
@@ -96,7 +104,7 @@ export interface PlusState {
  * Until auth has settled, and during every identity change, the visible state
  * is loading + free so a prior user's entitlement can never flash or leak.
  */
-export function usePlus(): PlusState {
+function usePlusCoordinator(): PlusState {
   const availability = getRevenueCatAvailability();
   const session = useSession();
   const sessionPending = session.configured && session.loading;
@@ -312,4 +320,21 @@ export function usePlus(): PlusState {
     openCustomerCenter,
     refresh,
   };
+}
+
+const PlusContext = createContext<PlusState | null>(null);
+
+/** Runs one entitlement coordinator for the persistent private app shell. */
+export function PlusProvider({ children }: { children: React.ReactNode }) {
+  const state = usePlusCoordinator();
+  return createElement(PlusContext.Provider, { value: state }, children);
+}
+
+/** Reads the shared entitlement state without duplicating RevenueCat requests. */
+export function usePlus(): PlusState {
+  const state = useContext(PlusContext);
+  if (!state) {
+    throw new Error("usePlus must be rendered inside PlusProvider.");
+  }
+  return state;
 }

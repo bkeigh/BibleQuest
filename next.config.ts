@@ -153,7 +153,8 @@ const contentSecurityPolicy = [
 // origin and Stripe (Apple/Google Pay via the RevenueCat Web Billing flow).
 const permissionsPolicy = [
   "accelerometer=()",
-  "autoplay=()",
+  // Silent, same-origin wallpaper loops may autoplay; audio remains absent.
+  "autoplay=(self)",
   "browsing-topics=()",
   "camera=()",
   "display-capture=()",
@@ -223,6 +224,17 @@ const nextConfig: NextConfig = {
             value: "no-cache, no-store, must-revalidate",
           },
           { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+      {
+        // Posters and the one selected loop may use the HTTP cache, while the
+        // service worker deliberately avoids storing large range responses.
+        source: "/wallpapers/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
         ],
       },
       {

@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { ServiceWorkerRegistrar } from "@/components/app-shell/ServiceWorkerRegistrar";
 import { JournalDraftJanitor } from "@/components/journal/JournalDraftJanitor";
+import { APPEARANCE_BOOTSTRAP_SCRIPT } from "@/lib/appearance-bootstrap";
 
 const fraunces = Fraunces({
   variable: "--font-fraunces",
@@ -83,8 +84,15 @@ export default function RootLayout({
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={`${fraunces.variable} ${inter.variable} ${ithaca.variable} h-full antialiased`}
+      className={`${fraunces.variable} ${inter.variable} ${ithaca.variable} glass-surfaces h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        {/* Applies saved appearance before painted content can flash or animate. */}
+        <script
+          dangerouslySetInnerHTML={{ __html: APPEARANCE_BOOTSTRAP_SCRIPT }}
+        />
+      </head>
       <body className="min-h-full flex flex-col bg-parchment text-charcoal">
         {children}
         <JournalDraftJanitor />
