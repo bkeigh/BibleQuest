@@ -36,6 +36,7 @@ import {
 } from "@/lib/bible/translations";
 import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
 import { WallpaperPicker } from "@/components/settings/WallpaperPicker";
+import { ExplorePlusLink } from "@/components/plus/ExplorePlusLink";
 
 function Row({
   label,
@@ -706,11 +707,12 @@ function SettingsInner() {
       <PageContainer className="pb-8">
         <SectionTitle>{t.settings.profile}</SectionTitle>
         <PaperCard variant="paper" padding="md">
-          <div className="flex items-start gap-4">
+          <div className="flex items-center gap-4 max-[360px]:flex-col max-[360px]:items-stretch sm:gap-5">
             <Avatar
               name={profile?.displayName}
               marker={profile?.avatarUpdatedAt}
               size="lg"
+              className="ring-1 ring-paper/70 shadow-[0_8px_24px_rgb(18_33_27_/_0.12)] max-[360px]:self-center"
             />
             <div className="min-w-0 flex-1">
               {editingName ? (
@@ -738,7 +740,7 @@ function SettingsInner() {
                     autoComplete="given-name"
                     className="w-full rounded-[var(--radius-button)] border border-mist bg-paper px-4 py-2.5 text-[0.9375rem] text-graphite outline-none transition-colors focus:border-accent/50"
                   />
-                  <div className="mt-2.5 flex gap-2.5">
+                  <div className="mt-2.5 flex flex-wrap gap-2.5">
                     <GentleButton
                       type="submit"
                       variant="primary"
@@ -761,8 +763,8 @@ function SettingsInner() {
                 </form>
               ) : (
                 <>
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="min-w-0 truncate text-[1.0625rem] font-medium text-graphite">
+                  <div className="flex min-h-11 items-center justify-between gap-3">
+                    <p className="min-w-0 truncate font-display text-[1.25rem] leading-tight text-graphite">
                       {profile?.displayName}
                     </p>
                     <GentleButton
@@ -777,7 +779,7 @@ function SettingsInner() {
                       {t.common.edit}
                     </GentleButton>
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2">
                     <input
                       ref={photoInputRef}
                       type="file"
@@ -1052,20 +1054,18 @@ function SettingsInner() {
         </DisclosureGroup>
 
         <SectionTitle>Plus</SectionTitle>
-        <PaperCard variant="atmospheric" padding="md">
-          <p className="text-[0.9375rem] leading-relaxed text-charcoal">
-            BibleQuest is free for everything that matters. Plus deepens the
-            experience and supports the mission.
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <GentleLink variant="gold" size="sm" href="/app/plus" className="min-h-11">
-              Explore Plus
-            </GentleLink>
-            <GentleLink variant="outline" size="sm" href="/support" className="min-h-11">
-              Make a one-time donation
-            </GentleLink>
-          </div>
-        </PaperCard>
+        <div className="space-y-3">
+          <ExplorePlusLink description="Discover the full wallpaper collection and extra ways to deepen your daily practice." />
+          <GentleLink
+            variant="outline"
+            size="sm"
+            href="/support"
+            fullWidth
+            className="min-h-11 app-glass-surface"
+          >
+            Make a one-time donation
+          </GentleLink>
+        </div>
 
         {/* Danger zone — plain, calm, confirmed */}
         <SectionTitle>Start over</SectionTitle>
