@@ -286,57 +286,80 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* The artwork stays visible without competing with reading contrast. Dark
-   mode receives a denser chapel-toned veil over the same selected scene. */
+/* The artwork stays visible without competing with reading contrast. The
+   lighter veil lets glass surfaces borrow more color from the selected scene. */
 .wallpaper-scrim {
-  background-color: rgb(250 246 236 / 0.34);
+  background-color: rgb(250 246 236 / 0.26);
   background-image: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--color-parchment) 58%, transparent),
-    color-mix(in srgb, var(--color-parchment) 35%, transparent) 42%,
-    color-mix(in srgb, var(--color-parchment) 62%, transparent)
+    color-mix(in srgb, var(--color-parchment) 50%, transparent),
+    color-mix(in srgb, var(--color-parchment) 28%, transparent) 42%,
+    color-mix(in srgb, var(--color-parchment) 54%, transparent)
   );
 }
 html.theme-dark .wallpaper-scrim {
-  background-color: rgb(16 24 20 / 0.5);
+  background-color: rgb(16 24 20 / 0.42);
   background-image: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--color-parchment) 68%, transparent),
-    color-mix(in srgb, var(--color-parchment) 46%, transparent) 42%,
-    color-mix(in srgb, var(--color-parchment) 72%, transparent)
+    color-mix(in srgb, var(--color-parchment) 62%, transparent),
+    color-mix(in srgb, var(--color-parchment) 38%, transparent) 42%,
+    color-mix(in srgb, var(--color-parchment) 66%, transparent)
   );
 }
 
-/* Glass is opt-in and scoped to the private app shell. Browsers without
-   backdrop-filter keep the existing opaque paper treatment as a fallback. */
+/* Glass is enabled by default and scoped to the private app shell. Layered
+   highlights, translucency, and saturation echo iOS glass while preserving
+   the warm paper palette. Unsupported browsers keep the opaque fallback. */
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   html.glass-surfaces [data-app-shell] .app-glass-surface:not([data-paper-variant="outlined"]) {
-    background-color: color-mix(in srgb, var(--color-paper) 72%, transparent) !important;
-    border-color: color-mix(in srgb, var(--color-paper) 52%, var(--color-mist)) !important;
+    background-color: color-mix(in srgb, var(--color-paper) 54%, transparent) !important;
+    border-color: color-mix(in srgb, var(--color-paper) 68%, var(--color-mist)) !important;
     box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.38),
-      0 8px 30px rgb(18 33 27 / 0.08);
-    -webkit-backdrop-filter: blur(18px) saturate(1.22);
-    backdrop-filter: blur(18px) saturate(1.22);
+      inset 0 1px 0 rgb(255 255 255 / 0.58),
+      inset 0 -1px 0 rgb(255 255 255 / 0.12),
+      0 12px 36px rgb(18 33 27 / 0.1);
+    -webkit-backdrop-filter: blur(28px) saturate(1.38);
+    backdrop-filter: blur(28px) saturate(1.38);
   }
   html.glass-surfaces [data-app-shell] .app-glass-surface[data-paper-variant="linen"],
   html.glass-surfaces [data-app-shell] .app-glass-surface[data-paper-variant="atmospheric"],
   html.glass-surfaces [data-app-shell] .app-glass-surface-quiet {
-    background-color: color-mix(in srgb, var(--color-linen) 70%, transparent) !important;
+    background-color: color-mix(in srgb, var(--color-linen) 50%, transparent) !important;
   }
   html.glass-surfaces [data-app-shell] .app-glass-surface[data-paper-variant="quiet"] {
-    background-color: color-mix(in srgb, var(--color-paper) 58%, transparent) !important;
+    background-color: color-mix(in srgb, var(--color-paper) 40%, transparent) !important;
   }
   html.glass-surfaces [data-app-shell] .app-glass-surface .app-glass-surface {
+    background-color: color-mix(in srgb, var(--color-paper) 34%, transparent) !important;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
   html.glass-surfaces [data-app-shell] .app-glass-nav {
-    background-color: color-mix(in srgb, var(--color-parchment) 76%, transparent) !important;
-    border-color: color-mix(in srgb, var(--color-paper) 50%, var(--color-mist)) !important;
-    box-shadow: 0 -8px 30px rgb(18 33 27 / 0.08);
-    -webkit-backdrop-filter: blur(22px) saturate(1.25);
-    backdrop-filter: blur(22px) saturate(1.25);
+    background-color: color-mix(in srgb, var(--color-parchment) 58%, transparent) !important;
+    border-color: color-mix(in srgb, var(--color-paper) 66%, var(--color-mist)) !important;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.42),
+      0 -10px 34px rgb(18 33 27 / 0.1);
+    -webkit-backdrop-filter: blur(30px) saturate(1.4);
+    backdrop-filter: blur(30px) saturate(1.4);
+  }
+  html.theme-dark.glass-surfaces [data-app-shell] .app-glass-surface:not([data-paper-variant="outlined"]) {
+    background-color: color-mix(in srgb, var(--color-paper) 60%, transparent) !important;
+    border-color: color-mix(in srgb, var(--color-paper) 72%, var(--color-mist)) !important;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.1),
+      0 14px 38px rgb(0 0 0 / 0.2);
+  }
+  html.theme-dark.glass-surfaces [data-app-shell] .app-glass-surface[data-paper-variant="linen"],
+  html.theme-dark.glass-surfaces [data-app-shell] .app-glass-surface[data-paper-variant="atmospheric"],
+  html.theme-dark.glass-surfaces [data-app-shell] .app-glass-surface-quiet {
+    background-color: color-mix(in srgb, var(--color-linen) 56%, transparent) !important;
+  }
+  html.theme-dark.glass-surfaces [data-app-shell] .app-glass-nav {
+    background-color: color-mix(in srgb, var(--color-parchment) 66%, transparent) !important;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.08),
+      0 -12px 36px rgb(0 0 0 / 0.24);
   }
 }
 

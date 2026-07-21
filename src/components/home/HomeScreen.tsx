@@ -50,6 +50,7 @@ import {
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { seedQuests, questBySlug } from "@/data/seed/quests";
 import { usePlus } from "@/lib/revenuecat/usePlus";
+import { ExplorePlusLink } from "@/components/plus/ExplorePlusLink";
 
 function HomeInner() {
   const profile = useQuestOS((s) => s.profile);
@@ -183,8 +184,11 @@ function HomeInner() {
       <PageContainer className="relative pt-safe">
         {/* Personal welcome — one framed devotional surface with today's
             candle, echoing a bookplate rather than a dashboard header. */}
-        <header className="sacred-frame mt-4 mb-4 bg-paper/90 px-5 py-4 max-[360px]:px-4 sm:mt-5 sm:px-6 sm:py-5">
-          <div className="relative z-10 flex min-w-0 items-center gap-3 max-[360px]:gap-2.5 min-[361px]:gap-3.5">
+        <header
+          data-paper-variant="paper"
+          className="app-glass-surface sacred-frame mt-4 mb-4 bg-paper/90 px-5 py-4 max-[360px]:px-4 sm:mt-5 sm:px-6 sm:py-5"
+        >
+          <div className="relative z-10 flex min-w-0 items-center gap-3 max-[360px]:gap-2">
             <Link
               href="/app/settings"
               aria-label={t.home.openSettings}
@@ -193,18 +197,19 @@ function HomeInner() {
               <Avatar
                 name={profile?.displayName}
                 marker={profile?.avatarUpdatedAt}
-                size="sm"
+                size="lg"
+                className="ring-1 ring-paper/70 shadow-[0_8px_24px_rgb(18_33_27_/_0.14)] max-[360px]:h-[4.5rem] max-[360px]:w-[4.5rem]"
               />
             </Link>
             <div className="min-w-0 flex-1">
-              <p className="font-display text-[1rem] leading-tight text-accent">
+              <p className="font-display text-[1rem] leading-tight text-accent max-[360px]:text-[0.875rem]">
                 {name ? `${hello},` : season.label}
               </p>
-              <h1 className="mt-1 truncate font-display text-[1.5rem] leading-tight text-graphite sm:text-editorial">
+              <h1 className="mt-1 truncate font-display text-[1.375rem] leading-tight text-graphite max-[360px]:text-[1.0625rem] min-[430px]:text-[1.5rem] sm:text-editorial">
                 {name || `${hello}.`}
               </h1>
               {name && (
-                <p className="mt-1 text-[0.8125rem] uppercase tracking-[0.14em] text-ash">
+                <p className="mt-1 text-[0.8125rem] uppercase tracking-[0.14em] text-ash max-[360px]:text-[0.6875rem] max-[360px]:tracking-[0.08em]">
                   {season.label}
                 </p>
               )}
@@ -472,6 +477,11 @@ function HomeInner() {
               subtitle={t.home.reflectionHint}
             />
           </div>
+
+          <ExplorePlusLink
+            className="mt-1"
+            description="See every live wallpaper and the complete Plus experience."
+          />
 
         </div>
       </PageContainer>

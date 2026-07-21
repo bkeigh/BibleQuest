@@ -37,14 +37,14 @@ export function StreakCard({
       href="/app/journey"
       aria-label={`${t.streak.title}. ${days > 0 ? fmt(t.streak.day, { n: days }) : t.streak.unlit}`}
       className={cn(
-        "group flex min-w-[4.75rem] shrink-0 flex-col items-center rounded-lg px-2 py-1.5 text-center transition-colors duration-300 hover:bg-gold-500/10",
+        "group flex w-16 shrink-0 flex-col items-center rounded-lg px-1 py-1.5 text-center transition-colors duration-300 hover:bg-gold-500/10 max-[360px]:w-14 min-[431px]:w-auto min-[431px]:min-w-[4.75rem] min-[431px]:px-2",
         className
       )}
     >
       <span className="flex h-12 items-end justify-center">
         <PixelIcon name={candleStage(days)} size={4} animate={lit} />
       </span>
-      <span className="mt-1 font-pixel text-[0.875rem] leading-none uppercase tracking-[0.05em] text-gilt">
+      <span className="mt-1 font-pixel text-[0.875rem] leading-none uppercase tracking-[0.05em] text-gilt max-[430px]:text-[0.6875rem] max-[430px]:leading-tight max-[430px]:tracking-[0.03em]">
         {days > 0 ? fmt(t.streak.day, { n: days }) : t.streak.title}
       </span>
     </Link>

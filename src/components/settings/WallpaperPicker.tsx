@@ -59,9 +59,12 @@ export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
   }
 
   return (
-    <fieldset className="min-w-0 max-w-full py-4">
-      <legend className="text-[0.9375rem] text-charcoal">Wallpaper</legend>
-      <p className="mt-1 text-caption leading-relaxed text-ash">
+    <fieldset className="min-w-0 max-w-full pb-4 pt-5">
+      <legend className="sr-only">Wallpaper</legend>
+      <p aria-hidden="true" className="text-[0.9375rem] text-charcoal">
+        Wallpaper
+      </p>
+      <p className="mt-1.5 text-caption leading-relaxed text-ash">
         Five scenes are included with Free. Plus unlocks the complete collection.
       </p>
 
