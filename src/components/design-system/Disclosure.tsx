@@ -28,13 +28,13 @@ const VARIANTS: Record<
   },
   /** PaperCard-like surface. */
   card: {
-    root: "rounded-[var(--radius-card)] border border-mist bg-paper paper-shadow",
+    root: "app-glass-surface rounded-[var(--radius-card)] border border-mist bg-paper paper-shadow",
     trigger: "px-5 py-3.5",
     content: "px-5 pb-4",
   },
   /** Soft linen panel. */
   quiet: {
-    root: "rounded-[var(--radius-card)] bg-linen",
+    root: "app-glass-surface app-glass-surface-quiet rounded-[var(--radius-card)] bg-linen",
     trigger: "px-5 py-3.5",
     content: "px-5 pb-4",
   },

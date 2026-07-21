@@ -64,6 +64,11 @@ import {
 } from "./types";
 import { advanceStreak } from "./streak-engine";
 import { isQuestChecklistComplete } from "./quest-steps";
+import { canRefreshDailyVerse } from "./verse-engine";
+import {
+  DEFAULT_WALLPAPER_ID,
+  isWallpaperId,
+} from "@/lib/wallpapers/catalog";
 
 function id(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -208,8 +213,8 @@ interface QuestOSState {
   recordRecentVerse: (verse: Omit<RecentVerse, "viewedAt">) => void;
 
   // -- daily verse
-  /** Deterministically show a different verse for the rest of today. */
-  refreshVerse: () => void;
+  /** Refresh today's verse when the active membership tier permits it. */
+  refreshVerse: (isPlus?: boolean) => boolean;
 
   // -- milestones
   dismissPendingMilestone: (key: string) => void;
@@ -1325,13 +1330,19 @@ export const useQuestOS = create<QuestOSState>()(
         },
 
         recordRecentVerse: (verse) => {
-          const now = new Date().toISOString();
           const key = recentVerseKey(verse);
+          const current = get().recentVerses;
+
+          // Revisiting the passage already at the front of history is a no-op;
+          // avoiding a full persisted-store rewrite keeps Bible entry smooth.
+          if (current[0] && recentVerseKey(current[0]) === key) return;
+
+          const now = new Date().toISOString();
           const next: RecentVerse = { ...verse, viewedAt: now };
           set({
             recentVerses: [
               next,
-              ...get().recentVerses.filter(
+              ...current.filter(
                 (candidate) => recentVerseKey(candidate) !== key,
               ),
             ].slice(0, 20),
@@ -1346,17 +1357,24 @@ export const useQuestOS = create<QuestOSState>()(
           });
         },
 
-        refreshVerse: () => {
+        refreshVerse: (isPlus = false) => {
           const dateKey = toDateKey();
           const prev = get().verseRefresh;
+          const count = prev?.dateKey === dateKey ? prev.count : 0;
+
+          // Enforce the free allowance in the data layer as well as the UI so
+          // a stale or duplicated button cannot spend a fourth refresh.
+          if (!canRefreshDailyVerse(count, isPlus)) return false;
+
           set({
             verseRefresh: {
               dateKey,
               // Yesterday's count doesn't carry — a new day starts at its
               // own daily verse and refreshes from there.
-              count: prev?.dateKey === dateKey ? prev.count + 1 : 1,
+              count: count + 1,
             },
           });
+          return true;
         },
 
         clearSyncTombstones: (cleared) => {
@@ -1406,7 +1424,7 @@ export const useQuestOS = create<QuestOSState>()(
     {
       name: "biblequest:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 10,
+      version: 11,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
@@ -1518,6 +1536,35 @@ export const useQuestOS = create<QuestOSState>()(
           state.prayers = ((state.prayers ?? []) as Prayer[]).map(
             normalizePrayerArchive,
           );
+        }
+        if (version < 11) {
+          // v11 adds device-local wallpaper and glass preferences. Invalid
+          // legacy/imported values resolve to the safe free still defaults.
+          const settings = state.settings as
+            | { appearance?: unknown }
+            | undefined;
+          if (settings && typeof settings === "object") {
+            const appearance =
+              settings.appearance &&
+              typeof settings.appearance === "object" &&
+              !Array.isArray(settings.appearance)
+                ? (settings.appearance as Record<string, unknown>)
+                : {};
+            settings.appearance = {
+              ...DEFAULT_SETTINGS.appearance,
+              ...appearance,
+              wallpaperId:
+                appearance.wallpaperId === "none" ||
+                isWallpaperId(appearance.wallpaperId)
+                  ? appearance.wallpaperId
+                  : DEFAULT_WALLPAPER_ID,
+              wallpaperMode:
+                appearance.wallpaperMode === "live" ? "live" : "still",
+              glassSurfaces: appearance.glassSurfaces !== false,
+            };
+          } else {
+            state.settings = DEFAULT_SETTINGS;
+          }
         }
         return state as unknown as QuestOSState;
       },

@@ -18,6 +18,8 @@ export function applyAppearance(a: AppearanceSettings) {
   // !! guards pre-v5 persisted appearance objects that lack the field.
   root.classList.toggle("text-bold", !!a.boldText);
   root.classList.toggle("force-reduce-motion", a.reducedMotion);
+  // Glass is scoped to app surfaces in globals.css, never marketing or editors.
+  root.classList.toggle("glass-surfaces", !!a.glassSurfaces);
   root.style.colorScheme = dark ? "dark" : "light";
 }
 

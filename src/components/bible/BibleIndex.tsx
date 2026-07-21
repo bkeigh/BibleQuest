@@ -7,12 +7,15 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   selectVerseRefreshCount,
   useQuestOS,
 } from "@/lib/questos/store";
-import { getDailyVerse } from "@/lib/questos/verse-engine";
+import {
+  canRefreshDailyVerse,
+  FREE_DAILY_VERSE_REFRESH_LIMIT,
+  getDailyVerse,
+} from "@/lib/questos/verse-engine";
 import {
   bibleBooks,
   getBookMeta,
@@ -21,7 +24,6 @@ import {
 } from "@/lib/bible/index";
 import { toDateKey } from "@/lib/utils/dates";
 import { cleanVerseText } from "@/lib/utils/scripture";
-import { riseIn } from "@/lib/motion";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
@@ -38,6 +40,8 @@ import {
   translationMetadata,
   translationPreferenceLabel,
 } from "@/lib/bible/translations";
+import { usePlus } from "@/lib/revenuecat/usePlus";
+import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 
 type Testament = "new" | "old";
 
@@ -67,6 +71,8 @@ function useCurrentDayKey() {
 }
 
 function BibleIndexInner() {
+  const plus = usePlus();
+  const shouldReduceMotion = useShouldReduceMotion();
   const readingPosition = useQuestOS((state) => state.readingPosition);
   const bookmarks = useQuestOS((state) => state.bookmarks);
   const chaptersRead = useQuestOS((state) => state.chaptersRead);
@@ -98,22 +104,45 @@ function BibleIndexInner() {
     [verse.bookSlug, verse.reference],
   );
   const preferredEdition = translationMetadata(preferredBibleTranslation);
+  const refreshAllowed =
+    !plus.loading && canRefreshDailyVerse(verseRefreshCount, plus.isPlus);
+  const freeRefreshesRemaining = Math.max(
+    0,
+    FREE_DAILY_VERSE_REFRESH_LIMIT - verseRefreshCount,
+  );
+
+  // Entitlements fail closed while loading, while the store independently
+  // enforces the same limit against rapid or stale clicks.
+  function handleAnotherVerse() {
+    if (!refreshAllowed) return;
+    refreshVerse(plus.isPlus);
+  }
 
   // Only a page that actually presents the verse should add it to reading
-  // history. This keeps ordinary Home visits from fabricating Bible activity.
+  // history. Defer the persisted write so it cannot contend with first paint.
   useEffect(() => {
     const passageKey = `${verse.bookSlug}:${verse.chapter}:${verse.verseStart}-${verse.verseEnd}`;
     if (recordedVerseRef.current === passageKey) return;
-    recordedVerseRef.current = passageKey;
-    recordRecentVerse({
-      bookSlug: verse.bookSlug,
-      bookName: verseBookName,
-      chapter: verse.chapter,
-      verseStart: verse.verseStart,
-      verseEnd: verse.verseEnd,
-      reference: verse.reference,
-      text: verse.text,
-    });
+
+    const record = () => {
+      recordedVerseRef.current = passageKey;
+      recordRecentVerse({
+        bookSlug: verse.bookSlug,
+        bookName: verseBookName,
+        chapter: verse.chapter,
+        verseStart: verse.verseStart,
+        verseEnd: verse.verseEnd,
+        reference: verse.reference,
+        text: verse.text,
+      });
+    };
+
+    if ("requestIdleCallback" in window) {
+      const idle = window.requestIdleCallback(record, { timeout: 1_000 });
+      return () => window.cancelIdleCallback(idle);
+    }
+    const timer = globalThis.setTimeout(record, 250);
+    return () => globalThis.clearTimeout(timer);
   }, [recordRecentVerse, verse, verseBookName]);
 
   const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -157,31 +186,40 @@ function BibleIndexInner() {
     <div className="relative overflow-hidden">
       <div
         aria-hidden="true"
-        className="ambient pointer-events-none absolute -right-20 top-10 h-56 w-56 rounded-full bg-gold-300/10 blur-3xl [animation:var(--animate-twinkle)]"
+        className={cn(
+          "ambient pointer-events-none absolute -right-20 top-10 h-56 w-56 rounded-full bg-gold-300/10 blur-3xl",
+          !shouldReduceMotion && "[animation:var(--animate-twinkle)]",
+        )}
       />
       <PageHeader title="Bible" subtitle="Read slowly. Let one verse land." />
       <PageContainer className="relative pb-6">
-        <motion.section
+        <section
           id="todays-verse"
           aria-label="Today's verse"
-          variants={riseIn}
-          initial="hidden"
-          animate="visible"
           className="scroll-mt-6"
         >
           <VerseCard
             verse={verse}
-            onAnotherVerse={refreshVerse}
+            onAnotherVerse={handleAnotherVerse}
+            anotherVerseLoading={plus.loading}
+            anotherVerseLocked={
+              !plus.loading && !plus.isPlus && !refreshAllowed
+            }
+            anotherVerseHint={
+              plus.loading
+                ? "Checking refresh access…"
+                : plus.isPlus
+                  ? "Unlimited verse refreshes with Plus."
+                  : refreshAllowed
+                    ? `${freeRefreshesRemaining} free ${freeRefreshesRemaining === 1 ? "refresh" : "refreshes"} left today.`
+                    : `${FREE_DAILY_VERSE_REFRESH_LIMIT} free refreshes used today.`
+            }
             showOpenInChapter
           />
-        </motion.section>
+        </section>
 
-        <motion.section
+        <section
           aria-labelledby="reading-shortcuts"
-          variants={riseIn}
-          initial="hidden"
-          animate="visible"
-          transition={{ delay: 0.08 }}
           className="mt-6"
         >
           <div className="mb-2.5 flex items-end justify-between gap-3 px-1">
@@ -238,15 +276,11 @@ function BibleIndexInner() {
                 translationPreferenceLabel(preferredBibleTranslation)}
             </span>
           </Link>
-        </motion.section>
+        </section>
 
         {previousVerses.length > 0 && (
-          <motion.section
+          <section
             aria-labelledby="recent-scripture"
-            variants={riseIn}
-            initial="hidden"
-            animate="visible"
-            transition={{ delay: 0.14 }}
             className="mt-7"
           >
             <div className="mb-2.5 flex items-center justify-between gap-3 px-1">
@@ -296,15 +330,11 @@ function BibleIndexInner() {
                 );
               })}
             </ul>
-          </motion.section>
+          </section>
         )}
 
-        <motion.section
+        <section
           aria-labelledby="find-a-book"
-          variants={riseIn}
-          initial="hidden"
-          animate="visible"
-          transition={{ delay: 0.2 }}
           className="mt-7"
         >
           <div className="px-1">
@@ -360,11 +390,9 @@ function BibleIndexInner() {
                     )}
                   >
                     {active && (
-                      <motion.span
+                      <span
                         aria-hidden="true"
-                        layoutId="active-testament"
                         className="pointer-events-none absolute inset-0 rounded-[7px] bg-paper paper-shadow"
-                        transition={{ duration: 0.3 }}
                       />
                     )}
                     <span className="relative z-10">
@@ -380,24 +408,17 @@ function BibleIndexInner() {
             {visibleBooks.length} {visibleBooks.length === 1 ? "book" : "books"} shown
           </p>
 
-          <motion.ul layout className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-            <AnimatePresence initial={false} mode="popLayout">
-              {visibleBooks.map((book, index) => {
+          <ul className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+              {visibleBooks.map((book) => {
                 const readCount = readCountByBook.get(book.slug) ?? 0;
                 const isCurrent = readingPosition?.bookSlug === book.slug;
                 return (
-                  <motion.li
-                    layout
-                    key={book.slug}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.98 }}
-                    transition={{ duration: 0.25, delay: Math.min(index, 8) * 0.025 }}
-                  >
+                  <li key={book.slug}>
                     <Link
                       href={`/app/bible/${book.slug}`}
                       className={cn(
-                        "group flex min-h-[5.25rem] h-full flex-col justify-between rounded-[var(--radius-card)] border bg-paper p-3.5 paper-shadow transition-all duration-300 [transition-timing-function:var(--ease-gentle)] hover:-translate-y-0.5 hover:border-accent/45 hover:paper-shadow-lg",
+                        "group flex min-h-[5.25rem] h-full flex-col justify-between rounded-[var(--radius-card)] border bg-paper p-3.5 paper-shadow transition-colors duration-300 [transition-timing-function:var(--ease-gentle)] hover:border-accent/45 hover:paper-shadow-lg",
+                        !shouldReduceMotion && "hover:-translate-y-0.5",
                         isCurrent ? "border-accent/45 bg-accent-surface/40" : "border-mist",
                       )}
                     >
@@ -420,11 +441,10 @@ function BibleIndexInner() {
                         <span>{readCount > 0 ? `${readCount} read` : "Open"}</span>
                       </span>
                     </Link>
-                  </motion.li>
+                  </li>
                 );
               })}
-            </AnimatePresence>
-          </motion.ul>
+          </ul>
 
           {visibleBooks.length === 0 && (
             <PaperCard variant="quiet" padding="md" className="mt-3 text-center">
@@ -440,7 +460,7 @@ function BibleIndexInner() {
               </button>
             </PaperCard>
           )}
-        </motion.section>
+        </section>
 
         <p className="mt-7 pb-4 text-center text-caption leading-relaxed text-ash">
           {preferredEdition?.source === "local"
@@ -466,7 +486,7 @@ function QuickLink({
   title: string;
 }) {
   return (
-    <motion.div className="h-full" whileHover={{ y: -2 }} whileTap={{ y: 0 }}>
+    <div className="h-full">
       <Link href={href} className="block h-full rounded-[var(--radius-card)]">
         <PaperCard
           interactive
@@ -487,7 +507,7 @@ function QuickLink({
           </span>
         </PaperCard>
       </Link>
-    </motion.div>
+    </div>
   );
 }
 

@@ -4,6 +4,7 @@ import { MilestoneReveal } from "@/components/journey/MilestoneReveal";
 import { ThemeApplier } from "@/components/app-shell/ThemeApplier";
 import { MotionProvider } from "@/components/app-shell/MotionProvider";
 import { SyncManager } from "@/components/app-shell/SyncManager";
+import { PlusProvider } from "@/lib/revenuecat/usePlus";
 
 export default function PrivateAppLayout({
   children,
@@ -14,11 +15,13 @@ export default function PrivateAppLayout({
     <>
       <SyncManager />
       <OnboardingGate>
-        <ThemeApplier />
-        <MotionProvider>
-          <AppShell>{children}</AppShell>
-          <MilestoneReveal />
-        </MotionProvider>
+        <PlusProvider>
+          <ThemeApplier />
+          <MotionProvider>
+            <AppShell>{children}</AppShell>
+            <MilestoneReveal />
+          </MotionProvider>
+        </PlusProvider>
       </OnboardingGate>
     </>
   );

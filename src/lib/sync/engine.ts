@@ -620,8 +620,8 @@ export function mergeSnapshots(
   const profile = adoptRemote
     ? remote.profile ?? null
     : local.profile ?? remote.profile ?? null;
-  // boldText is a device-local accessibility preference (no remote column;
-  // like OS-level bold text it shouldn't follow the account across devices).
+  // Accessibility comfort and wallpaper choices are device-local (no remote
+  // columns); a phone and desktop can keep different motion/art treatments.
   const baseSettings =
     adoptRemote && remote.settings
       ? {
@@ -629,6 +629,9 @@ export function mergeSnapshots(
           appearance: {
             ...remote.settings.appearance,
             boldText: local.settings.appearance.boldText,
+            wallpaperId: local.settings.appearance.wallpaperId,
+            wallpaperMode: local.settings.appearance.wallpaperMode,
+            glassSurfaces: local.settings.appearance.glassSurfaces,
           },
         }
       : local.settings;

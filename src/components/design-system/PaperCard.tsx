@@ -36,8 +36,9 @@ export function PaperCard({
 }: PaperCardProps) {
   return (
     <Tag
+      data-paper-variant={variant}
       className={cn(
-        "rounded-[var(--radius-card)]",
+        "app-glass-surface rounded-[var(--radius-card)]",
         VARIANTS[variant],
         PADDING[padding],
         interactive &&

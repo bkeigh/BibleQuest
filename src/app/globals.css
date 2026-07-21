@@ -243,12 +243,14 @@ html.force-reduce-motion .ambient,
 html.force-reduce-motion .ambient * {
   animation: none !important;
 }
+html.force-reduce-motion {
+  scroll-behavior: auto !important;
+}
 html.force-reduce-motion *,
 html.force-reduce-motion *::before,
 html.force-reduce-motion *::after {
-  animation-duration: 0.01ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
+  animation: none !important;
+  transition: none !important;
   scroll-behavior: auto !important;
 }
 
@@ -282,6 +284,60 @@ body {
   line-height: 1.5;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+/* The artwork stays visible without competing with reading contrast. Dark
+   mode receives a denser chapel-toned veil over the same selected scene. */
+.wallpaper-scrim {
+  background-color: rgb(250 246 236 / 0.34);
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-parchment) 58%, transparent),
+    color-mix(in srgb, var(--color-parchment) 35%, transparent) 42%,
+    color-mix(in srgb, var(--color-parchment) 62%, transparent)
+  );
+}
+html.theme-dark .wallpaper-scrim {
+  background-color: rgb(16 24 20 / 0.5);
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-parchment) 68%, transparent),
+    color-mix(in srgb, var(--color-parchment) 46%, transparent) 42%,
+    color-mix(in srgb, var(--color-parchment) 72%, transparent)
+  );
+}
+
+/* Glass is opt-in and scoped to the private app shell. Browsers without
+   backdrop-filter keep the existing opaque paper treatment as a fallback. */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html.glass-surfaces [data-app-shell] .app-glass-surface:not([data-paper-variant="outlined"]) {
+    background-color: color-mix(in srgb, var(--color-paper) 72%, transparent) !important;
+    border-color: color-mix(in srgb, var(--color-paper) 52%, var(--color-mist)) !important;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.38),
+      0 8px 30px rgb(18 33 27 / 0.08);
+    -webkit-backdrop-filter: blur(18px) saturate(1.22);
+    backdrop-filter: blur(18px) saturate(1.22);
+  }
+  html.glass-surfaces [data-app-shell] .app-glass-surface[data-paper-variant="linen"],
+  html.glass-surfaces [data-app-shell] .app-glass-surface[data-paper-variant="atmospheric"],
+  html.glass-surfaces [data-app-shell] .app-glass-surface-quiet {
+    background-color: color-mix(in srgb, var(--color-linen) 70%, transparent) !important;
+  }
+  html.glass-surfaces [data-app-shell] .app-glass-surface[data-paper-variant="quiet"] {
+    background-color: color-mix(in srgb, var(--color-paper) 58%, transparent) !important;
+  }
+  html.glass-surfaces [data-app-shell] .app-glass-surface .app-glass-surface {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  html.glass-surfaces [data-app-shell] .app-glass-nav {
+    background-color: color-mix(in srgb, var(--color-parchment) 76%, transparent) !important;
+    border-color: color-mix(in srgb, var(--color-paper) 50%, var(--color-mist)) !important;
+    box-shadow: 0 -8px 30px rgb(18 33 27 / 0.08);
+    -webkit-backdrop-filter: blur(22px) saturate(1.25);
+    backdrop-filter: blur(22px) saturate(1.25);
+  }
 }
 
 ::selection {
@@ -454,8 +510,7 @@ body {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    animation: none !important;
+    transition: none !important;
   }
 }

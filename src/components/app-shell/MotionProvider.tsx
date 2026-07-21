@@ -1,19 +1,40 @@
 "use client";
 
-import { MotionConfig } from "framer-motion";
-import { useQuestOS } from "@/lib/questos/store";
+import { useLayoutEffect } from "react";
+import { MotionConfig, MotionGlobalConfig } from "framer-motion";
+import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 
 /**
- * Makes the in-app "Reduce motion" setting authoritative for framer-motion.
- * framer's own reduced-motion only reads the OS query, so a user who toggles
- * the setting on a device with no OS preference would still see motion. Wiring
- * MotionConfig to the setting fixes that; "user" still honors the OS query when
- * the app toggle is off.
+ * Makes the app and operating-system preferences authoritative for all Framer
+ * descendants, including opacity animations that reducedMotion alone retains.
  */
 export function MotionProvider({ children }: { children: React.ReactNode }) {
-  const reduced = useQuestOS((s) => s.settings.appearance.reducedMotion);
+  const reduced = useShouldReduceMotion();
+
+  // Existing Framer VisualElements snapshot provider options when they mount.
+  // The global flag covers future animations without remounting the entire app,
+  // and finishing active animations prevents a half-transitioned UI.
+  useLayoutEffect(() => {
+    MotionGlobalConfig.skipAnimations = reduced;
+    if (reduced && typeof document.getAnimations === "function") {
+      for (const animation of document.getAnimations()) {
+        try {
+          animation.finish();
+        } catch {
+          animation.cancel();
+        }
+      }
+    }
+    return () => {
+      MotionGlobalConfig.skipAnimations = false;
+    };
+  }, [reduced]);
+
   return (
-    <MotionConfig reducedMotion={reduced ? "always" : "user"}>
+    <MotionConfig
+      reducedMotion={reduced ? "always" : "never"}
+      skipAnimations={reduced}
+    >
       {children}
     </MotionConfig>
   );
