@@ -31,6 +31,7 @@ import {
   uniqueValidQuestCompletions,
 } from "./history-integrity";
 import { isValidDateKey } from "@/lib/utils/dates";
+import { normalizeGlassOpacity } from "@/lib/glass-opacity";
 
 function isObj(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -259,6 +260,20 @@ export function parseSnapshot(rawText: string): ParseResult {
       }
       if (typeof appearance.glassSurfaces !== "boolean") {
         delete appearance.glassSurfaces;
+      }
+      // Keep valid backup preferences, but never let an imported file bypass
+      // the same readability floor enforced by the Settings slider.
+      if ("glassOpacity" in appearance) {
+        if (
+          typeof appearance.glassOpacity === "number" &&
+          Number.isFinite(appearance.glassOpacity)
+        ) {
+          appearance.glassOpacity = normalizeGlassOpacity(
+            appearance.glassOpacity,
+          );
+        } else {
+          delete appearance.glassOpacity;
+        }
       }
       s.appearance = appearance;
     }

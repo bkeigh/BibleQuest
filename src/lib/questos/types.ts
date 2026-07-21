@@ -10,6 +10,7 @@ import {
   DEFAULT_WALLPAPER_ID,
   type WallpaperId,
 } from "@/lib/wallpapers/catalog";
+import { DEFAULT_GLASS_OPACITY } from "@/lib/glass-opacity";
 
 // ---------------------------------------------------------------------------
 // Quests
@@ -535,6 +536,8 @@ export interface AppearanceSettings {
   wallpaperMode: "still" | "live";
   /** Translucent, blurred shared surfaces inspired by native Apple materials. */
   glassSurfaces: boolean;
+  /** Visible material opacity percentage; clamped to 15–100 for legibility. */
+  glassOpacity: number;
 }
 
 /**
@@ -595,6 +598,7 @@ export const DEFAULT_SETTINGS: Settings = {
     wallpaperId: DEFAULT_WALLPAPER_ID,
     wallpaperMode: "still",
     glassSurfaces: true,
+    glassOpacity: DEFAULT_GLASS_OPACITY,
   },
   language: "en",
   preferredBibleTranslation: DEFAULT_BIBLE_TRANSLATION_KEY,

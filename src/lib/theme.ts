@@ -1,4 +1,5 @@
 import type { AppearanceSettings } from "@/lib/questos/types";
+import { glassOpacityVariables } from "@/lib/glass-opacity";
 
 /**
  * Applies appearance settings to <html> via classes that globals.css reacts to.
@@ -20,6 +21,13 @@ export function applyAppearance(a: AppearanceSettings) {
   root.classList.toggle("force-reduce-motion", a.reducedMotion);
   // Glass is scoped to app surfaces in globals.css, never marketing or editors.
   root.classList.toggle("glass-surfaces", !!a.glassSurfaces);
+  // Normalize at the render boundary so corrupt legacy state can never make
+  // a quiet or nested surface more transparent than the readability floor.
+  for (const [property, value] of Object.entries(
+    glassOpacityVariables(a.glassOpacity),
+  )) {
+    root.style.setProperty(property, value);
+  }
   root.style.colorScheme = dark ? "dark" : "light";
 }
 

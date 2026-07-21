@@ -581,6 +581,7 @@ export function rowsToSettings(
       wallpaperId: d.appearance.wallpaperId,
       wallpaperMode: d.appearance.wallpaperMode,
       glassSurfaces: d.appearance.glassSurfaces,
+      glassOpacity: d.appearance.glassOpacity,
     },
     notifications: {
       dailyVerse: notifications?.daily_verse_enabled ?? d.notifications.dailyVerse,

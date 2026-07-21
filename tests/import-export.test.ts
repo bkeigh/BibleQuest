@@ -72,6 +72,33 @@ describe("journey import and export", () => {
     );
   });
 
+  it("clamps imported glass opacity and drops malformed values", () => {
+    const belowFloor = parseSnapshot(
+      JSON.stringify({ settings: { appearance: { glassOpacity: 0 } } }),
+    );
+    expect(belowFloor.ok).toBe(true);
+    if (!belowFloor.ok) return;
+    expect(belowFloor.data.settings?.appearance?.glassOpacity).toBe(15);
+
+    const aboveCeiling = parseSnapshot(
+      JSON.stringify({ settings: { appearance: { glassOpacity: 140 } } }),
+    );
+    expect(aboveCeiling.ok).toBe(true);
+    if (!aboveCeiling.ok) return;
+    expect(aboveCeiling.data.settings?.appearance?.glassOpacity).toBe(100);
+
+    const malformed = parseSnapshot(
+      JSON.stringify({
+        settings: { appearance: { glassOpacity: "fully-clear" } },
+      }),
+    );
+    expect(malformed.ok).toBe(true);
+    if (!malformed.ok) return;
+    expect(malformed.data.settings?.appearance).not.toHaveProperty(
+      "glassOpacity",
+    );
+  });
+
   it("drops malformed records and returns content-free errors", () => {
     const marker = "fixture-private-marker";
     const malformed = JSON.stringify({

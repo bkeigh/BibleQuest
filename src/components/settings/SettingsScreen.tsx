@@ -38,6 +38,11 @@ import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
 import { WallpaperPicker } from "@/components/settings/WallpaperPicker";
 import { ExplorePlusLink } from "@/components/plus/ExplorePlusLink";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
+import {
+  MAX_GLASS_OPACITY,
+  MIN_GLASS_OPACITY,
+  normalizeGlassOpacity,
+} from "@/lib/glass-opacity";
 
 function Row({
   label,
@@ -128,6 +133,94 @@ function Toggle({
         />
       </span>
     </button>
+  );
+}
+
+/** Adjusts every app-shell glass material while exposing an accessible value. */
+function GlassOpacitySlider({
+  value,
+  glassEnabled,
+  onPreview,
+  onCommit,
+}: {
+  value: number;
+  glassEnabled: boolean;
+  onPreview: (value: number) => void;
+  onCommit: (value: number) => void;
+}) {
+  const normalizedValue = normalizeGlassOpacity(value);
+  const [opacity, setOpacity] = useState(normalizedValue);
+  const opacityRef = useRef(normalizedValue);
+  const committedOpacityRef = useRef(normalizedValue);
+  const description = glassEnabled
+    ? "15% is the most transparent allowed; 100% is fully solid."
+    : "Turn on Glass surfaces to preview this setting. Your choice is saved.";
+
+  // Preview only updates lightweight CSS variables; the full persisted QuestOS
+  // snapshot is written once when the pointer or keyboard interaction ends.
+  function previewOpacity(nextValue: number) {
+    const next = normalizeGlassOpacity(nextValue);
+    opacityRef.current = next;
+    setOpacity(next);
+    onPreview(next);
+  }
+
+  function commitOpacity() {
+    const next = opacityRef.current;
+    if (next === committedOpacityRef.current) return;
+    committedOpacityRef.current = next;
+    onCommit(next);
+  }
+
+  return (
+    <div className="py-3.5">
+      <div className="flex items-center justify-between gap-4">
+        <label
+          htmlFor="glass-opacity"
+          className="text-[0.9375rem] text-charcoal"
+        >
+          UI transparency
+        </label>
+        <output
+          htmlFor="glass-opacity"
+          className="shrink-0 rounded-full border border-mist bg-linen px-2.5 py-1 text-[0.8125rem] font-medium tabular-nums text-charcoal"
+        >
+          {opacity}% opacity
+        </output>
+      </div>
+      <input
+        id="glass-opacity"
+        type="range"
+        min={MIN_GLASS_OPACITY}
+        max={MAX_GLASS_OPACITY}
+        step={1}
+        value={opacity}
+        aria-describedby="glass-opacity-description"
+        aria-valuetext={`${opacity}% opacity`}
+        // Native input events keep the glass preview in sync while dragging.
+        onInput={(event) =>
+          previewOpacity(Number(event.currentTarget.value))
+        }
+        onPointerUp={commitOpacity}
+        onPointerCancel={commitOpacity}
+        onKeyUp={commitOpacity}
+        onBlur={commitOpacity}
+        className="mt-2 h-11 w-full cursor-pointer accent-[var(--color-accent)]"
+      />
+      <div
+        aria-hidden="true"
+        className="mt-0.5 flex justify-between text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-ash"
+      >
+        <span>More transparent</span>
+        <span>More solid</span>
+      </div>
+      <p
+        id="glass-opacity-description"
+        className="mt-1.5 text-caption leading-relaxed text-ash"
+      >
+        {description}
+      </p>
+    </div>
   );
 }
 
@@ -864,6 +957,16 @@ function SettingsInner() {
                   onChange={(glassSurfaces) => setAppearance({ glassSurfaces })}
                 />
               </Row>
+              <GlassOpacitySlider
+                // A durable external change remounts the short-lived drag draft.
+                key={appearance.glassOpacity}
+                value={appearance.glassOpacity}
+                glassEnabled={appearance.glassSurfaces}
+                onPreview={(glassOpacity) =>
+                  applyAppearance({ ...appearance, glassOpacity })
+                }
+                onCommit={(glassOpacity) => setAppearance({ glassOpacity })}
+              />
               <Row label={t.settings.theme}>
                 <Segmented
                   label={t.settings.theme}

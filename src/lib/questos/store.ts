@@ -77,10 +77,21 @@ import {
   DEFAULT_WALLPAPER_ID,
   isWallpaperId,
 } from "@/lib/wallpapers/catalog";
+import { normalizeGlassOpacity } from "@/lib/glass-opacity";
 
 const meaningfulJourneyEventTypes = new Set<JourneyEventType>(
   MEANINGFUL_JOURNEY_EVENT_TYPES
 );
+
+/** Keeps the appearance object within render-safe material bounds. */
+function normalizeAppearanceSettings(
+  appearance: Settings["appearance"],
+): Settings["appearance"] {
+  return {
+    ...appearance,
+    glassOpacity: normalizeGlassOpacity(appearance.glassOpacity),
+  };
+}
 
 function id(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -700,13 +711,17 @@ export const useQuestOS = create<QuestOSState>()(
 
         completeOnboarding: (profileData, settingsPatch) => {
           const now = new Date().toISOString();
+          const settings = { ...get().settings, ...settingsPatch };
           set({
             profile: {
               ...profileData,
               onboardingCompleted: true,
               createdAt: now,
             },
-            settings: { ...get().settings, ...settingsPatch },
+            settings: {
+              ...settings,
+              appearance: normalizeAppearanceSettings(settings.appearance),
+            },
           });
           track("onboarding_completed");
         },
@@ -718,7 +733,13 @@ export const useQuestOS = create<QuestOSState>()(
         },
 
         updateSettings: (patch) => {
-          set({ settings: { ...get().settings, ...patch } });
+          const settings = { ...get().settings, ...patch };
+          set({
+            settings: {
+              ...settings,
+              appearance: normalizeAppearanceSettings(settings.appearance),
+            },
+          });
           // Mirror consent to its own storage key so events fired before
           // the store hydrates still honor the last known choice.
           if (patch.analyticsConsent != null) {
@@ -791,10 +812,10 @@ export const useQuestOS = create<QuestOSState>()(
               ? {
                   ...DEFAULT_SETTINGS,
                   ...snapshot.settings,
-                  appearance: {
+                  appearance: normalizeAppearanceSettings({
                     ...DEFAULT_SETTINGS.appearance,
                     ...(snapshot.settings.appearance ?? {}),
-                  },
+                  }),
                 }
               : DEFAULT_SETTINGS,
             assignments: normalizeAssignmentRecord(snapshot.assignments ?? {}),
@@ -1518,7 +1539,7 @@ export const useQuestOS = create<QuestOSState>()(
     {
       name: "biblequest:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 12,
+      version: 13,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
@@ -1699,6 +1720,28 @@ export const useQuestOS = create<QuestOSState>()(
             Array.isArray(state.growthEvents) ? state.growthEvents : []
           );
           state.streak = rebuildStreakFromJourneyEvents(journeyEvents);
+        }
+        if (version < 13) {
+          // v13 adds a device-local glass opacity preference and repairs any
+          // malformed value before it can reach the rendering layer.
+          const settings = state.settings as
+            | { appearance?: unknown }
+            | undefined;
+          if (settings && typeof settings === "object") {
+            const appearance =
+              settings.appearance &&
+              typeof settings.appearance === "object" &&
+              !Array.isArray(settings.appearance)
+                ? (settings.appearance as Record<string, unknown>)
+                : {};
+            settings.appearance = {
+              ...DEFAULT_SETTINGS.appearance,
+              ...appearance,
+              glassOpacity: normalizeGlassOpacity(appearance.glassOpacity),
+            };
+          } else {
+            state.settings = DEFAULT_SETTINGS;
+          }
         }
         return state as unknown as QuestOSState;
       },
