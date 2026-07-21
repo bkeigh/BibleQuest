@@ -639,6 +639,7 @@ export function mergeSnapshots(
             wallpaperId: local.settings.appearance.wallpaperId,
             wallpaperMode: local.settings.appearance.wallpaperMode,
             glassSurfaces: local.settings.appearance.glassSurfaces,
+            glassOpacity: local.settings.appearance.glassOpacity,
           },
         }
       : local.settings;

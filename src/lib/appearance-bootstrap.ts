@@ -1,3 +1,10 @@
+import {
+  DEFAULT_GLASS_OPACITY,
+  GLASS_OPACITY_LAYER_OFFSETS,
+  MAX_GLASS_OPACITY,
+  MIN_GLASS_OPACITY,
+} from "@/lib/glass-opacity";
+
 /**
  * Applies persisted appearance classes before React hydrates. The global CSP
  * currently permits the inline scripts Next.js itself requires.
@@ -18,6 +25,19 @@ export const APPEARANCE_BOOTSTRAP_SCRIPT = `
     root.classList.toggle("text-bold", appearance.boldText === true);
     root.classList.toggle("force-reduce-motion", appearance.reducedMotion === true);
     root.classList.toggle("glass-surfaces", appearance.glassSurfaces !== false);
+    // Match the hydrated theme's material hierarchy during the first paint.
+    var requestedOpacity = typeof appearance.glassOpacity === "number" && isFinite(appearance.glassOpacity)
+      ? appearance.glassOpacity
+      : ${DEFAULT_GLASS_OPACITY};
+    var glassOpacity = Math.min(${MAX_GLASS_OPACITY}, Math.max(${MIN_GLASS_OPACITY}, Math.round(requestedOpacity)));
+    var glassOffsets = ${JSON.stringify(GLASS_OPACITY_LAYER_OFFSETS)};
+    var offsetScale = glassOpacity >= ${DEFAULT_GLASS_OPACITY}
+      ? (${MAX_GLASS_OPACITY} - glassOpacity) / (${MAX_GLASS_OPACITY} - ${DEFAULT_GLASS_OPACITY})
+      : 1;
+    Object.keys(glassOffsets).forEach(function (property) {
+      var layerOpacity = Math.min(${MAX_GLASS_OPACITY}, Math.max(${MIN_GLASS_OPACITY}, Math.round(glassOpacity + glassOffsets[property] * offsetScale)));
+      root.style.setProperty(property, layerOpacity + "%");
+    });
     root.style.colorScheme = dark ? "dark" : "light";
   } catch (_) {
     // Storage denial or malformed legacy data should never block first paint.
