@@ -15,23 +15,11 @@ import { WallpaperBackdrop } from "./WallpaperBackdrop";
 /**
  * AppShell — container for the installed/private app experience.
  * Parchment canvas, safe-area aware, bottom navigation.
- * Also records the daily visit (feeds Journey's has-visited state).
  *
  * First paint is never blank: screens hydrate behind ClientOnly, whose
  * default fallback is the ShellSkeleton, so <main> renders immediately.
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const recordVisit = useQuestOS((s) => s.recordVisit);
-
-  useEffect(() => {
-    // Deferred so the first paint isn't competing with a store write. The
-    // original beneficiary (Home's welcome-back line, which snapshotted
-    // lastVisitDateKey at mount) is gone; today's only reader is Journey's
-    // null-check, which doesn't care about ordering.
-    const t = setTimeout(() => recordVisit(), 400);
-    return () => clearTimeout(t);
-  }, [recordVisit]);
-
   useEffect(() => {
     // Analytics events queued while offline flush when the shell mounts
     // and whenever the connection returns. Both are no-ops when analytics
@@ -64,7 +52,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <LanguageApplier />
         <WallpaperBackdrop />
-        <main className="relative z-10 flex-1 pb-28">{children}</main>
+        <a
+          href="#app-main"
+          className="sr-only z-50 rounded-[var(--radius-button)] bg-paper px-4 py-3 text-accent paper-shadow-lg focus:not-sr-only focus:fixed focus:start-4 focus:top-4"
+        >
+          Skip to content
+        </a>
+        <main id="app-main" tabIndex={-1} className="relative z-10 flex-1 pb-28">
+          {children}
+        </main>
         <BottomNav />
         <InstallPrompt />
       </div>

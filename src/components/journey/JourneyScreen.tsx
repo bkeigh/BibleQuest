@@ -1,27 +1,29 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useQuestOS } from "@/lib/questos/store";
 import {
   calculateTreeState,
-  GROWTH_MEANINGS,
   nextTreeStage,
   stageProgress,
+  summarizeRecentGrowth,
 } from "@/lib/questos/growth-engine";
 import { computeMetrics } from "@/lib/questos/milestone-engine";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
+import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
 import { PixelIcon, type PixelSpriteName } from "@/components/design-system/PixelIcon";
 import { PixelMascot } from "@/components/design-system/PixelMascot";
 import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosure";
 import { GrowthTree } from "@/components/journey/GrowthTree";
-import { treeReturnLine, treeStageLabels, emptyStates } from "@/lib/questos/copy";
+import { treeStageLabels, emptyStates } from "@/lib/questos/copy";
 import { seedMilestones } from "@/data/seed/milestones";
 import { questBySlug } from "@/data/seed/quests";
 import { formatShortDate } from "@/lib/utils/dates";
 import { SeasonalAtmosphere } from "@/components/design-system/SeasonalAtmosphere";
-import { useStrings, fmt } from "@/lib/i18n";
+import { useCurrentDayKey } from "@/lib/use-current-day-key";
 import type {
   GrowthType,
   JourneyEvent,
@@ -39,6 +41,60 @@ const GROWTH_ORDER: GrowthType[] = [
   "flowers",
 ];
 
+interface GrowthFacet {
+  label: string;
+  meaning: string;
+  invitation: string;
+  href: string;
+  sprite: PixelSpriteName;
+}
+
+/** Six symbolic facets make every kind of tending legible without ranking it. */
+const GROWTH_FACETS: Record<GrowthType, GrowthFacet> = {
+  roots: {
+    label: "Roots",
+    meaning: "Grounding and steadiness",
+    invitation: "Make space to pray",
+    href: "/app/prayer/new",
+    sprite: "candle",
+  },
+  branches: {
+    label: "Branches",
+    meaning: "Learning and direction",
+    invitation: "Open Scripture",
+    href: "/app/bible",
+    sprite: "book",
+  },
+  leaves: {
+    label: "Leaves",
+    meaning: "Care taking shape",
+    invitation: "Find a practice",
+    href: "/app/quests",
+    sprite: "leaf",
+  },
+  fruit: {
+    label: "Fruit",
+    meaning: "Love put into practice",
+    invitation: "Find a way to serve",
+    href: "/app/quests",
+    sprite: "service-basket",
+  },
+  sunlight: {
+    label: "Sunlight",
+    meaning: "Attention and reflection",
+    invitation: "Write a reflection",
+    href: "/app/prayer/reflection/new",
+    sprite: "sun",
+  },
+  flowers: {
+    label: "Flowers",
+    meaning: "Gratitude and joy",
+    invitation: "Notice what is good",
+    href: "/app/quests",
+    sprite: "flower",
+  },
+};
+
 const EVENT_SPRITE: Record<JourneyEventType, PixelSpriteName> = {
   quest_completed: "leaf",
   reflection_written: "sun",
@@ -49,20 +105,28 @@ const EVENT_SPRITE: Record<JourneyEventType, PixelSpriteName> = {
   milestone_reached: "star",
 };
 
-/** Sanctuary preview tiles — a quiet promise of personal touches to come.
-    Nothing here is purchasable or gated; it simply names what's ahead. */
-const SANCTUARY_TILES: { label: string; sprite: PixelSpriteName; size: number }[] = [
-  { label: "Backgrounds", sprite: "star", size: 5 },
-  { label: "Tree styles", sprite: "tree", size: 4 },
-  { label: "Candle styles", sprite: "candle-steady", size: 2 },
-  { label: "Garden", sprite: "flower", size: 4 },
-];
-
-function monthLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
+function monthLabel(dateKey: string): string {
+  return new Date(`${dateKey}T12:00:00`).toLocaleDateString(undefined, {
     month: "long",
     year: "numeric",
   });
+}
+
+const MILESTONE_GROUPS = [
+  ["first_step", "Beginnings"],
+  ["rhythm", "Rhythm"],
+  ["scripture", "Scripture"],
+  ["prayer", "Prayer"],
+  ["kindness", "Love in action"],
+  ["depth", "Depth"],
+] as const;
+
+/** Describe progress as a season of growth rather than an action countdown. */
+function stageSeasonLine(fraction: number, final: boolean): string {
+  if (final) return "Fully grown, and still changing with you.";
+  if (fraction < 0.34) return "A new season of growth is beginning.";
+  if (fraction < 0.67) return "This season is taking root.";
+  return "A new shape is beginning to show.";
 }
 
 interface MilestoneView {
@@ -107,18 +171,15 @@ function MilestoneHighlight({ view }: { view: MilestoneView }) {
 
   return (
     <article
-      className={
-        reached
-          ? "h-full rounded-[var(--radius-card)] border border-gold-500/45 bg-gold-500/10 p-4"
-          : "h-full rounded-[var(--radius-card)] border border-mist bg-linen p-4"
-      }
+      data-milestone-state={reached ? "reached" : "upcoming"}
+      className="milestone-glass-surface h-full rounded-[var(--radius-card)] border p-4"
     >
       <div className="flex items-start gap-3">
         <span
           className={
             reached
-              ? "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold-500/15"
-              : "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-paper"
+              ? "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold-100/85 ring-1 ring-gold-500/35"
+              : "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-paper/85 ring-1 ring-mist/70"
           }
         >
           <PixelIcon name={(milestone.iconKey as PixelSpriteName) ?? "star"} size={4} />
@@ -183,23 +244,47 @@ function MilestoneListRow({ view }: { view: MilestoneView }) {
 }
 
 function JourneyScreenInner() {
-  const t = useStrings();
   const growthEvents = useQuestOS((s) => s.growthEvents);
   const journeyEvents = useQuestOS((s) => s.journeyEvents);
   const earned = useQuestOS((s) => s.earnedMilestones);
-  const lastVisit = useQuestOS((s) => s.lastVisitDateKey);
+  const reconcileMilestones = useQuestOS((s) => s.reconcileMilestones);
   const completions = useQuestOS((s) => s.completions);
   const prayers = useQuestOS((s) => s.prayers);
   const reflections = useQuestOS((s) => s.reflections);
   const chaptersRead = useQuestOS((s) => s.chaptersRead);
   const bookmarks = useQuestOS((s) => s.bookmarks);
+  const dayKey = useCurrentDayKey();
+  const [visibleMonthCount, setVisibleMonthCount] = useState(4);
+
+  // Catalogue additions are awarded quietly from existing history. New user
+  // actions still receive the normal acknowledgement at the moment they occur.
+  useEffect(() => {
+    reconcileMilestones();
+  }, [
+    bookmarks,
+    chaptersRead,
+    completions,
+    journeyEvents,
+    prayers,
+    reconcileMilestones,
+    reflections,
+  ]);
 
   const tree = useMemo(() => calculateTreeState(growthEvents), [growthEvents]);
+  const recentGrowth = useMemo(
+    () => summarizeRecentGrowth(growthEvents, dayKey),
+    [dayKey, growthEvents]
+  );
   // Progress through the current stage — "small steps", never points.
   const progress = stageProgress(tree);
   const nextStage = nextTreeStage(tree.stage);
   const timeline = useMemo(
-    () => [...journeyEvents].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)),
+    () =>
+      [...journeyEvents].sort(
+        (a, b) =>
+          b.dateKey.localeCompare(a.dateKey) ||
+          b.occurredAt.localeCompare(a.occurredAt)
+      ),
     [journeyEvents]
   );
 
@@ -208,7 +293,7 @@ function JourneyScreenInner() {
   const months = useMemo(() => {
     const groups: { label: string; events: JourneyEvent[] }[] = [];
     for (const e of timeline) {
-      const label = monthLabel(e.occurredAt);
+      const label = monthLabel(e.dateKey);
       const last = groups[groups.length - 1];
       if (last && last.label === label) {
         last.events.push(e);
@@ -264,13 +349,25 @@ function JourneyScreenInner() {
 
   const milestoneHighlights = useMemo(
     () => [
-      ...milestoneViews.reached.slice(0, 3),
-      ...milestoneViews.upcoming.slice(0, 4),
+      ...milestoneViews.reached.slice(0, 1),
+      ...milestoneViews.upcoming.slice(0, 3),
     ],
     [milestoneViews]
   );
 
-  const returning = timeline.length > 0 && lastVisit !== null;
+  const milestoneGroups = useMemo(
+    () =>
+      MILESTONE_GROUPS.map(([key, label]) => ({
+        key,
+        label,
+        views: milestoneViews.all.filter(
+          (view) => view.milestone.milestoneType === key
+        ),
+      })).filter((group) => group.views.length > 0),
+    [milestoneViews]
+  );
+  const visibleMonths = months.slice(0, visibleMonthCount);
+  const finalStage = nextStage === null;
 
   return (
     <>
@@ -282,28 +379,31 @@ function JourneyScreenInner() {
             <SeasonalAtmosphere density={6} />
           </div>
           <div className="relative flex justify-center">
-            <GrowthTree state={tree} size={240} />
+            <GrowthTree state={tree} size={224} />
           </div>
           <h2 className="relative mt-2 font-display text-[1.5rem] text-graphite">
             {tree.stageLabel}
           </h2>
           <p className="relative mt-1 text-[0.9375rem] text-ash">
             {tree.totalActions === 0
-              ? "Complete one quest and it starts growing."
-              : returning
-                ? `${tree.totalActions} meaningful steps have shaped it.`
-                : treeReturnLine}
+              ? "One meaningful step is enough to begin."
+              : "Every meaningful practice leaves a mark. Growth never fades."}
           </p>
 
-          {/* Gentle progression — small steps toward the next stage. At the
-              final stage the bar simply rests full; nothing counts down. */}
+          {/* The tree shows direction without turning practice into points. */}
           <div className="relative mx-auto mt-4 w-full max-w-[17rem]">
             <div className="flex items-baseline justify-between text-caption text-ash">
               <span>{tree.stageLabel}</span>
               {nextStage && <span>{treeStageLabels[nextStage]}</span>}
             </div>
             <div
-              aria-hidden="true"
+              role="progressbar"
+              aria-label={`Growth from ${tree.stageLabel}${
+                nextStage ? ` toward ${treeStageLabels[nextStage]}` : ""
+              }`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round((progress?.fraction ?? 1) * 100)}
               className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-mist/60"
             >
               <div
@@ -312,28 +412,125 @@ function JourneyScreenInner() {
               />
             </div>
             <p className="mt-1.5 text-caption text-ash">
-              {progress && tree.toNextStage != null
-                ? tree.toNextStage === 1
-                  ? t.journey.toNextOne
-                  : fmt(t.journey.toNext, { n: tree.toNextStage })
-                : t.journey.fullGrown}
+              {stageSeasonLine(progress?.fraction ?? 1, finalStage)}
             </p>
           </div>
 
-          {/* Growth breakdown — gentle, not a chart */}
-          {tree.totalActions > 0 && (
-            <div className="relative mt-5 grid grid-cols-2 gap-x-6 gap-y-2 text-left sm:grid-cols-3">
-              {GROWTH_ORDER.filter((g) => tree.byType[g] > 0).map((g) => (
-                <div key={g} className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-olive-300" />
-                  <span className="text-[0.8125rem] text-charcoal">
-                    {GROWTH_MEANINGS[g]}
-                  </span>
-                </div>
-              ))}
-            </div>
+          {tree.totalActions === 0 && (
+            <GentleLink
+              href="/app/quests"
+              variant="primary"
+              size="sm"
+              className="relative mt-5"
+            >
+              Plant your first step
+            </GentleLink>
           )}
         </PaperCard>
+
+        {/* A rolling recap adds memory without introducing weekly goals. */}
+        <section className="mt-6" aria-labelledby="week-heading">
+          <div className="mb-2.5">
+            <h2
+              id="week-heading"
+              className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent"
+            >
+              This week
+            </h2>
+            <p className="mt-1 text-[0.8125rem] text-ash">
+              A look back, never a target to meet.
+            </p>
+          </div>
+          <PaperCard variant="quiet" padding="md">
+            {recentGrowth.totalSteps > 0 ? (
+              <>
+                <p className="text-[0.9375rem] text-graphite">
+                  Your tree was tended {recentGrowth.activeDays === 1
+                    ? "on one day"
+                    : `across ${recentGrowth.activeDays} days`}.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2" aria-label="Growth tended this week">
+                  {recentGrowth.activeGrowthTypes.map((type) => {
+                    const facet = GROWTH_FACETS[type];
+                    return (
+                      <span
+                        key={type}
+                        className="inline-flex min-h-9 items-center gap-2 rounded-full border border-mist bg-paper/80 px-3 text-caption text-charcoal"
+                      >
+                        <PixelIcon name={facet.sprite} size={2} />
+                        {facet.label}
+                      </span>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <div className="flex items-start gap-3">
+                <PixelIcon name="tree-stage-0" size={2} />
+                <div>
+                  <p className="text-[0.9375rem] text-graphite">
+                    Your tree is resting this week.
+                  </p>
+                  <p className="mt-1 text-[0.8125rem] leading-relaxed text-ash">
+                    Nothing has been lost. Return whenever you are ready.
+                  </p>
+                </div>
+              </div>
+            )}
+          </PaperCard>
+        </section>
+
+        {/* Every facet remains available, including those not yet tended. */}
+        <section className="mt-6" aria-labelledby="nourish-heading">
+          <div className="mb-2.5">
+            <h2
+              id="nourish-heading"
+              className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent"
+            >
+              How your tree grows
+            </h2>
+            <p className="mt-1 text-[0.8125rem] text-ash">
+              Different practices tend different parts of the same life.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            {GROWTH_ORDER.map((type) => {
+              const facet = GROWTH_FACETS[type];
+              const tended = tree.byType[type] > 0;
+              return (
+                <Link
+                  key={type}
+                  href={facet.href}
+                  className="app-glass-surface group rounded-[var(--radius-card)] border border-mist bg-paper p-3.5 transition-colors hover:border-accent/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-surface">
+                      <PixelIcon name={facet.sprite} size={3} />
+                    </span>
+                    <span
+                      className={
+                        tended
+                          ? "rounded-full bg-gold-500/15 px-2 py-1 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-gilt"
+                          : "rounded-full bg-linen px-2 py-1 text-[0.6875rem] uppercase tracking-[0.08em] text-ash"
+                      }
+                    >
+                      {tended ? "Tended" : "Ready"}
+                    </span>
+                  </span>
+                  <span className="mt-3 block text-[0.9375rem] font-medium text-graphite">
+                    {facet.label}
+                  </span>
+                  <span className="mt-0.5 block text-[0.75rem] leading-snug text-ash">
+                    {facet.meaning}
+                  </span>
+                  <span className="mt-2 block text-[0.75rem] font-medium text-accent group-hover:underline">
+                    {facet.invitation}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
 
         {/* Milestones — a compact side-scroll for the nearest markers, with
             the complete catalogue tucked into an accessible disclosure. */}
@@ -356,8 +553,7 @@ function JourneyScreenInner() {
           </div>
 
           <ol
-            tabIndex={0}
-            className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain rounded-[var(--radius-button)] px-1 pb-3 [scrollbar-width:thin] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-1 pb-3 [scrollbar-width:thin]"
             aria-label="Milestone highlights"
           >
             {milestoneHighlights.map((view) => (
@@ -380,9 +576,21 @@ function JourneyScreenInner() {
               </span>
             }
           >
-            <div className="divide-y divide-mist">
-              {milestoneViews.all.map((view) => (
-                <MilestoneListRow key={view.milestone.key} view={view} />
+            <div className="space-y-5">
+              {milestoneGroups.map((group) => (
+                <section key={group.key} aria-labelledby={`milestone-group-${group.key}`}>
+                  <h3
+                    id={`milestone-group-${group.key}`}
+                    className="mb-2 text-caption font-medium uppercase tracking-[0.14em] text-ash"
+                  >
+                    {group.label}
+                  </h3>
+                  <div className="divide-y divide-mist">
+                    {group.views.map((view) => (
+                      <MilestoneListRow key={view.milestone.key} view={view} />
+                    ))}
+                  </div>
+                </section>
               ))}
             </div>
           </Disclosure>
@@ -400,7 +608,7 @@ function JourneyScreenInner() {
             </div>
           ) : (
             <DisclosureGroup>
-              {months.map((month, i) => (
+              {visibleMonths.map((month, i) => (
                 <Disclosure
                   key={month.label}
                   defaultOpen={i === 0}
@@ -411,15 +619,15 @@ function JourneyScreenInner() {
                     </span>
                   }
                 >
-                  <ol className="relative ml-2 mt-1 border-l border-mist">
+                  <ol className="relative ms-2 mt-1 border-s border-mist">
                     {month.events.map((e) => (
-                      <li key={e.id} className="relative ml-6 pb-6 last:pb-0">
-                        <span className="absolute -left-[2.05rem] top-0 flex h-6 w-6 items-center justify-center rounded-full bg-parchment ring-1 ring-mist">
+                      <li key={e.id} className="relative ms-6 pb-6 last:pb-0">
+                        <span className="absolute -start-[2.05rem] top-0 flex h-6 w-6 items-center justify-center rounded-full bg-parchment ring-1 ring-mist">
                           <PixelIcon name={EVENT_SPRITE[e.type]} size={3} />
                         </span>
                         <p className="text-[0.9375rem] text-charcoal">{e.title}</p>
                         <p className="mt-0.5 text-[0.75rem] text-ash">
-                          {formatShortDate(e.occurredAt)}
+                          {formatShortDate(`${e.dateKey}T12:00:00`)}
                         </p>
                       </li>
                     ))}
@@ -428,44 +636,45 @@ function JourneyScreenInner() {
               ))}
             </DisclosureGroup>
           )}
+          {visibleMonthCount < months.length && (
+            <GentleButton
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={() => setVisibleMonthCount((count) => count + 4)}
+            >
+              Show earlier journey
+            </GentleButton>
+          )}
         </section>
 
-        {/* Sanctuary — personal touches on the way. A quiet closing note:
-            nothing purchasable, nothing locked, nothing required. */}
+        {/* Wallpaper customization has shipped, so Journey links to the real
+            setting instead of promising a background feature that already exists. */}
         <section className="mt-7 pb-6">
-          <Disclosure
-            variant="card"
-            label={
-              <span className="text-[0.9375rem] font-medium text-graphite">
-                {t.journey.sanctuary}
-              </span>
-            }
-            summary={
-              <span className="rounded-full bg-accent-surface px-2 py-0.5 text-[0.8125rem] font-medium text-accent">
-                Soon
-              </span>
-            }
+          <PaperCard
+            variant="atmospheric"
+            padding="md"
+            className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4"
           >
-            <p className="text-[0.875rem] leading-relaxed text-ash">
-              {t.journey.sanctuarySoon}
-            </p>
-            <div className="mt-4 grid grid-cols-2 gap-2.5">
-              {SANCTUARY_TILES.map((tile) => (
-                <PaperCard
-                  key={tile.label}
-                  variant="quiet"
-                  padding="sm"
-                  className="flex flex-col items-center gap-1.5 text-center"
-                >
-                  <span className="flex h-8 items-center opacity-80">
-                    <PixelIcon name={tile.sprite} size={tile.size} />
-                  </span>
-                  <span className="text-[0.875rem] text-charcoal">{tile.label}</span>
-                  <span className="text-[0.75rem] text-ash">Coming soon</span>
-                </PaperCard>
-              ))}
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent-surface">
+              <PixelIcon name="star" size={4} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-[1rem] font-medium text-graphite">Make the space yours</h2>
+              <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-ash">
+                Choose still or live artwork, then let the glass surfaces carry it through.
+              </p>
             </div>
-          </Disclosure>
+            <GentleLink
+              href="/app/settings#appearance"
+              variant="outline"
+              size="sm"
+              className="shrink-0 self-stretch sm:self-auto"
+            >
+              Customize
+            </GentleLink>
+          </PaperCard>
         </section>
       </PageContainer>
     </>

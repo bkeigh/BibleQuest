@@ -56,7 +56,7 @@ export function QuestGenerator({
         </p>
         <Link
           href="/app/plus"
-          className="mt-3 inline-flex text-small font-medium text-accent hover:underline"
+          className="mt-3 inline-flex min-h-11 items-center text-small font-medium text-accent hover:underline"
         >
           Explore BibleQuest Plus
         </Link>
@@ -92,7 +92,7 @@ export function QuestGenerator({
   }
 
   const selectClass =
-    "w-full rounded-[var(--radius-button)] border border-mist bg-paper px-3 py-2.5 text-small text-charcoal outline-none focus:border-accent/50";
+    "min-h-11 w-full rounded-[var(--radius-button)] border border-mist bg-paper px-3 py-2.5 text-small text-charcoal outline-none focus:border-accent/50";
   const resultAssignment = result
     ? activeQuestAssignments(assignments).find(
         (item) => item.questSlug === result.quest.slug
@@ -209,7 +209,7 @@ export function QuestGenerator({
                   onClick={() => onAdd(result.quest)}
                   aria-label={`Add ${result.quest.title} to your active quests`}
                   title="Add quest"
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-accent/50 bg-paper text-accent transition-colors hover:bg-accent-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  className="flex h-11 w-11 items-center justify-center rounded-full border border-accent/50 bg-paper text-accent transition-colors hover:bg-accent-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
                   <IconPlus size={17} />
                 </button>

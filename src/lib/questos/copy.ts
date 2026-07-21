@@ -25,7 +25,7 @@ export function completionLine(seed: number): string {
 export const emptyStates = {
   prayer: "Write what’s actually on your mind. Save it in your private-by-default journal.",
   reflections: "Your reflections will collect here.",
-  journey: "Nothing here yet. Your first quest will show up here.",
+  journey: "Nothing here yet. Your first meaningful step will show up here.",
   bookmarks: "Save verses you want to come back to.",
   questsFiltered: "Nothing matches those filters. Try widening them.",
   questsUnpicked: "No active quests yet. Choose up to three 24-hour windows.",
@@ -60,4 +60,4 @@ export const treeStageLabels: Record<string, string> = {
   sheltering: "Sheltering Tree",
 };
 
-export const treeReturnLine = "One quest is enough to keep growing.";
+export const treeReturnLine = "One meaningful step is enough to keep growing.";

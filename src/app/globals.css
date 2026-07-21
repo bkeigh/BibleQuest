@@ -363,6 +363,50 @@ html.theme-dark .wallpaper-scrim {
   }
 }
 
+/* Journey milestone cards sit above the general glass hierarchy so their
+   progress stays easy to scan. Reached markers receive the densest gold pane. */
+.milestone-glass-surface {
+  background-color: var(--color-paper);
+  border-color: var(--color-mist);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.64),
+    0 10px 28px rgb(18 33 27 / 0.1);
+}
+.milestone-glass-surface[data-milestone-state="reached"] {
+  background-color: var(--color-gold-100);
+  border-color: color-mix(in srgb, var(--color-gold-500) 62%, var(--color-mist));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.72),
+    0 12px 30px rgb(111 83 29 / 0.15);
+}
+html.theme-dark .milestone-glass-surface {
+  background-color: var(--color-linen);
+}
+html.theme-dark .milestone-glass-surface[data-milestone-state="reached"] {
+  background-color: color-mix(in srgb, var(--color-paper) 84%, var(--color-gold-700));
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html.glass-surfaces [data-app-shell] .milestone-glass-surface {
+    background-color: color-mix(in srgb, var(--color-paper) 78%, transparent);
+    -webkit-backdrop-filter: blur(24px) saturate(1.3);
+    backdrop-filter: blur(24px) saturate(1.3);
+  }
+  html.glass-surfaces [data-app-shell] .milestone-glass-surface[data-milestone-state="reached"] {
+    background-color: color-mix(in srgb, var(--color-gold-100) 92%, transparent);
+  }
+  html.theme-dark.glass-surfaces [data-app-shell] .milestone-glass-surface {
+    background-color: color-mix(in srgb, var(--color-linen) 84%, transparent);
+  }
+  html.theme-dark.glass-surfaces [data-app-shell] .milestone-glass-surface[data-milestone-state="reached"] {
+    background-color: color-mix(
+      in srgb,
+      color-mix(in srgb, var(--color-paper) 84%, var(--color-gold-700)) 94%,
+      transparent
+    );
+  }
+}
+
 ::selection {
   background-color: var(--color-gold-100);
   color: var(--color-graphite);

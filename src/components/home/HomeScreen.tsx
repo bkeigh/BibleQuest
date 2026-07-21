@@ -90,7 +90,12 @@ function HomeInner() {
 
   const tree = useMemo(() => calculateTreeState(growthEvents), [growthEvents]);
   const progress = useMemo(() => stageProgress(tree), [tree]);
-  const season = useMemo(() => getCurrentSeason(), []);
+  // The long-lived PWA already refreshes dayKey; seasonal content should move
+  // with that same local-day boundary instead of requiring an app restart.
+  const season = useMemo(
+    () => getCurrentSeason(new Date(`${dayKey}T12:00:00`)),
+    [dayKey],
+  );
   const name = profile?.displayName?.trim();
   const time = timeOfDay();
   const t = useStrings();

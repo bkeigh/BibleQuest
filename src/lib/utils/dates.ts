@@ -7,6 +7,43 @@ export function toDateKey(date: Date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
+/** Validate a local-calendar key without allowing JavaScript date rollover. */
+export function isValidDateKey(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
+/** Accept only complete ISO timestamps with an explicit timezone. */
+export function isValidZonedTimestamp(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.exec(
+      value
+    );
+  if (!match) return false;
+  const dateKey = `${match[1]}-${match[2]}-${match[3]}`;
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  return (
+    isValidDateKey(dateKey) &&
+    hour <= 23 &&
+    minute <= 59 &&
+    second <= 59 &&
+    Number.isFinite(Date.parse(value))
+  );
+}
+
 export function fromDateKey(dateKey: string): Date {
   const [y, m, d] = dateKey.split("-").map(Number);
   return new Date(y, m - 1, d);

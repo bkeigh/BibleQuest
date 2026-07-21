@@ -4,12 +4,11 @@
  *
  * Conventions:
  *  - Local ids are UUIDs and become the row `id`, so upserts are idempotent.
- *  - `dateKey` fields (local-time YYYY-MM-DD) map to date columns directly;
- *    where the schema has no date column (completions, journey events), the
- *    dateKey is re-derived from the timestamp in the reader's local time.
+ *  - `dateKey` fields (source-local YYYY-MM-DD) map to date columns directly;
+ *    legacy rows without a Journey date fall back to the reader's local time.
  *  - Optional local fields map to nullable columns and back to undefined.
  */
-import { toDateKey } from "@/lib/utils/dates";
+import { isValidDateKey, toDateKey } from "@/lib/utils/dates";
 import type {
   ChapterRead,
   DailyQuestAssignment,
@@ -148,6 +147,8 @@ export interface JourneyEventRow {
   event_type: string;
   title: string;
   detail: string | null;
+  date_key?: string | null;
+  source_id?: string | null;
   occurred_at: string;
 }
 
@@ -339,6 +340,8 @@ export function journeyEventToRow(uid: string, e: JourneyEvent): JourneyEventRow
     event_type: e.type,
     title: e.title,
     detail: e.detail ?? null,
+    date_key: e.dateKey,
+    source_id: e.sourceId ?? null,
     occurred_at: e.occurredAt,
   };
 }
@@ -517,12 +520,19 @@ export function rowToChapterRead(row: ChapterReadRow): ChapterRead {
 }
 
 export function rowToJourneyEvent(row: JourneyEventRow): JourneyEvent {
+  const utcDateKey = row.occurred_at.slice(0, 10);
   return {
     id: row.id,
     type: row.event_type as JourneyEventType,
     title: row.title,
     detail: row.detail ?? undefined,
-    dateKey: toDateKey(new Date(row.occurred_at)),
+    sourceId: row.source_id ?? undefined,
+    dateKey:
+      row.date_key && isValidDateKey(row.date_key)
+        ? row.date_key
+        : isValidDateKey(utcDateKey)
+          ? utcDateKey
+          : toDateKey(new Date(row.occurred_at)),
     occurredAt: row.occurred_at,
   };
 }

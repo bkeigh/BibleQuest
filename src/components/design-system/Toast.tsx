@@ -112,7 +112,7 @@ function ToastCard({
             item.action?.onClick();
             onDismiss();
           }}
-          className="shrink-0 font-medium text-accent underline-offset-4 hover:underline"
+          className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center px-1 font-medium text-accent underline-offset-4 hover:underline"
         >
           {item.action.label}
         </button>

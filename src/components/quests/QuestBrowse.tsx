@@ -36,6 +36,7 @@ import {
   CATEGORY_LABEL,
 } from "@/components/quests/QuestSlip";
 import { Disclosure } from "@/components/design-system/Disclosure";
+import { GentleButton } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { useToast } from "@/components/design-system/Toast";
 import {
@@ -109,10 +110,29 @@ function QuestBrowseInner() {
 
   const slotsRemaining = questSlotsRemaining(assignments, isPlus, now);
   const nextSlot = nextQuestSlotAt(assignments, isPlus, now);
-  const reservedSlots = occupiedQuestAssignments(assignments, now).length;
+  const occupiedPicks = useMemo(
+    () => occupiedQuestAssignments(assignments, now),
+    [assignments, now]
+  );
+  const reservedSlots = occupiedPicks.length;
 
-  const season = useMemo(() => getCurrentSeason(), []);
-  const todayKey = toDateKey();
+  // Released free-tier quests still own their original window. Keep them
+  // visible here so "restore" is a direct action, not a catalog scavenger hunt.
+  const releasedReservations = useMemo(
+    () =>
+      occupiedPicks.flatMap((pick) => {
+        if (pick.status !== "released") return [];
+        const quest = questBySlug.get(pick.questSlug);
+        return quest ? [{ pick, quest }] : [];
+      }),
+    [occupiedPicks]
+  );
+
+  // Derive daily and seasonal discovery from the minute-refreshed clock so a
+  // long-lived PWA rolls over without requiring a reload or route change.
+  const today = new Date(now);
+  const season = getCurrentSeason(today);
+  const todayKey = toDateKey(today);
 
   const completedToday = useMemo(
     () =>
@@ -217,6 +237,26 @@ function QuestBrowseInner() {
     }
   }
 
+  // Reuses the original reservation through pickQuest, so restoring never
+  // consumes a second free slot or resets the existing expiry window.
+  function handleRestore(quest: QuestTemplate) {
+    if (pickQuest(quest.slug, isPlus)) {
+      toast(`${quest.title} is back in today.`, { variant: "success" });
+      return;
+    }
+    toast("That reservation has ended. You can choose the quest again below.");
+  }
+
+  // Return discovery to its broad, predictable starting state in one action.
+  function clearFilters() {
+    setDuration(null);
+    setCategory(null);
+    setEnergy(null);
+    setCompany(null);
+    setSetting(null);
+    setSearch("");
+  }
+
   /** A browse-list slip: shelf state + add-to-today / save-for-later. */
   function browseSlip(quest: QuestTemplate, compact = false) {
     const done = completedToday.has(quest.slug);
@@ -243,7 +283,7 @@ function QuestBrowseInner() {
                 aria-label={t.quests.addToToday}
                 title={t.quests.addToToday}
                 onClick={() => handleAdd(quest)}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-accent/50 bg-paper text-accent transition-colors duration-300 hover:bg-accent-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                className="flex h-11 w-11 items-center justify-center rounded-full border border-accent/50 bg-paper text-accent transition-colors duration-300 hover:bg-accent-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
                 <IconPlus size={17} />
               </button>
@@ -253,7 +293,7 @@ function QuestBrowseInner() {
                   aria-label={t.myQuests.saveForLater}
                   title={t.myQuests.saveForLater}
                   onClick={() => handleSave(quest)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-mist bg-paper text-ash transition-colors duration-300 hover:border-accent/40 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  className="flex h-11 w-11 items-center justify-center rounded-full border border-mist bg-paper text-ash transition-colors duration-300 hover:border-accent/40 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
                   <IconBookmark size={16} />
                 </button>
@@ -297,8 +337,8 @@ function QuestBrowseInner() {
           {picks.length === 0 ? (
             <PaperCard variant="quiet" padding="sm" className="mt-2">
               <p className="text-small text-charcoal">
-                {reservedSlots > 0
-                  ? `${reservedSlots} removed ${reservedSlots === 1 ? "quest still holds a slot" : "quests still hold their slots"} until the 24-hour reset. You can restore ${reservedSlots === 1 ? "it" : "them"} from Browse.`
+                {releasedReservations.length > 0
+                  ? "Your visible list is clear. Restore a reserved quest below or browse for another."
                   : t.empty.questsUnpicked}
               </p>
             </PaperCard>
@@ -331,7 +371,7 @@ function QuestBrowseInner() {
                                 aria-label={`Remove ${quest.title} from today`}
                                 title="Remove from today"
                                 onClick={() => handleRemove(quest)}
-                                className="flex h-9 w-9 items-center justify-center rounded-full border border-mist bg-paper text-ash transition-colors duration-300 hover:border-accent/40 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                                className="flex h-11 w-11 items-center justify-center rounded-full border border-mist bg-paper text-ash transition-colors duration-300 hover:border-accent/40 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                               >
                                 <IconClose size={16} />
                               </button>
@@ -344,6 +384,56 @@ function QuestBrowseInner() {
                 </div>
               ))}
             </div>
+          )}
+
+          {releasedReservations.length > 0 && (
+            <PaperCard variant="linen" padding="sm" className="mt-3">
+              <p className="font-display text-[1.0625rem] text-graphite">
+                {releasedReservations.length === 1
+                  ? "Reserved quest"
+                  : "Reserved quests"}
+              </p>
+              <p className="mt-1 text-caption leading-relaxed text-ash">
+                {releasedReservations.length === 1 ? "This keeps" : "These keep"} the
+                original 24-hour {releasedReservations.length === 1 ? "slot" : "slots"}.
+                Restoring a quest does not use another slot or restart its timer.
+              </p>
+              <ul className="mt-2 divide-y divide-mist/70">
+                {releasedReservations.map(({ pick, quest }) => (
+                  <li
+                    key={`${pick.pickedAt}:${quest.slug}`}
+                    className="flex min-h-16 items-center gap-3 py-2"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-small font-medium text-graphite">
+                        {quest.title}
+                      </span>
+                      <time
+                        dateTime={pick.expiresAt}
+                        title={new Date(pick.expiresAt).toLocaleString()}
+                        className="mt-0.5 block text-caption text-ash"
+                      >
+                        Slot opens in{" "}
+                        {formatQuestWindowRemaining(pick.expiresAt, now).replace(
+                          " left",
+                          ""
+                        )}
+                      </time>
+                    </span>
+                    <GentleButton
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-label={`Restore ${quest.title} to today`}
+                      onClick={() => handleRestore(quest)}
+                      className="shrink-0"
+                    >
+                      Restore
+                    </GentleButton>
+                  </li>
+                ))}
+              </ul>
+            </PaperCard>
           )}
         </section>
 
@@ -506,9 +596,24 @@ function QuestBrowseInner() {
             {results.length} {results.length === 1 ? "quest" : "quests"}
           </p>
           {results.length === 0 ? (
-            <p className="py-10 text-center text-small text-ash">
-              {t.empty.questsFiltered}
-            </p>
+            <PaperCard variant="quiet" padding="lg" className="text-center">
+              <p className="font-display text-[1.125rem] text-graphite">
+                No quests match yet
+              </p>
+              <p className="mx-auto mt-1.5 max-w-sm text-small leading-relaxed text-ash">
+                {t.empty.questsFiltered} Clear the filters to return to the full
+                quest collection.
+              </p>
+              <GentleButton
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={clearFilters}
+                className="mt-4"
+              >
+                Clear all filters
+              </GentleButton>
+            </PaperCard>
           ) : (
             <div className="space-y-3 pb-6">
               {results.slice(0, visibleCount).map((quest) => browseSlip(quest))}
@@ -518,7 +623,7 @@ function QuestBrowseInner() {
                   onClick={() =>
                     setPagination({ key: resultKey, count: visibleCount + 24 })
                   }
-                  className="mx-auto block rounded-full border border-mist bg-paper px-5 py-2.5 text-small font-medium text-accent transition-colors hover:border-accent/40 hover:bg-accent-surface"
+                  className="mx-auto block min-h-11 rounded-full border border-mist bg-paper px-5 py-2.5 text-small font-medium text-accent transition-colors hover:border-accent/40 hover:bg-accent-surface"
                 >
                   Show 24 more · {results.length - visibleCount} remaining
                 </button>
@@ -571,7 +676,7 @@ function Chip({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "shrink-0 whitespace-nowrap rounded-full border transition-all duration-300",
+        "min-h-11 min-w-11 shrink-0 whitespace-nowrap rounded-full border transition-all duration-300",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
         small ? "px-3 py-1.5 text-[0.8125rem]" : "px-4 py-2 text-[0.875rem]",
         active

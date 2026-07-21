@@ -2,11 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRef } from "react";
 import { IconCheck } from "@/components/design-system/icons";
+import { useToast } from "@/components/design-system/Toast";
 import { usePlus } from "@/lib/revenuecat/usePlus";
 import {
   WALLPAPER_CATALOG,
+  DEFAULT_WALLPAPER_ID,
   canAccessWallpaper,
   getWallpaperById,
   type WallpaperId,
@@ -23,11 +26,33 @@ interface WallpaperPickerProps {
 
 /** Horizontal, keyboard-navigable artwork selector with clear tier gating. */
 export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
+  const router = useRouter();
+  const { toast } = useToast();
   const { isPlus, loading } = usePlus();
   const shouldReduceMotion = useShouldReduceMotion();
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const choices = ["none", ...WALLPAPER_CATALOG.map(({ id }) => id)] as const;
-  const selectedIndex = Math.max(0, choices.indexOf(value));
+  const requestedWallpaper = value === "none" ? undefined : getWallpaperById(value);
+  const savedChoiceLocked = Boolean(
+    !loading &&
+      requestedWallpaper &&
+      !canAccessWallpaper(requestedWallpaper, isPlus)
+  );
+  const effectiveValue = savedChoiceLocked ? DEFAULT_WALLPAPER_ID : value;
+  const selectedIndex = Math.max(0, choices.indexOf(effectiveValue));
+
+  function explainLockedWallpaper() {
+    if (loading) {
+      toast("Checking your Plus access…");
+      return;
+    }
+    toast("That scene is included with BibleQuest Plus.", {
+      action: {
+        label: "Explore Plus",
+        onClick: () => router.push("/app/plus"),
+      },
+    });
+  }
 
   // Arrow keys preserve the familiar radio-group interaction while the cards
   // remain horizontally scrollable by touch.
@@ -79,7 +104,7 @@ export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
           }}
           type="button"
           role="radio"
-          aria-checked={value === "none"}
+          aria-checked={effectiveValue === "none"}
           tabIndex={selectedIndex === 0 ? 0 : -1}
           onKeyDown={(event) => onKeyDown(event, 0)}
           onClick={() => onChange("none")}
@@ -91,14 +116,16 @@ export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
           <span
             className={cn(
               "relative block aspect-[9/16] overflow-hidden rounded-[var(--radius-card)] border bg-[linear-gradient(145deg,var(--color-paper),var(--color-linen))] paper-shadow",
-              value === "none" ? "border-accent ring-2 ring-accent/25" : "border-mist",
+              effectiveValue === "none"
+                ? "border-accent ring-2 ring-accent/25"
+                : "border-mist",
             )}
           >
             <span className="absolute inset-3 rounded-[10px] border border-mist bg-paper/80" />
             <span className="absolute inset-x-3 bottom-4 text-center font-pixel text-[0.75rem] uppercase tracking-[0.08em] text-accent">
               Classic
             </span>
-            {value === "none" && <SelectedMark />}
+            {effectiveValue === "none" && <SelectedMark />}
           </span>
           <span className="mt-1.5 block truncate text-caption text-charcoal">
             Parchment
@@ -109,7 +136,7 @@ export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
         </button>
 
         {WALLPAPER_CATALOG.map((wallpaper, index) => {
-          const selected = value === wallpaper.id;
+          const selected = effectiveValue === wallpaper.id;
           const accessible = canAccessWallpaper(wallpaper, isPlus);
           const refIndex = index + 1;
           return (
@@ -127,6 +154,7 @@ export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
               onKeyDown={(event) => onKeyDown(event, refIndex)}
               onClick={() => {
                 if (accessible) onChange(wallpaper.id);
+                else explainLockedWallpaper();
               }}
               className="group w-28 shrink-0 snap-center text-left rounded-[var(--radius-card)] focus-visible:outline-offset-2"
             >
@@ -170,6 +198,13 @@ export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
           );
         })}
       </div>
+
+      {savedChoiceLocked && requestedWallpaper && (
+        <p role="status" className="mt-2 text-caption leading-relaxed text-ash">
+          {requestedWallpaper.title} is saved for Plus. Galilee, Be Still is
+          showing for now.
+        </p>
+      )}
 
       {!isPlus && !loading && (
         <p className="mt-2 text-caption text-ash">

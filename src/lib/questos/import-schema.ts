@@ -17,8 +17,20 @@ import {
   type AccountNudgeContext,
   type QuestOSSnapshot,
 } from "./types";
+import { seedMilestones } from "@/data/seed/milestones";
 import { normalizeBibleTranslationKey } from "@/lib/bible/translations";
 import { isWallpaperId } from "@/lib/wallpapers/catalog";
+import {
+  isValidGrowthEvent,
+  uniqueValidGrowthEvents,
+} from "./growth-engine";
+import {
+  isValidJourneyEvent,
+  isValidQuestCompletion,
+  uniqueValidJourneyEvents,
+  uniqueValidQuestCompletions,
+} from "./history-integrity";
+import { isValidDateKey } from "@/lib/utils/dates";
 
 function isObj(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -28,6 +40,7 @@ const num = (v: unknown): v is number => typeof v === "number";
 const PRAYER_CATEGORY_SET = new Set<string>(PRAYER_CATEGORIES);
 const QUEST_STEP_SET = new Set<string>(QUEST_STEP_KEYS);
 const REFLECTION_MOOD_SET = new Set<string>(REFLECTION_MOODS);
+const MILESTONE_KEY_SET = new Set(seedMilestones.map(({ key }) => key));
 const MY_QUEST_STATUSES = new Set([
   "saved",
   "active",
@@ -59,11 +72,6 @@ const isReflection = (o: unknown) =>
   isObj(o) && str(o.id) && str(o.body) && str(o.createdAt) && str(o.updatedAt) &&
   (o.mood === undefined || (str(o.mood) && REFLECTION_MOOD_SET.has(o.mood))) &&
   (o.archivedAt === undefined || str(o.archivedAt));
-const isGrowthEvent = (o: unknown) => isObj(o) && str(o.growthType) && num(o.amount);
-const isCompletion = (o: unknown) =>
-  isObj(o) && str(o.id) && str(o.questSlug) && str(o.dateKey) && str(o.completedAt);
-const isJourneyEvent = (o: unknown) =>
-  isObj(o) && str(o.id) && str(o.type) && str(o.title) && str(o.dateKey) && str(o.occurredAt);
 const isBookmark = (o: unknown) =>
   isObj(o) && str(o.id) && str(o.bookSlug) && str(o.bookName) && num(o.chapter) && num(o.verse) && str(o.text) && str(o.createdAt);
 const isChapterRead = (o: unknown) => isObj(o) && str(o.bookSlug) && num(o.chapter) && str(o.dateKey);
@@ -88,8 +96,9 @@ const isAssignment = (o: unknown) =>
   (o.pickedAt === undefined || str(o.pickedAt)) &&
   (o.expiresAt === undefined || str(o.expiresAt));
 const isStreak = (o: unknown) =>
-  isObj(o) && num(o.current) && num(o.longest) &&
-  (str(o.lastActiveDateKey) || o.lastActiveDateKey === null);
+  isObj(o) && num(o.current) && Number.isSafeInteger(o.current) && o.current >= 0 &&
+  num(o.longest) && Number.isSafeInteger(o.longest) && o.longest >= o.current &&
+  (isValidDateKey(o.lastActiveDateKey) || o.lastActiveDateKey === null);
 const isMyQuest = (o: unknown) =>
   isObj(o) &&
   str(o.questSlug) &&
@@ -111,11 +120,11 @@ const isAccountNudge = (o: unknown) =>
 
 // field name -> element guard. Elements failing the guard are dropped.
 const ARRAY_GUARDS: Record<string, (o: unknown) => boolean> = {
-  completions: isCompletion,
+  completions: isValidQuestCompletion,
   prayers: isPrayer,
   reflections: isReflection,
-  journeyEvents: isJourneyEvent,
-  growthEvents: isGrowthEvent,
+  journeyEvents: isValidJourneyEvent,
+  growthEvents: isValidGrowthEvent,
   earnedMilestones: isEarnedMilestone,
   bookmarks: isBookmark,
   chaptersRead: isChapterRead,
@@ -138,6 +147,24 @@ const ALL_KEYS: string[] = [
 export type ParseResult =
   | { ok: true; data: Partial<QuestOSSnapshot> }
   | { ok: false; error: string };
+
+/** Keep known pending milestones once, preserving their reveal order. */
+function cleanPendingMilestones(values: unknown[]): string[] {
+  const seen = new Set<string>();
+  const clean: string[] = [];
+  for (const value of values) {
+    if (
+      !str(value) ||
+      !MILESTONE_KEY_SET.has(value) ||
+      seen.has(value)
+    ) {
+      continue;
+    }
+    seen.add(value);
+    clean.push(value);
+  }
+  return clean;
+}
 
 /**
  * Parse an untrusted JSON string into a sanitized snapshot. Returns a friendly,
@@ -164,11 +191,16 @@ export function parseSnapshot(rawText: string): ParseResult {
   // Object arrays: keep only well-formed elements.
   for (const [key, guard] of Object.entries(ARRAY_GUARDS)) {
     const v = src[key];
-    if (Array.isArray(v)) out[key] = v.filter(guard);
+    if (Array.isArray(v)) {
+      if (key === "completions") out[key] = uniqueValidQuestCompletions(v);
+      else if (key === "journeyEvents") out[key] = uniqueValidJourneyEvents(v);
+      else if (key === "growthEvents") out[key] = uniqueValidGrowthEvents(v);
+      else out[key] = v.filter(guard);
+    }
   }
-  // String arrays.
+  // Pending reveals only refer to the catalogue installed with this build.
   if (Array.isArray(src.pendingMilestones)) {
-    out.pendingMilestones = src.pendingMilestones.filter(str);
+    out.pendingMilestones = cleanPendingMilestones(src.pendingMilestones);
   }
   // Assignments: per-day picked quests. Accept BOTH shapes — new exports
   // hold arrays, pre-pick-model exports hold a single assignment object —

@@ -134,21 +134,32 @@ export function InstallPrompt() {
                   Add it to your home screen and it opens in one tap.
                 </p>
               )}
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-3 flex flex-col items-stretch gap-2 min-[360px]:flex-row min-[360px]:items-center">
                 {!isIOS && (
-                  <GentleButton variant="primary" size="sm" onClick={install}>
+                  <GentleButton
+                    variant="primary"
+                    size="sm"
+                    onClick={install}
+                    className="w-full min-[360px]:w-auto"
+                  >
                     Add to home screen
                   </GentleButton>
                 )}
-                <GentleButton variant="ghost" size="sm" onClick={dismiss}>
+                <GentleButton
+                  variant="ghost"
+                  size="sm"
+                  onClick={dismiss}
+                  className="w-full min-[360px]:w-auto"
+                >
                   Not now
                 </GentleButton>
               </div>
             </div>
             <button
+              type="button"
               onClick={dismiss}
               aria-label="Dismiss"
-              className="text-ash hover:text-charcoal"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ash transition-colors hover:bg-linen hover:text-charcoal"
             >
               <IconClose size={18} />
             </button>

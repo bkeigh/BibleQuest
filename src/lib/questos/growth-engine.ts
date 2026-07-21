@@ -5,13 +5,142 @@
  *  - Growth never decays. Absence is never punished.
  *  - Stages are presented visually, not numerically.
  */
-import type {
-  GrowthEvent,
-  GrowthTreeState,
-  GrowthType,
-  TreeStage,
+import {
+  GROWTH_TYPES,
+  MEANINGFUL_JOURNEY_EVENT_TYPES,
+  type GrowthEvent,
+  type GrowthTreeState,
+  type GrowthType,
+  type TreeStage,
 } from "./types";
 import { treeStageLabels } from "./copy";
+import { isValidZonedTimestamp } from "@/lib/utils/dates";
+
+const DAY_MS = 86_400_000;
+const GROWTH_TYPE_SET = new Set<string>(GROWTH_TYPES);
+const GROWTH_SOURCE_TYPE_SET = new Set<string>(MEANINGFUL_JOURNEY_EVENT_TYPES);
+
+export interface RecentGrowthSummary {
+  totalSteps: number;
+  activeDays: number;
+  activeGrowthTypes: GrowthType[];
+}
+
+/** Accept only complete ledger entries that the app can safely aggregate. */
+export function isValidGrowthEvent(value: unknown): value is GrowthEvent {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const event = value as Record<string, unknown>;
+  return (
+    typeof event.id === "string" &&
+    event.id.length > 0 &&
+    typeof event.growthType === "string" &&
+    GROWTH_TYPE_SET.has(event.growthType) &&
+    Number.isSafeInteger(event.amount) &&
+    (event.amount as number) > 0 &&
+    typeof event.sourceType === "string" &&
+    GROWTH_SOURCE_TYPE_SET.has(event.sourceType) &&
+    isValidZonedTimestamp(event.occurredAt)
+  );
+}
+
+/** Keep the first complete occurrence of each append-only event id. */
+export function uniqueValidGrowthEvents(events: readonly unknown[]): GrowthEvent[] {
+  const seen = new Set<string>();
+  const valid: GrowthEvent[] = [];
+  for (const event of events) {
+    if (!isValidGrowthEvent(event) || seen.has(event.id)) continue;
+    seen.add(event.id);
+    valid.push(event);
+  }
+  return valid;
+}
+
+/** Project an instant onto the user's calendar before comparing recap days. */
+function calendarDay(
+  value: string,
+  timeZone?: string
+): number | null {
+  if (!isValidZonedTimestamp(value)) return null;
+  const date = new Date(value);
+
+  if (!timeZone) {
+    return dateKeyDay(
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+        date.getDate()
+      ).padStart(2, "0")}`
+    );
+  }
+
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(date);
+    const part = (type: Intl.DateTimeFormatPartTypes) =>
+      parts.find((candidate) => candidate.type === type)?.value;
+    const year = part("year");
+    const month = part("month");
+    const day = part("day");
+    return year && month && day ? dateKeyDay(`${year}-${month}-${day}`) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Convert YYYY-MM-DD to a UTC day number without accepting calendar rollover. */
+function dateKeyDay(dateKey: string): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const timestamp = Date.UTC(year, month - 1, day);
+  const date = new Date(timestamp);
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return Math.floor(timestamp / DAY_MS);
+}
+
+/**
+ * Summarize the seven user-calendar days ending at `throughDateKey`.
+ * The recap describes presence and variety without assigning a virtue score.
+ */
+export function summarizeRecentGrowth(
+  events: readonly GrowthEvent[],
+  throughDateKey: string,
+  timeZone?: string
+): RecentGrowthSummary {
+  const endDay = dateKeyDay(throughDateKey);
+  if (endDay === null) {
+    return { totalSteps: 0, activeDays: 0, activeGrowthTypes: [] };
+  }
+
+  const activeDays = new Set<number>();
+  const activeTypes = new Set<GrowthType>();
+  let totalSteps = 0;
+  for (const event of uniqueValidGrowthEvents(events)) {
+    const day = calendarDay(event.occurredAt, timeZone);
+    if (day === null || day < endDay - 6 || day > endDay) continue;
+    totalSteps += event.amount;
+    activeDays.add(day);
+    activeTypes.add(event.growthType);
+  }
+
+  return {
+    totalSteps,
+    activeDays: activeDays.size,
+    activeGrowthTypes: GROWTH_TYPES.filter((type) => activeTypes.has(type)),
+  };
+}
 
 /**
  * One ordered source of truth for the tree's twenty visible stages.
@@ -53,7 +182,10 @@ export function nextTreeStage(stage: TreeStage): TreeStage | null {
   return index >= 0 ? TREE_STAGE_DEFINITIONS[index + 1]?.stage ?? null : null;
 }
 
-export function calculateTreeState(events: GrowthEvent[]): GrowthTreeState {
+/** Derive the lifetime tree from unique, complete, positive growth records. */
+export function calculateTreeState(
+  events: readonly GrowthEvent[]
+): GrowthTreeState {
   const byType: Record<GrowthType, number> = {
     roots: 0,
     branches: 0,
@@ -63,12 +195,9 @@ export function calculateTreeState(events: GrowthEvent[]): GrowthTreeState {
     flowers: 0,
   };
   let total = 0;
-  for (const e of events) {
-    // Import validation guarantees a number, but old/manual exports can still
-    // contain negative or non-finite values. Growth never runs backwards.
-    const amount = Number.isFinite(e.amount) ? Math.max(0, e.amount) : 0;
-    byType[e.growthType] += amount;
-    total += amount;
+  for (const event of uniqueValidGrowthEvents(events)) {
+    byType[event.growthType] += event.amount;
+    total += event.amount;
   }
 
   let stageIndex = 0;
@@ -114,10 +243,10 @@ export function stageProgress(
 
 /** What each growth type nourishes, for gentle UI explanations. */
 export const GROWTH_MEANINGS: Record<GrowthType, string> = {
-  roots: "Prayer nourishes the roots",
-  branches: "Scripture grows the branches",
-  leaves: "Kindness grows the leaves",
-  fruit: "Service bears fruit",
-  sunlight: "Reflection brings sunlight",
-  flowers: "Gratitude brings flowers",
+  roots: "Roots hold grounding and steadiness",
+  branches: "Branches carry learning and direction",
+  leaves: "Leaves show care taking shape",
+  fruit: "Fruit reflects love put into practice",
+  sunlight: "Sunlight holds attention and reflection",
+  flowers: "Flowers hold gratitude and joy",
 };

@@ -14,15 +14,52 @@ import { seedMilestones } from "@/data/seed/milestones";
 import { PixelIcon, type PixelSpriteName } from "@/components/design-system/PixelIcon";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { celebrationScale, pixelSparkle } from "@/lib/motion";
+import { resolvePendingMilestones } from "@/lib/questos/milestone-engine";
 import type { MilestoneSeed } from "@/lib/questos/types";
 
 const byKey = new Map(seedMilestones.map((m) => [m.key, m]));
+const knownKeys = new Set(byKey.keys());
+let activeModalLocks = 0;
+let restoreModalEnvironment: (() => void) | null = null;
+let modalFocusOrigin: HTMLElement | null = null;
+
+/** Reference-count the shell lock so queued milestone transitions stay inert. */
+function lockModalEnvironment(focusOrigin: HTMLElement | null): () => void {
+  if (activeModalLocks === 0) {
+    const appShell = document.querySelector<HTMLElement>("[data-app-shell]");
+    const shellWasInert = appShell?.hasAttribute("inert") ?? false;
+    const previousBodyOverflow = document.body.style.overflow;
+    appShell?.setAttribute("inert", "");
+    document.body.style.overflow = "hidden";
+    modalFocusOrigin = focusOrigin;
+    restoreModalEnvironment = () => {
+      if (!shellWasInert) appShell?.removeAttribute("inert");
+      document.body.style.overflow = previousBodyOverflow;
+      if (modalFocusOrigin?.isConnected) modalFocusOrigin.focus();
+      modalFocusOrigin = null;
+    };
+  }
+  activeModalLocks += 1;
+  return () => {
+    activeModalLocks = Math.max(0, activeModalLocks - 1);
+    if (activeModalLocks === 0) {
+      restoreModalEnvironment?.();
+      restoreModalEnvironment = null;
+    }
+  };
+}
 
 export function MilestoneReveal() {
   const pending = useQuestOS((s) => s.pendingMilestones);
   const dismiss = useQuestOS((s) => s.dismissPendingMilestone);
-  const key = pending[0];
+  const key = resolvePendingMilestones(pending, knownKeys).nextKey;
   const milestone = key ? byKey.get(key) : null;
+
+  useEffect(() => {
+    // Retired catalogue keys never block a later valid reveal or surface UI.
+    const { staleKeys } = resolvePendingMilestones(pending, knownKeys);
+    for (const staleKey of staleKeys) dismiss(staleKey);
+  }, [dismiss, pending]);
 
   return (
     <AnimatePresence>
@@ -57,6 +94,7 @@ function MilestoneDialog({
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const node = dialogRef.current;
+    const releaseModalEnvironment = lockModalEnvironment(previouslyFocused);
     const getFocusable = () =>
       Array.from(
         node?.querySelectorAll<HTMLElement>(
@@ -90,12 +128,7 @@ function MilestoneDialog({
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      // Only restore focus if it's still inside THIS dialog. When a second
-      // milestone is queued, this dialog exits AFTER the next one has mounted
-      // and taken focus — restoring here would yank focus out of the open one.
-      if (node && node.contains(document.activeElement)) {
-        previouslyFocused?.focus?.();
-      }
+      releaseModalEnvironment();
     };
   }, []);
 

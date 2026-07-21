@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { seedMilestones } from "@/data/seed/milestones";
 import { parseSnapshot } from "@/lib/questos/import-schema";
 import { createExportSnapshot } from "@/lib/questos/snapshot";
 import { currentSnapshot } from "./fixtures";
@@ -21,6 +22,7 @@ describe("journey import and export", () => {
     expect(analyticsConsent).toBe(false);
     expect(result.data).toEqual({
       ...exported,
+      pendingMilestones: [],
       settings: settingsWithoutConsent,
     });
   });
@@ -133,5 +135,109 @@ describe("journey import and export", () => {
     expect(result.data.prayers).toEqual([]);
     expect(result.data.reflections).toEqual([]);
     expect(JSON.stringify(result.data)).not.toContain(marker);
+  });
+
+  it("keeps only complete, unique, positive growth ledger entries", () => {
+    const valid = {
+      id: "growth-valid",
+      growthType: "roots",
+      amount: 1,
+      sourceType: "prayer_created",
+      occurredAt: "2026-07-16T12:00:00.000Z",
+    };
+    const result = parseSnapshot(
+      JSON.stringify({
+        growthEvents: [
+          valid,
+          { ...valid, amount: 20 },
+          { ...valid, id: "missing-source", sourceType: undefined },
+          { ...valid, id: "unknown-growth", growthType: "moss" },
+          { ...valid, id: "unknown-source", sourceType: "app_opened" },
+          { ...valid, id: "zero", amount: 0 },
+          { ...valid, id: "fractional", amount: 1.5 },
+          { ...valid, id: "bad-time", occurredAt: "not-a-timestamp" },
+          {
+            ...valid,
+            id: "bad-calendar-date",
+            occurredAt: "2026-02-31T12:00:00.000Z",
+          },
+          {
+            ...valid,
+            id: "missing-timezone",
+            occurredAt: "2026-07-16T12:00:00.000",
+          },
+          { growthType: "roots", amount: 1 },
+        ],
+      })
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.growthEvents).toEqual([valid]);
+  });
+
+  it("deduplicates and rejects malformed milestone-bearing history", () => {
+    const event = {
+      id: "journey-valid",
+      type: "prayer_created",
+      title: "Prayer written",
+      dateKey: "2026-07-16",
+      occurredAt: "2026-07-16T12:00:00.000Z",
+    };
+    const completion = {
+      id: "completion-valid",
+      questSlug: "legacy-quest",
+      dateKey: "2026-07-16",
+      completedAt: "2026-07-16T12:00:00.000Z",
+    };
+    const result = parseSnapshot(
+      JSON.stringify({
+        journeyEvents: [
+          event,
+          event,
+          { ...event, id: "duplicate-source", sourceId: "prayer:one" },
+          { ...event, id: "duplicate-source-two", sourceId: "prayer:one" },
+          { ...event, id: "unknown-type", type: "app_opened" },
+          { ...event, id: "bad-day", dateKey: "2026-02-31" },
+          { ...event, id: "far-day", dateKey: "2025-01-01" },
+          { ...event, id: "bad-time", occurredAt: "not-a-timestamp" },
+        ],
+        completions: [
+          completion,
+          completion,
+          { ...completion, id: "bad-completion-day", dateKey: "today" },
+          { ...completion, id: "bad-completion-time", completedAt: "later" },
+        ],
+        streak: { current: -2, longest: 1, lastActiveDateKey: "yesterday" },
+      })
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.journeyEvents).toEqual([
+      { ...event, id: "duplicate-source", sourceId: "prayer:one" },
+    ]);
+    expect(result.data.completions).toEqual([completion]);
+    expect(result.data.streak).toBeUndefined();
+  });
+
+  it("filters retired and duplicate pending milestone reveals", () => {
+    const first = seedMilestones[0].key;
+    const second = seedMilestones[1].key;
+    const result = parseSnapshot(
+      JSON.stringify({
+        pendingMilestones: [
+          "retired-milestone",
+          first,
+          first,
+          42,
+          second,
+        ],
+      })
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.pendingMilestones).toEqual([first, second]);
   });
 });
