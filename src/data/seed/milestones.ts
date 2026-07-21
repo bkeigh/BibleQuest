@@ -64,7 +64,7 @@ export const seedMilestones: MilestoneSeed[] = [
   },
   {
     "key": "seven-mornings",
-    "title": "Seven Mornings",
+    "title": "Seven Days",
     "description": "You showed up seven days. A rhythm is forming.",
     "milestoneType": "rhythm",
     "requirementMetric": "journey_days",

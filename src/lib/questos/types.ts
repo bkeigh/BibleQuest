@@ -350,20 +350,33 @@ export interface ReflectionPromptSeed {
 // Journey & growth
 // ---------------------------------------------------------------------------
 
-export type JourneyEventType =
-  | "quest_completed"
-  | "reflection_written"
-  | "prayer_created"
-  | "prayer_answered"
-  | "chapter_read"
-  | "verse_bookmarked"
-  | "milestone_reached";
+export const JOURNEY_EVENT_TYPES = [
+  "quest_completed",
+  "reflection_written",
+  "prayer_created",
+  "prayer_answered",
+  "chapter_read",
+  "verse_bookmarked",
+  "milestone_reached",
+] as const;
+export type JourneyEventType = (typeof JOURNEY_EVENT_TYPES)[number];
+
+/** Actions that represent a day of lived practice and can advance the candle. */
+export const MEANINGFUL_JOURNEY_EVENT_TYPES = [
+  "quest_completed",
+  "reflection_written",
+  "prayer_created",
+  "prayer_answered",
+  "chapter_read",
+] as const satisfies readonly JourneyEventType[];
 
 export interface JourneyEvent {
   id: string;
   type: JourneyEventType;
   title: string;
   detail?: string;
+  /** Stable originating record or passage, used for cumulative history. */
+  sourceId?: string;
   dateKey: string;
   occurredAt: string;
 }

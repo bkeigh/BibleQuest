@@ -46,7 +46,7 @@ insert into milestones (key, title, description, milestone_type, requirement_met
   ('first-answered-prayer', 'First Answer', 'You marked a prayer answered — worth remembering.', 'first_step', 'prayers_answered', 1, 'bird', true),
   ('first-chapter', 'First Chapter', 'You read your first chapter. No schedule, no rush.', 'first_step', 'chapters_read', 1, 'book', true),
   ('first-bookmark', 'First Verse', 'You saved your first verse — words worth coming back to.', 'first_step', 'verses_bookmarked', 1, 'bookmark', true),
-  ('seven-mornings', 'Seven Mornings', 'You showed up seven days. A rhythm is forming.', 'rhythm', 'journey_days', 7, 'sun', true),
+  ('seven-mornings', 'Seven Days', 'You showed up seven days. A rhythm is forming.', 'rhythm', 'journey_days', 7, 'sun', true),
   ('month-of-mornings', 'Thirty Days', 'Thirty days, all told. That''s a practice now.', 'rhythm', 'journey_days', 30, 'sun', true),
   ('steady-steps', 'Ten Quests', 'Ten quests done, one at a time.', 'rhythm', 'quest_completions', 10, 'path', true),
   ('into-the-story', 'Into the Story', 'Ten chapters read. The story is opening up.', 'scripture', 'chapters_read', 10, 'book', true),

@@ -136,7 +136,7 @@ export const en: UIStrings = {
   empty: {
     prayer: "Write what’s actually on your mind. Save it in your private-by-default journal.",
     reflections: "Your reflections will collect here.",
-    journey: "Nothing here yet. Your first quest will show up here.",
+    journey: "Nothing here yet. Your first meaningful step will show up here.",
     bookmarks: "Save verses you want to come back to.",
     questsFiltered: "Nothing matches those filters. Try widening them.",
     questsUnpicked: "No quests picked yet. Choose up to three for today.",

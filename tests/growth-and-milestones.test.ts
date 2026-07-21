@@ -4,6 +4,7 @@ import {
   calculateTreeState,
   nextTreeStage,
   stageProgress,
+  summarizeRecentGrowth,
   TREE_STAGE_DEFINITIONS,
 } from "@/lib/questos/growth-engine";
 import { computeMetrics } from "@/lib/questos/milestone-engine";
@@ -20,13 +21,18 @@ const EXPECTED_STAGE_MINS = [
   175, 210, 250,
 ];
 
-function growthEvent(amount: number, id = `growth-${amount}`): GrowthEvent {
+function growthEvent(
+  amount: number,
+  id = `growth-${amount}`,
+  patch: Partial<GrowthEvent> = {}
+): GrowthEvent {
   return {
     id,
     growthType: "roots",
     amount,
     sourceType: "quest_completed",
     occurredAt: "2026-07-17T12:00:00.000Z",
+    ...patch,
   };
 }
 
@@ -86,6 +92,118 @@ describe("living tree progression", () => {
     expect(state.totalActions).toBe(2);
     expect(state.byType.roots).toBe(2);
     expect(state.stage).toBe("stirring-seed");
+  });
+
+  it("ignores duplicate ids, unknown types, fractional amounts, and bad timestamps", () => {
+    const state = calculateTreeState([
+      growthEvent(2, "kept"),
+      growthEvent(40, "kept", { growthType: "fruit" }),
+      growthEvent(8, "unknown", {
+        growthType: "moss" as GrowthEvent["growthType"],
+      }),
+      growthEvent(1.5, "fractional"),
+      growthEvent(9, "bad-time", { occurredAt: "not-a-timestamp" }),
+    ]);
+
+    expect(state.totalActions).toBe(2);
+    expect(state.byType).toEqual({
+      roots: 2,
+      branches: 0,
+      leaves: 0,
+      fruit: 0,
+      sunlight: 0,
+      flowers: 0,
+    });
+  });
+
+  it("rejects event types that never grow the tree", () => {
+    const state = calculateTreeState([
+      growthEvent(10, "bookmark-growth", {
+        sourceType: "verse_bookmarked",
+      }),
+      growthEvent(10, "milestone-growth", {
+        sourceType: "milestone_reached",
+      }),
+      growthEvent(1, "prayer-growth", {
+        sourceType: "prayer_created",
+      }),
+    ]);
+
+    expect(state.totalActions).toBe(1);
+    expect(state.byType.roots).toBe(1);
+  });
+
+  it("summarizes seven inclusive UTC days without turning variety into a score", () => {
+    const summary = summarizeRecentGrowth(
+      [
+        growthEvent(2, "roots", {
+          occurredAt: "2026-07-11T00:00:00.000Z",
+        }),
+        growthEvent(1, "branches", {
+          growthType: "branches",
+          occurredAt: "2026-07-12T08:00:00.000Z",
+        }),
+        growthEvent(3, "flowers", {
+          growthType: "flowers",
+          occurredAt: "2026-07-12T20:00:00.000Z",
+        }),
+        growthEvent(1, "sunlight", {
+          growthType: "sunlight",
+          occurredAt: "2026-07-17T23:59:59.999Z",
+        }),
+        growthEvent(20, "roots", {
+          occurredAt: "2026-07-13T12:00:00.000Z",
+        }),
+        growthEvent(10, "older", {
+          growthType: "fruit",
+          occurredAt: "2026-07-10T23:59:59.999Z",
+        }),
+        growthEvent(10, "future", {
+          growthType: "leaves",
+          occurredAt: "2026-07-18T00:00:00.000Z",
+        }),
+        growthEvent(9, "bad-time", { occurredAt: "not-a-timestamp" }),
+      ],
+      "2026-07-17",
+      "UTC"
+    );
+
+    expect(summary).toEqual({
+      totalSteps: 7,
+      activeDays: 3,
+      activeGrowthTypes: ["roots", "branches", "sunlight", "flowers"],
+    });
+    expect(summarizeRecentGrowth([growthEvent(1)], "2026-02-31")).toEqual({
+      totalSteps: 0,
+      activeDays: 0,
+      activeGrowthTypes: [],
+    });
+  });
+
+  it("uses the user's calendar day around timezone boundaries", () => {
+    const summary = summarizeRecentGrowth(
+      [
+        growthEvent(8, "previous-local-day", {
+          occurredAt: "2026-07-11T02:30:00.000Z",
+        }),
+        growthEvent(1, "first-local-day", {
+          growthType: "branches",
+          occurredAt: "2026-07-11T04:00:00.000Z",
+        }),
+        growthEvent(1, "last-local-day", {
+          growthType: "fruit",
+          occurredAt: "2026-07-18T02:30:00.000Z",
+        }),
+      ],
+      "2026-07-17",
+      "America/New_York"
+    );
+
+    expect(summary).toEqual({
+      totalSteps: 2,
+      activeDays: 2,
+      activeGrowthTypes: ["branches", "fruit"],
+    });
   });
 });
 

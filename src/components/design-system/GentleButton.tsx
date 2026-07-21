@@ -39,10 +39,11 @@ const VARIANTS: Record<Variant, string> = {
     "border border-rose-300 text-rose-700 bg-transparent hover:bg-rose-50 active:bg-rose-100",
 };
 
+/** Filled and outlined controls keep a full mobile touch target at every size. */
 const SIZES: Record<Size, string> = {
-  sm: "text-[0.9375rem] px-3.5 py-2",
-  md: "text-[1rem] px-5 py-2.5",
-  lg: "text-[1.0625rem] px-6 py-3",
+  sm: "min-h-11 text-[0.9375rem] px-3.5 py-2",
+  md: "min-h-11 text-[1rem] px-5 py-2.5",
+  lg: "min-h-11 text-[1.0625rem] px-6 py-3",
 };
 
 /* The text variant keeps the font size of its Size but never the padding. */

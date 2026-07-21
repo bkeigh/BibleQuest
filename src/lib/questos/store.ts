@@ -29,6 +29,7 @@ import { track, setAnalyticsConsent } from "@/lib/analytics/events";
 import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
 import {
   DEFAULT_SETTINGS,
+  MEANINGFUL_JOURNEY_EVENT_TYPES,
   QUEST_STEP_KEYS,
   type AccountNudgeContext,
   type AccountNudgeState,
@@ -63,12 +64,23 @@ import {
   emptyStreak,
 } from "./types";
 import { advanceStreak } from "./streak-engine";
+import {
+  bookmarkJourneySourceId,
+  ensureCurrentJourneyEvents,
+  rebuildStreakFromJourneyEvents,
+  uniqueValidQuestCompletions,
+} from "./history-integrity";
+import { uniqueValidGrowthEvents } from "./growth-engine";
 import { isQuestChecklistComplete } from "./quest-steps";
 import { canRefreshDailyVerse } from "./verse-engine";
 import {
   DEFAULT_WALLPAPER_ID,
   isWallpaperId,
 } from "@/lib/wallpapers/catalog";
+
+const meaningfulJourneyEventTypes = new Set<JourneyEventType>(
+  MEANINGFUL_JOURNEY_EVENT_TYPES
+);
 
 function id(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -78,6 +90,17 @@ function id(): string {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
     return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
+/** Keep the first local record for each durable id during restore/migration. */
+function uniqueRecordsById<T extends { id: string }>(values: T[]): T[] {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const recordId = value && typeof value.id === "string" ? value.id : "";
+    if (!recordId || seen.has(recordId)) return false;
+    seen.add(recordId);
+    return true;
   });
 }
 
@@ -217,6 +240,8 @@ interface QuestOSState {
   refreshVerse: (isPlus?: boolean) => boolean;
 
   // -- milestones
+  /** Quietly record satisfied catalogue milestones after import or expansion. */
+  reconcileMilestones: () => MilestoneSeed[];
   dismissPendingMilestone: (key: string) => void;
 
   // -- sync bookkeeping
@@ -360,11 +385,25 @@ function journeyTitle(type: JourneyEventType, detail?: string): string {
 export const useQuestOS = create<QuestOSState>()(
   persist(
     (set, get) => {
+      /** Derives milestone progress from the store's current durable history. */
+      function currentMilestoneMetrics(state = get()) {
+        return computeMetrics({
+          completions: state.completions,
+          prayers: state.prayers,
+          reflections: state.reflections,
+          chaptersRead: state.chaptersRead,
+          bookmarks: state.bookmarks,
+          journeyEvents: state.journeyEvents,
+          questBySlug,
+        });
+      }
+
       /** Append a journey event (+ optional growth) and run milestone checks. */
       function recordAction(
         type: JourneyEventType,
         detail: string | undefined,
         growthType: GrowthType | null,
+        sourceId?: string,
         state = get()
       ): { journey: JourneyEvent; growth: GrowthEvent | null } {
         const now = new Date();
@@ -373,6 +412,7 @@ export const useQuestOS = create<QuestOSState>()(
           type,
           title: journeyTitle(type, detail),
           detail,
+          sourceId,
           dateKey: toDateKey(now),
           occurredAt: now.toISOString(),
         };
@@ -386,15 +426,16 @@ export const useQuestOS = create<QuestOSState>()(
             }
           : null;
         const prevStreak = get().streak;
-        const nextStreak = advanceStreak(prevStreak, journey.dateKey);
+        const nextStreak = meaningfulJourneyEventTypes.has(type)
+          ? advanceStreak(prevStreak, journey.dateKey)
+          : prevStreak;
         set({
           journeyEvents: [...state.journeyEvents, journey],
           growthEvents: growth
             ? [...state.growthEvents, growth]
             : state.growthEvents,
-          // Every meaningful action keeps the candle lit. advanceStreak
-          // returns the same reference when today is already counted, so
-          // repeat actions don't churn the persisted blob.
+          // Only lived-practice actions keep the candle lit. Repeat actions
+          // return the same reference and avoid persisted-store churn.
           streak: nextStreak,
         });
         // Milestone days only (never every day) — a count, nothing else.
@@ -409,15 +450,7 @@ export const useQuestOS = create<QuestOSState>()(
 
       function runMilestoneCheck(): MilestoneSeed[] {
         const s = get();
-        const metrics = computeMetrics({
-          completions: s.completions,
-          prayers: s.prayers,
-          reflections: s.reflections,
-          chaptersRead: s.chaptersRead,
-          bookmarks: s.bookmarks,
-          journeyEvents: s.journeyEvents,
-          questBySlug,
-        });
+        const metrics = currentMilestoneMetrics(s);
         const fresh = checkMilestones(
           seedMilestones,
           s.earnedMilestones,
@@ -436,7 +469,7 @@ export const useQuestOS = create<QuestOSState>()(
             ],
           });
           for (const m of fresh) {
-            recordAction("milestone_reached", m.title, null);
+            recordAction("milestone_reached", m.title, null, `milestone:${m.key}`);
           }
         }
         return fresh;
@@ -590,7 +623,7 @@ export const useQuestOS = create<QuestOSState>()(
           };
           set({ reflections: [...get().reflections, r] });
           reflectionId = r.id;
-          recordAction("reflection_written", undefined, "sunlight");
+          recordAction("reflection_written", undefined, "sunlight", `reflection:${r.id}`);
           track("reflection_created");
         }
 
@@ -633,7 +666,12 @@ export const useQuestOS = create<QuestOSState>()(
           archivedAt: undefined,
         });
 
-        recordAction("quest_completed", quest.title, quest.growthType);
+        recordAction(
+          "quest_completed",
+          quest.title,
+          quest.growthType,
+          `completion:${completion.id}`
+        );
         track("quest_completed", { category: quest.category });
         return { completed: true, newMilestones: runMilestoneCheck() };
       }
@@ -730,6 +768,23 @@ export const useQuestOS = create<QuestOSState>()(
           // nothing from the current journey bleeds through, then overlay the
           // validated snapshot. Any omitted field keeps its default. Emits no
           // analytics — imported prayer/reflection text stays on-device.
+          const completions = uniqueValidQuestCompletions(
+            snapshot.completions ?? []
+          );
+          const prayers = uniqueRecordsById(
+            (snapshot.prayers ?? []).map(normalizePrayerArchive)
+          );
+          const reflections = uniqueRecordsById(snapshot.reflections ?? []);
+          const bookmarks = uniqueRecordsById(snapshot.bookmarks ?? []);
+          const journeyEvents = ensureCurrentJourneyEvents(
+            {
+              prayers,
+              reflections,
+              bookmarks,
+              journeyEvents: snapshot.journeyEvents ?? [],
+            },
+            id
+          );
           set({
             profile: snapshot.profile ?? null,
             settings: snapshot.settings
@@ -751,19 +806,19 @@ export const useQuestOS = create<QuestOSState>()(
                 snapshot.completions ?? [],
                 snapshot.assignments ?? {}
               ),
-            completions: snapshot.completions ?? [],
-            prayers: (snapshot.prayers ?? []).map(normalizePrayerArchive),
-            reflections: snapshot.reflections ?? [],
-            journeyEvents: snapshot.journeyEvents ?? [],
-            growthEvents: snapshot.growthEvents ?? [],
+            completions,
+            prayers,
+            reflections,
+            journeyEvents,
+            growthEvents: uniqueValidGrowthEvents(snapshot.growthEvents ?? []),
             earnedMilestones: snapshot.earnedMilestones ?? [],
-            bookmarks: snapshot.bookmarks ?? [],
+            bookmarks,
             readingPosition: snapshot.readingPosition ?? null,
             chaptersRead: snapshot.chaptersRead ?? [],
             recentVerses: snapshot.recentVerses ?? [],
             pendingMilestones: snapshot.pendingMilestones ?? [],
             lastVisitDateKey: snapshot.lastVisitDateKey ?? null,
-            streak: snapshot.streak ?? emptyStreak(),
+            streak: rebuildStreakFromJourneyEvents(journeyEvents),
             // Device-local like the streak: the sync engine's merge-apply
             // passes the local value through; old exports just reset it.
             accountNudge: snapshot.accountNudge ?? emptyAccountNudge(),
@@ -1109,7 +1164,7 @@ export const useQuestOS = create<QuestOSState>()(
             updatedAt: now,
           };
           set({ prayers: [...get().prayers, prayer] });
-          recordAction("prayer_created", undefined, "roots");
+          recordAction("prayer_created", undefined, "roots", `prayer:${prayer.id}`);
           track("prayer_created");
           runMilestoneCheck();
           return prayer;
@@ -1191,7 +1246,12 @@ export const useQuestOS = create<QuestOSState>()(
                 : p
             ),
           });
-          recordAction("prayer_answered", undefined, "flowers");
+          recordAction(
+            "prayer_answered",
+            undefined,
+            "flowers",
+            `prayer-answer:${prayerId}`
+          );
           track("prayer_answered");
           return { newMilestones: runMilestoneCheck() };
         },
@@ -1209,7 +1269,12 @@ export const useQuestOS = create<QuestOSState>()(
             updatedAt: now,
           };
           set({ reflections: [...get().reflections, reflection] });
-          recordAction("reflection_written", undefined, "sunlight");
+          recordAction(
+            "reflection_written",
+            undefined,
+            "sunlight",
+            `reflection:${reflection.id}`
+          );
           track("reflection_created");
           return { reflection, newMilestones: runMilestoneCheck() };
         },
@@ -1295,7 +1360,8 @@ export const useQuestOS = create<QuestOSState>()(
           recordAction(
             "verse_bookmarked",
             `${bookmark.bookName} ${bookmark.chapter}:${bookmark.verse}`,
-            null
+            null,
+            bookmarkJourneySourceId(created)
           );
           track("verse_bookmarked");
           runMilestoneCheck();
@@ -1314,9 +1380,13 @@ export const useQuestOS = create<QuestOSState>()(
             set({
               chaptersRead: [...s.chaptersRead, { bookSlug, chapter, dateKey }],
             });
-            recordAction("chapter_read", `${bookName} ${chapter}`, "branches");
+            recordAction(
+              "chapter_read",
+              `${bookName} ${chapter}`,
+              "branches",
+              `chapter:${bookSlug}:${chapter}`
+            );
           }
-          track("bible_chapter_opened");
           return { newMilestones: already ? [] : runMilestoneCheck() };
         },
 
@@ -1347,6 +1417,30 @@ export const useQuestOS = create<QuestOSState>()(
               ),
             ].slice(0, 20),
           });
+        },
+
+        reconcileMilestones: () => {
+          const s = get();
+          const fresh = checkMilestones(
+            seedMilestones,
+            s.earnedMilestones,
+            currentMilestoneMetrics(s)
+          );
+          if (!fresh.length) return [];
+
+          const achievedAt = new Date().toISOString();
+          // Reconciliation is intentionally quiet: no pending reveal, Journey
+          // event, growth, streak change, or analytics side effect.
+          set({
+            earnedMilestones: [
+              ...s.earnedMilestones,
+              ...fresh.map((milestone) => ({
+                key: milestone.key,
+                achievedAt,
+              })),
+            ],
+          });
+          return fresh;
         },
 
         dismissPendingMilestone: (key) => {
@@ -1424,7 +1518,7 @@ export const useQuestOS = create<QuestOSState>()(
     {
       name: "biblequest:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 11,
+      version: 12,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
@@ -1565,6 +1659,46 @@ export const useQuestOS = create<QuestOSState>()(
           } else {
             state.settings = DEFAULT_SETTINGS;
           }
+        }
+        if (version < 12) {
+          // v12 repairs duplicate ledgers, attaches stable sources to current
+          // private records, and rebuilds the candle without bookmark-only days.
+          const completions = uniqueValidQuestCompletions(
+            Array.isArray(state.completions) ? state.completions : []
+          );
+          const prayers = uniqueRecordsById(
+            Array.isArray(state.prayers) ? (state.prayers as Prayer[]) : []
+          );
+          const reflections = uniqueRecordsById(
+            Array.isArray(state.reflections)
+              ? (state.reflections as Reflection[])
+              : []
+          );
+          const bookmarks = uniqueRecordsById(
+            Array.isArray(state.bookmarks)
+              ? (state.bookmarks as VerseBookmark[])
+              : []
+          );
+          const journeyEvents = ensureCurrentJourneyEvents(
+            {
+              prayers,
+              reflections,
+              bookmarks,
+              journeyEvents: Array.isArray(state.journeyEvents)
+                ? (state.journeyEvents as JourneyEvent[])
+                : [],
+            },
+            id
+          );
+          state.completions = completions;
+          state.prayers = prayers;
+          state.reflections = reflections;
+          state.bookmarks = bookmarks;
+          state.journeyEvents = journeyEvents;
+          state.growthEvents = uniqueValidGrowthEvents(
+            Array.isArray(state.growthEvents) ? state.growthEvents : []
+          );
+          state.streak = rebuildStreakFromJourneyEvents(journeyEvents);
         }
         return state as unknown as QuestOSState;
       },

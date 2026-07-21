@@ -406,7 +406,14 @@ async function initialSync(
   useQuestOS.getState().clearSyncTombstones(cleared);
 
   if (!isCurrent()) return;
-  await pushFields(supabase, userId, merged, new Set(SYNCED_FIELDS));
+  // importData repairs legacy ledgers; push that normalized store snapshot so
+  // its stable Journey sources survive deletion and the next device restore.
+  await pushFields(
+    supabase,
+    userId,
+    snapshotFromStore(),
+    new Set(SYNCED_FIELDS),
+  );
 }
 
 function snapshotFromStore(): QuestOSSnapshot {

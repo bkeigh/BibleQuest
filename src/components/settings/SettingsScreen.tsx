@@ -25,7 +25,7 @@ import { clearLastSyncedUserId } from "@/lib/sync/last-user";
 import { useSession } from "@/lib/supabase/useSession";
 import type { QuestOSSnapshot } from "@/lib/questos/types";
 import { useStrings, LANGUAGES, languageMeta, fmt } from "@/lib/i18n";
-import { IconCheck } from "@/components/design-system/icons";
+import { IconCheck, IconChevronRight } from "@/components/design-system/icons";
 import { cn } from "@/lib/utils/cn";
 import {
   FEATURED_TRANSLATIONS,
@@ -37,6 +37,7 @@ import {
 import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
 import { WallpaperPicker } from "@/components/settings/WallpaperPicker";
 import { ExplorePlusLink } from "@/components/plus/ExplorePlusLink";
+import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 
 function Row({
   label,
@@ -591,7 +592,7 @@ function SettingsInner() {
   const { toast } = useToast();
   // Signed-in clears/restores must also purge the account copy, or the next
   // initial sync merges it straight back (see lib/sync/engine.ts).
-  const { user } = useSession();
+  const { user, loading: sessionLoading } = useSession();
   const profile = useQuestOS((s) => s.profile);
   const settings = useQuestOS((s) => s.settings);
   const updateProfile = useQuestOS((s) => s.updateProfile);
@@ -611,6 +612,7 @@ function SettingsInner() {
   const [nameDraft, setNameDraft] = useState("");
 
   const appearance = settings.appearance;
+  const shouldReduceMotion = useShouldReduceMotion();
   const t = useStrings();
   const bibleTranslationCopy: BibleTranslationCopy = {
     ...DEFAULT_BIBLE_TRANSLATION_COPY,
@@ -823,86 +825,93 @@ function SettingsInner() {
             className="flex items-center justify-between px-4 py-3.5 text-charcoal hover:bg-linen"
           >
             <span className="text-[0.9375rem]">Sync across devices</span>
-            <span className="text-[0.8125rem] text-ash">Optional</span>
+            <span className="flex items-center gap-1 text-[0.8125rem] text-ash">
+              {sessionLoading ? "Checking…" : user ? "Signed in" : "Set up sync"}
+              <IconChevronRight size={15} />
+            </span>
           </Link>
         </PaperCard>
 
         {/* Always visible — text size and bold text are comfort settings
             people shouldn't have to hunt for behind a disclosure. */}
-        <SectionTitle>{t.settings.appearance}</SectionTitle>
-        <PaperCard
-          variant="paper"
-          padding="none"
-          className="overflow-hidden px-4"
-        >
-          <WallpaperPicker
-            value={appearance.wallpaperId}
-            onChange={(wallpaperId) => setAppearance({ wallpaperId })}
-          />
-          <div className="divide-y divide-mist/70">
-            <Row label="Wallpaper style">
-              <Segmented
-                label="Wallpaper style"
-                value={appearance.wallpaperMode}
-                onChange={(wallpaperMode) => setAppearance({ wallpaperMode })}
-                options={[
-                  { value: "still", label: "Still" },
-                  { value: "live", label: "Live" },
-                ]}
-              />
-            </Row>
-            <Row label="Glass surfaces">
-              <Toggle
-                label="Glass surfaces"
-                on={appearance.glassSurfaces}
-                onChange={(glassSurfaces) => setAppearance({ glassSurfaces })}
-              />
-            </Row>
-            <Row label={t.settings.theme}>
-              <Segmented
-                label={t.settings.theme}
-                value={appearance.theme}
-                onChange={(theme) => setAppearance({ theme })}
-                options={[
-                  { value: "light", label: t.settings.themeLight },
-                  { value: "dark", label: t.settings.themeDark },
-                  { value: "system", label: t.settings.themeSystem },
-                ]}
-              />
-            </Row>
-            <Row label={t.settings.textSize}>
-              <Segmented
-                label={t.settings.textSize}
-                value={appearance.textSize}
-                onChange={(textSize) => setAppearance({ textSize })}
-                options={[
-                  { value: "default", label: t.settings.textSizeDefault },
-                  { value: "large", label: t.settings.textSizeLarge },
-                ]}
-              />
-            </Row>
-            <Row label={t.settings.boldText}>
-              <Toggle
-                label={t.settings.boldText}
-                on={appearance.boldText}
-                onChange={(boldText) => setAppearance({ boldText })}
-              />
-            </Row>
-            <Row label={t.settings.reduceMotion}>
-              <Toggle
-                label={t.settings.reduceMotion}
-                on={appearance.reducedMotion}
-                onChange={(reducedMotion) => setAppearance({ reducedMotion })}
-              />
-            </Row>
-          </div>
-          {appearance.wallpaperMode === "live" && appearance.reducedMotion && (
-            <p className="border-t border-mist/70 py-3 text-caption leading-relaxed text-ash">
-              Live is saved as your preference. The matching still is shown
-              while Reduce Motion is on.
-            </p>
-          )}
-        </PaperCard>
+        <section id="appearance" className="scroll-mt-6">
+          <SectionTitle>{t.settings.appearance}</SectionTitle>
+          <PaperCard
+            variant="paper"
+            padding="none"
+            className="overflow-hidden px-4"
+          >
+            <WallpaperPicker
+              value={appearance.wallpaperId}
+              onChange={(wallpaperId) => setAppearance({ wallpaperId })}
+            />
+            <div className="divide-y divide-mist/70">
+              <Row label="Wallpaper style">
+                <Segmented
+                  label="Wallpaper style"
+                  value={appearance.wallpaperMode}
+                  onChange={(wallpaperMode) => setAppearance({ wallpaperMode })}
+                  options={[
+                    { value: "still", label: "Still" },
+                    { value: "live", label: "Live" },
+                  ]}
+                />
+              </Row>
+              <Row label="Glass surfaces">
+                <Toggle
+                  label="Glass surfaces"
+                  on={appearance.glassSurfaces}
+                  onChange={(glassSurfaces) => setAppearance({ glassSurfaces })}
+                />
+              </Row>
+              <Row label={t.settings.theme}>
+                <Segmented
+                  label={t.settings.theme}
+                  value={appearance.theme}
+                  onChange={(theme) => setAppearance({ theme })}
+                  options={[
+                    { value: "light", label: t.settings.themeLight },
+                    { value: "dark", label: t.settings.themeDark },
+                    { value: "system", label: t.settings.themeSystem },
+                  ]}
+                />
+              </Row>
+              <Row label={t.settings.textSize}>
+                <Segmented
+                  label={t.settings.textSize}
+                  value={appearance.textSize}
+                  onChange={(textSize) => setAppearance({ textSize })}
+                  options={[
+                    { value: "default", label: t.settings.textSizeDefault },
+                    { value: "large", label: t.settings.textSizeLarge },
+                  ]}
+                />
+              </Row>
+              <Row label={t.settings.boldText}>
+                <Toggle
+                  label={t.settings.boldText}
+                  on={appearance.boldText}
+                  onChange={(boldText) => setAppearance({ boldText })}
+                />
+              </Row>
+              <Row label={t.settings.reduceMotion}>
+                <Toggle
+                  label={t.settings.reduceMotion}
+                  on={appearance.reducedMotion}
+                  onChange={(reducedMotion) => setAppearance({ reducedMotion })}
+                />
+              </Row>
+            </div>
+            {appearance.wallpaperMode === "live" && shouldReduceMotion && (
+              <p className="border-t border-mist/70 py-3 text-caption leading-relaxed text-ash">
+                Live is saved as your preference. The matching still is shown
+                while {appearance.reducedMotion
+                  ? "Reduce Motion is"
+                  : "your device’s Reduce Motion setting is"} on.
+              </p>
+            )}
+          </PaperCard>
+        </section>
 
         <DisclosureGroup className="mt-6">
           <Disclosure

@@ -24,7 +24,8 @@ import {
   IconSearch,
 } from "@/components/design-system/icons";
 import { expander } from "@/lib/motion";
-import { formatShortDate, hashString, toDateKey } from "@/lib/utils/dates";
+import { formatShortDate, hashString } from "@/lib/utils/dates";
+import { useCurrentDayKey } from "@/lib/use-current-day-key";
 import { reflectionPrompts } from "@/data/seed/reflection-prompts";
 import {
   deriveJournalTimeline,
@@ -47,6 +48,7 @@ const SECONDARY_FILTERS: Array<{ value: JournalFilter; label: string }> = [
 
 function PrayerScreenInner() {
   const pathname = usePathname();
+  const dayKey = useCurrentDayKey();
   const prayers = useQuestOS((state) => state.prayers);
   const reflections = useQuestOS((state) => state.reflections);
   const [filter, setFilter] = useState<JournalFilter>(() =>
@@ -66,8 +68,8 @@ function PrayerScreenInner() {
   }, []);
 
   const prompt = useMemo(
-    () => reflectionPrompts[hashString(toDateKey()) % reflectionPrompts.length],
-    [],
+    () => reflectionPrompts[hashString(dayKey) % reflectionPrompts.length],
+    [dayKey],
   );
   const timeline = useMemo(
     () => deriveJournalTimeline(prayers, reflections, { filter, query }),

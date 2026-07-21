@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Translation-aware chapter reader. Opening a chapter records reading progress,
- * and keyboard-accessible verse selection lets the shared QuestOS store add or
- * remove bookmarks without moving Scripture text out of its reading layout.
+ * Translation-aware chapter reader. Opening a chapter records reading position;
+ * finishing remains an explicit choice so navigation alone never grows the tree.
+ * Keyboard-accessible verse selection keeps Scripture in its reading layout.
  */
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
@@ -11,12 +11,13 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useQuestOS } from "@/lib/questos/store";
 import { useToast } from "@/components/design-system/Toast";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
-import { GentleLink } from "@/components/design-system/GentleButton";
+import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
 import {
   IconArrowLeft,
   IconArrowRight,
   IconBookmark,
   IconBookmarkFilled,
+  IconCheck,
   IconClose,
   IconEye,
   IconShare,
@@ -31,6 +32,7 @@ import {
 } from "@/lib/bible/translations";
 import { VerseShareSheet } from "@/components/bible/VerseShareSheet";
 import { formatVerseShareText } from "@/lib/utils/scripture";
+import { track } from "@/lib/analytics/events";
 
 interface VerseRange {
   start: number;
@@ -76,6 +78,7 @@ function ReaderInner({
 }) {
   const { toast } = useToast();
   const bookmarks = useQuestOS((s) => s.bookmarks);
+  const chaptersRead = useQuestOS((s) => s.chaptersRead);
   const toggleBookmark = useQuestOS((s) => s.toggleBookmark);
   const recordRecentVerse = useQuestOS((s) => s.recordRecentVerse);
   const markChapterRead = useQuestOS((s) => s.markChapterRead);
@@ -95,19 +98,19 @@ function ReaderInner({
     resolved.effectiveTranslation,
   );
 
-  // Record reading position + chapter read on open.
+  // Navigation updates Continue Reading and analytics, but does not claim the
+  // chapter was read. The intentional control after the text does that.
   useEffect(() => {
     setReadingPosition({
       bookSlug: content.bookSlug,
       bookName: content.bookName,
       chapter: content.chapter,
     });
-    markChapterRead(content.bookSlug, content.bookName, content.chapter);
+    track("bible_chapter_opened");
   }, [
     content.bookName,
     content.bookSlug,
     content.chapter,
-    markChapterRead,
     setReadingPosition,
   ]);
 
@@ -234,6 +237,10 @@ function ReaderInner({
 
   const prev = content.chapter > 1 ? content.chapter - 1 : null;
   const next = content.chapter < content.chapterCount ? content.chapter + 1 : null;
+  const chapterRead = chaptersRead.some(
+    (entry) =>
+      entry.bookSlug === content.bookSlug && entry.chapter === content.chapter,
+  );
   const editionQuery = translationOverride
     ? `?translation=${encodeURIComponent(translationOverride)}`
     : "";
@@ -535,6 +542,34 @@ function ReaderInner({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Completion is intentional: reaching this point invites a choice, and
+          re-marking the same chapter stays disabled and idempotent. */}
+      <div className="app-glass-surface mt-9 rounded-[var(--radius-card)] border border-mist bg-paper p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
+        <div>
+          <p className="text-[0.9375rem] font-medium text-graphite">
+            {chapterRead ? "Chapter marked as read" : "Finished this chapter?"}
+          </p>
+          <p className="mt-1 text-caption leading-relaxed text-ash">
+            {chapterRead
+              ? "This reading is already part of your Journey."
+              : "Mark it when you are ready. It will tend your tree and reading milestones."}
+          </p>
+        </div>
+        <GentleButton
+          type="button"
+          variant={chapterRead ? "ghost" : "primary"}
+          size="sm"
+          disabled={chapterRead}
+          className="mt-3 shrink-0 sm:mt-0"
+          onClick={() => {
+            markChapterRead(content.bookSlug, content.bookName, content.chapter);
+            toast("Chapter added to your Journey.", { variant: "success" });
+          }}
+        >
+          <IconCheck size={17} /> {chapterRead ? "Read" : "Mark as read"}
+        </GentleButton>
+      </div>
 
       {/* Chapter navigation */}
       <div className="mt-8 flex items-center justify-between gap-3 pb-8">

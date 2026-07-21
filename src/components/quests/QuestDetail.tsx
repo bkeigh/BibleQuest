@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import type {
+  GrowthType,
   QuestStepKey,
   QuestTemplate,
   ReflectionMood,
@@ -34,7 +35,11 @@ import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
-import { PixelIcon, CATEGORY_SPRITE } from "@/components/design-system/PixelIcon";
+import {
+  PixelIcon,
+  CATEGORY_SPRITE,
+  type PixelSpriteName,
+} from "@/components/design-system/PixelIcon";
 import {
   IconArrowLeft,
   IconClock,
@@ -55,6 +60,19 @@ type Phase = "detail" | "reflect" | "done";
 
 /** Star positions for the small done-moment flourish. */
 const SPARKLES = ["-right-2 -top-1", "-left-3 bottom-2", "right-1 -bottom-2"];
+
+/** Quest completion mirrors the exact facet the action tended in Journey. */
+const GROWTH_COMPLETION: Record<
+  GrowthType,
+  { sprite: PixelSpriteName; line: string }
+> = {
+  roots: { sprite: "praying-hands", line: "You tended the roots." },
+  branches: { sprite: "open-book", line: "You strengthened the branches." },
+  leaves: { sprite: "leaf", line: "You grew new leaves." },
+  fruit: { sprite: "service-basket", line: "You helped the tree bear fruit." },
+  sunlight: { sprite: "sun", line: "You brought the tree sunlight." },
+  flowers: { sprite: "flower", line: "You helped the tree flower." },
+};
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
@@ -207,9 +225,8 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
   }
 
   const doneLine = completionLine(hashString(quest.slug));
-  const doneBody = doneLine.toLowerCase().includes("tree")
-    ? "It's part of today now."
-    : "Your tree grew a little.";
+  const growthCompletion = GROWTH_COMPLETION[quest.growthType];
+  const doneBody = growthCompletion.line;
 
   return (
     <PageContainer className="pt-safe">
@@ -545,7 +562,7 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
                 className="flex h-20 w-20 items-center justify-center rounded-full bg-accent-surface ring-1 ring-accent/20"
               >
                 <PixelIcon
-                  name={quest.growthType === "flowers" ? "flower" : "leaf"}
+                  name={growthCompletion.sprite}
                   size={8}
                   animate
                 />

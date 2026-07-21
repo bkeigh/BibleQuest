@@ -6,6 +6,7 @@ import { useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils/cn";
 import { useStrings } from "@/lib/i18n";
 import { en } from "@/lib/i18n/en";
+import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 import {
   IconHome,
   IconQuest,
@@ -32,6 +33,7 @@ const ITEMS: NavItem[] = [
 export function BottomNav() {
   const pathname = usePathname();
   const strings = useStrings();
+  const shouldReduceMotion = useShouldReduceMotion();
   // The server renders English (no persisted language on the server), so
   // first client paint must match it — swap to the chosen language only
   // after hydration to avoid a text mismatch on every load.
@@ -69,6 +71,25 @@ export function BottomNav() {
               <Link
                 href={href}
                 aria-current={active ? "page" : undefined}
+                onClick={(event) => {
+                  // A second tap on the current tab mirrors native tab bars.
+                  // Nested routes still navigate back to their tab root.
+                  if (
+                    pathname !== href ||
+                    event.button !== 0 ||
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey
+                  ) {
+                    return;
+                  }
+                  event.preventDefault();
+                  window.scrollTo({
+                    top: 0,
+                    behavior: shouldReduceMotion ? "auto" : "smooth",
+                  });
+                }}
                 className={cn(
                   "relative flex min-h-[44px] flex-col items-center gap-1 px-1 pt-2.5 pb-2 text-[0.6875rem] transition-colors duration-300",
                   active ? "text-accent" : "text-ash hover:text-charcoal"

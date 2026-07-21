@@ -1,17 +1,24 @@
+"use client";
+
 import Link from "next/link";
 import { IconArrowRight, IconSparkle } from "@/components/design-system/icons";
 import { cn } from "@/lib/utils/cn";
+import { usePlus } from "@/lib/revenuecat/usePlus";
 
 interface ExplorePlusLinkProps {
   className?: string;
   description?: string;
+  memberDescription?: string;
 }
 
 /** Full-width gold invitation that mirrors Home's primary verse card. */
 export function ExplorePlusLink({
   className,
   description = "Unlock every wallpaper, unlimited verse refreshes, and more room for daily quests.",
+  memberDescription = "Every wallpaper, unlimited verse refreshes, and unlimited quest windows are ready.",
 }: ExplorePlusLinkProps) {
+  const { isPlus } = usePlus();
+
   return (
     <Link
       href="/app/plus"
@@ -29,10 +36,10 @@ export function ExplorePlusLink({
       </span>
       <span className="relative min-w-0 flex-1">
         <span className="block font-display text-[1.125rem] leading-tight">
-          Explore Plus
+          {isPlus ? "Plus is active" : "Explore Plus"}
         </span>
         <span className="mt-1 block text-caption leading-snug text-[#2c2618]/75">
-          {description}
+          {isPlus ? memberDescription : description}
         </span>
       </span>
       <IconArrowRight className="relative shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
