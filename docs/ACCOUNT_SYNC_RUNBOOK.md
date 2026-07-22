@@ -40,7 +40,36 @@ steps below are complete. It does **not** prove migration history, SMTP delivery
 Google/email round trips, RLS isolation, backup recovery, or signed account
 sync.
 
+## Choose the account release track
+
+The launch record must select exactly one track:
+
+- **Auth + sync enabled:** complete every founder action in this runbook,
+  including custom SMTP, real Gmail and iCloud delivery/callbacks, both-direction
+  A/B isolation, transactional/cached-client sync, and signed restore evidence.
+- **Guest-only contained:** keep the frozen source's `ACCOUNT_SYNC_CONTAINED`
+  constant set to `true`; require health to
+  report `guest-only`; prove account controls are absent; callback exchange,
+  middleware session refresh, and sync/client creation are no-ops; prove clean
+  and upgraded browsers make no Supabase Auth/session/user-table/sync-RPC
+  requests; and prove the complete local-first core, persistence, export/clear,
+  offline/reconnect, and PWA update paths. The named account posture owner and
+  rollback authority must accept the evidence and any stale-client/backend
+  containment decision.
+
+Guest-only does not turn active auth or sync tests into passes. Record SMTP,
+Gmail/iCloud, provider callback, signed-in sync, and A/B client behavior as
+`OUT OF SCOPE — APPROVED GUEST-ONLY` for that release. Migrations through
+`0015`, the complete RLS/grant report and anonymous denial checks, canonical
+content, backup/restore, privacy, device, legal, monitoring, and rollback gates
+remain mandatory. Finish every deferred active-account test before a later
+release enables auth or sync.
+
 ## Founder action 1 — make auth email production-ready
+
+This action is mandatory for the auth + sync enabled track. It is intentionally
+out of scope for an approved guest-only release and remains a hard prerequisite
+for any later account enablement.
 
 Supabase’s built-in sender is a testing service with restricted recipients,
 low rate limits, and no delivery SLA. Configure a custom sender before inviting
@@ -89,6 +118,10 @@ reputation or the receiving mailbox. Do not paste email addresses or magic-link
 tokens into issue trackers.
 
 ## Founder action 2 — verify email links and advertised providers
+
+This action is mandatory for the auth + sync enabled track. In guest-only, do
+not advertise these providers; execute the no-control/no-exchange callback
+matrix instead and leave the provider round trips explicitly out of scope.
 
 1. Open [Supabase Auth providers](https://supabase.com/dashboard/project/iacnjqnssovaaojswjoh/auth/providers).
    Keep Email and Google enabled. Keep Phone disabled; the app does not advertise
@@ -163,8 +196,11 @@ supabase db push --linked
 supabase migration list --linked
 ```
 
-Run `supabase/evidence/rls_policy_report.sql`, the anonymous checks, the complete
-two-user negative test, Clear My Data, and offline/reconnect sync on staging.
+Run `supabase/evidence/rls_policy_report.sql` and the anonymous checks on staging
+for both tracks. Auth + sync enabled additionally requires the complete two-user
+negative test, Clear My Data, and offline/reconnect sync. Guest-only records
+those active-client checks out of scope until enablement and proves containment
+and zero browser Supabase auth/sync traffic instead.
 
 ### Production
 
@@ -219,7 +255,8 @@ The launch-hardening bundle uses `ACCOUNT_SYNC_CONTAINED` as one release latch.
 While it is `true`, current clients hide enrollment, the auth callback refuses
 to exchange codes or token hashes, the request proxy does not refresh Supabase
 sessions, and the browser sync engine stops before it creates a client. Keep the
-latch closed throughout schema, content, RLS, and isolation remediation.
+latch closed throughout schema, content, RLS, and isolation remediation and for
+the entire guest-only launch/watch window.
 
 This web release cannot stop JavaScript that is already running in an open v14
 tab or installed PWA window. The v15 worker evicts old BibleQuest caches after it
@@ -234,18 +271,24 @@ Use this order:
 1. Freeze account rollout and deploy the immutable contained bundle before any
    production migration or content write.
 2. Verify the health endpoint reports the intended guest-only posture, the
-   active worker reports v15, callbacks do not exchange credentials, and normal
-   proxy requests do not refresh sessions.
+   active worker reports v15, account controls are absent, callbacks do not
+   exchange credentials, normal proxy requests do not refresh sessions, and
+   the browser sync path does not create a Supabase client.
 3. Reload browser clients and fully close/relaunch installed PWAs twice. Record
    any remaining v14 observation as residual exposure; do not declare the
    incident contained solely because the deployment alias changed.
 4. With the latch still closed, apply and verify the approved migrations through
-   `0015`, then seed content separately and complete the RLS, two-account,
-   concurrent-device, cached-client, and restore evidence.
+   `0015`, then seed content separately and complete the full RLS/grant,
+   anonymous denial, backup/restore, content, privacy, device, legal, monitoring,
+   and rollback evidence. Complete the local-first core/persistence/export/clear/
+   offline matrix and record a sanitized browser request summary with no
+   Supabase Auth/session/user-table/sync-RPC traffic. Mark two-account,
+   concurrent-device, and cached-client behavior out of scope for this release.
 5. Re-enable accounts only by flipping the single latch in a new reviewed,
    immutable release. Advance the worker version again, repeat the reload/relaunch
-   and callback/proxy/sync checks, and keep the backend boundary until that
-   release is accepted.
+   and callback/proxy/sync checks, complete every deferred SMTP, Gmail/iCloud,
+   A/B isolation, and transactional/cached-client test, and keep the backend
+   boundary until that release is accepted.
 
 ### Transactional daily-quest rollout (`0015`)
 
@@ -280,7 +323,8 @@ docker exec -i supabase_db_BibleQuest \
   < supabase/evidence/rls_policy_report.sql
 ```
 
-On staging, require the same migration-history safeguards as above, then prove:
+Before enabling auth + sync, require the same staging migration-history
+safeguards as above, then prove:
 
 1. Two devices starting from the same revision produce one bounded conflict;
    the merged retry retains both unfinished picks and every completed pick.
@@ -298,14 +342,18 @@ On staging, require the same migration-history safeguards as above, then prove:
    `{"contract":"biblequest_daily_quest_sync_v1","ok":true}` with no rows,
    identifiers, policy text, grants, or failure diagnostics.
 
-Production remains a hard no-go until the compatibility SHA is live, SMTP and
-the signed restore bridge have been retested, a current backup/PITR point and
-isolated restore rehearsal are accepted, staging passes the matrix above, and
-the production dry run proposes exactly the independently reviewed pending
-set. Stop on any project, history, schema, backup, restore, RLS, conflict,
-resurrection, or data-loss disagreement. Applying `0015` is a production write
-and requires a fresh explicit approval; never combine it with the canonical
-content seed, `--include-all`, reset, or migration repair.
+An **auth + sync enabled** production launch remains a hard no-go until the
+compatibility SHA is live, SMTP and the signed restore bridge have been
+retested, a current backup/PITR point and isolated restore rehearsal are
+accepted, staging passes the complete active-client matrix above, and the
+production dry run proposes exactly the independently reviewed pending set. A
+**guest-only contained** launch may record the active-client matrix out of scope
+only after the separate containment matrix and named acceptance pass; backup,
+restore, migration, RLS/grant, anonymous denial, and public CAS posture remain
+hard gates. Stop on any project, history, schema, backup, restore, RLS, conflict,
+resurrection, containment, or data-loss disagreement. Applying `0015` is a
+production write and requires a fresh explicit approval; never combine it with
+the canonical content seed, `--include-all`, reset, or migration repair.
 
 ## Founder action 4 — reconcile the content mirror
 
@@ -394,9 +442,14 @@ data. All three integrity counts must be zero. The readiness probe also compares
 every visible canonical natural key and reviewed field to
 `supabase/seed-manifest.json`; matching row counts alone are not a pass. The seed
 changes only reviewed content tables; it is not a substitute for the RLS report,
-migration-history evidence, or signed two-user tests.
+migration-history evidence, or, when auth + sync is enabled, signed two-user
+tests.
 
-## Founder action 5 — prove the incident is closed
+## Founder action 5 — prove account sync is ready to enable
+
+This action is mandatory before auth + sync is enabled. It is not a guest-only
+launch gate; guest-only instead completes and signs the containment evidence in
+the release runbook while leaving every active-account item below out of scope.
 
 1. Run `pnpm check:production-readiness`; every automated line must pass.
 2. Create fresh staging/production test accounts A and B with synthetic content.

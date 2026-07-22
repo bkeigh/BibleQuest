@@ -258,8 +258,12 @@ function rateAlerts(surface, bucket) {
   return result;
 }
 
-/** Evaluates browser signal availability, rates, categories, and worker parity. */
-export function evaluateClientSignals(aggregate, phase) {
+/** Evaluates browser signal availability, required coverage, and failure posture. */
+export function evaluateClientSignals(
+  aggregate,
+  phase,
+  authPosture = "configured",
+) {
   const alerts = [];
   if (aggregate.collection_status === "truncated") {
     alerts.push(
@@ -284,16 +288,50 @@ export function evaluateClientSignals(aggregate, phase) {
     return alerts;
   }
 
-  const missingSurfaces = SURFACES.filter(
-    (surface) => aggregate[surface].attempts === 0,
+  // Guest-only containment has no legitimate auth or sync synthetic activity.
+  const requiredSurfaces =
+    authPosture === "guest-only" ? ["service_worker"] : SURFACES;
+  const missingSurfaces = requiredSurfaces.filter(
+    (surface) => aggregate[surface].success === 0,
   );
   if (missingSurfaces.length) {
+    const action =
+      authPosture === "guest-only"
+        ? "run the active-worker synthetic before continuing"
+        : "run the auth, sync, and active-worker synthetic before continuing";
     alerts.push(
       alert(
         "critical",
         "browser_signal_coverage_missing",
         "[MONITORING OWNER]",
-        "run the auth, sync, and active-worker synthetic before continuing",
+        action,
+      ),
+    );
+  }
+
+  // Any account activity contradicts the selected guest-only containment track.
+  if (
+    authPosture === "guest-only" &&
+    (aggregate.auth.attempts > 0 || aggregate.sync.attempts > 0)
+  ) {
+    alerts.push(
+      alert(
+        "critical",
+        "guest_only_account_activity_detected",
+        "[ACCOUNT POSTURE OWNER]",
+        "hold or roll back and investigate the auth or sync containment failure",
+      ),
+    );
+  }
+
+  // A failed worker canary is a launch hold even if a later attempt succeeds.
+  if (aggregate.service_worker.failure > 0) {
+    alerts.push(
+      alert(
+        "critical",
+        "service_worker_synthetic_failed",
+        "[PWA OWNER]",
+        "hold rollout and resolve the active-worker synthetic failure",
       ),
     );
   }
@@ -384,18 +422,6 @@ export function fixtureReadiness() {
 /** Returns safe fixture signals for the evidence command and CI. */
 export function fixtureSignals() {
   return [
-    ...Array.from({ length: 5 }, () => ({
-      surface: "auth",
-      stage: "session",
-      outcome: "success",
-      category: "ok",
-    })),
-    ...Array.from({ length: 5 }, () => ({
-      surface: "sync",
-      stage: "initial",
-      outcome: "success",
-      category: "ok",
-    })),
     {
       surface: "service_worker",
       stage: "registration",
@@ -416,8 +442,9 @@ export function buildLaunchEvidence(
 ) {
   const environment = options.environment === "preview" ? "preview" : "production";
   const liveBillingVerified = options.liveBillingVerified === true;
-  const alerts = evaluateClientSignals(aggregate, phase);
   const release = readiness?.external_health?.release ?? null;
+  // Only the bounded health contract can relax coverage for contained launches.
+  const alerts = evaluateClientSignals(aggregate, phase, release?.auth_posture);
   const schemaChecks = readiness?.schema_parity?.checks;
   const dailyQuestSyncReady =
     Array.isArray(schemaChecks) &&
@@ -469,7 +496,7 @@ export function buildLaunchEvidence(
     "hold rollout and reconcile deployment plus metadata origin",
   );
   add(
-    release?.auth_posture === "invalid" ||
+    !["configured", "guest-only"].includes(release?.auth_posture) ||
       readiness?.auth_providers?.settings_reachable !== true ||
       readiness?.auth_providers?.email_enabled !== true ||
       readiness?.auth_providers?.google_enabled !== true ||
@@ -483,7 +510,7 @@ export function buildLaunchEvidence(
     release?.auth_posture === "guest-only",
     "warning",
     "auth_guest_only",
-    "[AUTH OWNER]",
+    "[ACCOUNT POSTURE OWNER]",
     "confirm the launch explicitly intends guest-only mode",
   );
   add(

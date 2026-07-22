@@ -216,6 +216,167 @@ describe("sanitized launch evidence", () => {
     );
   });
 
+  it("requires only worker coverage for an exact guest-only health posture", () => {
+    const evidence = buildLaunchEvidence(
+      fixtureReadiness(),
+      aggregateClientSignals(fixtureSignals()),
+      "preflight",
+      "fixture",
+    );
+    expect(evidence.decision).toBe("REVIEW");
+    expect(evidence.browser_signals).toMatchObject({
+      auth: { attempts: 0 },
+      sync: { attempts: 0 },
+      service_worker: { attempts: 1 },
+    });
+    expect(evidence.alerts).not.toContainEqual(
+      expect.objectContaining({ code: "browser_signal_coverage_missing" }),
+    );
+  });
+
+  it("holds when guest-only evidence contains any auth or sync activity", () => {
+    const evidence = buildLaunchEvidence(
+      fixtureReadiness(),
+      aggregateClientSignals([
+        {
+          surface: "auth",
+          stage: "session",
+          outcome: "success",
+          category: "ok",
+        },
+        ...fixtureSignals(),
+      ]),
+      "t+0",
+      "fixture",
+    );
+    expect(evidence.decision).toBe("HOLD");
+    expect(evidence.alerts).toContainEqual(
+      expect.objectContaining({
+        severity: "critical",
+        code: "guest_only_account_activity_detected",
+      }),
+    );
+  });
+
+  it("requires auth, sync, and worker coverage for configured auth", () => {
+    const configured = fixtureReadiness();
+    configured.external_health.release.auth_posture = "configured";
+    const incomplete = buildLaunchEvidence(
+      configured,
+      aggregateClientSignals(fixtureSignals()),
+      "preflight",
+      "fixture",
+    );
+    expect(incomplete.decision).toBe("HOLD");
+    expect(incomplete.alerts).toContainEqual(
+      expect.objectContaining({
+        severity: "critical",
+        code: "browser_signal_coverage_missing",
+      }),
+    );
+
+    const complete = buildLaunchEvidence(
+      configured,
+      aggregateClientSignals([
+        {
+          surface: "auth",
+          stage: "session",
+          outcome: "success",
+          category: "ok",
+        },
+        {
+          surface: "sync",
+          stage: "initial",
+          outcome: "success",
+          category: "ok",
+        },
+        ...fixtureSignals(),
+      ]),
+      "preflight",
+      "fixture",
+    );
+    expect(complete.decision).toBe("CONTINUE");
+    expect(complete.alerts).toEqual([]);
+  });
+
+  it("does not relax coverage for an unrecognized health posture", () => {
+    const unknown = fixtureReadiness();
+    unknown.external_health.release.auth_posture = "contained";
+    const evidence = buildLaunchEvidence(
+      unknown,
+      aggregateClientSignals(fixtureSignals()),
+      "preflight",
+      "fixture",
+    );
+    expect(evidence.decision).toBe("HOLD");
+    expect(evidence.alerts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "browser_signal_coverage_missing" }),
+        expect.objectContaining({ code: "auth_posture_invalid" }),
+      ]),
+    );
+  });
+
+  it("holds configured launches when every required synthetic fails", () => {
+    const configured = fixtureReadiness();
+    configured.external_health.release.auth_posture = "configured";
+    const evidence = buildLaunchEvidence(
+      configured,
+      aggregateClientSignals([
+        {
+          surface: "auth",
+          stage: "session",
+          outcome: "failure",
+          category: "provider",
+        },
+        {
+          surface: "sync",
+          stage: "initial",
+          outcome: "failure",
+          category: "offline",
+        },
+        {
+          surface: "service_worker",
+          stage: "registration",
+          outcome: "failure",
+          category: "worker",
+        },
+      ]),
+      "preflight",
+      "fixture",
+    );
+    expect(evidence.decision).toBe("HOLD");
+    expect(evidence.alerts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "browser_signal_coverage_missing" }),
+        expect.objectContaining({ code: "service_worker_synthetic_failed" }),
+      ]),
+    );
+  });
+
+  it("holds guest-only launches when the worker synthetic fails", () => {
+    const evidence = buildLaunchEvidence(
+      fixtureReadiness(),
+      aggregateClientSignals([
+        {
+          surface: "service_worker",
+          stage: "registration",
+          outcome: "failure",
+          category: "worker",
+        },
+      ]),
+      "preflight",
+      "fixture",
+    );
+    expect(evidence.decision).toBe("HOLD");
+    expect(evidence.alerts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "browser_signal_coverage_missing" }),
+        expect.objectContaining({ code: "service_worker_synthetic_failed" }),
+      ]),
+    );
+  });
+
   it("holds on readiness summary or provider false-greens", () => {
     const failedSummary = fixtureReadiness();
     failedSummary.ok = false;

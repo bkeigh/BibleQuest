@@ -69,19 +69,63 @@ the evidence.
 | --- | --- | --- | --- |
 | Winterhill embed | Open the production BibleQuest iframe from both `https://winterhill.studio` and `https://www.winterhill.studio`; navigate within the preview and inspect the console/network panel. | BibleQuest renders and remains interactive on both hosts; no ancestor/XFO refusal occurs; the response still lists exactly self and those two hosts. | Winterhill integration owner |
 | Unapproved-origin denial | Serve `tests/manual/iframe-denied-origin.html` from an HTTPS origin that is not in the allowlist, point its iframe at the release candidate, and inspect the console. | The browser refuses to render BibleQuest because of `frame-ancestors`; opening BibleQuest directly still works. | Winterhill integration owner |
-| Supabase sign-in and sync | On a clean browser profile, sign in through each enabled method, create one non-sensitive test record, reload, and confirm the same account receives the synced record. | Auth calls reach only the configured Supabase project over HTTPS; the session survives; sync completes; no CSP errors or cross-account data appears. | Supabase owner |
-| Magic-link request + callback | Request a link for Gmail and iCloud addresses that are not Supabase organization members. Confirm the UI says the link was requested (not delivered), shows the target address, holds resend for 60 seconds, and keeps Google plus a local continuation available. Open the link in the intended same browser and in the supported token-hash/cross-device path, and observe `/auth/callback` through the first-quest hand-off. | Both messages have matching Supabase and SMTP-provider delivery events; callback stays on the BibleQuest origin, sets/refreshes the session, is `private, no-store`, and expired/used/browser-mismatch links show a bounded recovery reason with no raw token or provider text. | Supabase owner |
-| PWA | Install from the release candidate, launch standalone, inspect `/sw.js` headers and Cache Storage, then repeat the documented online/offline/reconnect flow. | Install/launch works; only the documented self-hosted shell/build assets are cached; forbidden/private routes are absent; worker update and streaming navigation remain functional. | Repository owner |
+| Supabase sign-in and sync (enabled track) | On a clean browser profile, sign in through each enabled method, create one non-sensitive test record, reload, and confirm the same account receives the synced record. | Auth calls reach only the configured Supabase project over HTTPS; the session survives; sync completes; no CSP errors or cross-account data appears. Guest-only records this active behavior `OUT OF SCOPE — APPROVED GUEST-ONLY`, not `PASS`. | Supabase owner |
+| Magic-link request + callback (enabled track) | Request a link for Gmail and iCloud addresses that are not Supabase organization members. Confirm the UI says the link was requested (not delivered), shows the target address, holds resend for 60 seconds, and keeps Google plus a local continuation available. Open the link in the intended same browser and in the supported token-hash/cross-device path, and observe `/auth/callback` through the first-quest hand-off. | Both messages have matching Supabase and SMTP-provider delivery events; callback stays on the BibleQuest origin, sets/refreshes the session, is `private, no-store`, and expired/used/browser-mismatch links show a bounded recovery reason with no raw token or provider text. Guest-only records provider delivery/round trips out of scope and runs the containment matrix below. | Supabase owner |
+| PWA | Fresh-install from the immutable candidate URL. Separately, use the approved controlled non-production alias to load compatible old and candidate staging-built artifacts that both use the confirmed staging Supabase pair and safe billing posture; abort on Production values. Remap the same origin for update/rollback rehearsal. Inspect `/sw.js`, Cache Storage, online/offline/reconnect, and record both deployment IDs plus alias changes. | Fresh install/launch works; only documented shell/build assets are cached; forbidden/private routes are absent; same-origin worker update, streaming navigation, and compatible rollback remain functional without Production backend traffic. | Repository owner |
 | RevenueCat sandbox paywall | Use the Test Store public key and a published sandbox paywall; open Plus, exercise paywall/package fallback, close/reopen, and complete a simulated purchase. | Offerings, branding image/font/media, entitlement refresh, and management action work without CSP errors; no Stripe request occurs for Test Store. | Billing owner |
 | Stripe 3DS | Use RevenueCat Web Billing in Stripe test mode with an official 3DS challenge test payment method; complete and cancel separate challenges while watching frames and requests. | Stripe.js loads from its allowed JS origin, API calls use `api.stripe.com`, 3DS renders through allowed Stripe/hooks frames, success updates entitlement, cancel returns safely, and no CSP source was broadened ad hoc. | Billing owner |
 
+## Manual — guest-only containment
+
+Run this matrix whenever the launch record selects guest-only. Use a clean
+browser on the immutable URL and an upgraded browser/installed PWA on the
+approved same-origin transition alias. The sanitized request summary may
+name endpoint categories and counts, but must not include keys, tokens, email,
+user/record IDs, private text, raw URLs, or query strings.
+
+- [ ] `/api/health` reports `guest-only`, the exact release SHA, canonical
+      origin, expected worker/schema/content contracts, and selected billing
+      posture; it never exposes a Supabase host or key.
+- [ ] Enrollment, Email, Google, sign-in, sign-out, and account-sync controls are
+      absent from onboarding, navigation, settings, direct account-route
+      behavior, and installed/returning-client UI.
+- [ ] Fake code, token-hash, provider-error, approved `next`, invalid `next`, and
+      encoded/protocol-relative callback forms remain bounded and do not
+      exchange credentials or create a session.
+- [ ] Ordinary page navigation does not refresh a Supabase session, and startup,
+      edits, reload, focus, `pageshow`, visibility return, offline/reconnect, and
+      PWA relaunch do not create a sync client or call a user-owned table/RPC.
+- [ ] DevTools/HAR inspection during the preceding steps shows zero browser
+      requests to Supabase Auth/session endpoints, user-owned REST tables, or
+      sync RPCs. Operator-only readiness probes are recorded separately.
+- [ ] A new and returning guest can complete the quest/reflection/journey loop;
+      settings, shelf, journal, Bible position, and milestones persist locally;
+      export and clear work; offline create/reopen/reconnect loses no local data.
+- [ ] On the controlled same-origin alias, fully close/relaunch installed PWAs
+      twice after the worker update. Record old/candidate deployment IDs and
+      alias changes. Any stale open client is documented with its backend
+      containment or rollback decision; an alias change alone is not
+      containment.
+- [ ] Active SMTP/Gmail/iCloud, provider callback completion, signed-in sync,
+      transactional/cached-client, and A/B client rows are recorded `OUT OF
+      SCOPE — APPROVED GUEST-ONLY`, not `PASS`.
+- [ ] The named account posture owner and rollback authority accept the complete
+      evidence and residual-client decision with UTC timestamps.
+
+Any visible account control, credential exchange, session refresh, sync-client
+activity, Supabase auth/sync browser request, local-first data loss, or missing
+acceptance is a hard failure.
+
 ## Manual — transactional daily-quest sync
 
-Run on staging first with two disposable accounts and two physical or isolated
-browser/PWA clients. Use obviously fake quest state only. Record UTC time,
-browser/device, deployed SHA, service-worker version, sanitized provider/event
-status, and pass/fail; never record email, cookie, token, raw user/record ID, or
-private content. Fully close and reopen each cached PWA where specified.
+Run before auth + sync is enabled, on staging first, with two disposable
+accounts and two physical or isolated browser/PWA clients. Use obviously fake
+quest state only. Record UTC time, browser/device, deployed SHA, service-worker
+version, sanitized provider/event status, and pass/fail; never record email,
+cookie, token, raw user/record ID, or private content. Fully close and reopen
+each cached PWA where specified. An approved guest-only release records these
+active-client rows out of scope and still requires local/database CAS tests,
+the public CAS posture, the RLS/grant report, and anonymous mutation denials.
 
 | Scenario | Action | Pass criteria |
 | --- | --- | --- |
@@ -103,9 +147,10 @@ remains separate from signed journey-restore and CAS evidence.
 ## Manual — core daily loop
 
 - [ ] A new visitor to `/app` is routed to onboarding.
-- [ ] Onboarding shows the account card before revealing the first quest. Email
-      and Google are visually primary; “Not now — continue on this device” is
-      available as a quiet local-first escape without losing profile choices.
+- [ ] Enabled auth/sync: onboarding shows the account card before revealing the
+      first quest; Email and Google are visually primary; “Not now — continue on
+      this device” is a quiet local-first escape. Guest-only: no account/provider
+      control is shown and onboarding proceeds locally without losing choices.
 - [ ] Onboarding completes in under two minutes; optional steps are skippable.
 - [ ] Home shows the greeting/account surface, then the compact “View Today's
       Verse” invitation, then active/ready/completed quests; the button opens
@@ -214,6 +259,14 @@ time BibleQuest opens.
 
 ### Physical iPhone offline check
 
+An immutable generated deployment URL cannot receive an upgrade because its
+origin never changes. Use it for fresh-install checks only. For the final update
+check below, use the approved controlled non-production alias: map it first to
+compatible old and candidate staging-built artifacts that both use the same
+confirmed staging Supabase pair and safe billing posture. Abort if either
+embeds Production values. Record both immutable deployment IDs and every alias
+change. Never move the production domain for a rehearsal.
+
 - [ ] In Safari while online, open `/app`, complete onboarding, and visit one
       prayer, reflection (inside the Prayer tab), quest, and Bible chapter screen.
 - [ ] Add BibleQuest to the Home Screen, launch it once online, then fully close
@@ -224,12 +277,15 @@ time BibleQuest opens.
       app bundle permits; an unvisited or forbidden route must show the honest
       offline page, never stale account, billing, or sign-in content.
 - [ ] Create a prayer and reflection offline, force-close/reopen, and confirm
-      both remain. Reconnect and confirm normal sync behavior separately.
+      both remain. Enabled auth/sync reconnects and syncs normally; guest-only
+      reconnects with local data intact and zero Supabase auth/sync traffic.
 - [ ] Follow an auth callback, account link, and URL containing `?qa=1` while
       offline; each must use the offline fallback and must not reveal a cached
       response for that URL.
-- [ ] After reconnecting and loading a newer release, relaunch twice and confirm
-      the worker update does not strand the installed app on the old shell.
+- [ ] After reconnecting and remapping the same controlled alias to the newer
+      candidate, relaunch twice and confirm the worker update does not strand
+      the installed app on the old shell. Rehearse the approved compatible
+      rollback mapping on that alias and restore the alias afterward.
 
 ### Desktop Cache Storage inspection
 
@@ -296,9 +352,15 @@ time BibleQuest opens.
 
 ## Known launch postures
 
-- Guest data is device-local. Account sync is implemented, but production must
-  pass migrations through `0015`, daily-quest CAS/cached-client evidence,
-  content reconciliation, custom auth-email, and both-direction two-user checks in
-  [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md) before the beta gate opens.
+- Guest data is device-local. A guest-only production launch may be READY only
+  after the containment matrix above and named acceptance pass; active SMTP,
+  Gmail/iCloud, provider callback, account sync, transactional/cached-client, and
+  A/B behavior remain explicitly out of scope. Migrations through `0015`, RLS/
+  grants and anonymous denials, public CAS posture, content, backup/restore,
+  privacy, device, legal, monitoring, and rollback evidence still pass.
+- Before the beta gate opens, account sync must pass the complete custom-auth
+  email, Gmail/iCloud, callback, transactional/cached-client, and both-direction
+  two-user checks in [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md). A
+  prior guest-only launch is not evidence for any of those active behaviors.
 - Notification delivery and external AI generation are not implemented. Plus
   stays coming-soon unless its complete provider and release gates pass.
