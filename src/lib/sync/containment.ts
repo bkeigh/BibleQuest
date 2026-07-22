@@ -1,7 +1,7 @@
 /**
  * Temporary incident latch for the production Journey schema mismatch.
  * Keep account data sync closed unless one reviewed build target explicitly
- * enables it after migrations through 0018 and the isolation gates pass.
+ * enables it after migrations through 0019 and the isolation gates pass.
  */
 export function accountSyncContained(enabled: string | undefined): boolean {
   return enabled !== "true";

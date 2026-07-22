@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(33);
+select plan(34);
 
 -- Create disposable owners; every row is removed by the surrounding rollback.
 insert into auth.users (id, raw_user_meta_data, created_at, updated_at)
@@ -30,13 +30,11 @@ begin
   select generation into live_generation
   from public.user_sync_state
   where user_id = uid;
-  response := public.upsert_mutable_account_rows(
-    uid,
-    live_generation,
+  response := public.upsert_mutable_account_rows_internal(
     p_resource,
     p_rows
   );
-  return response - 'generation';
+  return response;
 end;
 $function$;
 
@@ -102,8 +100,8 @@ select is(
    where table_schema = 'public'
      and table_name = 'profiles'
      and grantee = 'authenticated'),
-  'INSERT,SELECT',
-  'profiles retain exactly authenticated INSERT and SELECT'
+  'SELECT',
+  'profiles retain exactly authenticated SELECT'
 );
 select is(
   (select count(*)
@@ -120,10 +118,10 @@ select is(
        and grantee = 'authenticated'
      group by table_name
      having string_agg(privilege_type, ',' order by privilege_type)
-       = 'DELETE,INSERT,SELECT'
+       = 'SELECT'
    ) as exact_grants),
-  2::bigint,
-  'non-tombstone guarded tables retain DELETE, INSERT, and SELECT'
+  4::bigint,
+  'guarded tables retain exactly SELECT'
 );
 select is(
   (select count(*)
@@ -315,29 +313,25 @@ select is(
   'canonical content remains the newest RPC value'
 );
 
--- Direct INSERT and SELECT remain available during generation-zero rollout.
-insert into public.prayers (
-  id,
-  user_id,
-  body,
-  category,
-  status,
-  created_at,
-  updated_at
-) values (
-  '74000000-0000-4000-8000-000000000004',
-  '71000000-0000-4000-8000-000000000001',
-  'Synthetic direct insert',
-  'general',
-  'active',
-  '2026-07-22T20:00:00Z',
-  '2027-07-22T20:00:00Z'
+-- Direct INSERT and DELETE now fail closed behind the v4 CAS boundary.
+select throws_ok(
+  $$insert into public.prayers (
+      id, user_id, body, category, status, created_at, updated_at
+    ) values (
+      '74000000-0000-4000-8000-000000000004',
+      '71000000-0000-4000-8000-000000000001',
+      'Synthetic direct insert', 'general', 'active',
+      '2026-07-22T20:00:00Z', '2027-07-22T20:00:00Z'
+    )$$,
+  '42501',
+  null,
+  'direct INSERT is denied by the v4 boundary'
 );
 select is(
   (select count(*) from public.prayers
    where id = '74000000-0000-4000-8000-000000000004'),
-  1::bigint,
-  'owner direct INSERT and SELECT remain available'
+  0::bigint,
+  'the denied direct INSERT leaves no owner row'
 );
 select throws_ok(
   $$delete from public.prayers
@@ -349,8 +343,8 @@ select throws_ok(
 select is(
   (select count(*) from public.prayers
    where id = '74000000-0000-4000-8000-000000000004'),
-  1::bigint,
-  'the denied direct DELETE leaves the owner row intact'
+  0::bigint,
+  'the denied direct DELETE leaves the table unchanged'
 );
 
 -- RLS isolation still hides the first owner's row from the second owner.

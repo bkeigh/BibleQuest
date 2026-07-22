@@ -69,9 +69,9 @@ product tone. The production canonical host is `https://www.biblequest.co`.
 ### QuestOS and BibleQuest Console parity
 
 - Local QuestOS persistence, import/export, sync mappings, and Supabase rows all
-  carry `picked_at`, `expires_at`, and owner-only recent-verse history. A
-  database trigger keeps same-passage timestamps monotonic so a stale device
-  cannot overwrite the complete newer visit recorded by another device.
+  carry `picked_at`, `expires_at`, and owner-only recent-verse history. Per-row
+  server revisions order conflicting recent-history writes without trusting a
+  device clock.
 - Apply `0010_rolling_quest_windows_and_recent_verses.sql` and
   `0011_bible_translation_preference.sql` only through the staged migration
   procedure. Verify schema and RLS before a separate dry-run/review/application
@@ -85,13 +85,23 @@ product tone. The production canonical host is `https://www.biblequest.co`.
   `9497b745c5efc0c3f6c4c82e43e57c4fd9b34e8cfae12e6193226d564da50789`),
   `0015_transactional_daily_quest_sync.sql`, and
   `0016_mutable_account_sync_guards.sql`,
-  `0017_enforce_mutable_account_sync_boundary.sql`, and
-  `0018_bind_account_sync_identity_and_generation.sql`. `0013` is absent. These migrations
+  `0017_enforce_mutable_account_sync_boundary.sql`,
+  `0018_bind_account_sync_identity_and_generation.sql`, and
+  `0019_server_ordered_account_sync_revisions.sql`. `0013` is absent. These migrations
   provide transactional per-day replacement, explicit revision comparison,
   bounded idempotency, completion preservation, cached-client triggers, and
   guarded mutable account writes, cached-client update enforcement, expected-user
-  binding, retained generations, and durable destructive operations while
-  retaining the complete RLS and service-worker v16 contracts.
+  binding, retained generations, durable destructive operations, and per-row
+  server revision/CAS authority. Database-owned `server_seen_at` orders the
+  bounded recent-passage list so client `viewed_at` cannot become cross-key cap
+  authority, while retaining the complete RLS and service-worker v17 contracts.
+- The July 31 v3-to-v4 staging cutover depends on containment, not a transparent
+  client upgrade. Production/main is guest-only and never ran v3. The
+  superseded v3 Preview is synthetic-only and never-promote. Close its clients
+  and re-prove staging `auth.users` is exactly zero immediately before `0019`.
+  Any retained signed-in/v3 client or nonzero count requires a two-phase bridge
+  or reviewed reset/data-disposition decision; a service-worker refresh does
+  not prove unsynced v3 data was preserved.
 - A July 19 read-only production probe found the later migrations' expected schema
   absent and the content mirror behind the checked-in catalogue. Follow
   `docs/ACCOUNT_SYNC_RUNBOOK.md`: rehearse on staging, confirm the exact linked

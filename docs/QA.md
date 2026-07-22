@@ -24,6 +24,7 @@ supabase test db --local supabase/tests/0015_daily_quest_cas.sql
 supabase test db --local supabase/tests/0016_mutable_account_sync_guards.sql
 supabase test db --local supabase/tests/0017_mutable_account_sync_boundary.sql
 supabase test db --local supabase/tests/0018_account_sync_generation.sql
+supabase test db --local supabase/tests/0019_server_ordered_account_sync_revisions.sql
 ```
 
 The automated suite targets launch-critical behavior rather than UI snapshots:
@@ -38,6 +39,8 @@ The automated suite targets launch-critical behavior rather than UI snapshots:
   stale runs, and applies tombstones before merging remote rows. Daily-quest
   tests cover simultaneous devices, stale revisions, duplicate requests,
   atomic rollback, unpick, completed-state preservation, and cached clients.
+  Cap-agnostic ranged pulls also restore more than 1,000 rows through a lower
+  500-row provider cap without treating an omitted tail as deletion.
 - Analytics uses one transport; default-denies incomplete configuration and
   consent; validates closed event/prop shapes; normalizes URLs; honors DNT/GPC;
   bounds and sanitizes offline retries; and stops safely on mid-flush opt-out.
@@ -146,6 +149,30 @@ the public CAS posture, the RLS/grant report, and anonymous mutation denials.
 Any isolation, resurrection, completion loss, silent overwrite, unbounded retry,
 or rollback failure keeps account rollout on hold. Delivery-provider evidence
 remains separate from signed journey-restore and CAS evidence.
+
+## Manual — v4 server-ordered mutable sync
+
+Run only after Codex's `STAGING READY` handoff proves the 18-migration history
+through `0019`, its exact manifest, and the v4 contract. For this launch,
+Production/main is guest-only and never ran v3. The superseded v3 Preview is
+synthetic-only and never-promote. Close every v3 Preview client and re-prove
+synthetic staging has exactly zero Auth users before `0019`. If any retained
+signed-in/v3 client exists or the count is nonzero, stop for a two-phase bridge
+or reviewed reset/data-disposition decision; a service-worker refresh does not
+prove unsynced v3 data survives.
+
+- [ ] On devices at least 24 hours ahead and behind, create conflicting edits
+      for each of the nine revisioned resources. A stale revision conflicts,
+      then pulls/rebases/converges; a third reconciliation writes nothing.
+- [ ] Prove direct browser mutation and a v3 payload fail closed without
+      exposing row content or causing an unbounded retry.
+- [ ] Create more than 20 recent-passage keys with `viewed_at` values at least
+      one year ahead and behind. Database-owned `server_seen_at`, not the
+      client clock, determines the canonical 20-row cap, and a new local recent
+      passage still reaches CAS and remains after convergence.
+- [ ] After reload, sync metadata contains only bounded revisions and canonical
+      SHA-256 fingerprints, never duplicate prayer, reflection, bookmark-note,
+      or recent-verse content.
 
 ## Manual — core daily loop
 
@@ -358,7 +385,7 @@ change. Never move the production domain for a rehearsal.
 - Guest data is device-local. A guest-only production launch may be READY only
   after the containment matrix above and named acceptance pass; active SMTP,
   Gmail/iCloud, provider callback, account sync, transactional/cached-client, and
-  A/B behavior remain explicitly out of scope. Migrations through `0018`, RLS/
+  A/B behavior remain explicitly out of scope. Migrations through `0019`, RLS/
   grants and anonymous denials, public CAS posture, content, backup/restore,
   privacy, device, legal, monitoring, and rollback evidence still pass.
 - Before the beta gate opens, account sync must pass the complete custom-auth

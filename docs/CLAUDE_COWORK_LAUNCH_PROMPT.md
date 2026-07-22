@@ -35,7 +35,7 @@ with the observed evidence, expected behavior, and acceptance test.
   `main` SHA; never carry PR-head candidate evidence forward as final evidence.
 - Canonical production origin: `https://www.biblequest.co`
 - Target launch date: July 31, 2026, America/New_York
-- Expected migration history is the exact 17-file manifest ending at `0018`,
+- Expected migration history is the exact 18-file manifest ending at `0019`,
   has no `0013`, and retains the immutable `0014` migration.
 - Expected public content counts are 150 approved free quests, 180 active daily
   passages, 38 active milestones, 32 prayer prompts, and 32 reflection prompts.
@@ -99,6 +99,12 @@ because CI or a Vercel build is green.
    staging-only Codex build with its own SHA, worker version, immutable
    deployment, confirmed staging environment, and evidence namespace. It must
    never be promoted or treated as production-candidate evidence.
+   Production/main never ran the v3 sync engine. The superseded v3 Preview is
+   synthetic-only and never-promote. Before any account operator accepts a v4
+   staging handoff, require old v3 Preview clients closed and a repeated exact-
+   zero staging `auth.users` count. Any retained v3 client or nonzero count
+   requires a two-phase bridge or reviewed reset/data-disposition decision; a
+   service-worker refresh is not proof that unsynced v3 data was preserved.
 9. Never claim that Vercel promotion rolls back database changes. Database
    migrations are forward-only. Database restore is destructive and requires
    the separate two-person approval in the runbook.

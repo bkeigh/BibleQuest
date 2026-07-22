@@ -471,7 +471,7 @@ describe("service-worker lifecycle and upgrades", () => {
     });
   });
 
-  it("deletes old and incompatible BibleQuest caches during v16 activation", async () => {
+  it("deletes old and incompatible BibleQuest caches during v17 activation", async () => {
     const harness = loadWorker();
     await harness.caches.open("biblequest-v6-shell");
     await harness.caches.open("biblequest-v6-runtime");
@@ -493,8 +493,8 @@ describe("service-worker lifecycle and upgrades", () => {
     ]);
     expect((await harness.caches.keys()).sort()).toEqual([
       "another-app-runtime",
-      "biblequest-v16-runtime",
-      "biblequest-v16-shell",
+      "biblequest-v17-runtime",
+      "biblequest-v17-shell",
     ]);
     expect(harness.state.claimed).toBe(true);
   });

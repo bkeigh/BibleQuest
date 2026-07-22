@@ -25,6 +25,7 @@ const EXPECTED_MIGRATIONS = [
   "0016_mutable_account_sync_guards.sql",
   "0017_enforce_mutable_account_sync_boundary.sql",
   "0018_bind_account_sync_identity_and_generation.sql",
+  "0019_server_ordered_account_sync_revisions.sql",
 ];
 
 /** Hash a migration exactly as the release manifest does. */
@@ -91,6 +92,8 @@ describe("release migration contracts", () => {
     expect(report).toContain("'mutable_account_sync_contract'");
     expect(report).toContain("'account_sync_generation'");
     expect(report).toContain("'account_sync_contract'");
+    expect(report).toContain("'advance_account_sync_revision'");
+    expect(report).toContain("sync_revision");
     expect(report).toContain(
       "select public.mutable_account_sync_contract() as mutable_account_sync_contract;",
     );

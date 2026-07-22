@@ -104,13 +104,13 @@ describe("sanitized launch evidence", () => {
   it("accepts only the bounded account-generation boundary contract", () => {
     expect(
       isAccountSyncContract({
-        contract: "biblequest_account_sync_v3",
+        contract: "biblequest_account_sync_v4",
         ok: true,
       }),
     ).toBe(true);
     expect(
       isAccountSyncContract({
-        contract: "biblequest_account_sync_v3",
+        contract: "biblequest_account_sync_v4",
         ok: true,
         diagnostic: PRIVATE_MARKERS[4],
       }),
@@ -123,7 +123,7 @@ describe("sanitized launch evidence", () => {
     ).toBe(false);
     expect(
       isAccountSyncContract({
-        contract: "biblequest_account_sync_v3",
+        contract: "biblequest_account_sync_v4",
         ok: false,
       }),
     ).toBe(false);
@@ -554,7 +554,7 @@ describe("sanitized launch evidence", () => {
       rollback_target_sha: "b".repeat(40),
     });
     expect(evidence.service_worker_version.observed).toEqual([
-      "biblequest-v16",
+      "biblequest-v17",
     ]);
     expect(evidence.alerts).toEqual([
       expect.objectContaining({

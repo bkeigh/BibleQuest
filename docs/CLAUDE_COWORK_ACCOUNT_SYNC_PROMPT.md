@@ -42,21 +42,37 @@ and sync integrity must be proven first.
 - Launch window: July 31, 2026 at 11:00 AM ET / 15:00 UTC.
 - Production remains guest-only contained unless the complete enabled-account
   release gate is accepted.
-- The intended staging schema ends at `0018`, includes 17 migrations
-  `0001`–`0012`, `0014`, `0015`, `0016`, `0017`, and `0018`, and contains no
+- The intended staging schema ends at `0019`, includes 18 migrations
+  `0001`–`0012`, `0014`, `0015`, `0016`, `0017`, `0018`, and `0019`, and contains no
   `0013`.
-- Codex applied `0018` only to the synthetic staging project. Its exact
-  17-migration history, 176 remote pgTAP assertions, 29-table RLS/grant report,
-  v1/v2/v3 readiness contracts, canonical public counts/hashes, and a local
-  sync-enabled production build pass. The reviewed sync-enabled application
-  SHA, immutable deployment, masked Vercel pairing, and provider configuration
-  remain pending. Treat staging as **NOT READY FOR ACTIVE ACCOUNT TESTS** until
-  the exact handoff in this prompt is received.
+- Synthetic staging now has the exact 18-migration history through `0019`.
+  All 219 remote pgTAP assertions, the 29-table RLS/grant posture, exact v4
+  account contract, and canonical public counts/hashes pass. The cutover was
+  preceded and followed by read-only `auth.users` counts of exactly zero.
+- Production/main remains guest-only and never ran the v3 sync engine. The v3
+  Preview is synthetic-only, superseded, and **never promote**. It is not an
+  account-data migration source and none of its evidence may be relabeled as
+  v4 or Production evidence.
+- The reviewed local `0019` has 41 pgTAP assertions and digest
+  `49b59e11845465e073f4255b64584df2a48e5ed3a184ad15613d9b33fd1f863d`.
+  Its database-owned `server_seen_at` orders the bounded recent-passage list;
+  client `viewed_at` remains product/audit data, not cross-key cap authority.
+  Treat staging as **NOT READY FOR ACTIVE ACCOUNT TESTS** until the exact
+  handoff in this prompt is received.
 - Codex's adversarial review found deletion resurrection, stale cached writes,
   unbound in-flight identity, and guest-profile claim blockers in the prior
-  design. Migration `0018` and its matching client protocol are intended to
-  close those blockers, but no provider green check may substitute for the
+  design. Migrations `0018` and `0019` plus their matching client protocol are
+  intended to close those blockers and remove device-clock conflict authority,
+  but no provider green check may substitute for the
   final reviewed source, staging migration, and adversarial evidence handoff.
+
+The July 31 cutover is safe only because no active v3 account population exists
+in either contained Production or synthetic staging. Before `0019`, Codex must
+close every old v3 Preview client and re-prove the staging `auth.users` count is
+exactly zero. If the repeat count is nonzero or any retained signed-in/v3 client
+may exist, stop: require a reviewed two-phase compatibility bridge or an
+explicit reset/data-disposition decision. Never claim a service-worker update,
+claim, reload, or refresh preserves unsynced v3 data.
 
 Resolve the current GitHub, Vercel, Supabase, and local Git state at session
 start. Never assume the known commits still identify the current candidate.
@@ -98,6 +114,8 @@ You own:
 - synthetic test-account coordination;
 - browser and physical-device testing;
 - SMTP, callback, OAuth, PWA, privacy, and account-sync observations;
+- read-only backup inspection and manual restore-acceptance coordination after
+  the database owner provides an isolated recovery handoff;
 - sanitized evidence and exact operator handoffs.
 
 Do not edit application code, SQL, seeds, configuration files, runbooks, or Git
@@ -105,6 +123,10 @@ refs. Do not create a competing implementation. Do not create, delete, pause,
 restore, or rename a Supabase project. Do not link a CLI, apply migrations, run
 a seed, repair history, or execute SQL. Do not modify the staging project's
 schema or public content, even if a provider UI offers a shortcut.
+For a restore gate, you may inspect provider-displayed backup identity and run
+the assigned browser/device acceptance matrix against an already isolated
+recovery target. You may not create, restore, query, configure, promote, or
+delete that target.
 
 Only one operator may mutate a provider target at a time. Before every external
 mutation, name the provider, organization, exact project/environment, exact
@@ -125,12 +147,16 @@ Project reference: yjwlunqssyztxkedstjb
 Privacy class: SYNTHETIC ONLY
 Full reviewed source SHA: <40 characters>
 Automated checks: <exact passing suite summary>
-Migration manifest: 17 files; 0001-0012, 0014, 0015, 0016, 0017, 0018; no 0013
+Migration manifest: 18 files; 0001-0012, 0014, 0015, 0016, 0017, 0018, 0019; no 0013
 Applied migration history: <PASS with sanitized evidence>
 0014 SHA-256: 9497b745c5efc0c3f6c4c82e43e57c4fd9b34e8cfae12e6193226d564da50789
 0016 manifest digest: c816993cc79eee1be01ba7bf679f2d6db789ef3bddd71f4e7c6abc5b4cfffdcb
 0017 manifest digest: 769561fb5973ad2d48439bf4e5cbd0d1ed054ae2f6fe608aebf756036a910e16
 0018 manifest digest: 90615a6cf11156308bbd7d797e3996464233fa6646669f3975eba92b8bc98930
+0019 manifest digest: 49b59e11845465e073f4255b64584df2a48e5ed3a184ad15613d9b33fd1f863d
+Database tests: 219 total; 0019 server-revision plan is exactly 41
+Pre-0019 client cutover: old v3 Preview clients CLOSED; retained signed-in/v3 clients NONE PROVEN
+Pre-0019 staging Auth population: auth.users count exactly 0, re-proven after client closure
 RLS/grant/function/trigger evidence: <PASS with sanitized link or summary>
 Anonymous-denial evidence: <PASS with sanitized link or summary>
 Canonical public content: 150 / 180 / 38 / 32 / 32 and exact digest PASS
@@ -144,11 +170,13 @@ Anything missing, ambiguous, or tied to a different project or SHA keeps the
 handoff at `HOLD`. A screenshot of a green provider page is not a substitute
 for the complete handoff.
 
-For a provably empty project, applying all 17 reviewed migrations is the
-expected bootstrap. The legacy-history prohibition against replaying renamed
-early migrations applies to an existing linked database, not to this clean
-staging project. You do not perform or repair either workflow; you verify that
-Codex's handoff clearly identifies which case was proven.
+This staging project was cleanly bootstrapped through the 17 migrations ending
+at `0018`; `0019` is a separate forward-only cutover. A new provably empty
+project would apply the complete 18-migration history. The legacy-history
+prohibition against replaying renamed early migrations applies to an existing
+linked database, not to a clean bootstrap. You do not perform or repair either
+workflow; you verify that Codex's handoff clearly identifies which case was
+proven.
 
 ### Read these files completely before acting
 
@@ -184,8 +212,10 @@ Keep these environments visibly distinct in every update:
    staging credentials or staging evidence and requires the main runbook's
    exact production authorization.
 4. **Restricted recovery environment.** Consume the main launch operator's
-   accepted backup/restore evidence. Do not create, query, configure, or delete
-   a recovery environment in this parallel account-sync track.
+   accepted backup/restore evidence. After an isolated target is handed off,
+   perform only the assigned manual browser/device acceptance checks. Do not
+   create, restore, query, configure, promote, or delete a recovery environment
+   in this parallel account-sync track.
 
 The staging project's provider-displayed cost and retention policy must be
 recorded from the authenticated billing view. Do not invent a price or deletion
@@ -221,7 +251,7 @@ an exact lifecycle packet; it may remain useful for account-sync remediation.
    - ad hoc SQL copied from chat
    - a combined migration-and-seed mutation
 7. Stop on any `0013`, any source/history mismatch, an unreviewed `0016`,
-   `0017`, or `0018`, or an artifact not keyed to its exact 17-migration
+   `0017`, `0018`, or `0019`, or an artifact not keyed to its exact 18-migration
    manifest.
 8. Never load a sync artifact until Vercel and Supabase prove that its masked
    Supabase URL and publishable key form the paired staging credentials. Abort
@@ -234,7 +264,11 @@ an exact lifecycle packet; it may remain useful for account-sync remediation.
     forward-only; a database restore is destructive and separate.
 11. Do not enable RevenueCat, create a subscription product, add a billing key,
     or make a spiritual feature paid.
-12. A waiver is not a pass. Use only `PASS`, `FAIL`, `HOLD`, `NOT RUN`, or
+12. Do not merge, close, retarget, mark ready, or otherwise change PR #16 or
+    any successor account-sync pull request. Git integration remains Codex's
+    job, and this prompt grants no Production mutation or sync-enablement
+    authority.
+13. A waiver is not a pass. Use only `PASS`, `FAIL`, `HOLD`, `NOT RUN`, or
     `SUPERSEDED`. Staging never proves Production behavior by itself.
 
 ## Evidence system
@@ -265,7 +299,7 @@ Use these account-sync evidence IDs:
 | `AS01` | Authority, access, current source, checks, roles, and environment inventory | `E01`, `E02` |
 | `AS02` | Staging-project identity, cost, credential separation, handoff, and lifecycle | `E03` |
 | `AS03` | Immutable sync-enabled staging deployment and masked environment pairing | `E03`, `E21` |
-| `AS04` | Accepted 17-migration Codex handoff and applied staging history | `E04` |
+| `AS04` | Accepted 18-migration Codex handoff and applied staging history | `E04` |
 | `AS05` | Accepted RLS, grants, functions, triggers, and anonymous denials | `E05` |
 | `AS06` | Two-account, bidirectional isolation and sentinel-safe result | `E06` |
 | `AS07` | Accepted main-track daily-backup and isolated-restore evidence | `E07` |
@@ -276,7 +310,7 @@ Use these account-sync evidence IDs:
 | `AS12` | Auth/sync health, canary, error/log view, alerts, and support path | `E15` |
 | `AS13` | Web/database/PWA rollback compatibility evidence | `E16` |
 | `AS14` | Accepted canonical content counts and exact hashes | `E20` |
-| `AS15` | Complete enabled-account decision and named sign-off | `E21` |
+| `AS15` | Complete staging account-readiness decision and named sign-off | `E21` |
 | `AS16` | Exact Production enablement proposal; no mutation implied | `E04`, `E17`, `E21` |
 
 Do not merge evidence between staging, contained Production, a recovery
@@ -301,22 +335,32 @@ environment, and a future sync-enabled Production candidate.
    communications/account-posture, and rollback owner unless he assigns another
    human. Agent review does not manufacture an independent human approval.
 7. Confirm RevenueCat remains `coming-soon` and out of scope.
-8. Publish `AS01` and continue independent read-only checks while waiting for
-   `STAGING READY`.
+8. While waiting for `STAGING READY`, work in parallel on read-only staging
+   provider inventory, SMTP/DNS/OAuth inspection, device reservations and test
+   scripts, backup inventory, isolated-restore acceptance planning, evidence
+   templates, monitoring access, and synthetic-account labels. Do not create an
+   account or load any v3/v4 sync client yet.
+9. Publish `AS01` and continue those independent read-only checks while waiting
+   for `STAGING READY`.
 
 ### Phase 1 — wait for and validate staging handoff
 
 1. Do not mutate the staging project while Codex is provisioning it.
 2. Receive the complete `STAGING READY` block. Confirm the exact project name
-   and reference, full reviewed SHA, 17-migration manifest through `0018`, no
-   `0013`, RLS/anonymous evidence, content evidence, and released target lock.
+   and reference, full reviewed SHA, 18-migration manifest through `0019`, no
+   `0013`, 41-test `0019` plan, final digest, RLS/anonymous evidence, content
+   evidence, zero-user cutover proof, and released target lock.
 3. In the Supabase UI, visually confirm the staging project is distinct from
    Production without exposing credentials or private values.
 4. Confirm the staging project has only synthetic/public data and record its
    current cost and lifecycle posture from the provider UI.
 5. Record that its URL and publishable key are present, paired, and distinct
    from Production. Do not transcribe either value.
-6. Publish `AS02`, `AS04`, `AS05`, and `AS14` from the exact handoff and provider
+6. Confirm the superseded v3 Preview has no open test client, no Production or
+   canonical alias, and a `NEVER PROMOTE` disposition. If any retained signed-
+   in/v3 client may exist or the pre-`0019` user count was not re-proven zero
+   after client closure, reject the handoff and require a bridge/reset decision.
+7. Publish `AS02`, `AS04`, `AS05`, and `AS14` from the exact handoff and provider
    inspection. Mark them `HOLD` if any identity differs.
 
 ### Phase 2 — bind an immutable staging artifact
@@ -327,8 +371,9 @@ environment, and a future sync-enabled Production candidate.
 2. Use only the reviewed sync-enabled SHA named by Codex. Create or locate its
    immutable Vercel deployment and prove SHA, deployment ID, environment pair,
    billing posture, and `NEVER PROMOTE` label before loading it.
-3. Confirm there is no canonical or Production alias on the deployment.
-4. Check `/api/health` for the expected source, worker, schema `0018`, content,
+3. Confirm there is no canonical or Production alias on the deployment. Do not
+   reuse, reload, promote, or relabel the superseded v3 Preview.
+4. Check `/api/health` for the expected source, worker, schema `0019`, content,
    billing, origin, and `configured` account posture. A mismatch is a hard stop.
 5. Publish `AS03`.
 
@@ -353,8 +398,9 @@ setting while preparing staging.
    `next` path, use the expected token fields, and never hard-code an unsafe
    external destination. Never record generated links or tokens.
 6. Configure only the exact staging Google OAuth origins and callbacks. State
-   clearly when a shared Google-console mutation could affect Production and
-   obtain the target-specific packet before changing it.
+   clearly when a shared Google-console mutation could affect Production. Do
+   not make that shared change in this parallel goal; send an exact handoff to
+   the main launch operator instead.
 7. Using fresh synthetic accounts, test new and existing account flows, Gmail
    and iCloud receipt/spam placement, a non-organization-member recipient,
    same- and cross-browser completion, iPhone Mail to Safari and installed PWA,
@@ -390,9 +436,11 @@ phrase “all supported data”:
 10. `earnedMilestones` — earned milestones restore exactly once.
 11. `bookmarks` — translation-aware bookmark create/delete restores without
     resurrection.
-12. `readingPosition` — the newest reading position restores correctly.
+12. `readingPosition` — the latest server-accepted reading position restores correctly.
 13. `chaptersRead` — chapter history unions without duplication or loss.
-14. `recentVerses` — newer verse state wins and older replay is rejected.
+14. `recentVerses` — the latest server-revision state wins, stale replay
+    conflicts, and database-owned `server_seen_at` determines the bounded
+    cross-passage recent list without exposing that server field as writable.
 
 Then run these cross-cutting scenarios:
 
@@ -403,13 +451,13 @@ Then run these cross-cutting scenarios:
    identifier, count-derived disclosure, sentinel, log payload, or cached data.
    Exercise both directions through normal user sessions only.
 3. **Guarded mutable writes (`0016`):** profile, user settings, notification
-   preferences, prayers, and reflections must use the authenticated guarded
-   contract; caller-supplied ownership is ignored, stale timestamps do not
-   overwrite newer rows, anonymous calls fail, malformed acknowledgements fail
-   closed, and there is no unsafe direct-write fallback.
-4. **Cached-client boundary (`0017`):** authenticated direct UPDATE and
-   conflict-upsert fail on all five guarded tables; intended owner
-   SELECT/INSERT/DELETE remain, service-role administration remains, and
+   preferences, prayers, and reflections use the authenticated guarded
+   contract; caller-supplied ownership is ignored, anonymous calls fail,
+   malformed acknowledgements fail closed, and there is no unsafe fallback.
+   Treat its timestamp ordering as historical compatibility superseded by
+   `0019`, never as current conflict authority.
+4. **Cached-client boundary (`0017`):** the historical direct-UPDATE boundary
+   remains intact beneath the stricter `0019` direct-mutation revocation, and
    `mutable_account_sync_contract()` returns exactly the accepted two fields.
 5. **Identity and generation boundary (`0018`):** every recreating write is
    pinned to the exact authenticated user and observed generation; a stale
@@ -417,29 +465,39 @@ Then run these cross-cutting scenarios:
    response-lost deletion and purge retries are idempotent; guarded My Quests
    and reading-position writes cannot replace newer rows; safe guest-profile
    claim succeeds exactly once; cached generation-zero compatibility ends
-   after the first destructive generation advance; and
-   `account_sync_contract()` returns exactly
-   `{"contract":"biblequest_account_sync_v3","ok":true}`.
-6. **Recovery reconciliation:** after offline edits, reconnect, focus, and
+   after the first destructive generation advance.
+6. **Server-ordered revisions (`0019`):** all nine conflict-bearing resources
+   use database-owned per-row revision CAS. Ahead, behind, and equal device
+   timestamps cannot change the decision; exact per-row acknowledgements bind
+   every partial result to its key; direct browser mutations and old v3
+   payloads fail closed; a conflict pulls, rebases, and converges without
+   ping-pong; and `account_sync_contract()` returns exactly
+   `{"contract":"biblequest_account_sync_v4","ok":true}`.
+   For recent verses, generate more than 20 passage keys with `viewed_at`
+   values at least one year ahead and behind. Prove those client clocks cannot
+   monopolize the 20-row cap, while a newly viewed local passage is still
+   offered to CAS and survives the converged server-owned ordering.
+7. **Recovery reconciliation:** after offline edits, reconnect, focus, and
    visible-page return each converge without needing a full reload. Event bursts
    must not produce concurrent or unbounded reconciliation runs.
-7. **Transactional daily quests (`0015`):** simultaneous devices, stale
+8. **Transactional daily quests (`0015`):** simultaneous devices, stale
    revision, duplicate request UUID, injected rollback, unpick, completed-state
    preservation, bounded conflict/retry, and legacy compatible-client behavior
    all pass.
-8. **Deletion:** every mutable collection's supported deletion or tombstone
+9. **Deletion:** every mutable collection's supported deletion or tombstone
    path remains deleted after reconnect, force-close, and another-device pull.
-9. **Clear My Data:** all A-owned rows and local data are removed, B remains
+10. **Clear My Data:** all A-owned rows and local data are removed, B remains
    unchanged, and A's Auth account remains. The UI must describe that boundary
    truthfully.
-10. **Clock-skew adversary:** test a device at least 24 hours ahead, one at
+11. **Clock-skew adversary:** test a device at least 24 hours ahead, one at
     least 24 hours behind, and equal-timestamp conflicting edits for every
-    timestamp-guarded mutable resource. Any indefinite winner, silent overwrite,
-    or inability to recover after correcting the clock is a `FAIL`, not a
-    waiver. Report it to Codex for a server-ordered revision/CAS fix.
-11. **Original regression:** the reported iPhone Mail to Safari/PWA path must not
+    revision-guarded mutable resource. Require one bounded CAS conflict, a
+    canonical pull/rebase, convergence, and a no-write third reconciliation.
+    Any indefinite winner, silent overwrite, client-clock decision, or inability
+    to recover after correcting the clock is a `FAIL`, not a waiver.
+12. **Original regression:** the reported iPhone Mail to Safari/PWA path must not
    show “We couldn't restore your journey.”
-12. **Failure UX:** supported network/provider failures fail closed with a
+13. **Failure UX:** supported network/provider failures fail closed with a
    bounded support reference, no retry loop, and no provider text, token, query,
    or private content exposure.
 
@@ -463,7 +521,9 @@ Publish `AS06` and the sync portions of `AS09` and `AS15`.
    where required and are not cached by the PWA.
 4. Complete desktop and physical current-iPhone Safari/PWA install, standalone,
    safe-area, offline, reconnect, force-close/reopen, worker update, and old-to-
-   new cache transition checks. Repeat relaunch twice.
+   new cache transition checks. The old-bundle check must start signed out with
+   no unsynced v3 account data; it proves cache/lifecycle behavior only, not v3
+   data preservation. Repeat relaunch twice.
 5. Run the sanitized enabled-auth/sync canary against the immutable staging
    deployment. Confirm bounded health, worker, failure signals, human alert
    delivery, no private payload, and a staffed support path.
@@ -472,8 +532,13 @@ Publish `AS06` and the sync portions of `AS09` and `AS15`.
    worker versions, and alias changes. Never imply web rollback reverts schema.
 7. Reconfirm billing is `coming-soon`, has no Production billing key, sends no
    RevenueCat request, and exposes no purchase control.
-8. Consume the accepted main-track backup/restore evidence as `AS07`; do not
-   duplicate or mutate that recovery work.
+8. In parallel, inspect the provider-displayed backup identity and coordinate
+   the manual restore gate with the database owner. After that owner creates
+   and hands off an isolated recovery target, run only the assigned browser/
+   device acceptance checks and record bounded row-count/hash and functional
+   outcomes. Do not create, restore, query, configure, promote, or delete the
+   recovery target. Consume the accepted main-track result as `AS07`; do not
+   relabel staging as restore evidence or duplicate the recovery mutation.
 9. Publish `AS07`, `AS08`, `AS09`, `AS11`, `AS12`, and `AS13`.
 
 ### Phase 6 — prepare, but do not execute, Production enablement
@@ -489,60 +554,50 @@ The packet must contain:
 - accepted backup/restore result and current backup timestamp;
 - Production migration list and migration-only dry-run summary supplied by the
   database owner;
-- exact pending migrations ending at `0018`, explicit absence of `0013`, and
+- exact pending migrations ending at `0019`, explicit absence of `0013`, and
   reviewed manifest hashes;
 - compatibility decision for current, sync-enabled, and rollback web artifacts;
 - exact content digest and separate content-only plan;
-- RLS/grant/`0015`/`0016`/`0017`/`0018`/anonymous verification plan;
+- RLS/grant/`0015`/`0016`/`0017`/`0018`/`0019`/anonymous verification plan;
 - exact remaining SMTP, DNS, Auth, callback, OAuth, and environment changes;
 - accepted `AS01`–`AS15` evidence;
 - deployment order, owner, duration, pause points, abort triggers, web rollback,
   forward-fix boundary, support plan, and T+60 watch timeline;
 - explicit statement that subscriptions remain out of scope.
 
-Ask one exact Production-approval question at a time. A staging pass, prior
-merge approval, or broad instruction to continue is not approval for a
-different database, migration set, seed digest, domain, or deployment.
+Do not ask for or execute a Production approval in this parallel Cowork goal.
+Send `AS16` to Codex and Brendan, keep Production guest-only, and stop. A later
+main-runbook session must independently authorize and perform any Production
+migration, environment change, promotion, account canary, cleanup, or T+60
+watch. Never relabel staging evidence as Production evidence.
 
-### Phase 7 — gated Production acceptance and first-hour watch
+### Phase 7 — hand off and stop
 
-Execute this phase only after the main runbook and a separate exact
-sync-enablement decision authorize it. Cowork performs manual acceptance; the
-designated release/database operator performs migrations, content loading,
-environment changes, and promotion.
-
-1. Prove the served artifact's SHA, Production credential pair, canonical
-   domain, health contract, schema `0018`, worker version, and effective account
-   posture `configured`.
-2. Use dedicated synthetic Production canary accounts only. Run the approved
-   minimum auth, callback, isolation, restore, sync, sign-out, and cleanup
-   canary without recording private values.
-3. Require the database owner to report `pnpm check:production-readiness`
-   passing. Do not represent it as proof of SMTP, devices, isolation, or restore.
-4. Monitor T+0, +5, +15, +30, and +60 minutes from 11:00 AM ET. Check bounded
-   health, errors, Auth/SMTP outcomes, sync failure/conflict rates, worker
-   uptake, privacy-safe signals, support, and coming-soon billing.
-5. Treat any cross-account exposure, private payload, callback/session defect,
-   stale overwrite, unbounded sync failure, resurrection, completion loss, or
-   Production identity mismatch as an immediate containment/rollback incident.
-6. At T+60, publish the exact `AS15` Production decision without relabeling
-   staging evidence as Production evidence.
-7. Delete synthetic Auth users and fixtures only under an exact cleanup packet.
-   Record the owner, time, expected cascade boundary, result, and any retained
-   server-owned record. Clear My Data alone is not Auth-account cleanup.
+1. Publish `AS16` with every open risk and exact dependency.
+2. Confirm PR #16 or its successor remains under Codex control and that Cowork
+   changed no Git integration state.
+3. Confirm Production received no mutation and still has guest-only account
+   posture with billing `coming-soon`.
+4. Record synthetic staging account cleanup as complete or assign its exact
+   owner/deadline. Clear My Data alone is not Auth-account cleanup.
+5. End with `READY FOR EXACT PRODUCTION PACKET` or `HOLD — NOT READY`; this
+   prompt never returns `ENABLED`.
 
 ## Account-sync acceptance criteria
 
-Account sync is `PASS` only when all of the following are true for the exact
-accepted artifacts and environments:
+Account-sync staging readiness is `PASS` only when all of the following are
+true for the exact accepted staging artifacts and manual evidence:
 
 - source SHA, deployment IDs, Supabase pairs, worker versions, and account
   posture are immutable and unambiguous;
-- staging and Production histories end at `0018`, contain all 17 reviewed
-  migrations, contain no `0013`, and match the accepted manifest;
+- staging history ends at `0019`, contains all 18 reviewed migrations, contains
+  no `0013`, and matches the accepted manifest; Production history and its
+  migration-only dry run remain separate main-runbook gates and are not changed
+  in this Cowork goal;
 - the complete RLS, grants, functions, triggers, anonymous denials, purge
   behavior, `0015` CAS, `0016` guarded mutable-write, `0017` cached-client,
-  and `0018` expected-user/generation/deletion boundary contracts pass;
+  `0018` expected-user/generation/deletion, and `0019` server-revision/CAS
+  boundary contracts pass;
 - the accepted main-track restore evidence proves a current backup can be
   restored without exposing private rows;
 - custom SMTP/DNS, Gmail, iCloud, non-organization delivery, Google, callbacks,
@@ -554,8 +609,8 @@ accepted artifacts and environments:
 - offline/reconnect, focus/visibility reconciliation, local ownership choices,
   Clear My Data, and supported deletions produce no resurrection or silent
   reassignment;
-- stale mutable writes cannot replace newer profile, preference, prayer, or
-  reflection state, and the guarded RPC fails closed;
+- stale mutable writes cannot replace any of the nine revisioned resource rows,
+  and the exact attributable CAS RPC fails closed;
 - clock-skew and equal-timestamp adversarial edits converge through a reviewed
   server-ordered contract; a client-wall-clock-only result is not a pass;
 - simultaneous-device CAS, stale revision, duplicate request, unpick,
@@ -571,8 +626,8 @@ accepted artifacts and environments:
 - billing remains `coming-soon`, no billing key or checkout is reachable, and
   no subscription implementation has begun;
 - synthetic accounts and fixtures have an exact accepted cleanup record;
-- the account-posture owner and rollback authority accept the evidence,
-  residual risks, rollback boundary, and T+60 outcome.
+- the account-posture owner and rollback authority accept the staging evidence,
+  residual risks, rollback boundary, and proposed T+60 plan.
 
 If any item is absent, ambiguous, tied to the wrong artifact, or supported only
 by source code, report `HOLD — ACCOUNT SYNC NOT YET READY`. Keep Production
@@ -642,7 +697,7 @@ Provider/account: <sanitized organization>
 Project/environment: <exact target>
 Action: <one mutation only>
 Expected effect: <bounded effect>
-Production write: YES | NO
+Production write: NO (otherwise hand off and stop)
 Cost: <exact displayed amount or NONE>
 Privacy classification: <PUBLIC | SYNTHETIC | RESTRICTED>
 Other operator target lock: <released by whom>
@@ -656,14 +711,14 @@ At the end of the session, provide:
 
 ```text
 ACCOUNT SYNC FINAL HANDOFF
-Decision: READY FOR EXACT PRODUCTION PACKET | HOLD — NOT READY | ENABLED AND T+60 ACCEPTED
+Decision: READY FOR EXACT PRODUCTION PACKET | HOLD — NOT READY
 Launch window: 2026-07-31 11:00 AM ET / 15:00 UTC
 Authoritative SHA and deployments: <exact identities>
 Evidence complete: <AS IDs>
 Evidence open/failed: <AS IDs with one-line reason>
 Staging lifecycle: <cost, retention, owner, and any approved cleanup>
 Synthetic account cleanup: <completed or exact owner/deadline>
-Production mutations performed: <exact sanitized list or NONE>
+Production mutations performed: NONE (required for this Cowork goal)
 Subscriptions: COMING SOON — NOT IMPLEMENTED
 Rollback/containment posture: <one paragraph>
 Codex handoffs: <open/completed list>

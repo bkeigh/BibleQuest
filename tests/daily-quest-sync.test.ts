@@ -166,6 +166,16 @@ class FakeStorage {
   }
 }
 
+/** Persist once, then emulate a browser storage write fault. */
+class FailAfterOneDailyWriteStorage extends FakeStorage {
+  private writesRemaining = 1;
+
+  override setItem(key: string, value: string) {
+    if (this.writesRemaining-- === 0) throw new Error("storage unavailable");
+    super.setItem(key, value);
+  }
+}
+
 describe("transactional daily-quest sync", () => {
   it("falls back only for the exact missing revision table contract", () => {
     expect(isMissingDailyQuestRevisionTable({
@@ -416,6 +426,33 @@ describe("transactional daily-quest sync", () => {
 
     expect(merged[DAY]).toEqual([]);
     expect(reopened.revisions.get(DAY)).toBe(2);
+  });
+
+  it("invalidates an older daily base when a canonical rewrite cannot persist", () => {
+    const storage = new FailAfterOneDailyWriteStorage();
+    const original = assignment("original");
+    const active = createDailyQuestSyncContext(() => "active-request");
+    restoreDailyQuestSyncContext(active, "owner-a", false, storage);
+    reconcileDailyQuestPull(
+      active,
+      { [DAY]: [original] },
+      { [DAY]: [original] },
+      [{ assigned_date: DAY, revision: 1 }],
+      true,
+    );
+    reconcileDailyQuestPull(
+      active,
+      { [DAY]: [original] },
+      { [DAY]: [] },
+      [{ assigned_date: DAY, revision: 2 }],
+      true,
+    );
+
+    const reopened = createDailyQuestSyncContext(() => "reopened-request");
+    restoreDailyQuestSyncContext(reopened, "owner-a", true, storage);
+
+    expect(reopened.revisions.size).toBe(0);
+    expect(reopened.bases.size).toBe(0);
   });
 
   it("does not repeat a committed request after an offline reload", async () => {

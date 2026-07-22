@@ -1,3 +1,4 @@
+import { webcrypto } from "node:crypto";
 import { afterEach, beforeEach, vi } from "vitest";
 
 class MemoryStorage implements Storage {
@@ -46,8 +47,10 @@ function installDeterministicGlobals() {
   });
   vi.stubGlobal("navigator", { doNotTrack: "0", onLine: true });
   vi.stubGlobal("crypto", {
+    getRandomValues: webcrypto.getRandomValues.bind(webcrypto),
     randomUUID: () =>
       `00000000-0000-4000-8000-${String(++uuid).padStart(12, "0")}`,
+    subtle: webcrypto.subtle,
   });
 }
 

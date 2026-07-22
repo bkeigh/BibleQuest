@@ -30,13 +30,11 @@ begin
   select generation into live_generation
   from public.user_sync_state
   where user_id = uid;
-  response := public.upsert_mutable_account_rows(
-    uid,
-    live_generation,
+  response := public.upsert_mutable_account_rows_internal(
     p_resource,
     p_rows
   );
-  return response - 'generation';
+  return response;
 end;
 $function$;
 

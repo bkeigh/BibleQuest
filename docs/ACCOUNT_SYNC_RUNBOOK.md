@@ -62,7 +62,7 @@ The launch record must select exactly one track:
 Guest-only does not turn active auth or sync tests into passes. Record SMTP,
 Gmail/iCloud, provider callback, signed-in sync, and A/B client behavior as
 `OUT OF SCOPE — APPROVED GUEST-ONLY` for that release. Migrations through
-`0018`, the complete RLS/grant report and anonymous denial checks, canonical
+`0019`, the complete RLS/grant report and anonymous denial checks, canonical
 content, backup/restore, privacy, device, legal, monitoring, and rollback gates
 remain mandatory. Finish every deferred active-account test before a later
 release enables auth or sync.
@@ -189,7 +189,7 @@ supabase db push --linked --dry-run
 Stop if the dry run proposes replaying any renamed migration. The July 19 probe
 proved only that `0010` and `0011` schema was absent; it did not prove history.
 The repository candidate now continues with `0012`, immutable `0014`, `0015`,
-`0016`, `0017`, and `0018`, with no `0013`. The linked migration list—not a column probe—is
+`0016`, `0017`, `0018`, and `0019`, with no `0013`. The linked migration list—not a column probe—is
 authoritative, and every proposed version must match that exact forward order.
 After review:
 
@@ -231,7 +231,7 @@ and zero browser Supabase auth/sync traffic instead.
    four-column conflict target after `0011` lands. Include a full PWA
    close/relaunch/update test in this approval. Require `0014` to match SHA-256
    `9497b745c5efc0c3f6c4c82e43e57c4fd9b34e8cfae12e6193226d564da50789`
-   before approving `0015`, then require `0016`, `0017`, and `0018` immediately
+   before approving `0015`, then require `0016`, `0017`, `0018`, and `0019` immediately
    after it; any `0013` proposal is a hard stop.
 5. Run the schema-only guarded sequence below, pause after the dry run for
    review, then immediately recapture the migration list and rerun the RLS
@@ -275,7 +275,7 @@ Use this order:
 1. Freeze account rollout and deploy the immutable contained bundle before any
    production migration or content write.
 2. Verify the health endpoint reports the intended guest-only posture, the
-   active worker reports `biblequest-v16`, account-action controls are absent (status-only
+   active worker reports `biblequest-v17`, account-action controls are absent (status-only
    containment copy is allowed), callbacks do not
    exchange credentials, normal proxy requests do not refresh sessions, and
    the browser sync path does not create a Supabase client.
@@ -283,7 +283,7 @@ Use this order:
    any remaining older-worker observation as residual exposure; do not declare the
    incident contained solely because the deployment alias changed.
 4. With the latch still closed, apply and verify the approved migrations through
-   `0018`, then seed content separately and complete the full RLS/grant,
+   `0019`, then seed content separately and complete the full RLS/grant,
    anonymous denial, backup/restore, content, privacy, device, legal, monitoring,
    and rollback evidence. Complete the local-first core/persistence/export/clear/
    offline matrix and record a sanitized browser request summary with no
@@ -325,6 +325,7 @@ supabase test db --local supabase/tests/0015_daily_quest_cas.sql
 supabase test db --local supabase/tests/0016_mutable_account_sync_guards.sql
 supabase test db --local supabase/tests/0017_mutable_account_sync_boundary.sql
 supabase test db --local supabase/tests/0018_account_sync_generation.sql
+supabase test db --local supabase/tests/0019_server_ordered_account_sync_revisions.sql
 supabase db lint --local --schema public --level warning --fail-on warning
 docker exec -i supabase_db_BibleQuest \
   psql -U postgres -d postgres -v ON_ERROR_STOP=1 -P pager=off \
@@ -350,6 +351,47 @@ safeguards as above, then prove:
    `{"contract":"biblequest_daily_quest_sync_v1","ok":true}` with no rows,
    identifiers, policy text, grants, or failure diagnostics.
 
+### Server-ordered mutable rollout (`0019`)
+
+`0019_server_ordered_account_sync_revisions.sql` removes device wall clocks
+from conflict authority. Profiles, settings, notification preferences,
+prayers, reflections, shelf quests, reading position, bookmarks, and recent
+verses carry database-owned revisions. Their single authenticated mutation
+RPC accepts an expected revision for every row and returns one attributable
+`applied` or `conflict` result in input order. Timestamps remain product/audit
+data only. Direct authenticated insert, update, and delete privileges on these
+nine tables are revoked. `user_recent_verses.server_seen_at` is also written by
+the database and orders the bounded cross-passage recent list; a future or
+behind-device `viewed_at` remains display/audit data and cannot monopolize the
+20-passage cap.
+
+This launch uses a narrow v3-to-v4 cutover, not an in-place compatibility
+claim. Production/main is guest-only and has never run the v3 sync engine. The
+only v3 Preview was synthetic-only, is superseded, and is **never promote**.
+Before applying `0019` to synthetic staging, close every old v3 Preview client
+and re-prove `auth.users` is exactly zero; the pre-cutover read-only check did
+prove zero users. Record only the count, not identities. If any retained
+signed-in/v3 client exists or the count is nonzero, stop before the migration
+and require an explicit two-phase compatibility bridge or reviewed reset/data-
+disposition decision. A service-worker install, activation, claim, refresh, or
+reload is not evidence that unsynced v3 data was preserved.
+
+Before enabling auth + sync, prove a device 24 hours ahead, one 24 hours
+behind, and equal-timestamp conflicting edits cannot bypass the row revision.
+One device must receive a bounded conflict, pull the canonical row and
+revision, rebase its still-local intent, and converge on a later CAS. A third
+reconciliation must issue no write. Repeat after a reload to prove the client
+retains only canonical SHA-256 fingerprints and revisions—not duplicate prayer,
+reflection, bookmark-note, or recent-verse content—in its sync metadata.
+For recent verses, add more than 20 passages from skewed clocks and prove
+server-owned `server_seen_at` selects the canonical cap while a newly viewed
+local passage still enters the next CAS batch.
+
+The client must page every multi-row restore query until the provider returns
+an empty page, advancing by the actual row count rather than assuming a fixed
+PostgREST cap. Automated evidence must cover 1,001 rows behind a 500-row cap,
+preserve the tail across a second reconciliation, and issue no phantom write.
+
 An **auth + sync enabled** production launch remains a hard no-go until the
 compatibility SHA is live, SMTP and the signed restore bridge have been
 retested, a current backup/PITR point and isolated restore rehearsal are
@@ -360,7 +402,7 @@ only after the separate containment matrix and named acceptance pass; backup,
 restore, migration, RLS/grant, anonymous denial, and public CAS posture remain
 hard gates. Stop on any project, history, schema, backup, restore, RLS, conflict,
 resurrection, containment, or data-loss disagreement. Applying `0015`, `0016`,
-`0017`, or `0018` is a
+`0017`, `0018`, or `0019` is a
 production write and requires a fresh explicit approval; never combine it with
 the canonical content seed, `--include-all`, reset, or migration repair.
 
@@ -477,9 +519,9 @@ The current source replaces daily assignments through the transactional `0015`
 RPC with an opaque per-day revision and idempotent request UUID. That source
 change is not production evidence. Keep account sync in a controlled beta until
 the compatibility release is deployed, staging and production both show
-`0014` followed by `0015`, `0016`, `0017`, and `0018` in migration history, the
+`0014` followed by `0015`, `0016`, `0017`, `0018`, and `0019` in migration history, the
 CAS/RLS, mutable-write guard, cached-client, expected-user, retained-generation,
-and durable-deletion boundary evidence pass,
+durable-deletion, and server-revision boundary evidence pass,
 and the complete
 concurrent-device pick/unpick/completion/cached-client matrix is accepted.
 

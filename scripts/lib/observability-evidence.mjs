@@ -34,7 +34,7 @@ const STAGES = {
 };
 
 export const DAILY_QUEST_SYNC_CONTRACT = "biblequest_daily_quest_sync_v1";
-export const ACCOUNT_SYNC_CONTRACT = "biblequest_account_sync_v3";
+export const ACCOUNT_SYNC_CONTRACT = "biblequest_account_sync_v4";
 
 /** Accepts only the two-field public CAS posture response. */
 export function isDailyQuestSyncContract(value) {
@@ -392,7 +392,7 @@ export function fixtureReadiness() {
   });
   schemaChecks.push({
     contract: ACCOUNT_SYNC_CONTRACT,
-    migration: "0018",
+    migration: "0019",
     ok: true,
   });
   const contentChecks = [
@@ -475,7 +475,7 @@ export function buildLaunchEvidence(
     schemaChecks.some(
       (check) =>
         check?.contract === ACCOUNT_SYNC_CONTRACT &&
-        check?.migration === "0018" &&
+        check?.migration === "0019" &&
         check?.ok === true,
     );
   const add = (condition, severity, code, owner, action) => {

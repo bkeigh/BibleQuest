@@ -475,7 +475,12 @@ function persistDailyQuestSyncContext(context: DailyQuestSyncContext) {
     };
     context.storage.setItem(DAILY_QUEST_SYNC_STORAGE_KEY, JSON.stringify(state));
   } catch {
-    // Storage failure leaves the in-memory CAS path and local journey usable.
+    // Never leave an older daily CAS base behind after a failed rewrite.
+    try {
+      context.storage.removeItem(DAILY_QUEST_SYNC_STORAGE_KEY);
+    } catch {
+      // Storage can be wholly unavailable; this session still uses memory.
+    }
   }
 }
 

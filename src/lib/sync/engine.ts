@@ -6,9 +6,8 @@
  * Principles:
  *  - The local store remains the source of truth for the UI; the account is a
  *    backup + bridge between devices. Everything keeps working offline.
- *  - On sign-in: pull the account copy, merge it with local (union by id/key,
- *    newer edit wins for prayers/reflections), apply, then push the merged
- *    result back up.
+ *  - On sign-in: pull the account copy, preserve offline edits relative to
+ *    persisted revision fingerprints, apply, then CAS-push changed rows.
  *  - After that: a debounced write-through pushes only the collections that
  *    changed. Local deletions carry tombstones so they propagate instead of
  *    resurrecting from the server.
@@ -95,6 +94,17 @@ import {
   writeMutableAccountRows,
   type MutableAccountTable,
 } from "./mutable-writes";
+import {
+  advanceMutableRevisionGeneration,
+  createMutableRevisionContext,
+  mutableResourceKey,
+  reconcileMutableRows,
+  replaceMutableRevisionGeneration,
+  resetMutableRevisionContext,
+  restoreMutableRevisionContext,
+  type MutableRevisionRemoval,
+  type ReconciledMutableRow,
+} from "./mutable-revisions";
 import {
   registerReconciliationTriggers,
   type ReconciliationTriggerController,
@@ -214,8 +224,11 @@ let reconciliationRequested = false;
 let reconciliationTriggers: ReconciliationTriggerController | null = null;
 let applyingRemote = false;
 let writeThroughReady = false;
+let localMutationVersion = 0;
 const dirty = new Set<SyncedField>();
 const dailyQuestSyncContext = createDailyQuestSyncContext();
+const mutableRevisionContext = createMutableRevisionContext();
+let mutableLocalRebase: { generation: number; userId: string } | null = null;
 
 function setStatus(
   state: "off" | "syncing" | "idle" | "error",
@@ -249,8 +262,10 @@ export function stopSync() {
   reconciliationRequested = false;
   rerunAfterPush = false;
   writeThroughReady = false;
+  localMutationVersion = 0;
   dirty.clear();
   resetDailyQuestSyncContext(dailyQuestSyncContext);
+  resetMutableRevisionContext(mutableRevisionContext);
   setStatus("off", { initialSyncComplete: false });
 }
 
@@ -307,6 +322,7 @@ export async function startSync(userId: string, retryingFailure = false) {
       }
     }
     if (state.tombstones !== prev.tombstones) changed = true;
+    if (changed) localMutationVersion += 1;
     if (changed && writeThroughReady) schedulePush();
   });
 
@@ -508,6 +524,31 @@ async function runPush() {
     if (propagated.requiresServerReset) {
       throw new AccountSyncGenerationConflictError();
     }
+    if (mutableRevisionContext.generation !== propagated.generation) {
+      if (propagated.purged) {
+        // A restore/clear purge intentionally establishes a new local baseline.
+        // Reset both CAS protocols before returning for the empty-server pull.
+        configureDailyQuestSyncContext(dailyQuestSyncContext, [], true);
+        replaceMutableRevisionGeneration(
+          mutableRevisionContext,
+          userId,
+          propagated.generation,
+        );
+        mutableLocalRebase = { userId, generation: propagated.generation };
+        reconciliationRequested = true;
+        return;
+      }
+      // A partial tombstone changes the destructive generation but leaves
+      // every surviving row revision valid. Carry those fingerprints forward
+      // and remove only the exact deleted keys so unrelated stale local rows
+      // cannot gain blanket rebase authority.
+      advanceMutableRevisionGeneration(
+        mutableRevisionContext,
+        userId,
+        propagated.generation,
+        mutableRevisionRemovals(tombstones),
+      );
+    }
     if (propagated.purged) {
       configureDailyQuestSyncContext(dailyQuestSyncContext, [], true);
     }
@@ -606,6 +647,14 @@ async function initialSync(
     userId,
   );
   if (!isCurrent()) return;
+  restoreMutableRevisionContext(
+    mutableRevisionContext,
+    userId,
+    observedGeneration,
+    previousOwner === userId &&
+      storedGeneration === observedGeneration &&
+      !accountSyncResetRequired(userId),
+  );
   let requiresServerReset =
     accountSyncResetRequired(userId) ||
     (storedGeneration !== null && storedGeneration !== observedGeneration) ||
@@ -631,6 +680,30 @@ async function initialSync(
     : propagated.recoveredOwnAdvance
       ? false
       : requiresServerReset || propagated.requiresServerReset;
+  if (propagated.purged) {
+    configureDailyQuestSyncContext(dailyQuestSyncContext, [], true);
+  }
+  if (mutableRevisionContext.generation !== propagated.generation) {
+    const partialDelete =
+      pendingBeforePull.purgeAccount !== userId &&
+      hasSyncTombstones(pendingBeforePull, userId);
+    if (partialDelete && !propagated.requiresServerReset) {
+      // A safe partial delete preserves every unrelated row revision across
+      // reload, so offline edits still rebase instead of becoming server loss.
+      advanceMutableRevisionGeneration(
+        mutableRevisionContext,
+        userId,
+        propagated.generation,
+        mutableRevisionRemovals(pendingBeforePull),
+      );
+    } else {
+      replaceMutableRevisionGeneration(
+        mutableRevisionContext,
+        userId,
+        propagated.generation,
+      );
+    }
+  }
 
   const supabase = createSyncClient(userId, propagated.generation);
   const pulled = await pullAll(supabase, userId);
@@ -641,20 +714,52 @@ async function initialSync(
   }
   const remote = pulled.snapshot;
 
-  // Capture tombstones at merge time so deletions made while signed out (or
-  // mid-sync) don't resurrect from the account copy.
-  const tombstones = useQuestOS.getState().tombstones;
-  const local = snapshotFromStore();
-  const mergeLocal = requiresServerReset
-    ? serverAuthoritativeBaseline(local)
-    : local;
-  // A pending purge for this account ("Clear my data" / restore-from-file
-  // while signed in) condemns the whole account copy — merging any of it
-  // back would resurrect exactly what the user erased.
-  const remoteKept =
-    tombstones.purgeAccount === userId
-      ? {}
-      : filterByTombstones(remote, tombstones);
+  let tombstones: SyncTombstones;
+  let mergeLocal: QuestOSSnapshot;
+  let remoteKept: RemoteData;
+  let revisioned: Partial<QuestOSSnapshot>;
+  // Hashing is asynchronous. If a local edit lands during reconciliation,
+  // repeat against the new store snapshot before the synchronous import so
+  // the write-through latch never has to recover an edit already overwritten.
+  while (true) {
+    const mergeVersion = localMutationVersion;
+    tombstones = useQuestOS.getState().tombstones;
+    const local = snapshotFromStore();
+    mergeLocal = requiresServerReset
+      ? serverAuthoritativeBaseline(local)
+      : local;
+    // A genuinely first account may adopt an already-onboarded guest journey
+    // without a separate cross-account handoff. A fresh/empty browser and a
+    // same-owner v4 upgrade remain server-authoritative when no CAS baseline
+    // exists, so default local settings cannot replace an account copy.
+    const firstGuestAdoption =
+      previousOwner === null && Boolean(local.profile?.onboardingCompleted);
+    const existingOnboardedAccount = pulled.mutableRows.profile.some(
+      (row) => row.onboarding_completed === true,
+    );
+    const explicitLocalAuthority =
+      localJourneyClaimIsPending(userId) ||
+      (mutableLocalRebase?.userId === userId &&
+        mutableLocalRebase.generation === propagated.generation) ||
+      propagated.preserveLocalBaseline ||
+      propagated.recoveredOwnAdvance;
+    // A pending purge for this account condemns the whole account copy.
+    remoteKept =
+      tombstones.purgeAccount === userId
+        ? {}
+        : filterByTombstones(remote, tombstones);
+    revisioned = await reconcileRevisionedMutableSnapshot(
+      userId,
+      mergeLocal,
+      pulled.mutableRows,
+      tombstones,
+      explicitLocalAuthority ||
+        (firstGuestAdoption && !existingOnboardedAccount),
+      firstGuestAdoption && existingOnboardedAccount,
+    );
+    if (!isCurrent()) return;
+    if (mergeVersion === localMutationVersion) break;
+  }
   const dailyAssignments = reconcileDailyQuestPull(
     dailyQuestSyncContext,
     mergeLocal.assignments,
@@ -664,6 +769,7 @@ async function initialSync(
   );
   const merged = normalizeIds({
     ...mergeSnapshots(mergeLocal, remoteKept),
+    ...revisioned,
     assignments: dailyAssignments,
   });
 
@@ -689,6 +795,12 @@ async function initialSync(
     new Set(SYNCED_FIELDS),
     isCurrent,
   );
+  if (
+    mutableLocalRebase?.userId === userId &&
+    mutableLocalRebase.generation === propagated.generation
+  ) {
+    mutableLocalRebase = null;
+  }
 }
 
 function snapshotFromStore(): QuestOSSnapshot {
@@ -765,22 +877,155 @@ type RemoteData = Partial<QuestOSSnapshot> & {
 interface PulledData {
   snapshot: RemoteData;
   dailyQuestRevisions: DailyQuestRevisionRow[];
+  mutableRows: MutablePulledRows;
   transactionalDailyQuestsAvailable: boolean;
+}
+
+interface MutablePulledRows {
+  bookmarks: Record<string, unknown>[];
+  notificationPreferences: Record<string, unknown>[];
+  prayers: Record<string, unknown>[];
+  profile: Record<string, unknown>[];
+  readingPosition: Record<string, unknown>[];
+  recentVerses: Record<string, unknown>[];
+  reflections: Record<string, unknown>[];
+  settings: Record<string, unknown>[];
+  userQuests: Record<string, unknown>[];
+}
+
+interface PullOrder {
+  column: string;
+  ascending?: boolean;
+}
+
+interface PaginatedPullResult {
+  data: Record<string, unknown>[] | null;
+  error: unknown;
+}
+
+const ACCOUNT_PULL_PAGE_SIZE = 1_000;
+const ACCOUNT_PULL_MAX_PAGES = 100;
+
+/**
+ * Read a complete account collection without trusting PostgREST's 1,000-row
+ * response cap. Every order ends in a unique key, so adjacent ranges cannot
+ * silently skip tied rows; the hard page ceiling fails closed instead of
+ * treating a truncated account as canonical deletion evidence.
+ */
+async function pullAccountRows(
+  supabase: SupabaseClient,
+  table: string,
+  columns: string,
+  orders: readonly PullOrder[],
+  userId?: string,
+): Promise<PaginatedPullResult> {
+  const rows: Record<string, unknown>[] = [];
+  let start = 0;
+  for (let page = 0; page < ACCOUNT_PULL_MAX_PAGES; page += 1) {
+    let query = supabase.from(table).select(columns);
+    if (userId) query = query.eq("user_id", userId);
+    for (const order of orders) {
+      query = query.order(order.column, {
+        ascending: order.ascending ?? true,
+      });
+    }
+    const response = await query.range(
+      start,
+      start + ACCOUNT_PULL_PAGE_SIZE - 1,
+    );
+    if (response.error) return { data: null, error: response.error };
+    const pageRows = (response.data ?? []) as unknown as Record<
+      string,
+      unknown
+    >[];
+    if (pageRows.length === 0) {
+      return { data: rows, error: null };
+    }
+    rows.push(...pageRows);
+    // Advance by what the server actually returned because a project-level
+    // max_rows setting may be lower than the requested 1,000-row range.
+    start += pageRows.length;
+  }
+  throw new Error(`Account pull exceeded the safe page limit for ${table}.`);
+}
+
+/** Encode the recent-verse natural key without using device timestamps. */
+function recentVerseNaturalKey(row: object): string {
+  const key = mutableResourceKey("user_recent_verses", row);
+  return JSON.stringify([
+    key.book_slug,
+    key.chapter,
+    key.verse_start,
+    key.verse_end,
+  ]);
+}
+
+/** Validate and index the server-owned receipt clock used for bounded history. */
+function recentVerseServerOrder(
+  rows: readonly Record<string, unknown>[],
+): Map<string, number> {
+  const order = new Map<string, number>();
+  for (const row of rows) {
+    const seenAt = row.server_seen_at;
+    const timestamp = typeof seenAt === "string" ? Date.parse(seenAt) : NaN;
+    if (
+      typeof seenAt !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}T/.test(seenAt) ||
+      !Number.isFinite(timestamp)
+    ) {
+      throw new Error("Recent verse server ordering is unavailable.");
+    }
+    order.set(recentVerseNaturalKey(row), timestamp);
+  }
+  return order;
+}
+
+/** Keep local actions first, then rank canonical rows by server receipt time. */
+function orderRecentVerseRows(
+  rows: readonly ReconciledMutableRow[],
+  localRows: readonly object[],
+  remoteRows: readonly Record<string, unknown>[],
+): ReconciledMutableRow[] {
+  const localOrder = new Map(
+    localRows.map((row, index) => [recentVerseNaturalKey(row), index]),
+  );
+  const serverOrder = recentVerseServerOrder(remoteRows);
+  return [...rows].sort((left, right) => {
+    if (left.localIntent !== right.localIntent) {
+      return left.localIntent ? -1 : 1;
+    }
+    const leftKey = recentVerseNaturalKey(left.key);
+    const rightKey = recentVerseNaturalKey(right.key);
+    if (left.localIntent) {
+      const localDelta =
+        (localOrder.get(leftKey) ?? Number.MAX_SAFE_INTEGER) -
+        (localOrder.get(rightKey) ?? Number.MAX_SAFE_INTEGER);
+      if (localDelta !== 0) return localDelta;
+    } else {
+      const leftSeenAt = serverOrder.get(leftKey);
+      const rightSeenAt = serverOrder.get(rightKey);
+      if (leftSeenAt === undefined || rightSeenAt === undefined) {
+        throw new Error("Recent verse server ordering is unavailable.");
+      }
+      if (leftSeenAt !== rightSeenAt) return rightSeenAt - leftSeenAt;
+    }
+    return leftKey.localeCompare(rightKey);
+  });
 }
 
 async function pullAll(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<PulledData> {
-  const from = (table: string) =>
-    supabase.from(table).select("*").eq("user_id", userId);
-
   // Observe revisions before rows. A write between these statements advances
   // the revision and guarantees the later replace conflicts instead of pairing
   // an older row snapshot with a newer revision.
-  const dailyRevisionRes = await supabase
-    .from("user_daily_quest_days")
-    .select("assigned_date,revision");
+  const dailyRevisionRes = await pullAccountRows(
+    supabase,
+    "user_daily_quest_days",
+    "assigned_date,revision",
+    [{ column: "assigned_date" }],
+  );
   const dailyRevisionsUnavailable = isMissingDailyQuestRevisionTable(
     dailyRevisionRes.error,
   );
@@ -806,20 +1051,104 @@ async function pullAll(
     milestonesRes,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
-    from("user_settings").maybeSingle(),
-    from("notification_preferences").maybeSingle(),
-    from("user_daily_quests"),
-    from("user_quests"),
-    from("quest_completions"),
-    from("prayers"),
-    from("reflections"),
-    from("verse_bookmarks"),
-    from("reading_progress").maybeSingle(),
-    from("chapters_read"),
-    from("user_recent_verses"),
-    from("journey_events"),
-    from("growth_events"),
-    from("user_milestones"),
+    supabase
+      .from("user_settings")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle(),
+    supabase
+      .from("notification_preferences")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle(),
+    pullAccountRows(
+      supabase,
+      "user_daily_quests",
+      "*",
+      [{ column: "assigned_date" }, { column: "quest_slug" }],
+      userId,
+    ),
+    pullAccountRows(
+      supabase,
+      "user_quests",
+      "*",
+      [{ column: "quest_slug" }],
+      userId,
+    ),
+    pullAccountRows(
+      supabase,
+      "quest_completions",
+      "*",
+      [{ column: "completed_at" }, { column: "id" }],
+      userId,
+    ),
+    pullAccountRows(
+      supabase,
+      "prayers",
+      "*",
+      [{ column: "created_at" }, { column: "id" }],
+      userId,
+    ),
+    pullAccountRows(
+      supabase,
+      "reflections",
+      "*",
+      [{ column: "created_at" }, { column: "id" }],
+      userId,
+    ),
+    pullAccountRows(
+      supabase,
+      "verse_bookmarks",
+      "*",
+      [{ column: "created_at" }, { column: "id" }],
+      userId,
+    ),
+    supabase
+      .from("reading_progress")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle(),
+    pullAccountRows(
+      supabase,
+      "chapters_read",
+      "*",
+      [{ column: "read_on" }, { column: "id" }],
+      userId,
+    ),
+    pullAccountRows(
+      supabase,
+      "user_recent_verses",
+      "*",
+      [
+        { column: "server_seen_at" },
+        { column: "book_slug" },
+        { column: "chapter" },
+        { column: "verse_start" },
+        { column: "verse_end" },
+      ],
+      userId,
+    ),
+    pullAccountRows(
+      supabase,
+      "journey_events",
+      "*",
+      [{ column: "occurred_at" }, { column: "id" }],
+      userId,
+    ),
+    pullAccountRows(
+      supabase,
+      "growth_events",
+      "*",
+      [{ column: "occurred_at" }, { column: "id" }],
+      userId,
+    ),
+    pullAccountRows(
+      supabase,
+      "user_milestones",
+      "*",
+      [{ column: "achieved_at" }, { column: "id" }],
+      userId,
+    ),
   ]);
 
   // Recent-verse history was introduced in 0010 and is non-essential to the
@@ -854,21 +1183,42 @@ async function pullAll(
 
   const assignments: QuestOSSnapshot["assignments"] = {};
   for (const row of dailyRes.data ?? []) {
-    const a = rowToAssignment(row);
+    const a = rowToAssignment(row as never);
     (assignments[a.dateKey] ??= []).push(a);
   }
 
   const myQuests: NonNullable<QuestOSSnapshot["myQuests"]> = {};
   for (const row of myQuestsRes.data ?? []) {
-    const q = rowToMyQuest(row);
+    const q = rowToMyQuest(row as never);
     myQuests[q.questSlug] = q;
   }
 
   return {
     dailyQuestRevisions: dailyRevisionsUnavailable
       ? []
-      : ((dailyRevisionRes.data ?? []) as DailyQuestRevisionRow[]),
+      : ((dailyRevisionRes.data ?? []) as unknown as DailyQuestRevisionRow[]),
     transactionalDailyQuestsAvailable: !dailyRevisionsUnavailable,
+    mutableRows: {
+      bookmarks: (bookmarksRes.data ?? []) as Record<string, unknown>[],
+      notificationPreferences: notifRes.data
+        ? [notifRes.data as Record<string, unknown>]
+        : [],
+      prayers: (prayersRes.data ?? []) as Record<string, unknown>[],
+      profile: profileRes.data
+        ? [profileRes.data as Record<string, unknown>]
+        : [],
+      readingPosition: readingRes.data
+        ? [readingRes.data as Record<string, unknown>]
+        : [],
+      recentVerses: recentVersesUnavailable
+        ? []
+        : ((recentVersesRes.data ?? []) as Record<string, unknown>[]),
+      reflections: (reflectionsRes.data ?? []) as Record<string, unknown>[],
+      settings: settingsRes.data
+        ? [settingsRes.data as Record<string, unknown>]
+        : [],
+      userQuests: (myQuestsRes.data ?? []) as Record<string, unknown>[],
+    },
     snapshot: {
       profile: profileRes.data ? rowToProfile(profileRes.data) : null,
       settings:
@@ -878,21 +1228,247 @@ async function pullAll(
       notificationPreferencesPresent: Boolean(notifRes.data),
       assignments,
       myQuests,
-      completions: (completionsRes.data ?? []).map(rowToCompletion),
-      prayers: (prayersRes.data ?? []).map(rowToPrayer),
-      reflections: (reflectionsRes.data ?? []).map(rowToReflection),
-      bookmarks: (bookmarksRes.data ?? []).map(rowToBookmark),
+      completions: (completionsRes.data ?? []).map((row) =>
+        rowToCompletion(row as never),
+      ),
+      prayers: (prayersRes.data ?? []).map((row) =>
+        rowToPrayer(row as never),
+      ),
+      reflections: (reflectionsRes.data ?? []).map((row) =>
+        rowToReflection(row as never),
+      ),
+      bookmarks: (bookmarksRes.data ?? []).map((row) =>
+        rowToBookmark(row as never),
+      ),
       readingPosition: readingRes.data
         ? rowToReadingPosition(readingRes.data)
         : null,
-      chaptersRead: (chaptersRes.data ?? []).map(rowToChapterRead),
+      chaptersRead: (chaptersRes.data ?? []).map((row) =>
+        rowToChapterRead(row as never),
+      ),
       recentVerses: recentVersesUnavailable
         ? undefined
-        : (recentVersesRes.data ?? []).map(rowToRecentVerse),
-      journeyEvents: (journeyRes.data ?? []).map(rowToJourneyEvent),
-      growthEvents: (growthRes.data ?? []).map(rowToGrowthEvent),
-      earnedMilestones: (milestonesRes.data ?? []).map(rowToMilestone),
+        : (recentVersesRes.data ?? []).map((row) =>
+            rowToRecentVerse(row as never),
+          ),
+      journeyEvents: (journeyRes.data ?? []).map((row) =>
+        rowToJourneyEvent(row as never),
+      ),
+      growthEvents: (growthRes.data ?? []).map((row) =>
+        rowToGrowthEvent(row as never),
+      ),
+      earnedMilestones: (milestonesRes.data ?? []).map((row) =>
+        rowToMilestone(row as never),
+      ),
     },
+  };
+}
+
+/** Reconcile every mutable row through revision fingerprints, never wall time. */
+async function reconcileRevisionedMutableSnapshot(
+  userId: string,
+  local: QuestOSSnapshot,
+  remote: MutablePulledRows,
+  tombstones: SyncTombstones,
+  allowLocalWithoutBaseline: boolean,
+  allowGuestInsertsWithoutBaseline: boolean,
+): Promise<Partial<QuestOSSnapshot>> {
+  const localSettingsRows = settingsToRows(userId, local.settings);
+  const defaultSettingsRows = settingsToRows(userId, DEFAULT_SETTINGS);
+  const localRecentVerseRows = (local.recentVerses ?? []).map((row) =>
+    recentVerseToRow(userId, row),
+  );
+  const options = { allowLocalWithoutBaseline, expectedUserId: userId };
+  const collectionOptions = {
+    ...options,
+    allowLocalInsertWithoutBaseline: allowGuestInsertsWithoutBaseline,
+  };
+  const remotePrayers = remote.prayers.filter(
+    (row) => !tombstones.prayers.includes(String(row.id)),
+  );
+  const remoteReflections = remote.reflections.filter(
+    (row) => !tombstones.reflections.includes(String(row.id)),
+  );
+  const remoteQuests = remote.userQuests.filter(
+    (row) => !tombstones.myQuests.includes(String(row.quest_slug)),
+  );
+  const remoteBookmarks = remote.bookmarks.filter(
+    (row) =>
+      !tombstones.bookmarks.some(
+        (deleted) =>
+          deleted.bookSlug === row.book_slug &&
+          deleted.chapter === row.chapter &&
+          deleted.verse === row.verse &&
+          (deleted.translationKey ?? "web") === row.translation_key,
+      ),
+  );
+
+  // Absent preference rows have a logical all-default canonical baseline.
+  // This prevents an untouched client from inserting defaults merely because
+  // its local store always carries a complete Settings object.
+  const remoteSettings = remote.settings.length
+    ? remote.settings
+    : [{ ...defaultSettingsRows.settings, sync_revision: 0 }];
+  const remoteNotifications = remote.notificationPreferences.length
+    ? remote.notificationPreferences
+    : [{ ...defaultSettingsRows.notifications, sync_revision: 0 }];
+
+  const [
+    profiles,
+    settings,
+    notifications,
+    prayers,
+    reflections,
+    quests,
+    reading,
+    bookmarks,
+    recentVerses,
+  ] = await Promise.all([
+    reconcileMutableRows(
+      mutableRevisionContext,
+      "profiles",
+      local.profile ? [profileToRow(userId, local.profile)] : [],
+      remote.profile,
+      options,
+    ),
+    reconcileMutableRows(
+      mutableRevisionContext,
+      "user_settings",
+      [localSettingsRows.settings],
+      remoteSettings,
+      options,
+    ),
+    reconcileMutableRows(
+      mutableRevisionContext,
+      "notification_preferences",
+      [localSettingsRows.notifications],
+      remoteNotifications,
+      options,
+    ),
+    reconcileMutableRows(
+      mutableRevisionContext,
+      "prayers",
+      local.prayers.map((row) => prayerToRow(userId, row)),
+      remotePrayers,
+      collectionOptions,
+    ),
+    reconcileMutableRows(
+      mutableRevisionContext,
+      "reflections",
+      local.reflections.map((row) => reflectionToRow(userId, row)),
+      remoteReflections,
+      collectionOptions,
+    ),
+    reconcileMutableRows(
+      mutableRevisionContext,
+      "user_quests",
+      Object.values(local.myQuests ?? {}).map((row) =>
+        myQuestToRow(userId, row),
+      ),
+      remoteQuests,
+      collectionOptions,
+    ),
+    reconcileMutableRows(
+      mutableRevisionContext,
+      "reading_progress",
+      local.readingPosition
+        ? [readingPositionToRow(userId, local.readingPosition)]
+        : [],
+      remote.readingPosition,
+      options,
+    ),
+    reconcileMutableRows(
+      mutableRevisionContext,
+      "verse_bookmarks",
+      local.bookmarks.map((row) => bookmarkToRow(userId, row)),
+      remoteBookmarks,
+      collectionOptions,
+    ),
+    reconcileMutableRows(
+      mutableRevisionContext,
+      "user_recent_verses",
+      localRecentVerseRows,
+      remote.recentVerses,
+      collectionOptions,
+    ),
+  ]);
+
+  const settingRow = settings[0]?.row ?? null;
+  const notificationRow = notifications[0]?.row ?? null;
+  const accountSettings = rowsToSettings(
+    settingRow as unknown as Parameters<typeof rowsToSettings>[0],
+    notificationRow as unknown as Parameters<typeof rowsToSettings>[1],
+  );
+  const mergedSettings: Settings = {
+    ...accountSettings,
+    // Consent remains privacy-first even when the local settings row has a
+    // pending revision: both observed copies must explicitly remain enabled.
+    analyticsConsent:
+      local.settings.analyticsConsent &&
+      remote.settings[0]?.analytics_consent === true,
+    appearance: {
+      ...accountSettings.appearance,
+      boldText: local.settings.appearance.boldText,
+      wallpaperId: local.settings.appearance.wallpaperId,
+      wallpaperMode: local.settings.appearance.wallpaperMode,
+      glassSurfaces: local.settings.appearance.glassSurfaces,
+      glassOpacity: local.settings.appearance.glassOpacity,
+    },
+  };
+
+  const localQuestRows = new Map(
+    Object.values(local.myQuests ?? {}).map((quest) => [quest.questSlug, quest]),
+  );
+  const remoteQuestRows = new Map(
+    remoteQuests.map((row) => [String(row.quest_slug), rowToMyQuest(row as never)]),
+  );
+  const myQuests = Object.fromEntries(
+    quests.map((result) => {
+      const chosen = rowToMyQuest(result.row as never);
+      const localQuest = localQuestRows.get(chosen.questSlug);
+      const remoteQuest = remoteQuestRows.get(chosen.questSlug);
+      if (!localQuest || !remoteQuest) return [chosen.questSlug, chosen];
+      const timesCompleted = Math.max(
+        chosen.timesCompleted,
+        localQuest.timesCompleted,
+        remoteQuest.timesCompleted,
+      );
+      const completionSource =
+        localQuest.timesCompleted > remoteQuest.timesCompleted
+          ? localQuest
+          : remoteQuest.timesCompleted > localQuest.timesCompleted
+            ? remoteQuest
+            : chosen;
+      return [
+        chosen.questSlug,
+        {
+          ...chosen,
+          timesCompleted,
+          completedAt: completionSource.completedAt ?? chosen.completedAt,
+        },
+      ];
+    }),
+  );
+
+  return {
+    profile: profiles[0] ? rowToProfile(profiles[0].row as never) : null,
+    settings: mergedSettings,
+    myQuests,
+    prayers: prayers.map((result) => rowToPrayer(result.row as never)),
+    reflections: reflections.map((result) =>
+      rowToReflection(result.row as never),
+    ),
+    readingPosition: reading[0]
+      ? rowToReadingPosition(reading[0].row as never)
+      : null,
+    bookmarks: bookmarks.map((result) => rowToBookmark(result.row as never)),
+    recentVerses: orderRecentVerseRows(
+      recentVerses,
+      localRecentVerseRows,
+      remote.recentVerses,
+    )
+      .slice(0, 20)
+      .map((result) => rowToRecentVerse(result.row as never)),
   };
 }
 
@@ -928,7 +1504,7 @@ export function filterByTombstones(
 }
 
 // ---------------------------------------------------------------------------
-// Merge — union by id/key; newer edit wins where rows are mutable
+// Merge — append-only unions plus revision-reconciled mutable overrides
 // ---------------------------------------------------------------------------
 
 function unionById<T extends { id: string }>(
@@ -946,30 +1522,12 @@ function unionById<T extends { id: string }>(
   return [...byId.values()];
 }
 
-function newerByUpdatedAt<T extends { updatedAt: string }>(a: T, b: T): T {
-  return a.updatedAt >= b.updatedAt ? a : b;
-}
-
-/** Returns a stable legacy fallback for last-write-wins comparisons. */
-function syncUpdatedAt(value: { updatedAt?: string }, fallback: string): string {
-  return value.updatedAt ?? fallback;
-}
-
-/** Returns the notification-row timestamp, including legacy snapshot fallback. */
-function notificationSyncUpdatedAt(value: Settings): string {
-  return (
-    value.notificationsUpdatedAt ??
-    value.updatedAt ??
-    "1970-01-01T00:00:00.000Z"
-  );
-}
-
 export function mergeSnapshots(
   local: QuestOSSnapshot,
   remote: RemoteData
 ): QuestOSSnapshot {
-  // Profile: an onboarded journey beats an empty signup row. When both devices
-  // are onboarded, the most recently edited account fields win.
+  // Profile fallback only handles onboarding shape. Revision reconciliation
+  // replaces it before an authenticated account snapshot is imported.
   const localOnboarded = Boolean(local.profile?.onboardingCompleted);
   const remoteOnboarded = Boolean(remote.profile?.onboardingCompleted);
   const adoptRemote = !localOnboarded && remoteOnboarded;
@@ -978,12 +1536,6 @@ export function mergeSnapshots(
     profile = remote.profile ?? null;
   } else if (localOnboarded && !remoteOnboarded && local.profile) {
     profile = local.profile;
-  } else if (local.profile && remote.profile) {
-    profile =
-      syncUpdatedAt(local.profile, local.profile.createdAt) >=
-      syncUpdatedAt(remote.profile, remote.profile.createdAt)
-        ? local.profile
-        : remote.profile;
   }
   // Accessibility comfort and wallpaper choices are device-local (no remote
   // columns); a phone and desktop can keep different motion/art treatments.
@@ -991,27 +1543,18 @@ export function mergeSnapshots(
   const remoteNotificationsPresent =
     remote.notificationPreferencesPresent ??
     remoteSettings?.notificationsUpdatedAt !== undefined;
-  const accountSettings =
-    remoteSettings &&
-    syncUpdatedAt(remoteSettings, "1970-01-01T00:00:00.000Z") >
-      syncUpdatedAt(local.settings, "1970-01-01T00:00:00.000Z")
-      ? remoteSettings
-      : local.settings;
+  const accountSettings = local.settings;
   const accountNotifications =
     remoteSettings &&
     remoteNotificationsPresent &&
-    notificationSyncUpdatedAt(remoteSettings) >
-      notificationSyncUpdatedAt(local.settings)
+    !local.settings.notificationsUpdatedAt
       ? remoteSettings.notifications
       : local.settings.notifications;
   const baseSettings = {
     ...accountSettings,
     notifications: accountNotifications,
     notificationsUpdatedAt:
-      remoteSettings &&
-      remoteNotificationsPresent &&
-      notificationSyncUpdatedAt(remoteSettings) >
-        notificationSyncUpdatedAt(local.settings)
+      accountNotifications === remoteSettings?.notifications
         ? remoteSettings.notificationsUpdatedAt ?? remoteSettings.updatedAt
         : local.settings.notificationsUpdatedAt ?? local.settings.updatedAt,
     appearance: {
@@ -1057,11 +1600,8 @@ export function mergeSnapshots(
     assignments[day] = [...bySlug.values()];
   }
 
-  // Shelf quests: union by slug. On conflict the side touched most
-  // recently wins the row (status, steps, timestamps travel together so a
-  // walk never mixes two devices' step lists) — but the lifetime completion
-  // count and latest completion date are folded in from both sides, so a
-  // completion on one device is never erased by activity on another.
+  // Shelf fallback keeps the local row and folds lifetime completion counts.
+  // Revision reconciliation selects the authoritative row for account sync.
   const localQuests = local.myQuests ?? {};
   const myQuests: NonNullable<QuestOSSnapshot["myQuests"]> = {
     ...(remote.myQuests ?? {}),
@@ -1072,18 +1612,12 @@ export function mergeSnapshots(
       myQuests[slug] = l;
       continue;
     }
-    const winner = l.lastActivityAt >= r.lastActivityAt ? l : r;
-    const loser = winner === l ? r : l;
+    const winner = l;
     myQuests[slug] = {
       ...winner,
       timesCompleted: Math.max(l.timesCompleted, r.timesCompleted),
       completedAt:
-        winner.completedAt && loser.completedAt
-          ? winner.completedAt >= loser.completedAt
-            ? winner.completedAt
-            : loser.completedAt
-          : winner.completedAt ?? loser.completedAt,
-      addedAt: l.addedAt <= r.addedAt ? l.addedAt : r.addedAt,
+        r.timesCompleted > l.timesCompleted ? r.completedAt : l.completedAt,
     };
   }
 
@@ -1115,24 +1649,19 @@ export function mergeSnapshots(
     }
   }
 
-  // Recent verses: de-duplicate by passage, keep the newest visit, and cap
-  // the account-backed history to the same small list used on-device.
+  // Recent verses: preserve the store's action order and let revision-aware
+  // reconciliation apply server ordering for account-backed history.
   const recentVerseMap = new Map(
-    (remote.recentVerses ?? []).map((verse) => [
+    (local.recentVerses ?? []).map((verse) => [
       `${verse.bookSlug}:${verse.chapter}:${verse.verseStart}:${verse.verseEnd}`,
       verse,
     ])
   );
-  for (const verse of local.recentVerses ?? []) {
+  for (const verse of remote.recentVerses ?? []) {
     const key = `${verse.bookSlug}:${verse.chapter}:${verse.verseStart}:${verse.verseEnd}`;
-    const remoteVerse = recentVerseMap.get(key);
-    if (!remoteVerse || verse.viewedAt >= remoteVerse.viewedAt) {
-      recentVerseMap.set(key, verse);
-    }
+    if (!recentVerseMap.has(key)) recentVerseMap.set(key, verse);
   }
-  const recentVerses = [...recentVerseMap.values()]
-    .sort((a, b) => b.viewedAt.localeCompare(a.viewedAt))
-    .slice(0, 20);
+  const recentVerses = [...recentVerseMap.values()].slice(0, 20);
 
   // Milestones: union by key, keeping the earliest achievement.
   const milestoneMap = new Map(
@@ -1143,14 +1672,8 @@ export function mergeSnapshots(
     milestoneMap.set(m.key, r && r.achievedAt <= m.achievedAt ? r : m);
   }
 
-  // Reading position: newest wins.
-  let readingPosition = local.readingPosition ?? remote.readingPosition ?? null;
-  if (local.readingPosition && remote.readingPosition) {
-    readingPosition =
-      local.readingPosition.updatedAt >= remote.readingPosition.updatedAt
-        ? local.readingPosition
-        : remote.readingPosition;
-  }
+  // Revision reconciliation replaces this fallback before account import.
+  const readingPosition = local.readingPosition ?? remote.readingPosition ?? null;
 
   return {
     profile,
@@ -1158,8 +1681,8 @@ export function mergeSnapshots(
     assignments,
     myQuests,
     completions: unionById(local.completions, remote.completions),
-    prayers: unionById(local.prayers, remote.prayers, newerByUpdatedAt),
-    reflections: unionById(local.reflections, remote.reflections, newerByUpdatedAt),
+    prayers: unionById(local.prayers, remote.prayers),
+    reflections: unionById(local.reflections, remote.reflections),
     journeyEvents: unionById(local.journeyEvents, remote.journeyEvents),
     growthEvents: unionById(local.growthEvents, remote.growthEvents),
     earnedMilestones: [...milestoneMap.values()],
@@ -1272,6 +1795,35 @@ function tombstoneBatchItems(t: SyncTombstones): TombstoneBatchItem[] {
     ...t.myQuests.map((questSlug) => ({
       deletion: { resource: "user_quests" as const, quest_slug: questSlug },
       cleared: { ...emptySyncTombstones(), myQuests: [questSlug] },
+    })),
+  ];
+}
+
+/** Identify only the revision observations removed by partial tombstones. */
+function mutableRevisionRemovals(
+  tombstones: SyncTombstones,
+): MutableRevisionRemoval[] {
+  return [
+    ...tombstones.prayers.map((id) => ({
+      resource: "prayers" as const,
+      key: { id },
+    })),
+    ...tombstones.reflections.map((id) => ({
+      resource: "reflections" as const,
+      key: { id },
+    })),
+    ...tombstones.bookmarks.map((bookmark) => ({
+      resource: "verse_bookmarks" as const,
+      key: {
+        book_slug: bookmark.bookSlug,
+        chapter: bookmark.chapter,
+        verse: bookmark.verse,
+        translation_key: bookmark.translationKey ?? "web",
+      },
+    })),
+    ...tombstones.myQuests.map((questSlug) => ({
+      resource: "user_quests" as const,
+      key: { quest_slug: questSlug },
     })),
   ];
 }
@@ -1443,6 +1995,7 @@ async function pushFields(
         generation,
         table,
         rows.slice(index, index + 200),
+        mutableRevisionContext,
       );
       stale += result.stale;
     }
@@ -1548,39 +2101,11 @@ async function pushFields(
     );
   }
   if (fields.has("bookmarks") && snap.bookmarks.length) {
-    jobs.push(
-      async () => {
-        const rows = snap.bookmarks.map((b) => bookmarkToRow(uid, b));
-        const current = await supabase.from("verse_bookmarks").upsert(rows, {
-          onConflict: "user_id,book_slug,chapter,verse,translation_key",
-        });
-        if (!current.error) return;
-        if (!isMissingBibleSyncColumn(current.error, "translation_key")) {
-          throw current.error;
-        }
-        // Pre-0011 compatibility stores the public-domain WEB snapshot in
-        // the legacy one-row-per-verse shape. The selected edition remains a
-        // local hint until the additive migration is available.
-        const legacyByPassage = new Map<string, Omit<(typeof rows)[number], "translation_key">>();
-        for (const { translation_key: _pending, ...row } of rows) {
-          void _pending;
-          const passageKey = [
-            row.user_id,
-            row.book_slug,
-            row.chapter,
-            row.verse,
-          ].join(":");
-          const previous = legacyByPassage.get(passageKey);
-          if (!previous || previous.created_at < row.created_at) {
-            legacyByPassage.set(passageKey, row);
-          }
-        }
-        const legacyRows = [...legacyByPassage.values()];
-        const legacy = await supabase.from("verse_bookmarks").upsert(legacyRows, {
-          onConflict: "user_id,book_slug,chapter,verse",
-        });
-        if (legacy.error) throw legacy.error;
-      },
+    jobs.push(() =>
+      guarded(
+        "verse_bookmarks",
+        snap.bookmarks.map((bookmark) => bookmarkToRow(uid, bookmark)),
+      ),
     );
   }
   const readingPosition = snap.readingPosition;
@@ -1600,26 +2125,14 @@ async function pushFields(
     );
   }
   if (fields.has("recentVerses") && (snap.recentVerses?.length ?? 0) > 0) {
-    const verses = [...(snap.recentVerses ?? [])]
-      .sort((a, b) => b.viewedAt.localeCompare(a.viewedAt))
-      .slice(0, 20);
-    jobs.push(
-      async () => {
-        const upsert = await supabase.from("user_recent_verses").upsert(
-          verses.map((verse) => recentVerseToRow(uid, verse)),
-          {
-            onConflict:
-              "user_id,book_slug,chapter,verse_start,verse_end",
-          }
-        );
-        if (upsert.error) {
-          if (isMissingRecentVersesTable(upsert.error)) return;
-          throw upsert.error;
-        }
-
-        // The client keeps only twenty locally. Older account rows remain
-        // until a future generation-bound deletion can remove exact passages.
-      },
+    // The store and reconciliation already encode action/server order; never
+    // let an untrusted device clock reorder passages across natural keys.
+    const verses = [...(snap.recentVerses ?? [])].slice(0, 20);
+    jobs.push(() =>
+      guarded(
+        "user_recent_verses",
+        verses.map((verse) => recentVerseToRow(uid, verse)),
+      ),
     );
   }
 

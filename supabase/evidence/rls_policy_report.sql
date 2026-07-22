@@ -117,6 +117,7 @@ where namespace.nspname = 'public'
     'account_sync_contract',
     'assert_user_sync_context',
     'enforce_user_sync_generation',
+    'advance_account_sync_revision',
     'handle_new_user',
     'bump_daily_quest_revision_for_legacy_write',
     'preserve_daily_quest_completion_for_legacy_write'
@@ -136,7 +137,7 @@ where table_schema = 'public'
 group by grantee, table_name
 order by table_name, grantee;
 
--- Guarded mutable tables must also have no column-level UPDATE bypass.
+-- Revision-guarded mutable tables must have no column-level mutation bypass.
 select
   grantee,
   table_name,
@@ -151,13 +152,15 @@ where table_schema = 'public'
     'prayers',
     'reflections',
     'user_quests',
-    'reading_progress'
+    'reading_progress',
+    'verse_bookmarks',
+    'user_recent_verses'
   )
   and grantee = 'authenticated'
-  and privilege_type = 'UPDATE'
+  and privilege_type in ('INSERT', 'UPDATE')
 order by table_name, column_name;
 
--- 6. Internal triggers preserve newest state, expose old-client daily-quest
+-- 6. Internal triggers assign server revisions, expose old-client daily-quest
 -- writes to CAS revisions, and bind all synced writes to retained generation.
 select
   trigger.tgname as trigger_name,
@@ -206,14 +209,15 @@ join pg_catalog.pg_namespace as namespace
 where namespace.nspname = 'public'
   and procedure.proname in (
     'keep_newest_recent_verse',
+    'advance_account_sync_revision',
     'bump_daily_quest_revision_for_legacy_write',
     'preserve_daily_quest_completion_for_legacy_write'
   )
   and pg_catalog.pg_get_function_identity_arguments(procedure.oid) = ''
 order by procedure.proname;
 
--- 7. Revision and retained generation tables expose only opaque concurrency
--- values to authenticated clients; raw owner and request history stay hidden.
+-- 7. Revision and retained generation state exposes only opaque concurrency
+-- values to authenticated clients; raw request history stays hidden.
 select
   grantee,
   table_name,
@@ -225,13 +229,35 @@ where table_schema = 'public'
   and grantee in ('anon', 'authenticated', 'service_role')
 order by grantee, column_name, privilege_type;
 
+select
+  table_name,
+  column_name,
+  data_type,
+  is_nullable,
+  column_default
+from information_schema.columns
+where table_schema = 'public'
+  and table_name in (
+    'profiles',
+    'user_settings',
+    'notification_preferences',
+    'prayers',
+    'reflections',
+    'user_quests',
+    'reading_progress',
+    'verse_bookmarks',
+    'user_recent_verses'
+  )
+  and column_name = 'sync_revision'
+order by table_name;
+
 -- 8. Public readiness surfaces return only fixed identities and booleans
 -- derived from the live RLS, grant, RPC, trigger, and update-boundary posture.
 select public.daily_quest_sync_contract() as daily_quest_sync_contract;
 select public.mutable_account_sync_contract() as mutable_account_sync_contract;
 select public.account_sync_contract() as account_sync_contract;
 
--- 9. Unbound security-definer entry points must be absent after 0018.
+-- 9. Unbound security-definer entry points remain absent after 0019.
 select
   pg_catalog.to_regprocedure(
     'public.replace_user_daily_quests(date,bigint,uuid,jsonb)'

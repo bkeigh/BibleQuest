@@ -1,13 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  acknowledgeMutableWrites,
+  prepareMutableWrites,
+  type MutableAccountResource,
+  type MutableRevisionAcknowledgement,
+  type MutableRevisionContext,
+  type MutableResourceKey,
+} from "./mutable-revisions";
 
-export type MutableAccountTable =
-  | "profiles"
-  | "user_settings"
-  | "notification_preferences"
-  | "prayers"
-  | "reflections"
-  | "user_quests"
-  | "reading_progress";
+export type MutableAccountTable = MutableAccountResource;
 
 export interface MutableAccountWriteResult {
   applied: number;
@@ -23,7 +24,7 @@ export class MutableAccountSyncContractError extends Error {
   }
 }
 
-/** Signal that the account copy won a timestamp race and needs a fresh pull. */
+/** Signal that another device advanced one or more server revisions. */
 export class MutableAccountSyncConflictError extends Error {
   readonly stale: number;
 
@@ -34,73 +35,86 @@ export class MutableAccountSyncConflictError extends Error {
   }
 }
 
-/** Remove caller-supplied ownership fields because the RPC derives them from auth. */
-function withoutOwnership(
-  table: MutableAccountTable,
-  row: object,
-): Record<string, unknown> {
-  const sanitized = Object.fromEntries(Object.entries(row));
-  delete sanitized.user_id;
-  if (table === "profiles") delete sanitized.id;
-  return sanitized;
-}
-
-/** Accept only the complete, generation-bound acknowledgement promised by 0018. */
+/** Accept only the attributable, generation-bound acknowledgement promised by v4. */
 function parseWriteResult(
   value: unknown,
   expectedRows: number,
   expectedGeneration: number,
-): MutableAccountWriteResult {
+): MutableRevisionAcknowledgement[] {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new MutableAccountSyncContractError(
       "Mutable account sync returned an invalid acknowledgement",
     );
   }
 
-  const candidate = value as {
-    applied?: unknown;
-    stale?: unknown;
-    generation?: unknown;
-  };
+  const candidate = value as { generation?: unknown; results?: unknown };
   const keys = Object.keys(value).sort();
   if (
-    keys.length !== 3 ||
-    keys[0] !== "applied" ||
-    keys[1] !== "generation" ||
-    keys[2] !== "stale" ||
-    !Number.isInteger(candidate.applied) ||
-    !Number.isInteger(candidate.stale) ||
-    (candidate.applied as number) < 0 ||
-    (candidate.stale as number) < 0 ||
-    (candidate.applied as number) + (candidate.stale as number) !== expectedRows ||
-    candidate.generation !== expectedGeneration
+    keys.length !== 2 ||
+    keys[0] !== "generation" ||
+    keys[1] !== "results" ||
+    candidate.generation !== expectedGeneration ||
+    !Array.isArray(candidate.results) ||
+    candidate.results.length !== expectedRows
   ) {
     throw new MutableAccountSyncContractError(
       "Mutable account sync returned an invalid acknowledgement",
     );
   }
 
-  return {
-    applied: candidate.applied as number,
-    stale: candidate.stale as number,
-    generation: candidate.generation as number,
-  };
+  return candidate.results.map((valueResult) => {
+    if (!valueResult || typeof valueResult !== "object" || Array.isArray(valueResult)) {
+      throw new MutableAccountSyncContractError(
+        "Mutable account sync returned an invalid acknowledgement",
+      );
+    }
+    const result = valueResult as {
+      key?: unknown;
+      revision?: unknown;
+      status?: unknown;
+    };
+    if (
+      Object.keys(valueResult).sort().join(",") !== "key,revision,status" ||
+      !result.key ||
+      typeof result.key !== "object" ||
+      Array.isArray(result.key) ||
+      !Number.isSafeInteger(result.revision) ||
+      (result.revision as number) < 0 ||
+      (result.status !== "applied" && result.status !== "conflict")
+    ) {
+      throw new MutableAccountSyncContractError(
+        "Mutable account sync returned an invalid acknowledgement",
+      );
+    }
+    return {
+      key: result.key as MutableResourceKey,
+      revision: result.revision as number,
+      status: result.status,
+    };
+  });
 }
 
-/** Conditionally write mutable account rows through the guarded server RPC only. */
+/** Write only locally changed mutable rows through the revision CAS RPC. */
 export async function writeMutableAccountRows<Row extends object>(
   supabase: SupabaseClient,
   expectedUserId: string,
   expectedGeneration: number,
   table: MutableAccountTable,
   rows: readonly Readonly<Row>[],
+  context: MutableRevisionContext,
 ): Promise<MutableAccountWriteResult> {
   if (rows.length > 200) {
     throw new MutableAccountSyncContractError(
       "Mutable account sync accepts at most 200 rows",
     );
   }
-  if (rows.length === 0) {
+  const prepared = await prepareMutableWrites(
+    context,
+    table,
+    rows as readonly Record<string, unknown>[],
+    expectedUserId,
+  );
+  if (prepared.length === 0) {
     return { applied: 0, stale: 0, generation: expectedGeneration };
   }
 
@@ -108,8 +122,32 @@ export async function writeMutableAccountRows<Row extends object>(
     p_expected_user_id: expectedUserId,
     p_expected_generation: expectedGeneration,
     p_resource: table,
-    p_rows: rows.map((row) => withoutOwnership(table, row)),
+    p_rows: prepared.map((row) => row.envelope),
   });
   if (result.error) throw result.error;
-  return parseWriteResult(result.data, rows.length, expectedGeneration);
+  const acknowledgement = parseWriteResult(
+    result.data,
+    prepared.length,
+    expectedGeneration,
+  );
+  let stale: number;
+  try {
+    stale = acknowledgeMutableWrites(
+      context,
+      table,
+      prepared,
+      acknowledgement,
+    );
+  } catch (error) {
+    throw new MutableAccountSyncContractError(
+      error instanceof Error
+        ? error.message
+        : "Mutable account sync returned an invalid acknowledgement",
+    );
+  }
+  return {
+    applied: prepared.length - stale,
+    stale,
+    generation: expectedGeneration,
+  };
 }

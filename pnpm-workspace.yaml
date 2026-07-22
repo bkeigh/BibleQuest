@@ -6,5 +6,7 @@ allowBuilds:
 verifyDepsBeforeRun: false
 overrides:
   postcss: 8.5.16
+  # Pin only the vulnerable ESLint-era 1.x range to its patched release.
+  "brace-expansion@<1.1.16": 1.1.16
   # Keep Next's optional image runtime on the audited libvips build.
   next>sharp: 0.35.3

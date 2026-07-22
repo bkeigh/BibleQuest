@@ -22,7 +22,7 @@ describe("account sync runtime contracts", () => {
             error: null,
           },
           account_sync_contract: {
-            data: { contract: "biblequest_account_sync_v3", ok: true },
+            data: { contract: "biblequest_account_sync_v4", ok: true },
             error: null,
           },
         }),
@@ -33,9 +33,9 @@ describe("account sync runtime contracts", () => {
   it("rejects a missing, false, or expanded account contract", async () => {
     const candidates = [
       null,
-      { contract: "biblequest_account_sync_v3", ok: false },
+      { contract: "biblequest_account_sync_v4", ok: false },
       {
-        contract: "biblequest_account_sync_v3",
+        contract: "biblequest_account_sync_v4",
         ok: true,
         diagnostic: "not allowed",
       },

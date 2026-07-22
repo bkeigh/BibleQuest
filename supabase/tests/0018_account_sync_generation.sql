@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(50);
+select plan(51);
 
 -- Pin the retained generation table and its intentionally narrow read surface.
 select has_table('public', 'user_sync_state', 'retained sync state exists');
@@ -164,14 +164,14 @@ select is(
 );
 select is(
   public.account_sync_contract(),
-  '{"contract":"biblequest_account_sync_v3","ok":true}'::jsonb,
-  'v3 readiness is exact and true'
+  '{"contract":"biblequest_account_sync_v4","ok":true}'::jsonb,
+  'v4 readiness is exact and true'
 );
 set local role service_role;
 select is(
   public.account_sync_contract(),
-  '{"contract":"biblequest_account_sync_v3","ok":true}'::jsonb,
-  'service role receives only the same bounded v3 readiness response'
+  '{"contract":"biblequest_account_sync_v4","ok":true}'::jsonb,
+  'service role receives only the same bounded v4 readiness response'
 );
 reset role;
 
@@ -187,6 +187,7 @@ select set_config(
   '82000000-0000-4000-8000-000000000002',
   true
 );
+set local role service_role;
 insert into public.prayers (
   id, user_id, body, category, status, created_at, updated_at
 ) values (
@@ -194,6 +195,8 @@ insert into public.prayers (
   '82000000-0000-4000-8000-000000000002',
   'other owner prayer', 'general', 'active', now(), now()
 );
+reset role;
+set local role authenticated;
 
 select set_config(
   'request.jwt.claim.sub',
@@ -221,7 +224,8 @@ select throws_ok(
   'the generation RPC rejects a captured-user mismatch'
 );
 
--- Generation zero is the explicit cached-client compatibility window.
+-- Service setup can seed owner rows without reopening browser mutations.
+set local role service_role;
 insert into public.prayers (
   id, user_id, body, category, status, created_at, updated_at
 ) values (
@@ -229,11 +233,13 @@ insert into public.prayers (
   '81000000-0000-4000-8000-000000000001',
   'owner prayer', 'general', 'active', now(), now()
 );
+reset role;
+set local role authenticated;
 select is(
   (select count(*) from public.prayers
    where id = '81100000-0000-4000-8000-000000000011'),
   1::bigint,
-  'a headerless cached insert is accepted only at generation zero'
+  'a service-seeded owner row is visible at generation zero'
 );
 
 -- Every security-definer write binds both the captured user and generation.
@@ -277,9 +283,9 @@ select throws_ok(
 select is(
   public.upsert_mutable_account_rows(
     '81000000-0000-4000-8000-000000000001', 0, 'profiles',
-    '[{"display_name":"Claimed owner","tradition":"baptist","primary_goal":"prayer","calling":null,"daily_rhythm":"morning","quest_style":"guided","onboarding_completed":true,"created_at":"2025-07-22T20:00:00Z","updated_at":"2025-07-22T20:00:00Z"}]'::jsonb
+    '[{"expected_revision":1,"row":{"display_name":"Claimed owner","tradition":"baptist","primary_goal":"prayer","calling":null,"daily_rhythm":"morning","quest_style":"guided","onboarding_completed":true,"created_at":"2025-07-22T20:00:00Z","updated_at":"2025-07-22T20:00:00Z"}}]'::jsonb
   ),
-  '{"applied":1,"stale":0,"generation":0}'::jsonb,
+  '{"generation":0,"results":[{"key":{"id":"81000000-0000-4000-8000-000000000001"},"status":"applied","revision":2}]}'::jsonb,
   'an onboarded local profile safely claims a blank scaffold'
 );
 select is(
@@ -293,47 +299,48 @@ select is(
 select is(
   public.upsert_mutable_account_rows(
     '81000000-0000-4000-8000-000000000001', 0, 'user_quests',
-    '[{"quest_slug":"walk-faith","status":"active","steps_done":[],"times_completed":0,"added_at":"2026-07-22T20:00:00Z","started_at":null,"paused_at":null,"completed_at":null,"archived_at":null,"last_activity_at":"2026-07-22T20:00:00Z"}]'::jsonb
+    '[{"expected_revision":0,"row":{"quest_slug":"walk-faith","status":"active","steps_done":[],"times_completed":0,"added_at":"2026-07-22T20:00:00Z","started_at":null,"paused_at":null,"completed_at":null,"archived_at":null,"last_activity_at":"2026-07-22T20:00:00Z"}}]'::jsonb
   ),
-  '{"applied":1,"stale":0,"generation":0}'::jsonb,
+  '{"generation":0,"results":[{"key":{"quest_slug":"walk-faith"},"status":"applied","revision":1}]}'::jsonb,
   'the shelf guard accepts a current row'
 );
 select is(
   public.upsert_mutable_account_rows(
     '81000000-0000-4000-8000-000000000001', 0, 'user_quests',
-    '[{"quest_slug":"walk-faith","status":"archived","steps_done":[],"times_completed":0,"added_at":"2026-07-22T20:00:00Z","started_at":null,"paused_at":null,"completed_at":null,"archived_at":null,"last_activity_at":"2026-07-22T19:59:59Z"}]'::jsonb
+    '[{"expected_revision":1,"row":{"quest_slug":"walk-faith","status":"archived","steps_done":[],"times_completed":0,"added_at":"2026-07-22T20:00:00Z","started_at":null,"paused_at":null,"completed_at":null,"archived_at":null,"last_activity_at":"2026-07-22T19:59:59Z"}}]'::jsonb
   ),
-  '{"applied":0,"stale":1,"generation":0}'::jsonb,
-  'the shelf guard rejects an older row'
+  '{"generation":0,"results":[{"key":{"quest_slug":"walk-faith"},"status":"applied","revision":2}]}'::jsonb,
+  'the shelf guard accepts the current revision despite an older clock'
 );
 select is(
   (select status from public.user_quests where quest_slug = 'walk-faith'),
-  'active',
-  'the newer shelf row remains canonical'
+  'archived',
+  'the revision-authorized shelf row becomes canonical'
 );
 select is(
   public.upsert_mutable_account_rows(
     '81000000-0000-4000-8000-000000000001', 0, 'reading_progress',
-    '[{"book_slug":"john","book_name":"John","chapter":3,"updated_at":"2026-07-22T20:00:00Z"}]'::jsonb
+    '[{"expected_revision":0,"row":{"book_slug":"john","book_name":"John","chapter":3,"updated_at":"2026-07-22T20:00:00Z"}}]'::jsonb
   ),
-  '{"applied":1,"stale":0,"generation":0}'::jsonb,
+  '{"generation":0,"results":[{"key":{"user_id":"81000000-0000-4000-8000-000000000001"},"status":"applied","revision":1}]}'::jsonb,
   'the reading guard accepts a current row'
 );
 select is(
   public.upsert_mutable_account_rows(
     '81000000-0000-4000-8000-000000000001', 0, 'reading_progress',
-    '[{"book_slug":"genesis","book_name":"Genesis","chapter":1,"updated_at":"2026-07-22T19:59:59Z"}]'::jsonb
+    '[{"expected_revision":1,"row":{"book_slug":"genesis","book_name":"Genesis","chapter":1,"updated_at":"2026-07-22T19:59:59Z"}}]'::jsonb
   ),
-  '{"applied":0,"stale":1,"generation":0}'::jsonb,
-  'the reading guard rejects an older row'
+  '{"generation":0,"results":[{"key":{"user_id":"81000000-0000-4000-8000-000000000001"},"status":"applied","revision":2}]}'::jsonb,
+  'the reading guard accepts the current revision despite an older clock'
 );
 select is(
   (select book_slug from public.reading_progress),
-  'john',
-  'the newer reading row remains canonical'
+  'genesis',
+  'the revision-authorized reading row becomes canonical'
 );
 
--- Seed all remaining tombstone types inside the generation-zero window.
+-- Seed all remaining tombstone types through the service setup role.
+set local role service_role;
 insert into public.reflections (
   id, user_id, body, created_at, updated_at
 ) values (
@@ -354,6 +361,8 @@ insert into public.user_recent_verses (
   '81000000-0000-4000-8000-000000000001',
   'psalms', 'Psalms', 23, 1, 2, 'Psalm 23:1-2', 'The Lord', now()
 );
+reset role;
+set local role authenticated;
 
 -- One bounded tombstone batch is owner-scoped, atomic, and bumps generation.
 select is(
@@ -447,7 +456,7 @@ select throws_ok(
       'cached stale prayer', 'general', 'active', now(), now()
     )$$,
   '42501',
-  'account sync: authenticated user changed',
+  null,
   'a headerless cached write fails after generation advances'
 );
 select set_config(
@@ -455,18 +464,23 @@ select set_config(
   '{"x-biblequest-expected-user":"81000000-0000-4000-8000-000000000001","x-biblequest-sync-generation":"1"}',
   true
 );
-insert into public.prayers (
-  id, user_id, body, category, status, created_at, updated_at
-) values (
-  '81600000-0000-4000-8000-000000000016',
-  '81000000-0000-4000-8000-000000000001',
-  'current header prayer', 'general', 'active', now(), now()
+select throws_ok(
+  $$insert into public.prayers (
+      id, user_id, body, category, status, created_at, updated_at
+    ) values (
+      '81600000-0000-4000-8000-000000000016',
+      '81000000-0000-4000-8000-000000000001',
+      'current header prayer', 'general', 'active', now(), now()
+    )$$,
+  '42501',
+  null,
+  'current generation headers cannot bypass the v4 CAS RPC'
 );
 select is(
   (select count(*) from public.prayers
    where id = '81600000-0000-4000-8000-000000000016'),
-  1::bigint,
-  'a direct write with current identity and generation headers succeeds'
+  0::bigint,
+  'the denied current-header write leaves no row'
 );
 select set_config(
   'request.headers',
@@ -481,9 +495,9 @@ select throws_ok(
       '81000000-0000-4000-8000-000000000001',
       'old header prayer', 'general', 'active', now(), now()
     )$$,
-  '40001',
-  'account sync: stale generation',
-  'a direct write with an old generation header fails'
+  '42501',
+  null,
+  'a direct write with an old generation header fails at the grant boundary'
 );
 
 -- Purge retains sync state, advances once, and has an idempotent retry.

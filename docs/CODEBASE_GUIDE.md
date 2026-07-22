@@ -122,7 +122,8 @@ Important safeguards:
 - Migration `0016_mutable_account_sync_guards.sql` conditionally writes
   profiles, settings, notification preferences, prayers, and reflections by
   `updated_at`; its owner comes from `auth.uid()` and its acknowledgement
-  contains counts rather than row content.
+  contains counts rather than row content. Migration `0019` supersedes its
+  timestamp ordering while retaining this history.
 - Migration `0017_enforce_mutable_account_sync_boundary.sql` revokes cached
   authenticated direct updates on those tables while preserving the guarded
   definer RPC and intended SELECT/INSERT/DELETE grants. Its anonymous readiness
@@ -131,8 +132,15 @@ Important safeguards:
   generation per owner, binds every recreating write to the expected user and
   generation, guards My Quests and reading position, safely claims a blank
   signup profile, and makes bounded deletion and whole-account purge
-  idempotent generation advances. Its v3 readiness contract is exact and
-  content-free.
+  idempotent generation advances.
+- Migration `0019_server_ordered_account_sync_revisions.sql` gives profiles,
+  settings, notification preferences, prayers, reflections, shelf quests,
+  reading position, bookmarks, and recent verses database-owned revisions.
+  Exact per-row CAS acknowledgements replace client timestamps as conflict
+  authority, and remaining direct browser mutations fail closed. Recent verses
+  also receive database-owned `server_seen_at` ordering so a skewed client-
+  supplied `viewed_at` cannot control the cross-passage 20-row cap. Its v4
+  readiness contract is exact and content-free.
 - Cached pre-`0015` daily-assignment bundles keep their owner-RLS direct writes
   during rollout. A database trigger advances the opaque revision for those
   legacy assignment writes. Migration `0017` deliberately rejects cached direct

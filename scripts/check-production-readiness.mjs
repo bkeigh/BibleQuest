@@ -188,7 +188,7 @@ function safeHealthBody(value) {
     typeof candidate.canonical_origin_matches !== "boolean" ||
     !["configured", "guest-only", "invalid"].includes(candidate.auth_posture) ||
     !["configured", "disabled", "invalid"].includes(candidate.analytics_posture) ||
-    candidate.schema_contract !== "0018" ||
+    candidate.schema_contract !== "0019" ||
     candidate.content_contract !== "seed-manifest-v1" ||
     !/^biblequest-v\d{1,4}$/.test(candidate.service_worker_version) ||
     !["coming-soon", "sandbox", "live", "invalid"].includes(
@@ -388,8 +388,9 @@ async function checkSchema() {
     );
   }
 
-  // The bounded 0018 contract proves the complete identity, generation, RPC,
-  // trigger, and direct-mutation boundary without attempting a user-data write.
+  // The bounded 0019 contract proves the complete identity, generation,
+  // per-row revision/CAS, RPC, trigger, and direct-mutation boundary without
+  // attempting a user-data write.
   try {
     const response = await supabaseFetch(
       "/rest/v1/rpc/account_sync_contract",
@@ -403,7 +404,7 @@ async function checkSchema() {
     const ok = response.ok && isAccountSyncContract(body);
     schemaEvidence.push({
       contract: ACCOUNT_SYNC_CONTRACT,
-      migration: "0018",
+      migration: "0019",
       ok,
     });
     result(
@@ -411,14 +412,14 @@ async function checkSchema() {
       "account identity and generation boundary",
       response.ok
         ? ok
-          ? "identity, generation, RPC, trigger, and grant boundary match 0018"
+          ? "identity, generation, revision/CAS, RPC, trigger, and grant boundary match 0019"
           : "invalid bounded contract"
         : safeProviderCode(body?.code, response.status),
     );
   } catch (error) {
     schemaEvidence.push({
       contract: ACCOUNT_SYNC_CONTRACT,
-      migration: "0018",
+      migration: "0019",
       ok: false,
     });
     result(

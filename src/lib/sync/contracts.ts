@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const DAILY_QUEST_SYNC_CONTRACT = "biblequest_daily_quest_sync_v1";
-export const ACCOUNT_SYNC_CONTRACT = "biblequest_account_sync_v3";
+export const ACCOUNT_SYNC_CONTRACT = "biblequest_account_sync_v4";
 
 /** Report a missing or malformed server boundary without attempting writes. */
 export class AccountSyncContractError extends Error {

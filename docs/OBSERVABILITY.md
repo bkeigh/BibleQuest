@@ -22,7 +22,7 @@ as a containment breach.
 - `configured`, `guest-only`, or `invalid` effective auth posture without a
   host or key; the containment latch reports `guest-only` even when dormant
   provider credentials remain configured;
-- schema/content contract labels (`0018` and `seed-manifest-v1`);
+- schema/content contract labels (`0019` and `seed-manifest-v1`);
 - the checked-in service-worker version;
 - `coming-soon`, `sandbox`, `live`, or `invalid` billing posture without a key.
 
@@ -108,12 +108,12 @@ Migration `0015` is not accepted from revision-table columns alone: the probe
 calls the anonymous read-only `daily_quest_sync_contract()` and requires its
 exact two-field contract to confirm the CAS RPC, trigger bindings, RLS, and
 grant posture without returning catalog diagnostics or user rows.
-Migration `0018` is also required independently. The probe calls the anonymous,
-content-free `account_sync_contract()` and accepts only its exact two-field v3
+Migration `0019` is also required independently. The probe calls the anonymous,
+content-free `account_sync_contract()` and accepts only its exact two-field v4
 response. That live contract verifies the expected-user and retained-generation
-wrappers, exact generation triggers, retired signatures, guarded mutation
-boundary, and retained sync-state RLS/grants without returning catalog
-diagnostics or user data.
+wrappers, per-row revision triggers and CAS entry point, retired timestamp and
+direct-mutation paths, and retained sync-state RLS/grants without returning
+catalog diagnostics or user data.
 
 Prerequisites:
 

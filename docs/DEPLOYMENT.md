@@ -118,17 +118,23 @@ needed — just don't remove that config.
       the production dry run, and obtain explicit approval before the database
       push (if enabling sync).
 - [ ] Complete [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md): apply
-      migrations through `0018` (including the authoritative `0014` Journey
+      migrations through `0019` (including the authoritative `0014` Journey
       identity change, guarded mutable writes, cached-client update boundary,
-      and expected-user/generation deletion boundary)
+      expected-user/generation deletion boundary, and server-ordered per-row CAS)
       with the reviewed seed applied separately,
       configure custom SMTP, and pass production readiness, daily-quest CAS,
       mutable-write guard, cached-client, and two-user isolation checks.
+- [ ] Before the synthetic staging `0019` cutover, close every superseded v3
+      Preview client and re-prove `auth.users` is exactly zero. Production/main
+      is guest-only and never ran v3; the v3 Preview is synthetic-only and
+      never-promote. Any retained signed-in/v3 client or nonzero staging count
+      requires a two-phase bridge or reviewed reset/data-disposition decision.
+      Never treat a service-worker refresh as preservation of unsynced v3 data.
 - [ ] Require the anonymous `daily_quest_sync_contract` readiness response to
       contain exactly the fixed contract identity and `ok: true`; treat extra
       keys, content, or `ok: false` as a sync launch blocker.
 - [ ] Require `account_sync_contract` to return exactly
-      `{"contract":"biblequest_account_sync_v3","ok":true}`; any extra field
+      `{"contract":"biblequest_account_sync_v4","ok":true}`; any extra field
       or false posture is an account-sync launch blocker.
 - [ ] Configure privacy-first analytics if desired. Use Vercel logs and an
       external uptime check through the content-free operational contract in
