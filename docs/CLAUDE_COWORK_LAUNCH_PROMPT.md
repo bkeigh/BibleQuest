@@ -322,14 +322,21 @@ Perform read-only inspection first, then request approval for any change.
 
 Use only the confirmed staging project and synthetic staging data.
 
-Current evidence says Vercel Preview has no project environment variables and
-no hosted staging Supabase identity has been proven. A deployed Vercel Preview
-cannot use the local Supabase stack. Before this phase, search for an existing
-hosted non-production project. If none exists, present an exact creation packet
-for a separate project (name, organization, region, owner, retention/deletion
-date, and current price). Supabase currently advertises additional Pro projects
-from `$10/month`; refresh that price and obtain explicit approval before
-creating one. Do not use the Production project or its URL/key pair as staging.
+Current authenticated evidence says Vercel Preview has no project environment
+variables, the Supabase organization has no BibleQuest staging project, and the
+BibleQuest project has no preview or persistent branches. A deployed Vercel
+Preview cannot use the local Supabase stack. The recommended bounded staging
+environment is a data-less Supabase Preview branch named
+`biblequest-launch-rehearsal-2026-07-31`, deleted no later than August 1.
+Supabase gives each branch its own instance and API credentials and does not
+copy Production data by default. The current dashboard and official usage guide
+quote Micro branch compute at `$0.01344/hour`; other usage may apply, compute
+credits do not apply, and branch charges are outside the Spend Cap. Refresh the
+price and present the exact name, owner, creation time, deletion deadline, and
+cost ceiling. Do not create the branch without Brendan's explicit approval of
+that packet. Do not use the Production project, its URL/key pair, or its data as
+staging. Keep this synthetic staging branch separate from any production-backup
+restore clone.
 
 1. Reconfirm that every Preview/build used in this phase is bound to the
    confirmed staging Supabase URL and paired publishable key. Compare provider
@@ -392,22 +399,33 @@ These gates can run in parallel when their owners are independent.
 
 1. Database backup/restore:
    - inspect the production Supabase backup/PITR posture;
-   - current preparation evidence shows a mismatch: the organization header
-     says `winterhill Pro`, while the production Scheduled Backups pane says
-     Free-plan backups are unavailable. Resolve the actual project entitlement
-     before recommending or buying anything;
+   - current authenticated preparation evidence confirms the `winterhill`
+     organization is on Pro with Spend Cap enabled and the production project
+     exposes daily physical backups. The latest observed restore point is
+     `2026-07-22 07:56:27 UTC`, with visible daily backups through July 15.
+     Reconfirm the latest backup at execution; Storage objects are excluded and
+     PITR is disabled;
    - record backup time, method, retention, and restore-point identity without
      credentials;
-   - present these mutually exclusive choices with a fresh official-price
-     check: existing Pro daily backups (seven-day retention; Pro currently
-     starts at `$25/month` and includes `$10/month` compute credit), a manually
-     captured logical backup, or seven-day PITR (currently `$0.137/hour`, about
-     `$100/month` per project, outside the Spend Cap). Never enable a plan or
-     add-on without Brendan's explicit approval of the exact price and duration;
-   - prefer resolving the existing Pro entitlement plus a fresh daily backup,
-     or the manual logical-backup path, for the contained guest-only launch;
-     PITR is optional unless the named owners require its lower recovery-point
-     objective;
+   - use the existing daily physical backup as the production recovery point;
+     do not buy another plan or enable PITR merely for this launch. Seven-day
+     PITR remains an optional separately priced choice only if the named owners
+     require its lower recovery-point objective;
+   - for the mandatory isolated drill, open but do not submit Supabase's beta
+     `Restore to a New Project` flow. Record the proposed target, mirrored
+     resources, exact cost, and deletion deadline without exposing secrets or
+     private data, then ask Brendan for explicit charge-capable creation
+     approval and the rollback authority for explicit production-data-clone
+     approval. This flow copies the full database, roles, permissions, auth
+     users, hashed passwords, and encryption root key; it does not copy Storage
+     objects and requires manual service reconfiguration;
+   - after both approvals, create only the approved isolated clone, restrict
+     access, disable copied extensions that can perform external operations,
+     verify migration/RLS posture and representative aggregate counts without
+     inspecting or exposing private rows, record evidence, and delete it by the
+     approved deadline. Never point a Vercel build at this clone;
+   - a manual logical backup is optional additional defense, not a substitute
+     for silently skipping the approved restore drill;
    - for a manual logical backup, obtain explicit read-only production-backup
      approval, use a restricted temporary directory outside the repository,
      and run separate role, schema, and data dumps. Do not print file contents,

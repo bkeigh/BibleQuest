@@ -102,9 +102,9 @@ for the eventual frozen commit and must be rerun at release freeze.
 | Production migration history | HOLD — the Supabase dashboard's latest recorded migration is `20260710192143 user_quests_shelf` from July 10. Reconcile the complete linked history against the frozen 14-file manifest with the guarded CLI list/dry run before approving any push; dashboard rows and column probes are not permission to execute |
 | Production content mirror | FAIL — 84/150 approved free quests with 84 content mismatches/blank Scripture snapshots, 60/180 active daily passages, and 22/38 milestones with 22 content mismatches; both prompt catalogues exactly match at 32 |
 | Production auth configuration | PARTIAL — Email and Google providers are enabled, Phone and anonymous sign-in are disabled, email confirmation is enabled, the Site URL is canonical `https://www.biblequest.co`, and 11 redirect entries are configured. This blocks the enabled track until deployed controls, custom SMTP delivery, and template/cross-browser behavior are proven; guest-only instead requires the signed containment/no-traffic track |
-| Production backup posture | HOLD / PLAN-ENTITLEMENT MISMATCH — the Supabase organization header reports `winterhill Pro`, but the production project's Scheduled Backups pane says Free-plan backups are unavailable; PITR is not enabled. Resolve which plan actually governs this project and prove an accessible restore point. No production schema/content mutation is permitted until a named database owner and rollback authority approve a recoverable backup/restore plan and the runbook's restore gate passes |
+| Production backup posture | PASS FOR BACKUP AVAILABILITY / RESTORE DRILL OPEN — the authenticated Supabase organization billing view confirms Pro with Spend Cap enabled. The production Scheduled Backups pane exposes daily physical backups from July 15–22; the latest observed restore point is `2026-07-22 07:56:27 UTC`. Storage objects are excluded and PITR is disabled. This proves an accessible database restore point, not restoration integrity. No production schema/content mutation is permitted until the isolated restore drill and named-owner approval pass |
 | Vercel production assignment | HARD HOLD BEFORE MERGE — Production tracks `main`, every `main` commit creates a Production Deployment, and Auto-assign Custom Production Domains is enabled. The current production deployment is `dpl_9jo9xSMx3K2hYVYNLkwVV6gKVL8c` at `b7b15426ba5ff21e707ba859bb5454540f9ee216`; merging PR #15 can move production traffic and is prohibited until the staged-candidate/promotion controls are approved |
-| Vercel environment separation | FAIL FOR STAGING REHEARSAL — Production has the expected Supabase variable names, but Preview currently has no project environment variables. The existing PR Preview therefore does not prove the required distinct staging Supabase pair and cannot satisfy the staging database rehearsal gate |
+| Vercel environment separation | FAIL FOR STAGING REHEARSAL — Production has the expected Supabase variable names, but Preview currently has no project environment variables. The authenticated Supabase inventory has four projects but no BibleQuest staging project, and the BibleQuest project has only Production `main` with no preview or persistent branches. The existing PR Preview therefore does not prove the required distinct staging Supabase pair and cannot satisfy the staging database rehearsal gate |
 | Provisional guest browser flow | PASS FOR THIS PROVISIONAL ARTIFACT — on deployment `dpl_3ja5bGrudTmnMQaLyahA4RDpZoWY`, an isolated clean browser completed onboarding → first assignment → `Begin quest` → active state → completion without writing → first milestone/Journey update → full reload persistence → export confirmation → two-step clear/reset back to onboarding. The earlier unchanged click was not reproduced locally or on the current immutable Preview and is superseded by this clean-origin evidence. The isolated test journey was cleared through the app; rerun the complete matrix on the frozen staging artifact |
 | Current Vercel runtime errors | PASS FOR CURRENT SEVEN-DAY QUERY — Vercel reported no grouped runtime errors for the project; this does not replace the candidate canary, browser console/network evidence, or staffed alert-routing gate |
 | Canonical host | PASS FOR CURRENT DEPLOYMENT — apex redirect, canonical link, and Open Graph URL identify `https://www.biblequest.co`; rerun against the immutable candidate |
@@ -116,18 +116,24 @@ for the eventual frozen commit and must be rerun at release freeze.
 Complete these in order. Each external mutation requires the named owner to
 approve that exact action; the preparation work above is not blanket approval.
 
-1. **Staging isolation:** identify or create the approved non-production
-   Supabase project/branch, then configure only Preview/staging with its masked
-   public URL/key pair. Prove it is distinct from Production before any staging
-   database rehearsal. Never copy the Production pair into Preview. A deployed
-   Vercel Preview cannot use the local Supabase stack; if no existing hosted
-   staging project exists, present the current incremental cost before creating
-   one. Supabase currently advertises additional Pro projects from `$10/month`.
-2. **Recoverability:** the database owner and rollback authority select and
-   approve a production backup method, create a fresh recoverable point, and
-   complete the isolated restore drill. Enabling a paid plan/add-on requires
-   separate price approval. Do not apply production migrations or content
-   before this passes.
+1. **Staging isolation:** obtain approval to create the data-less Preview branch
+   `biblequest-launch-rehearsal-2026-07-31`, delete it no later than August 1,
+   and configure only Preview/staging with that branch's masked public URL/key
+   pair. Supabase's current dashboard quote is `$0.01344/hour` from creation
+   until removal (about `$3.23` if continuously billed for ten days), plus any
+   usage; branch usage is outside the Spend Cap. Prove its credentials are
+   distinct from Production before applying the reviewed migrations and
+   synthetic seed. Never copy the Production pair or production data into this
+   branch. A deployed Vercel Preview cannot use the local Supabase stack.
+2. **Recoverability:** use the existing daily physical backup as the production
+   recovery point, then obtain a separate approval for Supabase's `Restore to a
+   New Project` drill after its provider screen shows the exact incremental
+   cost and target. The clone contains the full database, roles, auth users,
+   hashed passwords, and encryption root key; it excludes Storage objects and
+   needs manual service reconfiguration. Restrict access, disable any copied
+   external-operation extensions, verify aggregate integrity without exposing
+   private rows, and delete the clone after accepted evidence. Do not restore
+   over Production or apply production migrations/content before this passes.
 3. **Safe merge control:** the deploy owner explicitly approves temporarily
    disabling Vercel's `Auto-assign Custom Production Domains`, verifies the
    existing production domains remain on deployment
@@ -145,24 +151,31 @@ approve that exact action; the preparation work above is not blanket approval.
    5–6. Only then prepare the exact production migration and content approval
    packets for the separate step-6 and step-7 decisions.
 
-#### Current backup decision packet
+#### Current backup and staging decision packet
 
-Verify the price again at approval time. Supabase currently documents these
-choices:
+Authenticated provider inspection on July 22 confirms the `winterhill`
+organization is on Pro with Spend Cap enabled and that the BibleQuest project
+has accessible daily physical backups. The latest observed backup is
+`2026-07-22 07:56:27 UTC`; backups are visible through July 15. Record a fresh
+timestamp at execution. Storage objects are not included. See the official
+[backup guide](https://supabase.com/docs/guides/platform/backups).
 
-- **Resolve the existing Pro entitlement first (recommended):** Pro starts at
-  $25/month per organization, includes $10/month of compute credit, and gives
-  projects seven retained daily backups. Because the dashboard simultaneously
-  labels the organization Pro and the project ineligible, do not buy another
-  plan until billing/project support confirms the actual entitlement. See the
-  official [pricing page](https://supabase.com/pricing) and
-  [backup guide](https://supabase.com/docs/guides/platform/backups).
-- **Manual logical backup:** Supabase recommends `supabase db dump` for a
-  Free-plan project. A complete restorable packet needs separate role, schema,
-  and data dumps; the default command contains neither data nor custom roles.
-  Store the files only in a restricted, encrypted location outside the
-  repository, record hashes rather than contents, and restore-test them in a
-  disposable isolated environment. Follow the official
+- **Physical backup plus isolated clone drill (recommended):** keep the current
+  daily backup as the production recovery point. Supabase's beta `Restore to a
+  New Project` flow creates an independent, database-only project from a
+  physical backup. It copies schema, data, roles, permissions, auth users,
+  hashed passwords, and the encryption root key, but not Storage objects,
+  functions, Auth/API configuration, or Realtime configuration. The provider
+  shows the clone's incremental monthly cost before creation. The database
+  owner must approve that exact cost/target/deletion date and the rollback
+  authority must approve handling the restricted production-data clone. See
+  [Restore to a new project](https://supabase.com/docs/guides/platform/clone-project).
+- **Manual logical backup (optional additional defense):** a complete restorable
+  packet needs separate role, schema, and data dumps; the default command
+  contains neither data nor custom roles. Store files only in a restricted,
+  encrypted location outside the repository, record hashes rather than
+  contents, and restore-test them in a separately approved disposable isolated
+  environment. Follow the official
   [CLI backup/restore guide](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore).
 - **PITR (optional, not the default July 31 choice):** seven-day PITR is
   currently billed at `$0.137/hour`, approximately `$100/month` per project,
@@ -172,12 +185,20 @@ choices:
   requires a separate price-and-duration approval. See the official
   [PITR usage guide](https://supabase.com/docs/guides/platform/manage-your-usage/point-in-time-recovery).
 
-For staging, prefer an existing verified non-production project. If none
-exists, the exact approval packet should name the new project, region, expected
-retention/deletion date, owner, and Supabase's then-current incremental price;
-the current pricing page advertises additional Pro projects from `$10/month`.
-Do not create a project or database branch merely to make the checklist look
-complete.
+For synthetic staging, the authenticated inventory found no existing
+BibleQuest staging project or branch. The recommended bounded choice is the
+data-less Preview branch `biblequest-launch-rehearsal-2026-07-31`, deleted no
+later than August 1. Each branch has its own Supabase instance and API
+credentials; it receives no Production data unless someone deliberately loads
+it. The current dashboard and official usage guide quote Micro branch compute
+at `$0.01344/hour`; other usage may apply and branches are outside the Spend
+Cap. Obtain explicit price/duration approval before creation. See Supabase's
+[branching overview](https://supabase.com/docs/guides/deployment/branching),
+[dashboard branching limitations](https://supabase.com/docs/guides/deployment/branching/dashboard),
+and [branch billing](https://supabase.com/docs/guides/platform/manage-your-usage/branching).
+Do not use the staging branch as the restore-drill target: synthetic staging and
+the restricted production-data clone are separate environments with separate
+approvals.
 
 ## 2. Roles and authority
 
