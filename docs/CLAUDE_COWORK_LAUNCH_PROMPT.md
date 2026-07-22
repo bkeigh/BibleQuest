@@ -587,7 +587,8 @@ database, and content steps.
 3. With explicit approval, promote that exact staged production candidate
    without a rebuild or deployment substitution. Verify deployment ID, SHA,
    domains, canonical metadata, guest-only posture,
-   coming-soon billing, account controls absent, and current worker version.
+   coming-soon billing, enrollment/sign-in/account-action controls absent
+   (status-only containment copy is allowed), and current worker version.
    Fully close/relaunch one existing canonical-origin installed PWA twice and
    confirm the candidate worker controls it and obsolete BibleQuest caches are
    gone.

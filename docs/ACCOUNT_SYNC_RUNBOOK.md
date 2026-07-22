@@ -49,7 +49,8 @@ The launch record must select exactly one track:
   A/B isolation, transactional/cached-client sync, and signed restore evidence.
 - **Guest-only contained:** keep the frozen source's `ACCOUNT_SYNC_CONTAINED`
   constant set to `true`; require health to
-  report `guest-only`; prove account controls are absent; callback exchange,
+  report `guest-only`; prove enrollment, sign-in, and account-action controls
+  are absent (a status-only containment notice/page is allowed); callback exchange,
   middleware session refresh, and sync/client creation are no-ops; prove clean
   and upgraded browsers make no Supabase Auth/session/user-table/sync-RPC
   requests; and prove the complete local-first core, persistence, export/clear,
@@ -271,7 +272,8 @@ Use this order:
 1. Freeze account rollout and deploy the immutable contained bundle before any
    production migration or content write.
 2. Verify the health endpoint reports the intended guest-only posture, the
-   active worker reports v15, account controls are absent, callbacks do not
+   active worker reports v15, account-action controls are absent (status-only
+   containment copy is allowed), callbacks do not
    exchange credentials, normal proxy requests do not refresh sessions, and
    the browser sync path does not create a Supabase client.
 3. Reload browser clients and fully close/relaunch installed PWAs twice. Record

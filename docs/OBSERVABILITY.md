@@ -36,8 +36,9 @@ hard hold and this repository does not change that project setting.
 Health reports posture; it does not prove behavior. A `configured` release must
 complete the full auth/sync synthetic, SMTP delivery, callback, and
 cross-account evidence in the launch runbook. A `guest-only` release must
-complete the containment canary below: account controls absent, callback and
-middleware/session handling inert, sync/client creation inert, no browser
+complete the containment canary below: enrollment, sign-in, and account-action
+controls absent (a status-only containment notice/page is allowed), callback
+and middleware/session handling inert, sync/client creation inert, no browser
 Supabase Auth/session/user-table/sync-RPC traffic, and local-first core behavior
 complete. `invalid` is always a hard hold. Dormant credentials do not upgrade or
 downgrade these requirements.
