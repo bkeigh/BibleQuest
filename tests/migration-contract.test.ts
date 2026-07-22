@@ -1,0 +1,89 @@
+import { createHash } from "node:crypto";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const ROOT = process.cwd();
+const MIGRATIONS_DIR = join(ROOT, "supabase", "migrations");
+const JOURNEY_IDENTITY_SHA256 =
+  "9497b745c5efc0c3f6c4c82e43e57c4fd9b34e8cfae12e6193226d564da50789";
+const EXPECTED_MIGRATIONS = [
+  "0001_init.sql",
+  "0002_rls_policies.sql",
+  "0003_chapters_read_unique.sql",
+  "0004_multi_daily_quests.sql",
+  "0005_user_language.sql",
+  "0006_purge_user_data.sql",
+  "0007_user_quests.sql",
+  "0008_reassert_rls_and_purge.sql",
+  "0009_analytics_consent_opt_in.sql",
+  "0010_rolling_quest_windows_and_recent_verses.sql",
+  "0011_bible_translation_preference.sql",
+  "0012_kjv_bible_translation_default.sql",
+  "0014_journey_event_identity.sql",
+  "0015_transactional_daily_quest_sync.sql",
+];
+
+/** Hash a migration exactly as the release manifest does. */
+function sha256(path: string) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+describe("release migration contracts", () => {
+  it("keeps 0014 immutable and places CAS at the next forward-safe identity", () => {
+    const migrations = readdirSync(MIGRATIONS_DIR)
+      .filter((name) => name.endsWith(".sql"))
+      .sort();
+
+    expect(migrations).toEqual(EXPECTED_MIGRATIONS);
+    expect(
+      sha256(join(MIGRATIONS_DIR, "0014_journey_event_identity.sql")),
+    ).toBe(JOURNEY_IDENTITY_SHA256);
+    expect(migrations).not.toContain("0013_transactional_daily_quest_sync.sql");
+  });
+
+  it("matches the checked-in SHA-256 migration manifest", () => {
+    const manifest = readFileSync(
+      join(MIGRATIONS_DIR, "manifest.sha256"),
+      "utf8",
+    )
+      .trim()
+      .split("\n");
+    const expected = EXPECTED_MIGRATIONS.map(
+      (name) => `${sha256(join(MIGRATIONS_DIR, name))}  ${name}`,
+    );
+
+    expect(manifest).toEqual(expected);
+  });
+
+  it("keeps CAS in a client-only, tree-shakable module without server inputs", () => {
+    const source = readFileSync(
+      join(ROOT, "src", "lib", "sync", "daily-quests.ts"),
+      "utf8",
+    );
+
+    expect(source.startsWith('"use client";')).toBe(true);
+    expect(source).toContain(
+      'import type { SupabaseClient } from "@supabase/supabase-js";',
+    );
+    expect(source).not.toMatch(/process\.env|service_role|supabase\/migrations/);
+  });
+
+  it("pins the RLS inventory and checked-in service-worker release contract", () => {
+    const report = readFileSync(
+      join(ROOT, "supabase", "evidence", "rls_policy_report.sql"),
+      "utf8",
+    );
+    const observability = JSON.parse(
+      readFileSync(join(ROOT, "config", "observability.json"), "utf8"),
+    ) as { serviceWorkerVersion: string };
+    const expectedTables = report.match(/    \('[a-z_]+', '[^']+'\)/g) ?? [];
+    const worker = readFileSync(join(ROOT, "public", "sw.js"), "utf8");
+
+    expect(expectedTables).toHaveLength(28);
+    expect(report).toContain("('user_daily_quest_days', 'user-owned')");
+    expect(worker).toContain(
+      `const CACHE_VERSION = "${observability.serviceWorkerVersion}";`,
+    );
+  });
+});

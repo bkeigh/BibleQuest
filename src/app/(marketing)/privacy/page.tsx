@@ -3,8 +3,14 @@ import {
   Prose,
   ProseHeading,
 } from "@/components/marketing/MarketingPage";
+import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 
 export const metadata = { title: "Privacy Policy" };
+
+// Keep the storage promise aligned with the single containment release latch.
+const ACCOUNT_STORAGE_COPY = ACCOUNT_SYNC_CONTAINED
+  ? "Account sync is temporarily unavailable, so saved app data currently stays in this browser on this device."
+  : "If you sign in, saved app data also syncs to your BibleQuest account.";
 
 export default function PrivacyPage() {
   return (
@@ -17,8 +23,8 @@ export default function PrivacyPage() {
       <Prose>
         When you use BibleQuest without an account, your prayers, reflections,
         quests, bookmarks, and journey are stored in this browser on your device.
-        If you sign in, saved app data also syncs to your BibleQuest account. You
-        can export everything to a file, or clear it entirely, from Settings.
+        {" "}{ACCOUNT_STORAGE_COPY} You can export everything to a file, or clear
+        it entirely, from Settings.
       </Prose>
 
       <ProseHeading>What we never do</ProseHeading>

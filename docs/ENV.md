@@ -6,6 +6,7 @@ template in [`../.env.example`](../.env.example).
 | Variable | Required? | Purpose |
 | --- | --- | --- |
 | `NEXT_PUBLIC_APP_URL` | Recommended | Canonical URL for metadata / OG. |
+| `BIBLEQUEST_ROLLBACK_SHA` | Launch gate | **Server-only.** Exact approved 40-character rollback commit reported by health; never a branch, URL, or deployment ID. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Optional | Enables account sync. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Optional | Publishable client key (safe in browser). |
 | `NEXT_PUBLIC_ANALYTICS_ENABLED` | Optional | Must be exactly `true`; otherwise analytics is a silent no-op. |
@@ -27,6 +28,9 @@ template in [`../.env.example`](../.env.example).
   secure credential mechanism; it must never use a `NEXT_PUBLIC_*` name. See
   [`../SECURITY.md`](../SECURITY.md).
 - Never commit real values. Only `.env.example` (placeholders) is committed.
+- `BIBLEQUEST_ROLLBACK_SHA` is evidence, not an automatic rollback control. Set
+  it only after the rollback authority approves the target; changing it does not
+  move traffic or undo database changes.
 - Supabase Auth email is provider-side configuration. Follow
   [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md); do not add a
   `RESEND_API_KEY` to Vercel or `.env.local` for SMTP. Lifecycle email, external

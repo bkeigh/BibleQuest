@@ -14,6 +14,7 @@ import { GrowthTree } from "@/components/journey/GrowthTree";
 import { calculateTreeState } from "@/lib/questos/growth-engine";
 import { getDailyVerse } from "@/lib/questos/verse-engine";
 import { questBySlug, seedQuests } from "@/data/seed/quests";
+import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 
 /* "Today's Verse" is date-derived — re-render hourly so it doesn't freeze at deploy. */
 export const revalidate = 3600;
@@ -44,7 +45,9 @@ const FAQ = [
   },
   {
     q: "Will my prayers be private?",
-    a: "Yes—private by default. Signed-out entries stay in your browser; signed-in entries sync to your protected BibleQuest account. We never sell personal data, and analytics never include prayer or journal text.",
+    a: ACCOUNT_SYNC_CONTAINED
+      ? "Yes—private by default. Entries stay in your browser on this device while account sync is temporarily unavailable. We never sell personal data, and analytics never include prayer or journal text."
+      : "Yes—private by default. Signed-out entries stay in your browser; signed-in entries sync to your protected BibleQuest account. We never sell personal data, and analytics never include prayer or journal text.",
   },
 ];
 

@@ -4,6 +4,10 @@ BibleQuest uses one analytics transport: a direct `POST` to the configured
 Plausible Events API. There is no Plausible page script and no
 `window.plausible` dispatch path.
 
+Operational auth/sync/service-worker evidence is a separate, non-marketing
+contract documented in [`OBSERVABILITY.md`](OBSERVABILITY.md). It is not sent to
+Plausible and never carries analytics properties, content, identity, or routes.
+
 Collection is off by default. An event is accepted only when all three
 conditions are true:
 

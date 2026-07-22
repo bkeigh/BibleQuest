@@ -11,12 +11,16 @@ pnpm test                # all Vitest risk tests; noninteractive and exits
 pnpm test:headers        # representative live-billing build + next start/dev header tests
 pnpm test:headers:built  # rerun after that representative production build
 pnpm test:service-worker # cache policy, lifecycle, and offline fallback
+pnpm test:observability  # privacy allowlist, redaction, queue, and thresholds
+pnpm test:launch-evidence # one-command sanitized evidence fixture
 pnpm test:watch          # Vitest watch mode for local development
 pnpm lint                # ESLint — 0 errors
 pnpm exec tsc --noEmit   # strict TypeScript — 0 errors
 pnpm build               # production build succeeds
 pnpm audit --prod        # production dependency audit
 git diff --check         # no whitespace errors
+supabase test db --local supabase/tests/0014_journey_event_identity.sql
+supabase test db --local supabase/tests/0015_daily_quest_cas.sql
 ```
 
 The automated suite targets launch-critical behavior rather than UI snapshots:
@@ -28,10 +32,16 @@ The automated suite targets launch-critical behavior rather than UI snapshots:
 - Clear/restore intent and per-record tombstones prevent account data from
   reappearing after deletion.
 - Sync refuses cross-account handoff, permits same-account restart, invalidates
-  stale runs, and applies tombstones before merging remote rows.
+  stale runs, and applies tombstones before merging remote rows. Daily-quest
+  tests cover simultaneous devices, stale revisions, duplicate requests,
+  atomic rollback, unpick, completed-state preservation, and cached clients.
 - Analytics uses one transport; default-denies incomplete configuration and
   consent; validates closed event/prop shapes; normalizes URLs; honors DNT/GPC;
   bounds and sanitizes offline retries; and stops safely on mid-flush opt-out.
+- Operational observability reconstructs enum-only auth/sync/worker signals,
+  deterministically rejects private fields, safely queues offline categories,
+  aggregates Vercel-shaped rows without identifiers/URLs, and applies the
+  checked-in launch thresholds.
 - RevenueCat tests cover entitlement mapping, deny-by-default activation,
   current-offering/paywall readiness, cancellation/failure containment,
   anonymous persistence, guest → account identification, sign-out isolation,
@@ -64,6 +74,31 @@ the evidence.
 | PWA | Install from the release candidate, launch standalone, inspect `/sw.js` headers and Cache Storage, then repeat the documented online/offline/reconnect flow. | Install/launch works; only the documented self-hosted shell/build assets are cached; forbidden/private routes are absent; worker update and streaming navigation remain functional. | Repository owner |
 | RevenueCat sandbox paywall | Use the Test Store public key and a published sandbox paywall; open Plus, exercise paywall/package fallback, close/reopen, and complete a simulated purchase. | Offerings, branding image/font/media, entitlement refresh, and management action work without CSP errors; no Stripe request occurs for Test Store. | Billing owner |
 | Stripe 3DS | Use RevenueCat Web Billing in Stripe test mode with an official 3DS challenge test payment method; complete and cancel separate challenges while watching frames and requests. | Stripe.js loads from its allowed JS origin, API calls use `api.stripe.com`, 3DS renders through allowed Stripe/hooks frames, success updates entitlement, cancel returns safely, and no CSP source was broadened ad hoc. | Billing owner |
+
+## Manual — transactional daily-quest sync
+
+Run on staging first with two disposable accounts and two physical or isolated
+browser/PWA clients. Use obviously fake quest state only. Record UTC time,
+browser/device, deployed SHA, service-worker version, sanitized provider/event
+status, and pass/fail; never record email, cookie, token, raw user/record ID, or
+private content. Fully close and reopen each cached PWA where specified.
+
+| Scenario | Action | Pass criteria |
+| --- | --- | --- |
+| Simultaneous devices | Sign in as A on devices 1 and 2 from the same restored state; while one is offline, pick different unfinished quests on each, then reconnect both. | One device may briefly show the bounded conflict copy; the retry reaches the union once, sync returns idle, and neither completed nor unfinished pick is lost. |
+| Stale revision | Keep device 2 open on an older state, change the day on device 1, then change it on device 2. | Device 2 cannot overwrite the newer canonical day blindly; it adopts/merges the canonical response and retries without an error loop. |
+| Duplicate request | Interrupt the response after submitting a pick, then reconnect without making another local edit. | Exactly one canonical assignment remains and the revision advances once; offline retry completes without a duplicate. |
+| Partial failure / rollback | Use the staging-only failure fixture or database pgTAP test to fail insertion after deletion. | The preexisting day and revision are unchanged; no transient empty day becomes canonical. |
+| Deletion / unpick | Unpick an unfinished quest on device 1, sync, then close/reopen device 2. | The unfinished pick stays removed; no later pull resurrects it. |
+| Completed preservation | Complete a quest on device 1 while device 2 holds an older unfinished or empty day, then reconnect device 2. | Completion, completion timestamp, and visible completed state survive every merge and retry. |
+| Cached old client | Load the previous compatible bundle on device 1 before `0015`, close it, deploy `0015`, reopen it and write; then fully reopen the current bundle on device 2. | The cached bundle retains owner-only direct sync; the current bundle sees the legacy revision change and converges. No missing-RPC fallback occurs for a policy/permission error. |
+| Account isolation | Repeat assignment and revision SELECT/INSERT/UPDATE/DELETE attempts A→B and B→A using normal sessions only. | Every cross-owner read is empty and every cross-owner write is denied or affects zero rows; anonymous mutation RPC execution fails. |
+| Public CAS posture | Call `daily_quest_sync_contract` with the anonymous key and no user session. | HTTP succeeds with exactly `contract: "biblequest_daily_quest_sync_v1"` and `ok: true`; the response has no rows, identifiers, policy text, or diagnostics. |
+| Clear My Data | Purge A after creating an empty-day revision; restore B on the other device. | A’s assignment and revision rows are gone, B is unchanged, and neither account’s data resurrects. |
+
+Any isolation, resurrection, completion loss, silent overwrite, unbounded retry,
+or rollback failure keeps account rollout on hold. Delivery-provider evidence
+remains separate from signed journey-restore and CAS evidence.
 
 ## Manual — core daily loop
 
@@ -201,10 +236,11 @@ time BibleQuest opens.
 - [ ] Run a production build, open the app, and in DevTools → Application →
       Service Workers confirm `/sw.js` controls the page at scope `/`.
 - [ ] In Application → Cache Storage, confirm only the current
-      `biblequest-v4-shell` and `biblequest-v4-runtime` caches are BibleQuest
+      `biblequest-v15-shell` and `biblequest-v15-runtime` caches are BibleQuest
       owned; unrelated-origin cache names are not touched by activation.
-- [ ] Inspect every shell entry: only `/offline`, `/app`, `/onboarding`, and
-      `/manifest.webmanifest` may be present.
+- [ ] Inspect every shell entry: only `/offline`, `/app`, `/onboarding`,
+      `/manifest.webmanifest`, and the exact `/pixel/` catalogue from `sw.js`
+      may be present.
 - [ ] Inspect runtime entries: navigation keys must exactly match the allowlist
       above and contain no query string; asset keys must begin
       `/_next/static/` and contain no query string.
@@ -218,7 +254,7 @@ time BibleQuest opens.
       its exact cached page, an unvisited/forbidden navigation falls back to
       `/offline`, and an online 4xx/5xx remains visible instead of being replaced
       by cached content.
-- [ ] Seed old `biblequest-v3-shell` / `biblequest-v3-runtime` cache names and a
+- [ ] Seed old `biblequest-v13-shell` / `biblequest-v13-runtime` cache names and a
       clearly unrelated cache, activate the new worker, and confirm only the
       old `biblequest-*` caches are removed.
 
@@ -261,8 +297,8 @@ time BibleQuest opens.
 ## Known launch postures
 
 - Guest data is device-local. Account sync is implemented, but production must
-  pass migrations through `0011`, content reconciliation, custom auth-email,
-  and both-direction two-user checks in
+  pass migrations through `0015`, daily-quest CAS/cached-client evidence,
+  content reconciliation, custom auth-email, and both-direction two-user checks in
   [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md) before the beta gate opens.
 - Notification delivery and external AI generation are not implemented. Plus
   stays coming-soon unless its complete provider and release gates pass.

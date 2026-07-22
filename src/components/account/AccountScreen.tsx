@@ -14,6 +14,7 @@ import { useToast } from "@/components/design-system/Toast";
 import { IconCheck } from "@/components/design-system/icons";
 import { SignInMethods } from "./SignInMethods";
 import { track } from "@/lib/analytics/events";
+import { reportClientSignal } from "@/lib/observability/client-signals";
 import {
   authFailureMessage,
   parseAuthFailureReason,
@@ -39,6 +40,12 @@ function AccountInner() {
   // Clean the error out of the URL so a refresh doesn't re-show it.
   useEffect(() => {
     if (!callbackFailure) return;
+    reportClientSignal({
+      surface: "auth",
+      stage: "callback",
+      outcome: "failure",
+      category: callbackFailure,
+    });
     const params = new URLSearchParams(window.location.search);
     params.delete("error");
     const qs = params.toString();
@@ -100,7 +107,9 @@ function AccountInner() {
             {sync.state === "syncing"
               ? "Syncing…"
               : sync.state === "error"
-                ? "Sync will retry soon. Everything is safe on this device."
+                ? sync.issue === "daily-quest-conflict"
+                  ? "Today’s quests changed on another device. Completed progress is safe; sync will retry shortly."
+                  : "Sync will retry soon. Everything is safe on this device."
                 : sync.lastSyncedAt
                   ? "Synced across your devices."
                   : "Sync starts shortly."}

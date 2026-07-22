@@ -4,7 +4,9 @@ This is the execution record for the BibleQuest production launch targeted for
 **July 31, 2026**. It coordinates the detailed procedures in
 [`DEPLOYMENT.md`](DEPLOYMENT.md), [`QA.md`](QA.md),
 [`REVENUECAT.md`](REVENUECAT.md), and
-[`SUPABASE_SECURITY_ROLLOUT.md`](SUPABASE_SECURITY_ROLLOUT.md). Account sync,
+[`SUPABASE_SECURITY_ROLLOUT.md`](SUPABASE_SECURITY_ROLLOUT.md). Privacy-safe
+health, browser signals, thresholds, and synthetic routing use
+[`OBSERVABILITY.md`](OBSERVABILITY.md). Account sync,
 custom SMTP, auth templates, and content reconciliation are executed through
 [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md).
 
@@ -27,7 +29,7 @@ pushed, reviewed, and identical to the commit shown by the Vercel deployment.
 | Immutable release commit | `[FULL 40-CHAR SHA]` | CI run and signed release record: `[EVIDENCE URL]` | OPEN |
 | Build artifact / preview URL | `[IMMUTABLE VERCEL DEPLOYMENT URL]` | Vercel inspection showing the release SHA: `[EVIDENCE URL]` | OPEN |
 | Production URL after promotion | Canonical `https://www.biblequest.co`; apex redirects to `www` | DNS/TLS, redirect, metadata, Supabase Site URL/callback, and Vercel `NEXT_PUBLIC_APP_URL`: `[EVIDENCE URL]` | OPEN |
-| Database migration set | `0001` through `0011`, in filename order; record SHA-256 manifest at freeze | Local, staging, and production migration lists: `[EVIDENCE URLS]` | OPEN |
+| Database migration set | Exact `0001`–`0012`, immutable `0014`, and reviewed `0015`; `0013` must remain absent; record and verify the checked-in SHA-256 manifest at freeze | Local, staging, and production migration lists: `[EVIDENCE URLS]` | OPEN |
 | Production backup | `[UTC TIMESTAMP]`; method `[DAILY BACKUP / PITR / OTHER]`; restore point `[ID WITHOUT CREDENTIALS]` | Provider backup record: `[RESTRICTED EVIDENCE URL]` | OPEN |
 | Previous known-good deployment | `[IMMUTABLE VERCEL DEPLOYMENT URL]`, commit `[SHA]` | Rollback rehearsal and PWA/privacy checks: `[EVIDENCE URL]` | OPEN |
 | Database compatibility decision | `[BACKWARD COMPATIBLE / APP FIRST / DB FIRST / ROLLBACK RESTRICTED]` | Signed decision: `[EVIDENCE URL]` | OPEN |
@@ -55,27 +57,36 @@ Expected filenames, in order:
 0009_analytics_consent_opt_in.sql
 0010_rolling_quest_windows_and_recent_verses.sql
 0011_bible_translation_preference.sql
+0012_kjv_bible_translation_default.sql
+0014_journey_event_identity.sql
+0015_transactional_daily_quest_sync.sql
+```
+
+The immutable `0014_journey_event_identity.sql` SHA-256 must remain:
+
+```text
+9497b745c5efc0c3f6c4c82e43e57c4fd9b34e8cfae12e6193226d564da50789
 ```
 
 **Hard stop:** do not launch from a dirty tree, a moving branch reference, an
 unreviewed preview, or a deployment whose Git SHA does not exactly match the
 frozen release commit.
 
-### Preparation snapshot — July 19, 2026 (not launch sign-off)
+### Preparation snapshot — July 22, 2026 (not launch sign-off)
 
 These current-run results validate the working tree only. They are not evidence
 for the eventual frozen commit and must be rerun at release freeze.
 
 | Check | Current-run result |
 | --- | --- |
-| Active source | Remediation is in progress on `main`; the working tree is not frozen and is **not releasable** |
-| Source verification | MUST RERUN against the frozen commit using section 5; prior counts and page totals are not launch evidence |
-| Production health | PASS — `https://www.biblequest.co/api/health` returned the expected health payload |
-| Production account-sync contract | FAIL — the `0010` rolling/recent-verse shape and `0011` Bible-preference/bookmark shape are missing |
+| Active source | Remediation is integrated on `codex/launch-hardening`; the working tree is not yet committed, reviewed, or frozen and is **not releasable** |
+| Source verification | PASS FOR THIS UNCOMMITTED WORKTREE — frozen install, lint, TypeScript, 317 Vitest tests, deterministic seed parity, launch-evidence fixture, production build, security-header integration, service-worker tests, production dependency audit, and whitespace checks pass; MUST RERUN against the frozen commit |
+| Production health | FAIL CONTRACT — `https://www.biblequest.co/api/health` is reachable but still returns the retired minimal payload rather than `biblequest_observability_v1` |
+| Production account-sync contract | FAIL — the `0010`, `0011`, `0014`, and `0015` schema plus `biblequest_daily_quest_sync_v1` posture RPC are missing |
 | Production content mirror | FAIL — 84/150 approved free quests with 84 content mismatches/blank Scripture snapshots, 60/180 active daily passages, and 22/38 milestones with 22 content mismatches; both prompt catalogues exactly match at 32 |
 | Production auth providers | PARTIAL — Email and Google providers are enabled and Phone is disabled; deployed controls, custom SMTP delivery, and template/cross-browser behavior require manual proof |
-| Canonical host | FAIL — apex redirects to `www`, while deployed Open Graph metadata still identifies apex; reconcile Vercel metadata and Supabase Auth to `www` |
-| Local Supabase | PASS FOR THIS WORKTREE — local migration history reaches `0011`, schema lint is clean, the 27-table RLS report passes, and content counts are 150/180/38/32/32; rerun at release freeze |
+| Canonical host | PASS FOR CURRENT DEPLOYMENT — apex redirect, canonical link, and Open Graph URL identify `https://www.biblequest.co`; rerun against the immutable candidate |
+| Local Supabase | PASS FOR THIS WORKTREE — local migration history reaches `0015` with immutable `0014` retained and `0013` absent, 15 Journey identity and 59 CAS/contract database tests pass, public-schema lint is clean, the 28-table RLS report passes, and content counts are 150/180/38/32/32; rerun at release freeze |
 | Staging, device, legal, monitoring, backup/restore, rollback | NOT RUN — requires named humans and provider/device evidence; no deployment was performed |
 
 ## 2. Roles and authority
@@ -121,17 +132,18 @@ user experience matches the documented posture.
 
 | Gate | Pass evidence required | Owner | No-go / recovery action | Status |
 | --- | --- | --- | --- | --- |
-| Migration history | Clean local reset; `0001`-`0011` manifest; staging and production `migration list` captured; production migration-only dry run proposes only the reviewed pending set and ends at `0011` | Database owner | Stop on any mismatch or replay of renamed `0002`-`0006`; follow the forward-only reconciliation procedure; never use `--include-all` or repair as a shortcut | OPEN |
-| RLS | Catalog report shows all 27 expected public tables with RLS enabled, only documented policies, correct roles, and hardened `purge_user_data` grants/search path | Database owner | Stop application rollout; correct with a new higher-numbered migration and repeat all DB gates | OPEN |
+| Migration history | Clean local reset; the checked-in 14-file manifest ends at `0015`, `0013` is absent, and immutable `0014` matches its pinned SHA; staging and production `migration list` captured; production migration-only dry run proposes only the reviewed pending set and ends at `0015` | Database owner | Stop on any filename/hash/history mismatch or replay of renamed `0002`-`0006`; follow the forward-only reconciliation procedure; never use `--include-all` or repair as a shortcut | OPEN |
+| RLS | Catalog report shows all 28 expected public tables with RLS enabled, only documented policies, correct roles, hardened `purge_user_data`, and authenticated-only daily-quest CAS grants/search paths | Database owner | Stop application rollout; correct with a new higher-numbered migration and repeat all DB gates | OPEN |
+| Daily-quest CAS | All 59 local CAS/contract DB tests and deterministic client tests pass; the public posture RPC returns only the fixed contract identity plus `ok: true`; staging proves simultaneous devices, stale revisions, duplicate retry, rollback, unpick, completion durability, bounded conflict UX, and old cached-client compatibility | Database + QA owners | Keep account rollout on hold for any overwrite, resurrection, completion loss, retry loop, RLS, contract, or cached-client failure | OPEN |
 | Content mirror | After schema/RLS passes: regenerated seed/manifest have clean diffs and approved digests; seed dry run reports no pending migrations; production readiness proves exact natural-key/content hashes for 150 quests, 180 passages, 38 milestones, and 32/32 prompts | Database + content owners | Keep sync beta-gated; inspect mismatch totals and frozen artifacts; never reset production or paste ad hoc SQL from chat | OPEN |
 | Auth email and callback | Custom SMTP DNS/provider verification passes; Supabase Site URL and exact callback use canonical `www`; new and existing users complete real Gmail/iCloud links cross-browser | Deploy + QA owners | Stop invitations; correct provider/template/canonical configuration and retest without exposing single-use tokens | OPEN |
 | Cross-account isolation | Staging accounts A and B pass both-direction CRUD negative tests; sentinel prayer/reflection text never crosses accounts or appears in logs/evidence | Database + QA owners | Disable production auth/sync or stop launch; remove fixtures after evidence is accepted | OPEN |
 | Backup restore | Fresh production backup/PITR posture recorded; a representative backup has been restored and integrity-checked in an isolated non-production project | Database owner | No production DB change. Escalate provider issue; reschedule. Never test restore over production | OPEN |
-| Privacy telemetry | Consent off and Do Not Track produce no events; allowed events contain only whitelisted non-text props and query/hash-free URLs; no prayer/reflection/note text in analytics, browser console, network payloads, or error tooling | QA + monitoring owners | Disable analytics/error integration or stop launch; scrub queued/test data and retest | OPEN |
+| Privacy telemetry | Consent off and Do Not Track produce no Plausible events; operational auth/sync/worker events contain only the reviewed enum schema; no prayer/reflection/Scripture/note text, names, email, tokens, cookies, IDs, query strings, or arbitrary URLs appear in analytics, runtime logs, queues, network payloads, or evidence | QA + monitoring owners | Disable the affected integration or stop launch; restrict unsafe evidence, correct the allowlist, and rerun deterministic redaction tests | OPEN |
 | Device / PWA QA | Physical iPhone install/standalone/offline/reconnect/update passes; desktop cache inspection matches [`QA.md`](QA.md); mobile and desktop smoke tests pass | QA owner | Stop launch or use an explicitly approved web-only posture that prevents install promotion until fixed | OPEN |
 | Billing posture | Exactly one posture below is selected and verified; prices/copy/entitlement/manage flow match; no test key in production | Deploy + QA owners | Set coming-soon posture and redeploy, or stop launch. Never accept real charges through an unverified flow | OPEN |
 | Legal approval | Named approver accepts Privacy, Terms, WEB/public-domain posture, sensitive content, supporter claims, refund/cancellation copy, and the 5% giving pledge or removes the claim | Communications owner | Stop launch or remove unapproved claims/features and repeat QA | OPEN |
-| Monitoring | External health check, Vercel error/log view, auth/sync signals, billing dashboard if live, and staffed support inbox/channel are tested; alert routing reaches the named owner | Monitoring owner | Stop launch until signals and human response path work | OPEN |
+| Monitoring | [`OBSERVABILITY.md`](OBSERVABILITY.md) health/evidence contract, Vercel error/log view, synthetic auth/sync/worker signals, selected billing posture, and staffed support path are tested; existing alert routing reaches the named owner | Monitoring owner | Stop launch until sanitized signals and the human response path work; do not change recipients without approval | OPEN |
 | Rollback rehearsal | Eligible previous known-good deployment is recorded; Vercel rollback is rehearsed in non-production or approved dry rehearsal; DB compatibility and service-worker behavior are verified | Deploy + database + QA owners | Establish a new rollback-safe baseline or stop launch; do not assume the previous deployment is safe | OPEN |
 
 ### Billing gate choices
@@ -173,11 +185,13 @@ command, timestamp, exit code, and summary against the frozen SHA. Do not upload
 | `pnpm test` | Exit 0; all Vitest files/tests pass |
 | `pnpm test:headers` | Exit 0; production build plus live production/development response-header integration tests pass |
 | `pnpm test:service-worker` | Exit 0; all cache-policy, fetch, and lifecycle tests pass |
+| `pnpm test:observability` | Exit 0; allowlist, redaction, bounded queue, aggregation, worker-version, and threshold tests pass |
+| `pnpm test:launch-evidence` | Exit 0; the one-command evidence fixture reports only the intentional guest-only `REVIEW` warning and emits no raw logs |
 | `pnpm build` | Exit 0; Next.js production build completes |
 | `pnpm audit --prod` | Full production advisory report is reviewed and linked; every advisory has a disposition |
 | `pnpm audit --prod --audit-level high` | Exit 0; no high or critical production advisory |
 | `git diff --check` | Exit 0; no whitespace errors |
-| `pnpm check:production-readiness` | After the approved production push: all public schema, content, health, metadata, and auth-provider checks pass; deployed controls and other manual gates remain separate |
+| `pnpm check:production-readiness` | After the approved production push: all public schema through `0015`, including the bounded CAS RPC/trigger/RLS/grant contract, plus content, health, metadata, and auth-provider checks pass; deployed controls and other manual gates remain separate |
 
 The repository currently has no Markdown or link-check script in `package.json`.
 If one is added before freeze, it becomes required and its exact command and
@@ -193,21 +207,29 @@ target only the local stack; do not add `--linked` or `--db-url`:
 supabase start
 supabase db reset
 supabase migration list --local
+supabase test db --local supabase/tests/0014_journey_event_identity.sql
+supabase test db --local supabase/tests/0015_daily_quest_cas.sql
 docker exec -i supabase_db_BibleQuest \
   psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
   < supabase/evidence/rls_policy_report.sql
 ```
 
-Pass means all eleven migrations apply in the documented order, analytics
+Pass means all fourteen checked-in migrations apply in the documented order,
+with `0013` absent and immutable `0014` matching its pinned SHA. Analytics
 consent defaults to and is reset to explicit opt-in (`false`) by `0009`, the
 rolling/recent-verse schema from `0010` exists, the Bible preference and
-translation-aware bookmark schema from `0011` exists, and the report meets the
-27-table RLS gate. Supabase CLI and a Docker-compatible daemon are required.
+translation-aware bookmark schema from `0011` exists, the new-settings KJV
+default from `0012` exists, the Journey identity contract from `0014` exists,
+the daily-quest CAS/legacy compatibility contract from `0015` passes, its
+content-free public posture RPC reports the fixed contract identity and
+`ok: true`, and the
+report meets the 28-table RLS gate. Supabase CLI and
+a Docker-compatible daemon are required.
 
 For a linked project, retain every history/RLS safeguard in the security
 runbook and follow the seed/auth/content sequence in
 [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md). The reviewed dry run must
-match the frozen manifest and end at `0011`; a column probe alone is not
+match the frozen manifest and end at `0015`; a column probe alone is not
 migration-history evidence.
 
 ### Immutable deployment checks
@@ -221,16 +243,27 @@ curl --fail --silent --show-error --head \
   https://<IMMUTABLE-DEPLOYMENT-URL>/sw.js
 ```
 
-The health body must be exactly compatible with
-`{"status":"ok","app":"biblequest"}`. The worker response must include
-`Cache-Control: no-cache, no-store, must-revalidate`. Browser verification is
-still required because `curl` does not exercise PWA, auth, sync, or billing.
+The health body must pass the bounded contract in
+[`OBSERVABILITY.md`](OBSERVABILITY.md): correct deployed and rollback SHA,
+canonical origin, auth posture, schema/content contract, worker version, and
+billing mode. The worker response must include `Cache-Control: no-cache,
+no-store, must-revalidate`. Browser verification is still required because
+`curl` does not exercise PWA, auth, sync, or billing.
 
 ## 6. Staging rehearsal matrix
 
 Run every row against the same immutable candidate deployment and the approved
 staging project. Use synthetic staging data only. Record browser/device/version,
 UTC time, named tester, and a sanitized evidence link.
+
+Run the sanitized collector against that exact preview, never the aggregate of
+all preview deployments:
+
+```bash
+BIBLEQUEST_READINESS_APP_URL=https://<IMMUTABLE-PREVIEW-HOST> \
+BIBLEQUEST_VERCEL_DEPLOYMENT=<IMMUTABLE-DEPLOYMENT-ID-OR-HOST> \
+pnpm evidence:launch --phase=preflight --environment=preview
+```
 
 | Scenario | Actions and pass criteria | Evidence | Owner | Status |
 | --- | --- | --- | --- | --- |
@@ -291,12 +324,14 @@ restores.
    exact migration-only push, then saves the after-list and RLS report and runs
    limited isolation/sync schema checks.
    - Checkpoint: migration/RLS/isolation evidence remains PASS and the linked
-     migration list has no pending version through `0011`.
+     migration list has no pending version through `0015`.
    - Abort: any command error, unexpected row effect, RLS failure, privacy,
      auth, or sync regression. `0009` deliberately resets existing analytics
      consent to `false`; `0010` backfills/deduplicates data; `0011` changes
-     bookmark uniqueness. Capture failures and stop rather than attempting an
-     ad hoc reversal.
+     bookmark uniqueness; `0012` changes only the new-row edition default;
+     `0014` adds Journey source identity; and `0015` backfills daily-quest
+     revisions plus installs CAS/legacy triggers.
+     Capture failures and stop rather than attempting an ad hoc reversal.
 7. **Apply the approved content seed.** Regenerate the seed, require
    `git diff --exit-code -- supabase/seed.sql supabase/seed-manifest.json`,
    record
@@ -321,12 +356,25 @@ restores.
 
 Use aggregate counts and synthetic canaries. Do not paste user content, emails,
 tokens, request bodies, or sensitive screenshots into the incident record.
+The monitoring owner runs the same sanitized command for the required early
+checkpoints and attaches only its JSON output:
+
+```bash
+pnpm evidence:launch --phase=preflight
+pnpm evidence:launch --phase=t+0
+pnpm evidence:launch --phase=t+5
+pnpm evidence:launch --phase=t+15
+```
+
+Production is the command default. A live-billing release still returns `HOLD`
+unless the billing owner has attached every section 4 gate and the operator
+adds `--live-billing-verified` to that exact checkpoint invocation.
 
 | Time | Required observations | Owner | Evidence / result | Decision |
 | --- | --- | --- | --- | --- |
-| T+0 | Health returns expected JSON; production SHA/aliases correct; synthetic auth and sync smoke; no new 5xx/CSP errors; selected checkout posture correct; support channel open | Monitoring + QA | `[URL / SUMMARY]` | `[CONTINUE / ROLLBACK]` |
-| T+5 | Health and landing latency normal; auth callback success/error pattern sane; sync has no failure burst; Vercel errors stable; checkout success/decline or coming-soon state correct; no support reports | Monitoring | `[URL / SUMMARY]` | `[CONTINUE / ROLLBACK]` |
-| T+15 | Repeat health/auth/sync/error review; inspect privacy-safe analytics shape/consent; review RevenueCat/Stripe aggregate signals if live; triage support | Monitoring + QA | `[URL / SUMMARY]` | `[CONTINUE / ROLLBACK]` |
+| T+0 | Evidence command reports correct SHA/origin/schema/content/worker/billing/rollback; synthetic auth and sync smoke appears; no new 5xx/CSP errors; support path open | Monitoring + QA | `[URL / SUMMARY]` | `[CONTINUE / ROLLBACK]` |
+| T+5 | Evidence command remains below auth/sync thresholds; health and landing latency normal; Vercel errors stable; selected billing posture correct; support reviewed | Monitoring | `[URL / SUMMARY]` | `[CONTINUE / ROLLBACK]` |
+| T+15 | Repeat the evidence command and synthetic; inspect Plausible shape/consent separately if enabled; review RevenueCat/Stripe aggregate signals only if live; triage support | Monitoring + QA | `[URL / SUMMARY]` | `[CONTINUE / ROLLBACK]` |
 | T+30 | Repeat all signals; test returning session and one offline/reconnect canary; verify no stale-worker/private-cache report; summarize rates against prelaunch baseline | Monitoring + QA | `[URL / SUMMARY]` | `[CONTINUE / ROLLBACK]` |
 | T+60 | Repeat all signals; account for every support issue; record incident links; confirm production SHA, migration state, and rollback readiness; release commander requests final signatures | All owners | `[URL / SUMMARY]` | `[STABLE / INCIDENT]` |
 
@@ -341,6 +389,13 @@ Minimum signal set at every interval:
   management and aggregate provider signals remain healthy.
 - **Support:** staffed inbox/channel, number/severity of reports, no user content
   copied into the launch record.
+
+The exact thresholds, safe synthetic, existing-recipient alert test, owner
+placeholders, and incident-safe evidence handling are defined in
+[`OBSERVABILITY.md`](OBSERVABILITY.md). In summary: two health failures within
+two minutes page immediately; auth/sync warns at 3 failures and 10% after at
+least 5 attempts, becomes critical at 5 failures and 25%; any sync
+schema/permission failure or privacy/isolation issue is an immediate hard stop.
 
 ## 9. Rollback and recovery
 
@@ -416,6 +471,8 @@ re-enable it during the incident by accident.
 Migration `0008` is forward-only policy/function DDL. `0009` resets existing
 `analytics_consent` values and the default to `false`; `0010` backfills quest
 timestamps and deduplicates daily content; `0011` changes bookmark uniqueness;
+`0012` changes a new-row default; `0014` adds Journey source identity; `0015`
+adds daily-quest revisions/CAS and legacy tracking;
 and the reviewed seed upserts public content. An app rollback does not undo any
 of those row or schema changes. If verification fails, create a new
 higher-numbered reviewed corrective migration; never delete/edit an applied
@@ -499,17 +556,17 @@ or raw production logs.
 | E02 | CI/local verification | Commands, exit codes, test counts, build summary | Deploy owner | `[UTC / URL]` | OPEN |
 | E03 | Immutable preview | Vercel URL, inspected SHA, environment posture | Deploy owner | `[UTC / URL]` | OPEN |
 | E04 | Migration history | Local/staging/production lists and reviewed migration-only dry run | Database owner | `[UTC / URL]` | OPEN |
-| E05 | RLS catalog | Sanitized 27-table policy/function report | Database owner | `[UTC / URL]` | OPEN |
+| E05 | RLS catalog | Sanitized 28-table policy/function report plus daily-quest CAS grants/triggers | Database owner | `[UTC / URL]` | OPEN |
 | E06 | Isolation | A/B and anonymous negative-test summary; no sentinel values | Database + QA | `[UTC / URL]` | OPEN |
 | E07 | Backup/restore | Backup timestamp/method and isolated restore drill | Database owner | `[UTC / URL]` | OPEN |
-| E08 | Privacy telemetry | Consent/DNT/network/error-tool findings | QA + monitoring | `[UTC / URL]` | OPEN |
+| E08 | Privacy telemetry | Consent/DNT findings plus operational allowlist/redaction/queue evidence | QA + monitoring | `[UTC / URL]` | OPEN |
 | E09 | Device/PWA | iPhone and desktop cache/update matrix | QA owner | `[UTC / URL]` | OPEN |
 | E10 | Auth | Custom SMTP/DNS, Gmail/iCloud delivery, guest/Google/email/callback/sign-out results | Deploy + QA | `[UTC / URL]` | OPEN |
 | E11 | Billing posture | Coming-soon proof or live Web Billing matrix | Deploy + QA | `[UTC / URL]` | OPEN |
 | E12 | Accessibility | Keyboard/zoom/motion/contrast/screen-reader results | QA owner | `[UTC / URL]` | OPEN |
 | E13 | Winterhill | Both canonical embed origins and CSP results | QA owner | `[UTC / URL]` | OPEN |
 | E14 | Legal | Named approval of policies, content, licensing, and claims | Communications owner | `[UTC / URL]` | OPEN |
-| E15 | Monitoring/support | Health/error/auth/sync/billing/support alert tests | Monitoring owner | `[UTC / URL]` | OPEN |
+| E15 | Monitoring/support | Sanitized health/error/auth/sync/worker/billing evidence plus existing-recipient alert acknowledgement | Monitoring owner | `[UTC / URL]` | OPEN |
 | E16 | Rollback rehearsal | Target eligibility, compatibility, PWA transition, recovery | Deploy + database + QA | `[UTC / URL]` | OPEN |
 | E17 | Production deployment | Promotion time, domains, release SHA | Deploy owner | `[UTC / URL]` | OPEN |
 | E18 | First-hour watch | T+0/5/15/30/60 sanitized summaries | Monitoring owner | `[UTC / URL]` | OPEN |

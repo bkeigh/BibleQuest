@@ -18,6 +18,12 @@ vi.mock("@/lib/analytics/events", () => ({
   setAnalyticsConsent: vi.fn(),
 }));
 
+// Exercise the dormant sync implementation independently of containment.
+vi.mock("@/lib/sync/containment", () => ({
+  ACCOUNT_SYNC_CONTAINED: false,
+  accountSyncAvailable: (configured: boolean) => configured,
+}));
+
 import {
   filterByTombstones,
   isMissingBibleSyncColumn,
@@ -90,7 +96,19 @@ function fakeClient(
   };
   return {
     from,
-    rpc: async () => OK,
+    // Existing engine fixtures emulate a cached schema so assignment pushes
+    // exercise the rollout-compatible legacy path unless a test opts in.
+    rpc: async (name: string) =>
+      name === "replace_user_daily_quests"
+        ? {
+            data: null,
+            error: {
+              code: "PGRST202",
+              message:
+                "Could not find the function public.replace_user_daily_quests in the schema cache",
+            },
+          }
+        : OK,
   } as unknown as SupabaseClient;
 }
 

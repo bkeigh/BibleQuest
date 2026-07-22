@@ -10,12 +10,20 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { track } from "@/lib/analytics/events";
+import {
+  classifyOperationalError,
+  reportClientSignal,
+} from "@/lib/observability/client-signals";
 import { authCallbackPath } from "@/lib/auth/redirect";
 import {
   emailRequestFailure,
   oauthRequestFailure,
   type AuthRequestFailure,
 } from "@/lib/auth/errors";
+import {
+  ACCOUNT_SYNC_CONTAINED,
+  ACCOUNT_SYNC_CONTAINMENT_NOTICE,
+} from "@/lib/sync/containment";
 
 type EmailStatus = "idle" | "sending" | "requested";
 
@@ -90,6 +98,12 @@ export function SignInMethods({
         },
       });
       if (requestError) {
+        reportClientSignal({
+          surface: "auth",
+          stage: "request_email",
+          outcome: "failure",
+          category: classifyOperationalError(requestError, online()),
+        });
         showFailure(emailRequestFailure(requestError, online()));
         if (!resend) setEmailStatus("idle");
         return;
@@ -98,8 +112,20 @@ export function SignInMethods({
       setRequestedEmail(address);
       setEmailStatus("requested");
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
+      reportClientSignal({
+        surface: "auth",
+        stage: "request_email",
+        outcome: "success",
+        category: "ok",
+      });
       onEmailSent?.();
     } catch (requestError) {
+      reportClientSignal({
+        surface: "auth",
+        stage: "request_email",
+        outcome: "failure",
+        category: classifyOperationalError(requestError, online()),
+      });
       showFailure(emailRequestFailure(requestError, online()));
       if (!resend) setEmailStatus("idle");
     } finally {
@@ -117,14 +143,35 @@ export function SignInMethods({
         options: { redirectTo: callbackUrl() },
       });
       if (requestError) {
+        reportClientSignal({
+          surface: "auth",
+          stage: "request_oauth",
+          outcome: "failure",
+          category: classifyOperationalError(requestError, online()),
+        });
         setOauthPending(false);
         showFailure(oauthRequestFailure(requestError, online()));
       }
       // On success the browser navigates away; pending intentionally remains.
     } catch (requestError) {
+      reportClientSignal({
+        surface: "auth",
+        stage: "request_oauth",
+        outcome: "failure",
+        category: classifyOperationalError(requestError, online()),
+      });
       setOauthPending(false);
       showFailure(oauthRequestFailure(requestError, online()));
     }
+  }
+
+  // Defense in depth for any enrollment surface missed by a parent gate.
+  if (ACCOUNT_SYNC_CONTAINED) {
+    return (
+      <p role="status" className="text-small leading-relaxed text-ash">
+        {ACCOUNT_SYNC_CONTAINMENT_NOTICE}
+      </p>
+    );
   }
 
   if (emailStatus === "requested") {
