@@ -22,6 +22,7 @@ import { parseSnapshot } from "@/lib/questos/import-schema";
 import { createExportSnapshot } from "@/lib/questos/snapshot";
 import { clearAllDeviceLocalJournalDrafts } from "@/lib/questos/journal-drafts";
 import { clearLastSyncedUserId } from "@/lib/sync/last-user";
+import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 import { useSession } from "@/lib/supabase/useSession";
 import type { QuestOSSnapshot } from "@/lib/questos/types";
 import { useStrings, LANGUAGES, languageMeta, fmt } from "@/lib/i18n";
@@ -918,9 +919,17 @@ function SettingsInner() {
             href="/app/account"
             className="flex items-center justify-between px-4 py-3.5 text-charcoal hover:bg-linen"
           >
-            <span className="text-[0.9375rem]">Sync across devices</span>
+            <span className="text-[0.9375rem]">
+              {ACCOUNT_SYNC_CONTAINED ? "Account sync" : "Sync across devices"}
+            </span>
             <span className="flex items-center gap-1 text-[0.8125rem] text-ash">
-              {sessionLoading ? "Checking…" : user ? "Signed in" : "Set up sync"}
+              {ACCOUNT_SYNC_CONTAINED
+                ? "Temporarily unavailable"
+                : sessionLoading
+                  ? "Checking…"
+                  : user
+                    ? "Signed in"
+                    : "Set up sync"}
               <IconChevronRight size={15} />
             </span>
           </Link>

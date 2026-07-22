@@ -10,11 +10,15 @@ rollback procedure, execute [`LAUNCH_RUNBOOK.md`](LAUNCH_RUNBOOK.md).
 ## Deploy to Vercel
 
 1. Import the `bkeigh/BibleQuest` repository into Vercel.
-2. Framework preset: **Next.js** (auto-detected). Build command `pnpm build`,
-   install command `pnpm install`.
-3. Add environment variables (all optional for a guest-mode launch) — see
+2. Framework preset: **Next.js** (auto-detected). The checked-in Vercel config
+   fixes build command `pnpm build` and install command
+   `pnpm install --frozen-lockfile`.
+3. Add environment variables (application features remain optional for a
+   guest-mode launch) — see
    [`ENV.md`](ENV.md). Add
-   `NEXT_PUBLIC_APP_URL=https://www.biblequest.co`.
+   `NEXT_PUBLIC_APP_URL=https://www.biblequest.co`. Before production promotion,
+   the rollback authority must also approve the exact
+   `BIBLEQUEST_ROLLBACK_SHA`; this code change does not modify Vercel variables.
 4. Deploy.
 
 Database changes use a separate staged, approval-gated process. Follow
@@ -93,7 +97,12 @@ needed — just don't remove that config.
       repeat with the variable absent and confirm it fails closed.
 - [ ] Add to Home Screen on an iPhone; confirm it opens standalone.
 - [ ] Offline: load the app, go offline, confirm the offline fallback appears.
-- [ ] `/api/health` returns `{ "status": "ok" }`.
+- [ ] `/api/health` passes the bounded release contract in
+      [`OBSERVABILITY.md`](OBSERVABILITY.md), including deployed/rollback SHA,
+      canonical, auth, schema/content, worker, and billing posture.
+- [ ] Vercel Firewall applies a deployment-wide bound to
+      `/api/observability/client`; the in-process 60/minute and 300/15-minute
+      limits are defense in depth and never make public signals authenticated.
 - [ ] Privacy and Terms pages load.
 - [ ] Save deployed document and `/sw.js` header evidence; confirm HSTS/CSP are
       not changed by Vercel project-level header rules.
@@ -109,10 +118,17 @@ needed — just don't remove that config.
       the production dry run, and obtain explicit approval before the database
       push (if enabling sync).
 - [ ] Complete [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md): apply
-      migrations through `0011` with the reviewed seed, configure custom SMTP,
-      and pass the production readiness and two-user isolation checks.
+      migrations through `0015` (including the authoritative `0014` Journey
+      identity change) with the reviewed seed applied separately,
+      configure custom SMTP, and pass production readiness, daily-quest CAS,
+      cached-client, and two-user isolation checks.
+- [ ] Require the anonymous `daily_quest_sync_contract` readiness response to
+      contain exactly the fixed contract identity and `ok: true`; treat extra
+      keys, content, or `ok: false` as a sync launch blocker.
 - [ ] Configure privacy-first analytics if desired. Use Vercel logs and an
-      external uptime check until a privacy-reviewed error provider exists.
+      external uptime check through the content-free operational contract in
+      [`OBSERVABILITY.md`](OBSERVABILITY.md) until a separately privacy-reviewed
+      error provider exists.
 - [ ] Keep RevenueCat in `coming-soon` unless every sandbox-to-production gate
       in [`REVENUECAT.md`](REVENUECAT.md) has evidence and explicit approval.
 - [ ] Keep the Free Use Bible API catalogue constrained to the reviewed

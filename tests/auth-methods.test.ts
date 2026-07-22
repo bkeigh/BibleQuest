@@ -1,6 +1,13 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// Preserve coverage for the enrollment UI that returns after containment.
+vi.mock("@/lib/sync/containment", () => ({
+  ACCOUNT_SYNC_CONTAINED: false,
+  accountSyncAvailable: (configured: boolean) => configured,
+}));
+
 import { SignInMethods } from "@/components/account/SignInMethods";
 
 describe("production sign-in methods", () => {

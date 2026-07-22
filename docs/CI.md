@@ -14,7 +14,7 @@ guest mode with analytics, payments, and Supabase integrations disabled.
 | Check | Commands | Policy |
 | --- | --- | --- |
 | `Quality` | `pnpm lint`, `pnpm check:seed`, `git diff --check` over the event changes and working tree | Blocks lint, stale generated Console content, and whitespace errors. |
-| `Types and tests` | `pnpm exec tsc --noEmit`, `pnpm test` | Blocks type errors and test failures. Tests run noninteractively. |
+| `Types and tests` | `pnpm exec tsc --noEmit`, `pnpm test`, `pnpm test:launch-evidence` | Blocks type/test failures and verifies the sanitized evidence command plus alert thresholds with fixtures. Tests run noninteractively. |
 | `Production build` | `pnpm build` | Blocks a guest-mode production build failure; times out after 20 minutes. |
 | `Dependency risk` | `pnpm audit --prod`, then `pnpm audit --prod --audit-level high` | Reports every production advisory. High and critical advisories block CI; moderate advisories stay visible for triage without blocking. |
 
@@ -51,6 +51,18 @@ schema lint, and RLS evidence procedure in
 freeze. After an approved production reconciliation, run
 `pnpm check:production-readiness`; it is a read-only compatibility probe, not
 proof of migration history, SMTP delivery, or cross-account isolation.
+
+The repository does include deterministic local acceptance files for the
+immutable Journey identity and daily-quest CAS contracts:
+
+```bash
+supabase test db --local supabase/tests/0014_journey_event_identity.sql
+supabase test db --local supabase/tests/0015_daily_quest_cas.sql
+```
+
+The migration contract test also pins the checked-in SHA-256 manifest. A hash
+mismatch, a new `0013`, or a change to immutable `0014` is a hard failure even
+when a column-level compatibility probe succeeds.
 
 The production probe intentionally stays out of pull-request CI: CI receives no
 production credentials, a transient provider incident must not block unrelated

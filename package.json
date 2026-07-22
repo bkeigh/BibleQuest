@@ -13,11 +13,14 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:analytics": "vitest run tests/analytics.test.ts",
+    "test:observability": "vitest run tests/observability.test.ts tests/observability-evidence.test.mjs",
     "test:headers": "NEXT_PUBLIC_SUPABASE_URL=https://header-fixture.supabase.co NEXT_PUBLIC_REVENUECAT_BILLING_MODE=live NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY=rcb_headerfixture pnpm build && pnpm test:headers:built",
     "test:headers:built": "node --test tests/security-headers.integration.test.mjs",
     "test:service-worker": "vitest run tests/service-worker.test.ts",
     "check:seed": "node scripts/build-supabase-seed.mjs && git diff --exit-code -- supabase/seed.sql supabase/seed-manifest.json",
     "check:production-readiness": "node --env-file-if-exists=.env.local scripts/check-production-readiness.mjs",
+    "evidence:launch": "node --env-file-if-exists=.env.local scripts/collect-launch-evidence.mjs",
+    "test:launch-evidence": "pnpm evidence:launch --phase=preflight --fixture",
     "test:watch": "vitest"
   },
   "dependencies": {

@@ -4,7 +4,7 @@
  * validated build assets. Prayers, reflections, and other user data continue
  * to live in the persisted Zustand store; this worker never handles that data.
  */
-const CACHE_VERSION = "biblequest-v14";
+const CACHE_VERSION = "biblequest-v15";
 const CACHE_OWNER_PREFIX = "biblequest-";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
@@ -288,6 +288,21 @@ self.addEventListener("activate", (event) => {
       )
       .then(() => self.clients.claim())
   );
+});
+
+// Answers a fixed version challenge so a controlled page can prove which
+// worker is active without exposing its script URL or any client identifier.
+self.addEventListener("message", (event) => {
+  if (
+    event.data?.type === "BIBLEQUEST_SW_VERSION_REQUEST" &&
+    event.source &&
+    typeof event.source.postMessage === "function"
+  ) {
+    event.source.postMessage({
+      type: "BIBLEQUEST_SW_VERSION_RESPONSE",
+      version: CACHE_VERSION,
+    });
+  }
 });
 
 self.addEventListener("fetch", (event) => {
