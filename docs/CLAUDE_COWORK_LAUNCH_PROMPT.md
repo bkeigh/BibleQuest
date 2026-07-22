@@ -295,10 +295,18 @@ Perform read-only inspection first, then request approval for any change.
    report the deployment SHA.
 6. Inspect Production branch/domain auto-assignment and deployment checks. The
    merge to `main` must not move production traffic automatically. If it would,
-   stop and ask approval to establish Vercel's staged-production flow before
-   merge—for example, the approved dashboard control or a production deployment
-   created with `vercel --prod --skip-domain`. Record the setting's owner and
-   restoration decision; do not change it without explicit approval.
+   stop and ask approval to disable only Vercel's `Auto-assign Custom Production
+   Domains` before merge. Current evidence says Production tracks `main` and
+   this control is enabled. Do not pause the project or change branch tracking.
+   Record the setting's owner and restoration decision; do not change it without
+   explicit approval. After the control is disabled, prove every current
+   production domain still resolves to deployment
+   `dpl_9jo9xSMx3K2hYVYNLkwVV6gKVL8c` before merging. Treat the automatic
+   domainless `main` Production deployment as the staged candidate only if its
+   exact SHA and masked Production environment pass. Otherwise create a separate
+   candidate with `vercel --prod --skip-domain`. Promote later with
+   `vercel promote <DEPLOYMENT-ID-OR-URL>` only after the distinct promotion
+   approval. Never run bare `vercel --prod` in this workflow.
 7. Identify a previous deployment that is actually eligible as a rollback
    target. Verify its database compatibility, private-route cache protection,
    and worker behavior before proposing it.
@@ -313,6 +321,15 @@ Perform read-only inspection first, then request approval for any change.
 ### Phase 3 — staging Supabase rehearsal
 
 Use only the confirmed staging project and synthetic staging data.
+
+Current evidence says Vercel Preview has no project environment variables and
+no hosted staging Supabase identity has been proven. A deployed Vercel Preview
+cannot use the local Supabase stack. Before this phase, search for an existing
+hosted non-production project. If none exists, present an exact creation packet
+for a separate project (name, organization, region, owner, retention/deletion
+date, and current price). Supabase currently advertises additional Pro projects
+from `$10/month`; refresh that price and obtain explicit approval before
+creating one. Do not use the Production project or its URL/key pair as staging.
 
 1. Reconfirm that every Preview/build used in this phase is bound to the
    confirmed staging Supabase URL and paired publishable key. Compare provider

@@ -119,7 +119,10 @@ approve that exact action; the preparation work above is not blanket approval.
 1. **Staging isolation:** identify or create the approved non-production
    Supabase project/branch, then configure only Preview/staging with its masked
    public URL/key pair. Prove it is distinct from Production before any staging
-   database rehearsal. Never copy the Production pair into Preview.
+   database rehearsal. Never copy the Production pair into Preview. A deployed
+   Vercel Preview cannot use the local Supabase stack; if no existing hosted
+   staging project exists, present the current incremental cost before creating
+   one. Supabase currently advertises additional Pro projects from `$10/month`.
 2. **Recoverability:** the database owner and rollback authority select and
    approve a production backup method, create a fresh recoverable point, and
    complete the isolated restore drill. Enabling a paid plan/add-on requires
@@ -129,7 +132,13 @@ approve that exact action; the preparation work above is not blanket approval.
    disabling Vercel's `Auto-assign Custom Production Domains`, verifies the
    existing production domains remain on deployment
    `dpl_9jo9xSMx3K2hYVYNLkwVV6gKVL8c`, and only then allows PR #15 to merge.
-   Branch tracking may still build `main`; it must not move production traffic.
+   Do not pause the project or change `main` branch tracking. Branch tracking
+   may still build `main`; it must not move production traffic. Treat the
+   resulting domainless Production-environment deployment as the staged
+   candidate only if its SHA and masked Production environment pass; otherwise
+   create one with `vercel --prod --skip-domain`. Promotion is a later, separate
+   approval using the exact deployment ID. See Vercel's official
+   [staged deployment workflow](https://vercel.com/docs/cli/deploying-from-cli).
 4. **Freeze and rehearse:** after the first three items pass, freeze clean
    `main`, rerun every source check, create the distinct staging and staged
    Production-environment deployments from the same SHA, and execute sections
@@ -162,6 +171,13 @@ choices:
   backup recovery window for the contained guest-only launch. Enabling it
   requires a separate price-and-duration approval. See the official
   [PITR usage guide](https://supabase.com/docs/guides/platform/manage-your-usage/point-in-time-recovery).
+
+For staging, prefer an existing verified non-production project. If none
+exists, the exact approval packet should name the new project, region, expected
+retention/deletion date, owner, and Supabase's then-current incremental price;
+the current pricing page advertises additional Pro projects from `$10/month`.
+Do not create a project or database branch merely to make the checklist look
+complete.
 
 ## 2. Roles and authority
 
