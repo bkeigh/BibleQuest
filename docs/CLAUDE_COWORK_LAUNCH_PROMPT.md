@@ -375,8 +375,43 @@ These gates can run in parallel when their owners are independent.
 
 1. Database backup/restore:
    - inspect the production Supabase backup/PITR posture;
+   - current preparation evidence shows a mismatch: the organization header
+     says `winterhill Pro`, while the production Scheduled Backups pane says
+     Free-plan backups are unavailable. Resolve the actual project entitlement
+     before recommending or buying anything;
    - record backup time, method, retention, and restore-point identity without
      credentials;
+   - present these mutually exclusive choices with a fresh official-price
+     check: existing Pro daily backups (seven-day retention; Pro currently
+     starts at `$25/month` and includes `$10/month` compute credit), a manually
+     captured logical backup, or seven-day PITR (currently `$0.137/hour`, about
+     `$100/month` per project, outside the Spend Cap). Never enable a plan or
+     add-on without Brendan's explicit approval of the exact price and duration;
+   - prefer resolving the existing Pro entitlement plus a fresh daily backup,
+     or the manual logical-backup path, for the contained guest-only launch;
+     PITR is optional unless the named owners require its lower recovery-point
+     objective;
+   - for a manual logical backup, obtain explicit read-only production-backup
+     approval, use a restricted temporary directory outside the repository,
+     and run separate role, schema, and data dumps. Do not print file contents,
+     connection strings, passwords, or private rows:
+
+     ```bash
+     BIBLEQUEST_BACKUP_DIR="$(mktemp -d)"
+     chmod 700 "$BIBLEQUEST_BACKUP_DIR"
+     supabase db dump --linked \
+       -f "$BIBLEQUEST_BACKUP_DIR/roles.sql" --role-only
+     supabase db dump --linked \
+       -f "$BIBLEQUEST_BACKUP_DIR/schema.sql"
+     supabase db dump --linked \
+       -f "$BIBLEQUEST_BACKUP_DIR/data.sql" --use-copy --data-only \
+       -x "storage.buckets_vectors" -x "storage.vector_indexes"
+     shasum -a 256 "$BIBLEQUEST_BACKUP_DIR"/*.sql
+     ```
+
+     Treat all three files as restricted production data. Move/encrypt/retain
+     or securely dispose of them only under the database owner's recorded
+     policy; never add them to Git, Drive, chat, tickets, or public CI artifacts;
    - restore a representative backup only into an isolated non-production
      project;
    - verify migrations, RLS posture, and representative aggregate counts;

@@ -94,18 +94,18 @@ for the eventual frozen commit and must be rerun at release freeze.
 
 | Check | Current-run result |
 | --- | --- |
-| Active source | Remediation is integrated on `codex/launch-hardening` at `bd96e9b5a735b57758f66512bd118d48d7e45395` and carried by draft PR #15; the PR is mergeable with all reported GitHub/Vercel checks green, but it is not yet reviewed, merged to `main`, or frozen and is **not releasable** |
+| Active source | Remediation is integrated on `codex/launch-hardening` and carried by draft PR #15. GitHub's current PR-head SHA is authoritative; every artifact row records the exact SHA it verified. The PR is mergeable with all reported GitHub/Vercel checks green, but it is not yet reviewed, merged to `main`, or frozen and is **not releasable** |
 | Source verification | PASS FOR THIS CANDIDATE CHECKOUT — frozen install, lint, TypeScript, 323 Vitest tests, deterministic seed parity, launch-evidence fixture, production build, security-header integration, service-worker tests, production dependency audit, and whitespace checks pass; MUST RERUN against frozen `main` |
 | Production health | FAIL CONTRACT — `https://www.biblequest.co/api/health` is reachable but still returns the retired minimal payload rather than `biblequest_observability_v1` |
-| Provisional Preview health | PASS FOR THIS PROVISIONAL ARTIFACT — deployment `dpl_CgEETEXwHT9GUdnoUBKirLjBwvRj` at commit `bd96e9b5a735b57758f66512bd118d48d7e45395` returns the expected observability contract, `guest-only`, `coming-soon`, schema `0015`, content `seed-manifest-v1`, and worker `biblequest-v15`; `canonical_origin_matches=false` is expected on Preview. This is not the frozen-`main` staging or Production-environment artifact |
+| Provisional Preview health | PASS FOR THIS PROVISIONAL ARTIFACT — deployment `dpl_3ja5bGrudTmnMQaLyahA4RDpZoWY` at commit `a745a061266ab6bae2dce44bb64a9cb8cbe033f0` returns the expected observability contract, `guest-only`, `coming-soon`, schema `0015`, content `seed-manifest-v1`, and worker `biblequest-v15`; `canonical_origin_matches=false` is expected on Preview. This is not the frozen-`main` staging or Production-environment artifact |
 | Production account-sync contract | FAIL — the `0010`, `0011`, `0014`, and `0015` schema plus `biblequest_daily_quest_sync_v1` posture RPC are missing |
 | Production migration history | HOLD — the Supabase dashboard's latest recorded migration is `20260710192143 user_quests_shelf` from July 10. Reconcile the complete linked history against the frozen 14-file manifest with the guarded CLI list/dry run before approving any push; dashboard rows and column probes are not permission to execute |
 | Production content mirror | FAIL — 84/150 approved free quests with 84 content mismatches/blank Scripture snapshots, 60/180 active daily passages, and 22/38 milestones with 22 content mismatches; both prompt catalogues exactly match at 32 |
 | Production auth configuration | PARTIAL — Email and Google providers are enabled, Phone and anonymous sign-in are disabled, email confirmation is enabled, the Site URL is canonical `https://www.biblequest.co`, and 11 redirect entries are configured. This blocks the enabled track until deployed controls, custom SMTP delivery, and template/cross-browser behavior are proven; guest-only instead requires the signed containment/no-traffic track |
-| Production backup posture | FAIL — the Supabase project reports that scheduled backups are unavailable on its current Free plan, and Point-in-Time Recovery is not enabled. No production schema/content mutation is permitted until a named database owner and rollback authority approve a recoverable backup/restore plan and the runbook's restore gate passes |
+| Production backup posture | HOLD / PLAN-ENTITLEMENT MISMATCH — the Supabase organization header reports `winterhill Pro`, but the production project's Scheduled Backups pane says Free-plan backups are unavailable; PITR is not enabled. Resolve which plan actually governs this project and prove an accessible restore point. No production schema/content mutation is permitted until a named database owner and rollback authority approve a recoverable backup/restore plan and the runbook's restore gate passes |
 | Vercel production assignment | HARD HOLD BEFORE MERGE — Production tracks `main`, every `main` commit creates a Production Deployment, and Auto-assign Custom Production Domains is enabled. The current production deployment is `dpl_9jo9xSMx3K2hYVYNLkwVV6gKVL8c` at `b7b15426ba5ff21e707ba859bb5454540f9ee216`; merging PR #15 can move production traffic and is prohibited until the staged-candidate/promotion controls are approved |
 | Vercel environment separation | FAIL FOR STAGING REHEARSAL — Production has the expected Supabase variable names, but Preview currently has no project environment variables. The existing PR Preview therefore does not prove the required distinct staging Supabase pair and cannot satisfy the staging database rehearsal gate |
-| Provisional guest browser flow | HOLD — fresh guest onboarding, containment-only account status, local quest assignment, and assignment persistence across full navigation passed on the protected Preview. The `Begin quest` action remained on the unchanged ready-state detail screen after two attempts, so core-loop verification stopped at that boundary; a named QA owner must reproduce and either fix it or attach contrary browser evidence before this row can pass |
+| Provisional guest browser flow | PASS FOR THIS PROVISIONAL ARTIFACT — on deployment `dpl_3ja5bGrudTmnMQaLyahA4RDpZoWY`, an isolated clean browser completed onboarding → first assignment → `Begin quest` → active state → completion without writing → first milestone/Journey update → full reload persistence → export confirmation → two-step clear/reset back to onboarding. The earlier unchanged click was not reproduced locally or on the current immutable Preview and is superseded by this clean-origin evidence. The isolated test journey was cleared through the app; rerun the complete matrix on the frozen staging artifact |
 | Current Vercel runtime errors | PASS FOR CURRENT SEVEN-DAY QUERY — Vercel reported no grouped runtime errors for the project; this does not replace the candidate canary, browser console/network evidence, or staffed alert-routing gate |
 | Canonical host | PASS FOR CURRENT DEPLOYMENT — apex redirect, canonical link, and Open Graph URL identify `https://www.biblequest.co`; rerun against the immutable candidate |
 | Local Supabase | PASS FOR THIS WORKTREE — local migration history reaches `0015` with immutable `0014` retained and `0013` absent, 15 Journey identity and 59 CAS/contract database tests pass, public-schema lint is clean, the 28-table RLS report passes, and content counts are 150/180/38/32/32; rerun at release freeze |
@@ -116,31 +116,52 @@ for the eventual frozen commit and must be rerun at release freeze.
 Complete these in order. Each external mutation requires the named owner to
 approve that exact action; the preparation work above is not blanket approval.
 
-1. **QA disposition:** a named QA owner manually repeats the protected
-   Preview's fresh onboarding → first quest → `Begin quest` flow. If the action
-   still does not advance, keep the release on hold, capture sanitized browser
-   evidence, fix it on the PR branch, and rerun the full core loop. If it does
-   advance, record the browser/version and evidence explaining the automation
-   discrepancy before changing the row above.
-2. **Staging isolation:** identify or create the approved non-production
+1. **Staging isolation:** identify or create the approved non-production
    Supabase project/branch, then configure only Preview/staging with its masked
    public URL/key pair. Prove it is distinct from Production before any staging
    database rehearsal. Never copy the Production pair into Preview.
-3. **Recoverability:** the database owner and rollback authority select and
+2. **Recoverability:** the database owner and rollback authority select and
    approve a production backup method, create a fresh recoverable point, and
    complete the isolated restore drill. Enabling a paid plan/add-on requires
    separate price approval. Do not apply production migrations or content
    before this passes.
-4. **Safe merge control:** the deploy owner explicitly approves temporarily
+3. **Safe merge control:** the deploy owner explicitly approves temporarily
    disabling Vercel's `Auto-assign Custom Production Domains`, verifies the
    existing production domains remain on deployment
    `dpl_9jo9xSMx3K2hYVYNLkwVV6gKVL8c`, and only then allows PR #15 to merge.
    Branch tracking may still build `main`; it must not move production traffic.
-5. **Freeze and rehearse:** after the first four items pass, freeze clean
+4. **Freeze and rehearse:** after the first three items pass, freeze clean
    `main`, rerun every source check, create the distinct staging and staged
    Production-environment deployments from the same SHA, and execute sections
    5–6. Only then prepare the exact production migration and content approval
    packets for the separate step-6 and step-7 decisions.
+
+#### Current backup decision packet
+
+Verify the price again at approval time. Supabase currently documents these
+choices:
+
+- **Resolve the existing Pro entitlement first (recommended):** Pro starts at
+  $25/month per organization, includes $10/month of compute credit, and gives
+  projects seven retained daily backups. Because the dashboard simultaneously
+  labels the organization Pro and the project ineligible, do not buy another
+  plan until billing/project support confirms the actual entitlement. See the
+  official [pricing page](https://supabase.com/pricing) and
+  [backup guide](https://supabase.com/docs/guides/platform/backups).
+- **Manual logical backup:** Supabase recommends `supabase db dump` for a
+  Free-plan project. A complete restorable packet needs separate role, schema,
+  and data dumps; the default command contains neither data nor custom roles.
+  Store the files only in a restricted, encrypted location outside the
+  repository, record hashes rather than contents, and restore-test them in a
+  disposable isolated environment. Follow the official
+  [CLI backup/restore guide](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore).
+- **PITR (optional, not the default July 31 choice):** seven-day PITR is
+  currently billed at `$0.137/hour`, approximately `$100/month` per project,
+  and Supabase says it is outside the Spend Cap. It provides seconds-granularity
+  recovery, but it is not required if the named owners accept the daily/manual
+  backup recovery window for the contained guest-only launch. Enabling it
+  requires a separate price-and-duration approval. See the official
+  [PITR usage guide](https://supabase.com/docs/guides/platform/manage-your-usage/point-in-time-recovery).
 
 ## 2. Roles and authority
 
