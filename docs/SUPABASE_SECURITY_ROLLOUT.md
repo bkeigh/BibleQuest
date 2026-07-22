@@ -5,8 +5,12 @@ This runbook covers the forward-only reconciliation migration
 `0010_rolling_quest_windows_and_recent_verses.sql`, through the current Bible
 preference/bookmark migration `0011_bible_translation_preference.sql`, the KJV
 default migration `0012_kjv_bible_translation_default.sql`, immutable Journey
-identity `0014_journey_event_identity.sql`, and transactional daily-quest
-migration `0015_transactional_daily_quest_sync.sql`. It is
+identity `0014_journey_event_identity.sql`, transactional daily-quest migration
+`0015_transactional_daily_quest_sync.sql`, mutable-write guards
+`0016_mutable_account_sync_guards.sql`, cached-client enforcement
+`0017_enforce_mutable_account_sync_boundary.sql`, followed by retained account
+identity/generation binding in
+`0018_bind_account_sync_identity_and_generation.sql`. It is
 deliberately local/staging-first. Do not run any linked or remote command until
 the project reference and exact command have been reviewed and explicitly
 approved.
@@ -33,6 +37,9 @@ The repository timeline is:
 | 2026-07-20 | KJV default pass | Adds `0012_kjv_bible_translation_default.sql`: new account settings default to the app's keyless KJV edition; existing choices are unchanged. |
 | 2026-07-21 | Journey identity release | Adds immutable `0014_journey_event_identity.sql` with SHA-256 `9497b745c5efc0c3f6c4c82e43e57c4fd9b34e8cfae12e6193226d564da50789`. |
 | 2026-07-21 | Daily-quest CAS pass | Re-versions the reviewed but untracked local `0013` work as `0015_transactional_daily_quest_sync.sql`: owner-RLS day revisions, authenticated atomic replacement, bounded duplicate-request protection, completed-state preservation, legacy-client revision tracking, and complete purge coverage. `0013` remains absent because no immutable linked history proved insertion below `0014` safe. |
+| 2026-07-22 | Mutable account guards | Adds `0016_mutable_account_sync_guards.sql`: authenticated owner-derived conditional writes for profiles, settings, notification preferences, prayers, and reflections with content-free acknowledgements. |
+| 2026-07-22 | Cached-client update boundary | Adds `0017_enforce_mutable_account_sync_boundary.sql`: authenticated direct UPDATE is revoked on the five guarded tables while the definer RPC and intended SELECT/INSERT/DELETE grants remain available. |
+| 2026-07-22 | Account identity and generation boundary | Adds `0018_bind_account_sync_identity_and_generation.sql`: retained owner generation, expected-user/generation wrappers, guarded shelf/reading writes, bounded owner-only tombstones, idempotent generation-bumping purge, safe blank-profile claim, and cached-client rejection after generation advances. |
 
 If a database recorded an old `0002`, `0003`, or `0004` before the renames,
 the later filenames do not change those recorded versions. Conversely, a
@@ -47,11 +54,11 @@ history rows.
 | Classification | Tables | Intended access |
 | --- | --- | --- |
 | Public content | `faith_providers`, `bible_translations`, `bible_books`, `bible_chapters`, `bible_verses`, `daily_verses`, `quest_templates`, `prayer_prompts`, `reflection_prompts`, `milestones`, `feature_flags` | Anonymous and authenticated `SELECT` only. Reads are limited to active/approved content; disabled feature flags are hidden. No client writes. Prompt tables contain generic seed prompts, not a user's prayer or reflection text. |
-| User-owned | `profiles`, `user_settings`, `user_daily_quests`, `user_daily_quest_days`, `user_quests`, `quest_completions`, `prayers`, `reflections`, `verse_bookmarks`, `user_recent_verses`, `reading_progress`, `chapters_read`, `journey_events`, `growth_events`, `user_milestones`, `notification_preferences` | Authenticated owner only. Most tables allow all owner operations; profiles have no client delete, journey/growth events have no client update, and `user_daily_quest_days` exposes only `assigned_date`/`revision` SELECT while its authenticated RPC owns writes. |
+| User-owned | `profiles`, `user_sync_state`, `user_settings`, `user_daily_quests`, `user_daily_quest_days`, `user_quests`, `quest_completions`, `prayers`, `reflections`, `verse_bookmarks`, `user_recent_verses`, `reading_progress`, `chapters_read`, `journey_events`, `growth_events`, `user_milestones`, `notification_preferences` | Authenticated owner only. `account_sync_generation(expected_user_id)` atomically validates the captured identity and returns only `{"generation":n}`; raw state exposes only `generation`/`updated_at`. `user_daily_quest_days` exposes only `assigned_date`/`revision`. Generation-bound RPCs own mutable updates and tombstone deletes; cached direct writes work only while retained generation is zero or when exact identity/generation headers are present. |
 | Server-owned | `subscriptions` | Authenticated owner `SELECT` only. Inserts, updates, and deletes require trusted service-role/webhook code. |
 | Internal | None in `public`. Supabase-managed schemas are outside this migration. |
 
-RLS is enabled on all 28 tables. Private prayers, reflections, recent Scripture
+RLS is enabled on all 29 tables. Private prayers, reflections, recent Scripture
 history, notes, and
 journey data have no anonymous policy and every authenticated policy includes
 an `auth.uid()` owner condition.
@@ -67,6 +74,9 @@ supabase db reset
 supabase migration list --local
 supabase test db --local supabase/tests/0014_journey_event_identity.sql
 supabase test db --local supabase/tests/0015_daily_quest_cas.sql
+supabase test db --local supabase/tests/0016_mutable_account_sync_guards.sql
+supabase test db --local supabase/tests/0017_mutable_account_sync_boundary.sql
+supabase test db --local supabase/tests/0018_account_sync_generation.sql
 docker exec -i supabase_db_BibleQuest \
   psql -U postgres -d postgres -v ON_ERROR_STOP=1 -P pager=off \
   < supabase/evidence/rls_policy_report.sql
@@ -90,14 +100,20 @@ Expected migration order:
 0012_kjv_bible_translation_default.sql
 0014_journey_event_identity.sql
 0015_transactional_daily_quest_sync.sql
+0016_mutable_account_sync_guards.sql
+0017_enforce_mutable_account_sync_boundary.sql
+0018_bind_account_sync_identity_and_generation.sql
 ```
 
-Evidence must show 28 existing tables with `rowsecurity = true`, only the
+Evidence must show 29 existing tables with `rowsecurity = true`, only the
 documented policy names, no `anon` role on user/server-owned policies, and
 `purge_user_data` as `security_definer = true`, `search_path=""`, anonymous
 execute false, authenticated execute true. Table grants must also match the
-policy commands: anonymous content reads only, authenticated least privilege,
-and service-role administration. The report must also show the enabled
+effective boundary: anonymous content reads only; authenticated direct UPDATE
+is absent on profiles, settings, notification preferences, prayers,
+reflections, shelf quests, and reading progress; direct DELETE is absent on
+prayers, reflections, bookmarks, shelf quests, and recent verses; and
+service-role administration retains all privileges. The report must also show the enabled
 `keep_newest_recent_verse` trigger and its fixed-search-path, security-invoker
 function with no direct anonymous or authenticated execute privilege.
 Verify that `user_settings.preferred_bible_translation` and
@@ -108,10 +124,15 @@ It must also show that `user_daily_quest_days` exposes only
 `assigned_date`/`revision` to authenticated clients, its owner-only SELECT
 policy is active, `replace_user_daily_quests` is authenticated-only SECURITY
 DEFINER with `search_path=""`, and both non-callable legacy trigger functions
-are installed. The anonymous `daily_quest_sync_contract` readiness RPC must
-return only its fixed contract identity and `ok: true`. The 15 Journey identity
-and 59 CAS/contract database tests must pass, including the pinned `0014`
-migration, without selecting application rows into evidence.
+are installed. The anonymous `daily_quest_sync_contract` and
+`mutable_account_sync_contract` and `account_sync_contract` readiness RPCs must
+each return only their fixed contract identity and `ok: true`. The v3 contract
+must be exactly `{"contract":"biblequest_account_sync_v3","ok":true}`.
+The authenticated `account_sync_generation(expected_user_id)` RPC must reject a
+session/captured-user mismatch and return exactly `{"generation":n}` otherwise.
+The 15 Journey identity, 59 CAS/contract, 19 mutable guard, 33 cached-client
+boundary, and 50 identity/generation database tests must pass, including
+the pinned `0014` migration, without selecting application rows into evidence.
 
 ## Two-user negative tests
 
@@ -125,17 +146,17 @@ fixtures using the matching owner's session. Then test:
 
 1. As A, `SELECT` A's row succeeds and `SELECT` B's primary key returns zero rows.
 2. As A, `INSERT` with A's UUID succeeds where inserts are supported; inserting B's UUID fails RLS.
-3. As A, `UPDATE` A's row succeeds where updates are supported; targeting B's row changes zero rows, and changing A's owner column to B fails `WITH CHECK`.
-4. As A, `DELETE` A's row succeeds where deletes are supported; targeting B's row changes zero rows.
+3. As A, call guarded writes with A's captured UUID and retained generation. Newer/equal timestamps apply, stale timestamps and A/B identity swaps fail, and no acknowledgement exposes row content.
+4. Delete prayers, reflections, bookmarks, shelf quests, and recent verses only through `delete_user_sync_rows(expected_user_id, expected_generation, request_id, deletions)`. Confirm at most 200 tombstones, owner scoping, exact retry idempotency, and one generation advance.
 5. Confirm profile delete and journey/growth update fail even for the owner.
 6. Repeat the cross-owner checks as B against A to catch asymmetric fixtures or tokens.
 7. For `subscriptions`, both users can select only their own row; all client insert/update/delete attempts fail. Create subscription fixtures only with a trusted staging admin/service-role path.
 8. Put unique sentinel text in A and B prayer/reflection bodies. Confirm neither account can retrieve the other's sentinel in any response, error, log, or evidence output.
-9. Call `purge_user_data()` as A. Confirm all 16 A-owned tables are empty for A, B's rows remain, A's auth account remains, and A's server-owned subscription row remains.
+9. Call `purge_user_data(A_UUID, generation, request_id)` as A. Confirm all 16 purgeable A-owned tables are empty, B's rows remain, A's auth account and `user_sync_state` remain, generation advances once, and an exact request retry does not advance it again.
 10. For one A-owned recent passage, write a newer `viewed_at` and exact text from device B, then replay an older upsert for the same passage from device A. Confirm the whole newer row survives; a genuinely later upsert must still replace it.
-11. Pull A's daily-quest revision and rows on two devices, apply different picks from the same revision, and confirm the stale call returns canonical rows without mutation. Merge/retry and confirm both picks remain.
+11. Pull A's generation, daily-quest revision, and rows on two devices. Apply different picks using the captured UUID/generation and same revision; confirm the stale revision returns canonical rows without mutation. Merge/retry and confirm both picks remain.
 12. Replay one daily-quest request UUID and confirm its revision advances once. Unpick an unfinished row and confirm it stays deleted; replay an empty/stale day against a completed row and confirm completion survives.
-13. As A and B, verify `user_daily_quest_days` hides the other owner and disallows direct revision writes. Confirm the RPC ignores caller ownership because no owner argument exists, anonymous execution fails, and Clear My Data removes the owner's revision metadata only.
+13. As A and B, verify `user_daily_quest_days` and `user_sync_state` hide raw owner/history columns and the other owner. Read generation through `account_sync_generation(captured_user_id)` and confirm an A/B session swap fails before returning it. Confirm all wrappers require the exact authenticated UUID, anonymous execution fails, and Clear My Data removes revision metadata while retaining only the advanced sync generation.
 
 ## Anonymous-access tests
 
@@ -144,7 +165,7 @@ Using only the Supabase URL and anon key with no user JWT:
 1. `SELECT` each public-content table. Only active/approved rows should return; inactive translations/providers and their books/chapters/verses, unapproved quests, inactive prompts/milestones, and disabled flags must not return.
 2. Attempt insert/update/delete on every public-content table; each must fail.
 3. Attempt select/insert/update/delete on every user-owned table and `subscriptions`; each must return no private rows or fail RLS.
-4. Call `purge_user_data()`; execution must be denied before function logic runs.
+4. Call the generation-bound `purge_user_data` wrapper; execution must be denied before function logic runs.
 5. Confirm generic `prayer_prompts` and `reflection_prompts` are readable, while private `prayers` and `reflections` are not.
 
 ## Staging rollout gate
@@ -164,7 +185,7 @@ supabase migration list --linked
 Before the real push, save the `migration list` and dry-run output. The dry run
 must propose only the intended pending migration(s), including `0008` when it
 is not already present, contain no `0013`, and end in the current highest
-version (`0015`). If it tries to replay renamed `0002`-`0006`, stop: do not use
+version (`0018`). If it tries to replay renamed `0002`-`0006`, stop: do not use
 `--include-all` and do not repair history. After the push, run
 `supabase/evidence/rls_policy_report.sql` in the staging SQL editor, then execute
 the full two-user and anonymous plans. Exercise account sync and Clear My Data
@@ -205,8 +226,14 @@ apart from replacing bookmark uniqueness with a translation-aware index.
 `0012` changes only the default for new settings rows. `0014` adds the accepted
 Journey identity. `0015` is additive except for replacing `purge_user_data`; it
 backfills opaque revisions from existing assignment days and installs the
-authenticated CAS/legacy triggers. The
-seed upserts reviewed public content. Rollback is forward-only:
+authenticated CAS/legacy triggers. The `0016` RPC is additive and rejects
+stale or cross-owner mutable account writes.
+`0017` revokes authenticated direct UPDATE on the five guarded mutable tables;
+`0018` retires every unbound security-definer write signature, adds retained
+generation and sixteen enforcement triggers, expands guarded updates to shelf
+and reading progress, and routes the five tombstone resources through one
+bounded generation-bumping RPC. Service-role administration remains.
+The seed upserts reviewed public content. Rollback is forward-only:
 
 1. If the migration fails, its transaction rolls back; capture the error and do not alter history.
 2. If verification reveals a policy regression, stop application rollout and create a new, higher-numbered idempotent migration restoring the last known-safe policy/function definitions. Do not delete or edit `0008` after it has been applied.

@@ -21,6 +21,9 @@ pnpm audit --prod        # production dependency audit
 git diff --check         # no whitespace errors
 supabase test db --local supabase/tests/0014_journey_event_identity.sql
 supabase test db --local supabase/tests/0015_daily_quest_cas.sql
+supabase test db --local supabase/tests/0016_mutable_account_sync_guards.sql
+supabase test db --local supabase/tests/0017_mutable_account_sync_boundary.sql
+supabase test db --local supabase/tests/0018_account_sync_generation.sql
 ```
 
 The automated suite targets launch-critical behavior rather than UI snapshots:
@@ -292,7 +295,7 @@ change. Never move the production domain for a rehearsal.
 - [ ] Run a production build, open the app, and in DevTools → Application →
       Service Workers confirm `/sw.js` controls the page at scope `/`.
 - [ ] In Application → Cache Storage, confirm only the current
-      `biblequest-v15-shell` and `biblequest-v15-runtime` caches are BibleQuest
+      `biblequest-v16-shell` and `biblequest-v16-runtime` caches are BibleQuest
       owned; unrelated-origin cache names are not touched by activation.
 - [ ] Inspect every shell entry: only `/offline`, `/app`, `/onboarding`,
       `/manifest.webmanifest`, and the exact `/pixel/` catalogue from `sw.js`
@@ -355,7 +358,7 @@ change. Never move the production domain for a rehearsal.
 - Guest data is device-local. A guest-only production launch may be READY only
   after the containment matrix above and named acceptance pass; active SMTP,
   Gmail/iCloud, provider callback, account sync, transactional/cached-client, and
-  A/B behavior remain explicitly out of scope. Migrations through `0015`, RLS/
+  A/B behavior remain explicitly out of scope. Migrations through `0018`, RLS/
   grants and anonymous denials, public CAS posture, content, backup/restore,
   privacy, device, legal, monitoring, and rollback evidence still pass.
 - Before the beta gate opens, account sync must pass the complete custom-auth

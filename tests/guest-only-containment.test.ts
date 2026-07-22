@@ -36,6 +36,7 @@ import { useQuestOS } from "@/lib/questos/store";
 import {
   ACCOUNT_SYNC_CONTAINED,
   accountSyncAvailable,
+  accountSyncContained,
 } from "@/lib/sync/containment";
 import { retrySync, startSync, stopSync } from "@/lib/sync/engine";
 import { useSyncStatus } from "@/lib/sync/status";
@@ -54,6 +55,14 @@ describe("guest-only account-sync containment", () => {
       userId: null,
       initialSyncComplete: false,
     });
+  });
+
+  it("requires an exact reviewed enable flag and fails closed otherwise", () => {
+    expect(accountSyncContained(undefined)).toBe(true);
+    expect(accountSyncContained("false")).toBe(true);
+    expect(accountSyncContained("TRUE")).toBe(true);
+    expect(accountSyncContained(" true ")).toBe(true);
+    expect(accountSyncContained("true")).toBe(false);
   });
 
   it.each(["current 0014 columns", "missing 0014 columns"])(

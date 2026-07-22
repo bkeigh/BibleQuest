@@ -84,7 +84,7 @@ docker exec -i supabase_db_BibleQuest \
   < supabase/evidence/rls_policy_report.sql
 ```
 
-All 28 public tables must show `rowsecurity = true`; verify policy roles and
+All 29 public tables must show `rowsecurity = true`; verify policy roles and
 expressions in the same report. See [`../SECURITY.md`](../SECURITY.md).
 
 ## 3. Bible content

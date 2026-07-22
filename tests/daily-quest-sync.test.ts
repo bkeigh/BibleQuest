@@ -27,6 +27,8 @@ interface PayloadRow {
 }
 
 interface ReplaceArgs {
+  p_expected_user_id: string;
+  p_expected_generation: number;
   p_assigned_date: string;
   p_expected_revision: number;
   p_request_id: string;
@@ -128,6 +130,7 @@ class FakeCasServer {
       revision: this.revision,
       duplicate,
       rows: structuredClone(this.rows),
+      generation: 0,
     };
   }
 }
@@ -502,6 +505,36 @@ describe("transactional daily-quest sync", () => {
     })).toBe(false);
   });
 
+  it("fails closed when a v3 engine loses the transactional RPC", async () => {
+    const query = {
+      delete: () => query,
+      eq: () => query,
+      insert: async () => ({ data: null, error: null }),
+    };
+    const client = {
+      rpc: async () => ({
+        data: null,
+        error: {
+          code: "PGRST202",
+          message:
+            "Could not find the function public.replace_user_daily_quests in the schema cache",
+        },
+      }),
+      from: () => query,
+    } as unknown as SupabaseClient;
+
+    await expect(
+      writeDailyQuestAssignments(
+        client,
+        "owner-a",
+        { [DAY]: [assignment("quest-a")] },
+        context("aaaaaaaa"),
+        0,
+        false,
+      ),
+    ).rejects.toMatchObject({ code: "PGRST202" });
+  });
+
   it("never sends a caller-controlled owner or day inside the row payload", async () => {
     const server = new FakeCasServer();
     await writeDailyQuestAssignments(
@@ -512,6 +545,10 @@ describe("transactional daily-quest sync", () => {
     );
 
     expect(server.calls[0]).not.toHaveProperty("p_user_id");
+    expect(server.calls[0]).toMatchObject({
+      p_expected_user_id: "owner-a",
+      p_expected_generation: 0,
+    });
     expect(server.calls[0].p_rows[0]).not.toHaveProperty("user_id");
     expect(server.calls[0].p_rows[0]).not.toHaveProperty("assigned_date");
   });
@@ -523,7 +560,33 @@ describe("transactional daily-quest sync", () => {
           status: "applied",
           revision: 1,
           duplicate: false,
+          generation: 0,
           rows: [{ quest_slug: "missing-required-fields" }],
+        },
+        error: null,
+      }),
+    } as unknown as SupabaseClient;
+
+    await expect(
+      writeDailyQuestAssignments(
+        client,
+        "owner-a",
+        { [DAY]: [assignment("quest-a")] },
+        context("aaaaaaaa"),
+      ),
+    ).rejects.toThrow("Invalid daily quest transaction response.");
+  });
+
+  it("fails closed on an expanded canonical RPC response", async () => {
+    const client = {
+      rpc: async () => ({
+        data: {
+          status: "applied",
+          revision: 1,
+          duplicate: false,
+          generation: 0,
+          rows: [],
+          diagnostic: "not part of the bounded contract",
         },
         error: null,
       }),

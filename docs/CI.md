@@ -49,8 +49,10 @@ Until then, the database owner must run the clean local reset, migration list,
 schema lint, and RLS evidence procedure in
 [`SUPABASE_SECURITY_ROLLOUT.md`](SUPABASE_SECURITY_ROLLOUT.md) at release
 freeze. After an approved production reconciliation, run
-`pnpm check:production-readiness`; it is a read-only compatibility probe, not
-proof of migration history, SMTP delivery, or cross-account isolation.
+`pnpm check:production-readiness`; it is a non-mutating compatibility probe that
+requires both the `0015` CAS contract and the `0018` complete account identity
+and generation boundary contract, not proof of migration history, SMTP
+delivery, or cross-account isolation.
 
 The repository does include deterministic local acceptance files for the
 immutable Journey identity and daily-quest CAS contracts:
@@ -58,6 +60,9 @@ immutable Journey identity and daily-quest CAS contracts:
 ```bash
 supabase test db --local supabase/tests/0014_journey_event_identity.sql
 supabase test db --local supabase/tests/0015_daily_quest_cas.sql
+supabase test db --local supabase/tests/0016_mutable_account_sync_guards.sql
+supabase test db --local supabase/tests/0017_mutable_account_sync_boundary.sql
+supabase test db --local supabase/tests/0018_account_sync_generation.sql
 ```
 
 The migration contract test also pins the checked-in SHA-256 manifest. A hash

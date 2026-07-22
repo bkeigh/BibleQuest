@@ -47,8 +47,9 @@ The launch record must select exactly one track:
 - **Auth + sync enabled:** complete every founder action in this runbook,
   including custom SMTP, real Gmail and iCloud delivery/callbacks, both-direction
   A/B isolation, transactional/cached-client sync, and signed restore evidence.
-- **Guest-only contained:** keep the frozen source's `ACCOUNT_SYNC_CONTAINED`
-  constant set to `true`; require health to
+- **Guest-only contained:** keep `NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED` unset or set
+  to any value other than the exact string `true`; the frozen source then
+  computes `ACCOUNT_SYNC_CONTAINED` as `true`. Require health to
   report `guest-only`; prove enrollment, sign-in, and account-action controls
   are absent (a status-only containment notice/page is allowed); callback exchange,
   middleware session refresh, and sync/client creation are no-ops; prove clean
@@ -61,7 +62,7 @@ The launch record must select exactly one track:
 Guest-only does not turn active auth or sync tests into passes. Record SMTP,
 Gmail/iCloud, provider callback, signed-in sync, and A/B client behavior as
 `OUT OF SCOPE — APPROVED GUEST-ONLY` for that release. Migrations through
-`0015`, the complete RLS/grant report and anonymous denial checks, canonical
+`0018`, the complete RLS/grant report and anonymous denial checks, canonical
 content, backup/restore, privacy, device, legal, monitoring, and rollback gates
 remain mandatory. Finish every deferred active-account test before a later
 release enables auth or sync.
@@ -187,8 +188,8 @@ supabase db push --linked --dry-run
 
 Stop if the dry run proposes replaying any renamed migration. The July 19 probe
 proved only that `0010` and `0011` schema was absent; it did not prove history.
-The repository candidate now continues with `0012`, immutable `0014`, and
-`0015`, with no `0013`. The linked migration list—not a column probe—is
+The repository candidate now continues with `0012`, immutable `0014`, `0015`,
+`0016`, `0017`, and `0018`, with no `0013`. The linked migration list—not a column probe—is
 authoritative, and every proposed version must match that exact forward order.
 After review:
 
@@ -230,7 +231,8 @@ and zero browser Supabase auth/sync traffic instead.
    four-column conflict target after `0011` lands. Include a full PWA
    close/relaunch/update test in this approval. Require `0014` to match SHA-256
    `9497b745c5efc0c3f6c4c82e43e57c4fd9b34e8cfae12e6193226d564da50789`
-   before approving `0015`; any `0013` proposal is a hard stop.
+   before approving `0015`, then require `0016`, `0017`, and `0018` immediately
+   after it; any `0013` proposal is a hard stop.
 5. Run the schema-only guarded sequence below, pause after the dry run for
    review, then immediately recapture the migration list and rerun the RLS
    evidence report in the
@@ -252,15 +254,16 @@ production. Correct a verified defect with a new higher-numbered migration.
 
 ### Guest-only containment release order
 
-The launch-hardening bundle uses `ACCOUNT_SYNC_CONTAINED` as one release latch.
-While it is `true`, current clients hide enrollment, the auth callback refuses
+The launch-hardening bundle derives `ACCOUNT_SYNC_CONTAINED` from one fail-closed
+release flag: only `NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED=true` opens the latch.
+While the computed containment value is `true`, current clients hide enrollment, the auth callback refuses
 to exchange codes or token hashes, the request proxy does not refresh Supabase
 sessions, and the browser sync engine stops before it creates a client. Keep the
 latch closed throughout schema, content, RLS, and isolation remediation and for
 the entire guest-only launch/watch window.
 
-This web release cannot stop JavaScript that is already running in an open v14
-tab or installed PWA window. The v15 worker evicts old BibleQuest caches after it
+This web release cannot stop JavaScript that is already running in an older
+tab or installed PWA window. The `biblequest-v16` worker evicts old BibleQuest caches after it
 installs and activates, but it does not forcibly reload an already controlled
 page; that page can retain its old authenticated sync behavior until it reloads
 or closes. If the incident requires an immediate zero-write boundary, use a
@@ -272,15 +275,15 @@ Use this order:
 1. Freeze account rollout and deploy the immutable contained bundle before any
    production migration or content write.
 2. Verify the health endpoint reports the intended guest-only posture, the
-   active worker reports v15, account-action controls are absent (status-only
+   active worker reports `biblequest-v16`, account-action controls are absent (status-only
    containment copy is allowed), callbacks do not
    exchange credentials, normal proxy requests do not refresh sessions, and
    the browser sync path does not create a Supabase client.
 3. Reload browser clients and fully close/relaunch installed PWAs twice. Record
-   any remaining v14 observation as residual exposure; do not declare the
+   any remaining older-worker observation as residual exposure; do not declare the
    incident contained solely because the deployment alias changed.
 4. With the latch still closed, apply and verify the approved migrations through
-   `0015`, then seed content separately and complete the full RLS/grant,
+   `0018`, then seed content separately and complete the full RLS/grant,
    anonymous denial, backup/restore, content, privacy, device, legal, monitoring,
    and rollback evidence. Complete the local-first core/persistence/export/clear/
    offline matrix and record a sanitized browser request summary with no
@@ -319,6 +322,9 @@ Required local and staging evidence:
 supabase db reset
 supabase test db --local supabase/tests/0014_journey_event_identity.sql
 supabase test db --local supabase/tests/0015_daily_quest_cas.sql
+supabase test db --local supabase/tests/0016_mutable_account_sync_guards.sql
+supabase test db --local supabase/tests/0017_mutable_account_sync_boundary.sql
+supabase test db --local supabase/tests/0018_account_sync_generation.sql
 supabase db lint --local --schema public --level warning --fail-on warning
 docker exec -i supabase_db_BibleQuest \
   psql -U postgres -d postgres -v ON_ERROR_STOP=1 -P pager=off \
@@ -353,7 +359,8 @@ production dry run proposes exactly the independently reviewed pending set. A
 only after the separate containment matrix and named acceptance pass; backup,
 restore, migration, RLS/grant, anonymous denial, and public CAS posture remain
 hard gates. Stop on any project, history, schema, backup, restore, RLS, conflict,
-resurrection, containment, or data-loss disagreement. Applying `0015` is a
+resurrection, containment, or data-loss disagreement. Applying `0015`, `0016`,
+`0017`, or `0018` is a
 production write and requires a fresh explicit approval; never combine it with
 the canonical content seed, `--include-all`, reset, or migration repair.
 
@@ -470,7 +477,9 @@ The current source replaces daily assignments through the transactional `0015`
 RPC with an opaque per-day revision and idempotent request UUID. That source
 change is not production evidence. Keep account sync in a controlled beta until
 the compatibility release is deployed, staging and production both show
-`0014` followed by `0015` in migration history, the CAS/RLS evidence passes,
+`0014` followed by `0015`, `0016`, `0017`, and `0018` in migration history, the
+CAS/RLS, mutable-write guard, cached-client, expected-user, retained-generation,
+and durable-deletion boundary evidence pass,
 and the complete
 concurrent-device pick/unpick/completion/cached-client matrix is accepted.
 

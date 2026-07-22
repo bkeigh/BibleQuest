@@ -70,6 +70,7 @@ interface DailyQuestRpcResponse {
   revision: number;
   duplicate: boolean;
   rows: DailyQuestPayloadRow[];
+  generation: number;
 }
 
 /** A bounded CAS conflict is safe to retry after the canonical day is merged. */
@@ -245,8 +246,13 @@ export async function writeDailyQuestAssignments(
   userId: string,
   assignments: Record<string, DailyQuestAssignment[]>,
   context: DailyQuestSyncContext,
+  expectedGeneration = 0,
+  allowLegacyFallback = true,
 ): Promise<DailyQuestWriteResult> {
   if (context.mode === "legacy") {
+    if (!allowLegacyFallback) {
+      throw new Error("The transactional daily quest contract is unavailable.");
+    }
     await writeLegacyDailyQuestAssignments(supabase, userId, assignments);
     return { conflicts: {}, usedLegacy: true };
   }
@@ -270,13 +276,17 @@ export async function writeDailyQuestAssignments(
     persistDailyQuestSyncContext(context);
 
     const result = await supabase.rpc("replace_user_daily_quests", {
+      p_expected_user_id: userId,
+      p_expected_generation: expectedGeneration,
       p_assigned_date: day,
       p_expected_revision: context.revisions.get(day) ?? 0,
       p_request_id: pending.requestId,
       p_rows: payloadRows,
     });
     if (result.error) {
-      if (!isMissingDailyQuestRpc(result.error)) throw result.error;
+      if (!isMissingDailyQuestRpc(result.error) || !allowLegacyFallback) {
+        throw result.error;
+      }
       context.mode = "legacy";
       context.revisions.clear();
       context.bases.clear();
@@ -286,7 +296,7 @@ export async function writeDailyQuestAssignments(
       return { conflicts: {}, usedLegacy: true };
     }
 
-    const response = parseRpcResponse(result.data);
+    const response = parseRpcResponse(result.data, expectedGeneration);
     const previousBase = context.bases.get(day) ?? [];
     const canonical = response.rows.map((row) =>
       rowToAssignment({
@@ -578,16 +588,22 @@ function assignmentPayload(
 }
 
 /** Validate the narrow JSON contract returned by the transactional RPC. */
-function parseRpcResponse(data: unknown): DailyQuestRpcResponse {
+function parseRpcResponse(
+  data: unknown,
+  expectedGeneration: number,
+): DailyQuestRpcResponse {
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     throw new Error("Invalid daily quest transaction response.");
   }
   const candidate = data as Partial<DailyQuestRpcResponse>;
+  const keys = Object.keys(data).sort().join(",");
   if (
+    keys !== "duplicate,generation,revision,rows,status" ||
     (candidate.status !== "applied" && candidate.status !== "conflict") ||
     !Number.isSafeInteger(candidate.revision) ||
     (candidate.revision ?? -1) < 0 ||
     typeof candidate.duplicate !== "boolean" ||
+    candidate.generation !== expectedGeneration ||
     !Array.isArray(candidate.rows) ||
     !candidate.rows.every(isDailyQuestPayloadRow)
   ) {

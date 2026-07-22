@@ -93,6 +93,34 @@ function normalizeAppearanceSettings(
   };
 }
 
+/** Compares base settings persisted to the account, not notifications or art. */
+function syncedBaseSettingsChanged(before: Settings, after: Settings): boolean {
+  return (
+    before.appearance.theme !== after.appearance.theme ||
+    before.appearance.reducedMotion !== after.appearance.reducedMotion ||
+    before.appearance.textSize !== after.appearance.textSize ||
+    before.questDurationPreference.join(",") !==
+      after.questDurationPreference.join(",") ||
+    before.questCategoryPreference.join(",") !==
+      after.questCategoryPreference.join(",") ||
+    before.language !== after.language ||
+    before.preferredBibleTranslation !== after.preferredBibleTranslation ||
+    before.analyticsConsent !== after.analyticsConsent
+  );
+}
+
+/** Compares the independently timestamped notification-preferences row. */
+function syncedNotificationsChanged(before: Settings, after: Settings): boolean {
+  return (
+    before.notifications.dailyVerse !== after.notifications.dailyVerse ||
+    before.notifications.dailyQuest !== after.notifications.dailyQuest ||
+    before.notifications.prayerReminders !==
+      after.notifications.prayerReminders ||
+    before.notifications.weeklyRecap !== after.notifications.weeklyRecap ||
+    before.notifications.preferredTime !== after.notifications.preferredTime
+  );
+}
+
 function id(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -168,7 +196,10 @@ interface QuestOSState {
   tombstones: SyncTombstones;
 
   // -- lifecycle
-  completeOnboarding: (profile: Omit<Profile, "onboardingCompleted" | "createdAt">, settings?: Partial<Settings>) => void;
+  completeOnboarding: (
+    profile: Omit<Profile, "onboardingCompleted" | "createdAt" | "updatedAt">,
+    settings?: Partial<Settings>,
+  ) => void;
   updateProfile: (patch: Partial<Profile>) => void;
   updateSettings: (patch: Partial<Settings>) => void;
   recordVisit: () => void;
@@ -717,10 +748,13 @@ export const useQuestOS = create<QuestOSState>()(
               ...profileData,
               onboardingCompleted: true,
               createdAt: now,
+              updatedAt: now,
             },
             settings: {
               ...settings,
               appearance: normalizeAppearanceSettings(settings.appearance),
+              updatedAt: now,
+              notificationsUpdatedAt: now,
             },
           });
           track("onboarding_completed");
@@ -729,15 +763,40 @@ export const useQuestOS = create<QuestOSState>()(
         updateProfile: (patch) => {
           const profile = get().profile;
           if (!profile) return;
-          set({ profile: { ...profile, ...patch } });
+          const syncedChange = Object.keys(patch).some(
+            (key) => key !== "avatarUpdatedAt" && key !== "updatedAt",
+          );
+          set({
+            profile: {
+              ...profile,
+              ...patch,
+              updatedAt: syncedChange
+                ? new Date().toISOString()
+                : profile.updatedAt,
+            },
+          });
         },
 
         updateSettings: (patch) => {
-          const settings = { ...get().settings, ...patch };
+          const previous = get().settings;
+          const now = new Date().toISOString();
+          const settings = { ...previous, ...patch };
+          const normalized = {
+            ...settings,
+            appearance: normalizeAppearanceSettings(settings.appearance),
+          };
           set({
             settings: {
-              ...settings,
-              appearance: normalizeAppearanceSettings(settings.appearance),
+              ...normalized,
+              updatedAt: syncedBaseSettingsChanged(previous, normalized)
+                ? now
+                : previous.updatedAt,
+              notificationsUpdatedAt: syncedNotificationsChanged(
+                previous,
+                normalized,
+              )
+                ? now
+                : previous.notificationsUpdatedAt,
             },
           });
           // Mirror consent to its own storage key so events fired before
@@ -1539,7 +1598,7 @@ export const useQuestOS = create<QuestOSState>()(
     {
       name: "biblequest:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 13,
+      version: 14,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
@@ -1741,6 +1800,21 @@ export const useQuestOS = create<QuestOSState>()(
             };
           } else {
             state.settings = DEFAULT_SETTINGS;
+          }
+        }
+        if (version < 14) {
+          // v14 makes account conflict clocks explicit. Conservative legacy
+          // fallbacks let an existing account copy win; the server separately
+          // permits an onboarded guest profile to claim a blank signup row.
+          const profile = state.profile as Profile | null | undefined;
+          if (profile && !profile.updatedAt) {
+            profile.updatedAt = profile.createdAt;
+          }
+          const settings = state.settings as Settings | undefined;
+          if (settings) {
+            const fallback = profile?.createdAt ?? "1970-01-01T00:00:00.000Z";
+            settings.updatedAt ??= fallback;
+            settings.notificationsUpdatedAt ??= settings.updatedAt;
           }
         }
         return state as unknown as QuestOSState;

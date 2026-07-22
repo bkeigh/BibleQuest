@@ -1,5 +1,5 @@
 /**
- * Read-only production compatibility probe.
+ * Non-mutating production compatibility probe.
  *
  * Uses the same publishable Supabase configuration as the browser. It never
  * needs a database password, service-role key, or Supabase access token, and it
@@ -16,7 +16,9 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import {
   DAILY_QUEST_SYNC_CONTRACT,
+  ACCOUNT_SYNC_CONTRACT,
   isDailyQuestSyncContract,
+  isAccountSyncContract,
 } from "./lib/observability-evidence.mjs";
 
 const JSON_OUTPUT = process.argv.includes("--json");
@@ -186,7 +188,7 @@ function safeHealthBody(value) {
     typeof candidate.canonical_origin_matches !== "boolean" ||
     !["configured", "guest-only", "invalid"].includes(candidate.auth_posture) ||
     !["configured", "disabled", "invalid"].includes(candidate.analytics_posture) ||
-    candidate.schema_contract !== "0015" ||
+    candidate.schema_contract !== "0018" ||
     candidate.content_contract !== "seed-manifest-v1" ||
     !/^biblequest-v\d{1,4}$/.test(candidate.service_worker_version) ||
     !["coming-soon", "sandbox", "live", "invalid"].includes(
@@ -385,6 +387,46 @@ async function checkSchema() {
       safeRequestFailure(error),
     );
   }
+
+  // The bounded 0018 contract proves the complete identity, generation, RPC,
+  // trigger, and direct-mutation boundary without attempting a user-data write.
+  try {
+    const response = await supabaseFetch(
+      "/rest/v1/rpc/account_sync_contract",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      },
+    );
+    const body = await jsonBody(response);
+    const ok = response.ok && isAccountSyncContract(body);
+    schemaEvidence.push({
+      contract: ACCOUNT_SYNC_CONTRACT,
+      migration: "0018",
+      ok,
+    });
+    result(
+      ok,
+      "account identity and generation boundary",
+      response.ok
+        ? ok
+          ? "identity, generation, RPC, trigger, and grant boundary match 0018"
+          : "invalid bounded contract"
+        : safeProviderCode(body?.code, response.status),
+    );
+  } catch (error) {
+    schemaEvidence.push({
+      contract: ACCOUNT_SYNC_CONTRACT,
+      migration: "0018",
+      ok: false,
+    });
+    result(
+      false,
+      "account identity and generation boundary",
+      safeRequestFailure(error),
+    );
+  }
 }
 
 async function checkContent() {
@@ -539,7 +581,7 @@ async function checkAuthMethods() {
   }
 }
 
-if (!JSON_OUTPUT) console.log("BibleQuest production readiness (read-only)\n");
+if (!JSON_OUTPUT) console.log("BibleQuest production readiness (non-mutating)\n");
 
 if (failures.length === 0) {
   await checkHealth();
@@ -562,7 +604,7 @@ if (JSON_OUTPUT) {
       canonical_metadata: { ok: canonicalEvidence },
       schema_parity: {
         ok:
-          schemaEvidence.length === REQUIRED_SCHEMA.length + 1 &&
+          schemaEvidence.length === REQUIRED_SCHEMA.length + 2 &&
           schemaEvidence.every((check) => check.ok),
         checks: schemaEvidence,
       },

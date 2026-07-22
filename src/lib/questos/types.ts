@@ -515,6 +515,8 @@ export interface Profile {
   calling?: Calling;
   onboardingCompleted: boolean;
   createdAt: string;
+  /** Last change to account-synced profile fields; legacy snapshots may omit it. */
+  updatedAt?: string;
   /**
    * Set when a profile photo exists in the on-device media store (IndexedDB —
    * see src/lib/utils/avatar.ts). The image itself deliberately stays OUT of
@@ -587,6 +589,10 @@ export interface Settings {
    * Counts taps and screens only — never prayer, reflection, or note text.
    */
   analyticsConsent: boolean;
+  /** Last change to account-synced base settings; device-only art preserves it. */
+  updatedAt?: string;
+  /** Last change to notification preferences, which live in a separate row. */
+  notificationsUpdatedAt?: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {

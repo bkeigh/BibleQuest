@@ -22,7 +22,7 @@ as a containment breach.
 - `configured`, `guest-only`, or `invalid` effective auth posture without a
   host or key; the containment latch reports `guest-only` even when dormant
   provider credentials remain configured;
-- schema/content contract labels (`0015` and `seed-manifest-v1`);
+- schema/content contract labels (`0018` and `seed-manifest-v1`);
 - the checked-in service-worker version;
 - `coming-soon`, `sandbox`, `live`, or `invalid` billing posture without a key.
 
@@ -52,7 +52,7 @@ The browser posts to the fixed same-origin
 | Field | Values |
 | --- | --- |
 | `surface` | `auth`, `sync`, `service_worker` |
-| `stage` | bounded stages for that surface: session/request/callback, initial/push, or registration |
+| `stage` | bounded stages for that surface: session/request/callback, initial/push/reconciliation, or registration |
 | `outcome` | `success`, `failure` |
 | `category` | `ok` or a bounded safe failure category such as `offline`, `timeout`, `rate_limited`, `schema`, `conflict`, `provider`, `permission`, `server`, or `unknown` |
 | `service_worker_version` | bounded `biblequest-vN` value, only after a successful worker version challenge; evidence compares it with the checked-in version |
@@ -97,7 +97,7 @@ BIBLEQUEST_VERCEL_DEPLOYMENT=<IMMUTABLE-DEPLOYMENT-ID-OR-HOST> \
 pnpm evidence:launch --phase=preflight --environment=preview
 ```
 
-The command runs the read-only readiness probe, verifies the health
+The command runs the non-mutating readiness probe, verifies the health
 and canonical metadata contracts, checks public schema/content parity and auth
 provider posture, then runs a fixed Vercel Runtime Logs query for the last 15
 minutes. The operator probe's public, read-only database checks are not browser
@@ -108,6 +108,12 @@ Migration `0015` is not accepted from revision-table columns alone: the probe
 calls the anonymous read-only `daily_quest_sync_contract()` and requires its
 exact two-field contract to confirm the CAS RPC, trigger bindings, RLS, and
 grant posture without returning catalog diagnostics or user rows.
+Migration `0018` is also required independently. The probe calls the anonymous,
+content-free `account_sync_contract()` and accepts only its exact two-field v3
+response. That live contract verifies the expected-user and retained-generation
+wrappers, exact generation triggers, retired signatures, guarded mutation
+boundary, and retained sync-state RLS/grants without returning catalog
+diagnostics or user data.
 
 Prerequisites:
 

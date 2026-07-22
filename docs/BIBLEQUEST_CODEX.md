@@ -83,11 +83,16 @@ product tone. The production canonical host is `https://www.biblequest.co`.
 - The accepted forward release order continues with `0012`, immutable
   `0014_journey_event_identity.sql` (SHA-256
   `9497b745c5efc0c3f6c4c82e43e57c4fd9b34e8cfae12e6193226d564da50789`),
-  and `0015_transactional_daily_quest_sync.sql`. `0013` is absent. The CAS
-  migration provides transactional per-day replacement, explicit revision
-  comparison, bounded idempotency, completion preservation, and cached-client
-  triggers while retaining the 28-table RLS and service-worker v14 contracts.
-- A July 19 read-only production probe found both migrations' expected schema
+  `0015_transactional_daily_quest_sync.sql`, and
+  `0016_mutable_account_sync_guards.sql`,
+  `0017_enforce_mutable_account_sync_boundary.sql`, and
+  `0018_bind_account_sync_identity_and_generation.sql`. `0013` is absent. These migrations
+  provide transactional per-day replacement, explicit revision comparison,
+  bounded idempotency, completion preservation, cached-client triggers, and
+  guarded mutable account writes, cached-client update enforcement, expected-user
+  binding, retained generations, and durable destructive operations while
+  retaining the complete RLS and service-worker v16 contracts.
+- A July 19 read-only production probe found the later migrations' expected schema
   absent and the content mirror behind the checked-in catalogue. Follow
   `docs/ACCOUNT_SYNC_RUNBOOK.md`: rehearse on staging, confirm the exact linked
   project and backup, approve/apply the migration-only dry run, verify schema

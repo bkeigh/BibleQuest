@@ -6,11 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { startSync, stopSync } from "@/lib/sync/engine";
 import {
   localDataBelongsToOtherUser,
-  markInitialSyncPending,
-  setLastSyncedUserId,
 } from "@/lib/sync/last-user";
-import { useQuestOS } from "@/lib/questos/store";
-import { clearAllDeviceLocalJournalDrafts } from "@/lib/questos/journal-drafts";
+import { prepareLocalJourneyHandoff } from "@/lib/sync/handoff";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton } from "@/components/design-system/GentleButton";
 
@@ -61,12 +58,7 @@ export function SyncManager() {
     if (!userId) return;
     // The engine never started (startSync refuses while the marker
     // mismatches), so clearing here can't race a push.
-    if (startFresh) {
-      useQuestOS.getState().clearAllData();
-      clearAllDeviceLocalJournalDrafts();
-    }
-    markInitialSyncPending(userId);
-    setLastSyncedUserId(userId);
+    prepareLocalJourneyHandoff(userId, startFresh);
     startSync(userId);
     rerender();
   };

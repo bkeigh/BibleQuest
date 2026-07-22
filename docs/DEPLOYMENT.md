@@ -118,13 +118,18 @@ needed — just don't remove that config.
       the production dry run, and obtain explicit approval before the database
       push (if enabling sync).
 - [ ] Complete [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md): apply
-      migrations through `0015` (including the authoritative `0014` Journey
-      identity change) with the reviewed seed applied separately,
+      migrations through `0018` (including the authoritative `0014` Journey
+      identity change, guarded mutable writes, cached-client update boundary,
+      and expected-user/generation deletion boundary)
+      with the reviewed seed applied separately,
       configure custom SMTP, and pass production readiness, daily-quest CAS,
-      cached-client, and two-user isolation checks.
+      mutable-write guard, cached-client, and two-user isolation checks.
 - [ ] Require the anonymous `daily_quest_sync_contract` readiness response to
       contain exactly the fixed contract identity and `ok: true`; treat extra
       keys, content, or `ok: false` as a sync launch blocker.
+- [ ] Require `account_sync_contract` to return exactly
+      `{"contract":"biblequest_account_sync_v3","ok":true}`; any extra field
+      or false posture is an account-sync launch blocker.
 - [ ] Configure privacy-first analytics if desired. Use Vercel logs and an
       external uptime check through the content-free operational contract in
       [`OBSERVABILITY.md`](OBSERVABILITY.md) until a separately privacy-reviewed

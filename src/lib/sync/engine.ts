@@ -21,14 +21,25 @@
  * on (user_id, book_slug, chapter) — see migration 0002.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import {
+  createClient,
+  createSyncClient,
+  isSupabaseConfigured,
+} from "@/lib/supabase/client";
 import { useQuestOS } from "@/lib/questos/store";
-import type { QuestOSSnapshot, SyncTombstones } from "@/lib/questos/types";
+import type {
+  QuestOSSnapshot,
+  Settings,
+  SyncTombstones,
+} from "@/lib/questos/types";
+import { DEFAULT_SETTINGS } from "@/lib/questos/types";
 import { useSyncStatus } from "./status";
 import {
   clearInitialSyncPending,
+  clearLocalJourneyClaimPending,
   getLastSyncedUserId,
   localDataBelongsToOtherUser,
+  localJourneyClaimIsPending,
   markInitialSyncPending,
   setLastSyncedUserId,
 } from "./last-user";
@@ -78,6 +89,31 @@ import {
   type DailyQuestRevisionRow,
 } from "./daily-quests";
 import { accountSyncAvailable } from "./containment";
+import { assertAccountSyncContracts } from "./contracts";
+import {
+  MutableAccountSyncConflictError,
+  writeMutableAccountRows,
+  type MutableAccountTable,
+} from "./mutable-writes";
+import {
+  registerReconciliationTriggers,
+  type ReconciliationTriggerController,
+} from "./reconciliation";
+import {
+  accountSyncResetRequired,
+  clearAccountSyncResetRequired,
+  getAccountSyncGeneration,
+  markAccountSyncResetRequired,
+  setAccountSyncGeneration,
+} from "./generation";
+import {
+  AccountSyncGenerationConflictError,
+  deleteAccountSyncRows,
+  isAccountSyncGenerationConflict,
+  purgeAccountSyncRows,
+  readAccountSyncGeneration,
+  type AccountDeletion,
+} from "./generation-boundary";
 
 type SyncedField =
   | "profile"
@@ -172,8 +208,12 @@ let unsubscribe: (() => void) | null = null;
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let pushing = false;
+let pushLifecycleToken = 0;
 let rerunAfterPush = false;
+let reconciliationRequested = false;
+let reconciliationTriggers: ReconciliationTriggerController | null = null;
 let applyingRemote = false;
+let writeThroughReady = false;
 const dirty = new Set<SyncedField>();
 const dailyQuestSyncContext = createDailyQuestSyncContext();
 
@@ -196,12 +236,19 @@ function setStatus(
 export function stopSync() {
   currentUserId = null;
   runToken++;
+  pushLifecycleToken++;
+  pushing = false;
   unsubscribe?.();
   unsubscribe = null;
+  reconciliationTriggers?.stop();
+  reconciliationTriggers = null;
   if (pushTimer) clearTimeout(pushTimer);
   if (retryTimer) clearTimeout(retryTimer);
   pushTimer = null;
   retryTimer = null;
+  reconciliationRequested = false;
+  rerunAfterPush = false;
+  writeThroughReady = false;
   dirty.clear();
   resetDailyQuestSyncContext(dailyQuestSyncContext);
   setStatus("off", { initialSyncComplete: false });
@@ -247,10 +294,28 @@ export async function startSync(userId: string, retryingFailure = false) {
   // "syncing", so retries don't re-count sync_failed every 30s.
   setStatus("syncing", { initialSyncComplete: false });
 
+  // Subscribe before the first network request so edits made during a slow
+  // pull or push are retained as dirty work. The readiness latch prevents a
+  // blind write until the complete initial pull -> merge -> push succeeds.
+  unsubscribe = useQuestOS.subscribe((state, prev) => {
+    if (applyingRemote) return;
+    let changed = false;
+    for (const field of SYNCED_FIELDS) {
+      if (state[field] !== prev[field]) {
+        dirty.add(field);
+        changed = true;
+      }
+    }
+    if (state.tombstones !== prev.tombstones) changed = true;
+    if (changed && writeThroughReady) schedulePush();
+  });
+
   try {
     await initialSync(createClient(), userId, isCurrent);
     if (!isCurrent()) return; // stopped/restarted mid-sync
     clearInitialSyncPending(userId);
+    clearLocalJourneyClaimPending(userId);
+    writeThroughReady = true;
     setStatus("idle", { syncedNow: true, initialSyncComplete: true });
     track("sync_completed", { status: "initial" });
     reportClientSignal({
@@ -261,6 +326,18 @@ export async function startSync(userId: string, retryingFailure = false) {
     });
   } catch (error) {
     if (!isCurrent()) return;
+    const generationConflict =
+      error instanceof AccountSyncGenerationConflictError;
+    if (generationConflict) {
+      // The merge may already be persisted when another device advances the
+      // destructive generation. Quarantine it across reloads until the next
+      // pull replaces stale account fields with the server baseline.
+      markInitialSyncPending(userId);
+      markAccountSyncResetRequired(
+        userId,
+        getAccountSyncGeneration(userId) ?? 0,
+      );
+    }
     // One event per failure streak, not one per 30s retry — a long
     // offline stretch shouldn't flood the queue with identical failures.
     if (!wasError) {
@@ -270,7 +347,9 @@ export async function startSync(userId: string, retryingFailure = false) {
         stage: "initial",
         outcome: "failure",
         category:
-          error instanceof DailyQuestConflictError
+            error instanceof DailyQuestConflictError ||
+            error instanceof MutableAccountSyncConflictError ||
+            generationConflict
             ? "conflict"
             : classifyOperationalError(error),
       });
@@ -289,25 +368,32 @@ export async function startSync(userId: string, retryingFailure = false) {
     retryTimer = setTimeout(() => {
       if (!isCurrent()) return;
       void retrySync(userId);
-    }, RETRY_MS);
+    }, generationConflict && !wasError ? 0 : RETRY_MS);
     return;
   }
 
   if (!isCurrent()) return;
 
-  // Write-through: watch the store and push only what changed.
-  unsubscribe = useQuestOS.subscribe((state, prev) => {
-    if (applyingRemote) return;
-    let changed = false;
-    for (const f of SYNCED_FIELDS) {
-      if (state[f] !== prev[f]) {
-        dirty.add(f);
-        changed = true;
-      }
-    }
-    if (state.tombstones !== prev.tombstones) changed = true;
-    if (changed) schedulePush();
-  });
+  // Reconcile the account copy whenever this tab regains a usable network or
+  // foreground state. Busy local pushes finish first, then request one full
+  // pull -> merge -> push so a second device's changes cannot be missed.
+  if (
+    typeof window !== "undefined" &&
+    typeof document !== "undefined" &&
+    typeof navigator !== "undefined"
+  ) {
+    reconciliationTriggers = registerReconciliationTriggers({
+      reconcile: () => requestReconciliation(userId),
+      onError: (error) => {
+        reportClientSignal({
+          surface: "sync",
+          stage: "reconciliation",
+          outcome: "failure",
+          category: classifyOperationalError(error),
+        });
+      },
+    });
+  }
 
   // A clear/restore/deletion that landed while the initial sync's network
   // calls were in flight predates the subscriber and would otherwise sit
@@ -315,6 +401,7 @@ export async function startSync(userId: string, retryingFailure = false) {
   // a purge push to all fields itself.)
   const pending = useQuestOS.getState().tombstones;
   if (
+    dirty.size > 0 ||
     pending.purgeAccount === userId ||
     pending.prayers.length ||
     pending.reflections.length ||
@@ -338,6 +425,17 @@ export async function retrySync(userId: string) {
   await startSync(userId, retryingFailure);
 }
 
+/** Defer a foreground/network reconciliation until any local push settles. */
+async function requestReconciliation(userId: string) {
+  if (currentUserId !== userId) return;
+  if (pushing || pushTimer) {
+    reconciliationRequested = true;
+    return;
+  }
+  reconciliationRequested = false;
+  await retrySync(userId);
+}
+
 function schedulePush() {
   if (pushTimer) clearTimeout(pushTimer);
   pushTimer = setTimeout(runPush, PUSH_DEBOUNCE_MS);
@@ -351,18 +449,34 @@ function scheduleRetry() {
   }, RETRY_MS);
 }
 
+/** Retry the complete pull/merge flow after a server-side timestamp conflict. */
+function scheduleReconciliationRetry(userId: string) {
+  if (retryTimer) clearTimeout(retryTimer);
+  retryTimer = setTimeout(() => {
+    if (currentUserId !== userId) return;
+    void retrySync(userId);
+  }, RETRY_MS);
+}
+
 async function runPush() {
+  pushTimer = null;
   const userId = currentUserId;
   if (!userId) return;
   if (pushing) {
     rerunAfterPush = true;
     return;
   }
+  const lifecycleToken = pushLifecycleToken;
+  const engineToken = runToken;
+  const isCurrent = () =>
+    lifecycleToken === pushLifecycleToken &&
+    engineToken === runToken &&
+    currentUserId === userId;
   pushing = true;
   const wasError = useSyncStatus.getState().state === "error";
   setStatus("syncing", { initialSyncComplete: true });
   try {
-    const supabase = createClient();
+    const controlClient = createClient();
     const state = useQuestOS.getState();
     const tombstones = state.tombstones;
     // A purge empties the whole account copy, so the push that follows must
@@ -372,23 +486,41 @@ async function runPush() {
     );
     dirty.clear();
 
-    const cleared = await propagateTombstones(supabase, tombstones, userId);
-    if (cleared.purgeAccount === userId) {
+    const liveGeneration = await readAccountSyncGeneration(controlClient, userId);
+    if (!isCurrent()) return;
+    const storedGeneration = getAccountSyncGeneration(userId);
+    const pendingDestruction = hasSyncTombstones(tombstones, userId);
+    if (
+      accountSyncResetRequired(userId) ||
+      (storedGeneration !== liveGeneration && !pendingDestruction)
+    ) {
+      throw new AccountSyncGenerationConflictError();
+    }
+    const propagated = await propagateTombstones(
+      controlClient,
+      tombstones,
+      userId,
+      storedGeneration ?? liveGeneration,
+      liveGeneration,
+      isCurrent,
+    );
+    if (!isCurrent()) return;
+    if (propagated.requiresServerReset) {
+      throw new AccountSyncGenerationConflictError();
+    }
+    if (propagated.purged) {
       configureDailyQuestSyncContext(dailyQuestSyncContext, [], true);
     }
-    // Only clear when there was something to propagate — an unconditional
-    // clear writes a fresh tombstones object every push, which the
-    // subscriber sees as a change and turns into an endless push loop.
-    if (
-      cleared.prayers.length ||
-      cleared.reflections.length ||
-      cleared.bookmarks.length ||
-      cleared.myQuests.length ||
-      cleared.purgeAccount
-    ) {
-      useQuestOS.getState().clearSyncTombstones(cleared);
-    }
-    await pushFields(supabase, userId, snapshotFromStore(), fields);
+    const supabase = createSyncClient(userId, propagated.generation);
+    await pushFields(
+      supabase,
+      userId,
+      propagated.generation,
+      snapshotFromStore(),
+      fields,
+      isCurrent,
+    );
+    if (!isCurrent()) return;
     // Re-stamp ownership on every successful push: "Clear my data" in
     // settings drops the marker, but anything written afterwards while still
     // signed in lands in this account's rows and belongs to it.
@@ -403,6 +535,7 @@ async function runPush() {
       });
     }
   } catch (error) {
+    if (!isCurrent()) return;
     // Push failed (offline, etc.) — mark everything dirty again and retry.
     for (const f of SYNCED_FIELDS) dirty.add(f);
     if (currentUserId === userId) {
@@ -414,7 +547,9 @@ async function runPush() {
           stage: "push",
           outcome: "failure",
           category:
-            error instanceof DailyQuestConflictError
+          error instanceof DailyQuestConflictError ||
+          error instanceof MutableAccountSyncConflictError ||
+          error instanceof AccountSyncGenerationConflictError
               ? "conflict"
               : classifyOperationalError(error),
         });
@@ -426,10 +561,24 @@ async function runPush() {
             ? "daily-quest-conflict"
             : null,
       });
-      scheduleRetry();
+      if (
+        error instanceof MutableAccountSyncConflictError ||
+        error instanceof AccountSyncGenerationConflictError
+      ) {
+        scheduleReconciliationRetry(userId);
+      } else {
+        scheduleRetry();
+      }
     }
   } finally {
+    if (lifecycleToken !== pushLifecycleToken) return;
     pushing = false;
+    if (reconciliationRequested && currentUserId === userId) {
+      reconciliationRequested = false;
+      rerunAfterPush = false;
+      void retrySync(userId);
+      return;
+    }
     if (rerunAfterPush) {
       rerunAfterPush = false;
       schedulePush();
@@ -442,18 +591,63 @@ async function runPush() {
 // ---------------------------------------------------------------------------
 
 async function initialSync(
-  supabase: SupabaseClient,
+  controlClient: SupabaseClient,
   userId: string,
   isCurrent: () => boolean
 ) {
+  // Fail closed before touching user-owned tables when a deployment is paired
+  // with an old, wrong, or incompletely migrated Supabase project.
+  await assertAccountSyncContracts(controlClient);
+  if (!isCurrent()) return;
+  const storedGeneration = getAccountSyncGeneration(userId);
+  const previousOwner = getLastSyncedUserId();
+  const observedGeneration = await readAccountSyncGeneration(
+    controlClient,
+    userId,
+  );
+  if (!isCurrent()) return;
+  let requiresServerReset =
+    accountSyncResetRequired(userId) ||
+    (storedGeneration !== null && storedGeneration !== observedGeneration) ||
+    (storedGeneration === null &&
+      previousOwner === userId &&
+      !localJourneyClaimIsPending(userId));
+
+  // Resolve destructive intent before the pull so condemned rows can never
+  // enter the merge. A successful whole-account purge intentionally makes
+  // this device's empty/restored snapshot the new account baseline.
+  const pendingBeforePull = useQuestOS.getState().tombstones;
+  const propagated = await propagateTombstones(
+    controlClient,
+    pendingBeforePull,
+    userId,
+    storedGeneration ?? observedGeneration,
+    observedGeneration,
+    isCurrent,
+  );
+  if (!isCurrent()) return;
+  requiresServerReset = propagated.preserveLocalBaseline
+    ? false
+    : propagated.recoveredOwnAdvance
+      ? false
+      : requiresServerReset || propagated.requiresServerReset;
+
+  const supabase = createSyncClient(userId, propagated.generation);
   const pulled = await pullAll(supabase, userId);
   if (!isCurrent()) return;
+  const verifiedGeneration = await readAccountSyncGeneration(supabase, userId);
+  if (verifiedGeneration !== propagated.generation) {
+    throw new AccountSyncGenerationConflictError();
+  }
   const remote = pulled.snapshot;
 
   // Capture tombstones at merge time so deletions made while signed out (or
   // mid-sync) don't resurrect from the account copy.
   const tombstones = useQuestOS.getState().tombstones;
   const local = snapshotFromStore();
+  const mergeLocal = requiresServerReset
+    ? serverAuthoritativeBaseline(local)
+    : local;
   // A pending purge for this account ("Clear my data" / restore-from-file
   // while signed in) condemns the whole account copy — merging any of it
   // back would resurrect exactly what the user erased.
@@ -463,13 +657,13 @@ async function initialSync(
       : filterByTombstones(remote, tombstones);
   const dailyAssignments = reconcileDailyQuestPull(
     dailyQuestSyncContext,
-    local.assignments,
+    mergeLocal.assignments,
     remoteKept.assignments ?? {},
     pulled.dailyQuestRevisions,
     pulled.transactionalDailyQuestsAvailable,
   );
   const merged = normalizeIds({
-    ...mergeSnapshots(local, remoteKept),
+    ...mergeSnapshots(mergeLocal, remoteKept),
     assignments: dailyAssignments,
   });
 
@@ -479,24 +673,21 @@ async function initialSync(
   } finally {
     applyingRemote = false;
   }
+  setAccountSyncGeneration(userId, propagated.generation);
+  clearAccountSyncResetRequired(userId);
   // From this moment the local store holds this account's (merged) journey —
   // record the owner even if the pushes below fail and retry later.
   setLastSyncedUserId(userId);
 
-  const cleared = await propagateTombstones(supabase, tombstones, userId);
-  if (cleared.purgeAccount === userId) {
-    configureDailyQuestSyncContext(dailyQuestSyncContext, [], true);
-  }
-  useQuestOS.getState().clearSyncTombstones(cleared);
-
-  if (!isCurrent()) return;
   // importData repairs legacy ledgers; push that normalized store snapshot so
   // its stable Journey sources survive deletion and the next device restore.
   await pushFields(
     supabase,
     userId,
+    propagated.generation,
     snapshotFromStore(),
     new Set(SYNCED_FIELDS),
+    isCurrent,
   );
 }
 
@@ -529,11 +720,47 @@ function snapshotFromStore(): QuestOSSnapshot {
   };
 }
 
+/** Build an empty account baseline while preserving intentionally local UI state. */
+export function serverAuthoritativeBaseline(
+  local: QuestOSSnapshot,
+): QuestOSSnapshot {
+  return {
+    profile: null,
+    settings: {
+      ...DEFAULT_SETTINGS,
+      appearance: { ...local.settings.appearance },
+      notifications: { ...DEFAULT_SETTINGS.notifications },
+      questDurationPreference: [],
+      questCategoryPreference: [],
+      analyticsConsent: local.settings.analyticsConsent,
+    },
+    assignments: {},
+    myQuests: {},
+    completions: [],
+    prayers: [],
+    reflections: [],
+    journeyEvents: [],
+    growthEvents: [],
+    earnedMilestones: [],
+    bookmarks: [],
+    readingPosition: null,
+    chaptersRead: [],
+    recentVerses: [],
+    pendingMilestones: local.pendingMilestones,
+    lastVisitDateKey: local.lastVisitDateKey,
+    streak: local.streak,
+    accountNudge: local.accountNudge,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Pull
 // ---------------------------------------------------------------------------
 
-type RemoteData = Partial<QuestOSSnapshot>;
+type RemoteData = Partial<QuestOSSnapshot> & {
+  /** Distinguishes an absent row from real all-disabled preferences. */
+  notificationPreferencesPresent?: boolean;
+};
 
 interface PulledData {
   snapshot: RemoteData;
@@ -648,6 +875,7 @@ async function pullAll(
         settingsRes.data || notifRes.data
           ? rowsToSettings(settingsRes.data ?? null, notifRes.data ?? null)
           : undefined,
+      notificationPreferencesPresent: Boolean(notifRes.data),
       assignments,
       myQuests,
       completions: (completionsRes.data ?? []).map(rowToCompletion),
@@ -722,36 +950,79 @@ function newerByUpdatedAt<T extends { updatedAt: string }>(a: T, b: T): T {
   return a.updatedAt >= b.updatedAt ? a : b;
 }
 
+/** Returns a stable legacy fallback for last-write-wins comparisons. */
+function syncUpdatedAt(value: { updatedAt?: string }, fallback: string): string {
+  return value.updatedAt ?? fallback;
+}
+
+/** Returns the notification-row timestamp, including legacy snapshot fallback. */
+function notificationSyncUpdatedAt(value: Settings): string {
+  return (
+    value.notificationsUpdatedAt ??
+    value.updatedAt ??
+    "1970-01-01T00:00:00.000Z"
+  );
+}
+
 export function mergeSnapshots(
   local: QuestOSSnapshot,
   remote: RemoteData
 ): QuestOSSnapshot {
-  // Profile: prefer whichever side has a real (onboarded) profile; if both,
-  // keep this device's — the account copy gets updated by the push that
-  // follows. A fresh device (no onboarded local profile) adopts the account.
+  // Profile: an onboarded journey beats an empty signup row. When both devices
+  // are onboarded, the most recently edited account fields win.
   const localOnboarded = Boolean(local.profile?.onboardingCompleted);
   const remoteOnboarded = Boolean(remote.profile?.onboardingCompleted);
   const adoptRemote = !localOnboarded && remoteOnboarded;
-
-  const profile = adoptRemote
-    ? remote.profile ?? null
-    : local.profile ?? remote.profile ?? null;
+  let profile = local.profile ?? remote.profile ?? null;
+  if (adoptRemote) {
+    profile = remote.profile ?? null;
+  } else if (localOnboarded && !remoteOnboarded && local.profile) {
+    profile = local.profile;
+  } else if (local.profile && remote.profile) {
+    profile =
+      syncUpdatedAt(local.profile, local.profile.createdAt) >=
+      syncUpdatedAt(remote.profile, remote.profile.createdAt)
+        ? local.profile
+        : remote.profile;
+  }
   // Accessibility comfort and wallpaper choices are device-local (no remote
   // columns); a phone and desktop can keep different motion/art treatments.
-  const baseSettings =
-    adoptRemote && remote.settings
-      ? {
-          ...remote.settings,
-          appearance: {
-            ...remote.settings.appearance,
-            boldText: local.settings.appearance.boldText,
-            wallpaperId: local.settings.appearance.wallpaperId,
-            wallpaperMode: local.settings.appearance.wallpaperMode,
-            glassSurfaces: local.settings.appearance.glassSurfaces,
-            glassOpacity: local.settings.appearance.glassOpacity,
-          },
-        }
+  const remoteSettings = remote.settings;
+  const remoteNotificationsPresent =
+    remote.notificationPreferencesPresent ??
+    remoteSettings?.notificationsUpdatedAt !== undefined;
+  const accountSettings =
+    remoteSettings &&
+    syncUpdatedAt(remoteSettings, "1970-01-01T00:00:00.000Z") >
+      syncUpdatedAt(local.settings, "1970-01-01T00:00:00.000Z")
+      ? remoteSettings
       : local.settings;
+  const accountNotifications =
+    remoteSettings &&
+    remoteNotificationsPresent &&
+    notificationSyncUpdatedAt(remoteSettings) >
+      notificationSyncUpdatedAt(local.settings)
+      ? remoteSettings.notifications
+      : local.settings.notifications;
+  const baseSettings = {
+    ...accountSettings,
+    notifications: accountNotifications,
+    notificationsUpdatedAt:
+      remoteSettings &&
+      remoteNotificationsPresent &&
+      notificationSyncUpdatedAt(remoteSettings) >
+        notificationSyncUpdatedAt(local.settings)
+        ? remoteSettings.notificationsUpdatedAt ?? remoteSettings.updatedAt
+        : local.settings.notificationsUpdatedAt ?? local.settings.updatedAt,
+    appearance: {
+      ...accountSettings.appearance,
+      boldText: local.settings.appearance.boldText,
+      wallpaperId: local.settings.appearance.wallpaperId,
+      wallpaperMode: local.settings.appearance.wallpaperMode,
+      glassSurfaces: local.settings.appearance.glassSurfaces,
+      glassOpacity: local.settings.appearance.glassOpacity,
+    },
+  };
   // Privacy-first exception to local-wins: consent must be explicit on BOTH
   // sides. A missing remote setting is ambiguous and therefore remains off.
   const settings = {
@@ -953,126 +1224,250 @@ export function normalizeIds(snapshot: QuestOSSnapshot): QuestOSSnapshot {
 // Push
 // ---------------------------------------------------------------------------
 
+interface TombstonePropagationResult {
+  generation: number;
+  purged: boolean;
+  preserveLocalBaseline: boolean;
+  recoveredOwnAdvance: boolean;
+  requiresServerReset: boolean;
+}
+
+interface TombstoneBatchItem {
+  deletion: AccountDeletion;
+  cleared: SyncTombstones;
+}
+
+/** Return whether this account has a destructive operation waiting to run. */
+function hasSyncTombstones(t: SyncTombstones, userId: string): boolean {
+  return Boolean(
+    t.purgeAccount === userId ||
+      t.prayers.length ||
+      t.reflections.length ||
+      t.bookmarks.length ||
+      t.myQuests.length,
+  );
+}
+
+/** Convert local tombstones into the narrow server deletion vocabulary. */
+function tombstoneBatchItems(t: SyncTombstones): TombstoneBatchItem[] {
+  return [
+    ...t.prayers.map((id) => ({
+      deletion: { resource: "prayers" as const, id },
+      cleared: { ...emptySyncTombstones(), prayers: [id] },
+    })),
+    ...t.reflections.map((id) => ({
+      deletion: { resource: "reflections" as const, id },
+      cleared: { ...emptySyncTombstones(), reflections: [id] },
+    })),
+    ...t.bookmarks.map((bookmark) => ({
+      deletion: {
+        resource: "bookmarks" as const,
+        book_slug: bookmark.bookSlug,
+        chapter: bookmark.chapter,
+        verse: bookmark.verse,
+        translation_key: bookmark.translationKey ?? "web",
+      },
+      cleared: { ...emptySyncTombstones(), bookmarks: [bookmark] },
+    })),
+    ...t.myQuests.map((questSlug) => ({
+      deletion: { resource: "user_quests" as const, quest_slug: questSlug },
+      cleared: { ...emptySyncTombstones(), myQuests: [questSlug] },
+    })),
+  ];
+}
+
+/** Return a fresh empty tombstone set without importing store implementation. */
+function emptySyncTombstones(): SyncTombstones {
+  return {
+    prayers: [],
+    reflections: [],
+    bookmarks: [],
+    myQuests: [],
+    purgeAccount: null,
+  };
+}
+
+/** Combine the tombstones acknowledged by one bounded server batch. */
+function combineClearedTombstones(
+  items: readonly TombstoneBatchItem[],
+): SyncTombstones {
+  const cleared = emptySyncTombstones();
+  for (const item of items) {
+    cleared.prayers.push(...item.cleared.prayers);
+    cleared.reflections.push(...item.cleared.reflections);
+    cleared.bookmarks.push(...item.cleared.bookmarks);
+    cleared.myQuests.push(...item.cleared.myQuests);
+  }
+  return cleared;
+}
+
 /**
- * Deletes tombstoned rows from the account, returning what actually
- * propagated so the caller clears exactly that. A pending account purge
- * ("Clear my data" / restore-from-file while signed in) deletes EVERY
- * user-data row via the purge_user_data RPC (migration 0004) and subsumes
- * the per-row tombstones. A purge marker for a DIFFERENT account is left
- * pending — it propagates only when that user signs back in.
+ * Apply destructive intent before any merge. The first call uses the locally
+ * remembered generation so a response-lost request can be deduplicated; only
+ * a proven serialization miss is retried against the newly observed server.
  */
 async function propagateTombstones(
-  supabase: SupabaseClient,
+  controlClient: SupabaseClient,
   t: SyncTombstones,
-  userId: string
-): Promise<SyncTombstones> {
-  if (t.purgeAccount === userId) {
-    const { error } = await supabase.rpc("purge_user_data");
-    if (error) throw error;
-    return t;
-  }
-  if (t.prayers.length) {
-    const { error } = await supabase.from("prayers").delete().in("id", t.prayers);
-    if (error) throw error;
-  }
-  if (t.reflections.length) {
-    const { error } = await supabase
-      .from("reflections")
-      .delete()
-      .in("id", t.reflections);
-    if (error) throw error;
-  }
-  for (const b of t.bookmarks) {
-    const result = await supabase
-      .from("verse_bookmarks")
-      .delete()
-      .match({
-        book_slug: b.bookSlug,
-        chapter: b.chapter,
-        verse: b.verse,
-        translation_key: b.translationKey ?? "web",
-      });
-    if (!result.error) continue;
-    if (!isMissingBibleSyncColumn(result.error, "translation_key")) {
-      throw result.error;
+  userId: string,
+  preferredGeneration: number,
+  observedGeneration: number,
+  isCurrent: () => boolean,
+): Promise<TombstonePropagationResult> {
+  let generation = observedGeneration;
+  let preferred = preferredGeneration;
+  let recoveredOwnAdvance = false;
+  let requiresServerReset = accountSyncResetRequired(userId);
+
+  /** Run one destructive request, retrying only a stale remembered generation. */
+  const execute = async (
+    operation: "delete" | "purge",
+    deletions?: readonly AccountDeletion[],
+  ) => {
+    let attemptedGeneration = preferred;
+    let retriedObservedGeneration = false;
+    let result;
+    try {
+      const client = createSyncClient(userId, attemptedGeneration);
+      result = operation === "purge"
+        ? await purgeAccountSyncRows(client, userId, attemptedGeneration)
+        : await deleteAccountSyncRows(
+            client,
+            userId,
+            attemptedGeneration,
+            deletions ?? [],
+          );
+    } catch (error) {
+      if (
+        !(error instanceof AccountSyncGenerationConflictError) ||
+        attemptedGeneration === generation
+      ) {
+        throw error;
+      }
+      attemptedGeneration = generation;
+      retriedObservedGeneration = true;
+      const client = createSyncClient(userId, attemptedGeneration);
+      result = operation === "purge"
+        ? await purgeAccountSyncRows(client, userId, attemptedGeneration)
+        : await deleteAccountSyncRows(
+            client,
+            userId,
+            attemptedGeneration,
+            deletions ?? [],
+          );
     }
-    // Pre-0011 compatibility: the legacy schema has exactly one row per
-    // verse, so the same tombstone can safely delete it without an edition.
-    const legacy = await supabase
-      .from("verse_bookmarks")
-      .delete()
-      .match({
-        book_slug: b.bookSlug,
-        chapter: b.chapter,
-        verse: b.verse,
-      });
-    if (legacy.error) throw legacy.error;
+
+    const currentGeneration = await readAccountSyncGeneration(
+      controlClient,
+      userId,
+    );
+    if (currentGeneration < result.generation) {
+      throw new Error("The account sync generation moved backward.");
+    }
+    const recovered =
+      preferred !== generation &&
+      result.duplicate &&
+      result.generation === currentGeneration;
+    const operationIsCurrent = result.generation === currentGeneration;
+    const unsafePartialDelete =
+      operation === "delete" &&
+      ((retriedObservedGeneration && !recovered) || !operationIsCurrent);
+    const unsafePurge = operation === "purge" && !operationIsCurrent;
+
+    recoveredOwnAdvance ||= recovered;
+    requiresServerReset ||= unsafePartialDelete || unsafePurge;
+    generation = currentGeneration;
+    preferred = currentGeneration;
+    if (requiresServerReset) {
+      markAccountSyncResetRequired(userId, generation);
+    } else {
+      setAccountSyncGeneration(userId, generation);
+    }
+    return { operationIsCurrent };
+  };
+
+  if (t.purgeAccount === userId) {
+    const { operationIsCurrent } = await execute("purge");
+    if (isCurrent()) useQuestOS.getState().clearSyncTombstones(t);
+    return {
+      generation,
+      purged: true,
+      preserveLocalBaseline: operationIsCurrent,
+      recoveredOwnAdvance,
+      requiresServerReset,
+    };
   }
-  if (t.myQuests.length) {
-    const { error } = await supabase
-      .from("user_quests")
-      .delete()
-      .eq("user_id", userId)
-      .in("quest_slug", t.myQuests);
-    if (error) throw error;
+
+  const items = tombstoneBatchItems(t);
+  for (let index = 0; index < items.length; index += 200) {
+    const batch = items.slice(index, index + 200);
+    await execute("delete", batch.map((item) => item.deletion));
+    if (isCurrent()) {
+      useQuestOS.getState().clearSyncTombstones(
+        combineClearedTombstones(batch),
+      );
+    }
   }
-  return { ...t, purgeAccount: null };
+  return {
+    generation,
+    purged: false,
+    preserveLocalBaseline: false,
+    recoveredOwnAdvance,
+    requiresServerReset,
+  };
 }
 
 async function pushFields(
   supabase: SupabaseClient,
   uid: string,
+  generation: number,
   snap: QuestOSSnapshot,
-  fields: Set<SyncedField>
+  fields: Set<SyncedField>,
+  isCurrent: () => boolean,
 ) {
-  const jobs: Array<Promise<void>> = [];
+  const jobs: Array<() => Promise<void>> = [];
   const run = async (p: PromiseLike<{ error: unknown }>) => {
     const { error } = await p;
     if (error) throw error;
   };
+  const guarded = async <Row extends object>(
+    table: MutableAccountTable,
+    rows: readonly Readonly<Row>[],
+  ) => {
+    let stale = 0;
+    for (let index = 0; index < rows.length; index += 200) {
+      if (!isCurrent()) return;
+      const result = await writeMutableAccountRows(
+        supabase,
+        uid,
+        generation,
+        table,
+        rows.slice(index, index + 200),
+      );
+      stale += result.stale;
+    }
+    if (stale) throw new MutableAccountSyncConflictError(stale);
+  };
 
-  if (fields.has("profile") && snap.profile) {
-    jobs.push(
-      run(supabase.from("profiles").upsert(profileToRow(uid, snap.profile)))
-    );
+  const profile = snap.profile;
+  if (fields.has("profile") && profile) {
+    jobs.push(() => guarded("profiles", [profileToRow(uid, profile)]));
   }
   if (fields.has("settings")) {
     const rows = settingsToRows(uid, snap.settings);
-    jobs.push(
-      (async () => {
-        const current = await supabase.from("user_settings").upsert(rows.settings);
-        if (!current.error) return;
-        if (
-          !isMissingBibleSyncColumn(
-            current.error,
-            "preferred_bible_translation",
-          )
-        ) {
-          throw current.error;
-        }
-        // Safe rolling-deploy fallback. The preference remains device-local
-        // until migration 0011 is applied; all older settings still sync.
-        const { preferred_bible_translation: _pending, ...legacySettings } =
-          rows.settings;
-        void _pending;
-        const legacy = await supabase
-          .from("user_settings")
-          .upsert(legacySettings);
-        if (legacy.error) throw legacy.error;
-      })(),
-    );
-    jobs.push(
-      run(supabase.from("notification_preferences").upsert(rows.notifications))
-    );
+    jobs.push(() => guarded("user_settings", [rows.settings]));
+    jobs.push(() => guarded("notification_preferences", [rows.notifications]));
   }
   if (fields.has("assignments")) {
     jobs.push(
-      (async () => {
+      async () => {
         const result = await writeDailyQuestAssignments(
           supabase,
           uid,
           snap.assignments,
           dailyQuestSyncContext,
+          generation,
+          false,
         );
         if (!Object.keys(result.conflicts).length) return;
 
@@ -1088,7 +1483,7 @@ async function pushFields(
           applyingRemote = false;
         }
         throw new DailyQuestConflictError();
-      })(),
+      },
     );
   }
   if (fields.has("myQuests")) {
@@ -1096,18 +1491,12 @@ async function pushFields(
       myQuestToRow(uid, q)
     );
     if (rows.length) {
-      jobs.push(
-        run(
-          supabase
-            .from("user_quests")
-            .upsert(rows, { onConflict: "user_id,quest_slug" })
-        )
-      );
+      jobs.push(() => guarded("user_quests", rows));
     }
   }
   if (fields.has("completions") && snap.completions.length) {
     jobs.push(
-      run(
+      () => run(
         supabase
           .from("quest_completions")
           .upsert(snap.completions.map((c) => completionToRow(uid, c)))
@@ -1116,26 +1505,21 @@ async function pushFields(
   }
   if (fields.has("prayers") && snap.prayers.length) {
     jobs.push(
-      run(
-        supabase
-          .from("prayers")
-          .upsert(snap.prayers.map((p) => prayerToRow(uid, p)))
-      )
+      () => guarded("prayers", snap.prayers.map((p) => prayerToRow(uid, p))),
     );
   }
   if (fields.has("reflections") && snap.reflections.length) {
     jobs.push(
-      run(
-        supabase
-          .from("reflections")
-          .upsert(snap.reflections.map((r) => reflectionToRow(uid, r)))
-      )
+      () => guarded(
+        "reflections",
+        snap.reflections.map((r) => reflectionToRow(uid, r)),
+      ),
     );
   }
   if (fields.has("journeyEvents") && snap.journeyEvents.length) {
     // Append-only table (no UPDATE policy): insert new rows, skip existing.
     jobs.push(
-      run(
+      () => run(
         supabase.from("journey_events").upsert(
           snap.journeyEvents.map((e) => journeyEventToRow(uid, e)),
           { onConflict: "id", ignoreDuplicates: true }
@@ -1145,7 +1529,7 @@ async function pushFields(
   }
   if (fields.has("growthEvents") && snap.growthEvents.length) {
     jobs.push(
-      run(
+      () => run(
         supabase.from("growth_events").upsert(
           snap.growthEvents.map((e) => growthEventToRow(uid, e)),
           { onConflict: "id", ignoreDuplicates: true }
@@ -1155,7 +1539,7 @@ async function pushFields(
   }
   if (fields.has("earnedMilestones") && snap.earnedMilestones.length) {
     jobs.push(
-      run(
+      () => run(
         supabase.from("user_milestones").upsert(
           snap.earnedMilestones.map((m) => milestoneToRow(uid, m)),
           { onConflict: "user_id,milestone_key", ignoreDuplicates: true }
@@ -1165,7 +1549,7 @@ async function pushFields(
   }
   if (fields.has("bookmarks") && snap.bookmarks.length) {
     jobs.push(
-      (async () => {
+      async () => {
         const rows = snap.bookmarks.map((b) => bookmarkToRow(uid, b));
         const current = await supabase.from("verse_bookmarks").upsert(rows, {
           onConflict: "user_id,book_slug,chapter,verse,translation_key",
@@ -1196,21 +1580,18 @@ async function pushFields(
           onConflict: "user_id,book_slug,chapter,verse",
         });
         if (legacy.error) throw legacy.error;
-      })(),
+      },
     );
   }
-  if (fields.has("readingPosition") && snap.readingPosition) {
-    jobs.push(
-      run(
-        supabase
-          .from("reading_progress")
-          .upsert(readingPositionToRow(uid, snap.readingPosition))
-      )
+  const readingPosition = snap.readingPosition;
+  if (fields.has("readingPosition") && readingPosition) {
+    jobs.push(() =>
+      guarded("reading_progress", [readingPositionToRow(uid, readingPosition)]),
     );
   }
   if (fields.has("chaptersRead") && snap.chaptersRead.length) {
     jobs.push(
-      run(
+      () => run(
         supabase.from("chapters_read").upsert(
           snap.chaptersRead.map((c) => chapterReadToRow(uid, c)),
           { onConflict: "user_id,book_slug,chapter", ignoreDuplicates: true }
@@ -1223,7 +1604,7 @@ async function pushFields(
       .sort((a, b) => b.viewedAt.localeCompare(a.viewedAt))
       .slice(0, 20);
     jobs.push(
-      (async () => {
+      async () => {
         const upsert = await supabase.from("user_recent_verses").upsert(
           verses.map((verse) => recentVerseToRow(uid, verse)),
           {
@@ -1236,21 +1617,23 @@ async function pushFields(
           throw upsert.error;
         }
 
-        // The local/account merge keeps the newest twenty. Prune only rows
-        // strictly older than that shared cutoff, so a concurrent newer visit
-        // from another device can never be erased by this write-through.
-        const oldestKeptAt = verses.at(-1)?.viewedAt;
-        if (verses.length === 20 && oldestKeptAt) {
-          const prune = await supabase
-            .from("user_recent_verses")
-            .delete()
-            .eq("user_id", uid)
-            .lt("viewed_at", oldestKeptAt);
-          if (prune.error) throw prune.error;
-        }
-      })()
+        // The client keeps only twenty locally. Older account rows remain
+        // until a future generation-bound deletion can remove exact passages.
+      },
     );
   }
 
-  await Promise.all(jobs);
+  // Serialize writes so a failure or auth/lifecycle transition cannot leave
+  // sibling requests running after the engine has already begun recovery.
+  for (const job of jobs) {
+    if (!isCurrent()) return;
+    try {
+      await job();
+    } catch (error) {
+      if (isAccountSyncGenerationConflict(error)) {
+        throw new AccountSyncGenerationConflictError();
+      }
+      throw error;
+    }
+  }
 }

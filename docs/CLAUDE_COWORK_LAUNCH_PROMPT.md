@@ -35,8 +35,8 @@ with the observed evidence, expected behavior, and acceptance test.
   `main` SHA; never carry PR-head candidate evidence forward as final evidence.
 - Canonical production origin: `https://www.biblequest.co`
 - Target launch date: July 31, 2026, America/New_York
-- Expected migration history ends at `0015`, has no `0013`, and retains the
-  immutable `0014` migration.
+- Expected migration history is the exact 17-file manifest ending at `0018`,
+  has no `0013`, and retains the immutable `0014` migration.
 - Expected public content counts are 150 approved free quests, 180 active daily
   passages, 38 active milestones, 32 prayer prompts, and 32 reflection prompts.
 - Recommended July 31 posture:

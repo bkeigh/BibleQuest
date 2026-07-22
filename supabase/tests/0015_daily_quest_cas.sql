@@ -1,6 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
+set local search_path = public, extensions;
 
 select plan(59);
 
@@ -9,6 +10,71 @@ insert into auth.users (id, raw_user_meta_data, created_at, updated_at)
 values
   ('10000000-0000-4000-8000-000000000001', '{}'::jsonb, now(), now()),
   ('20000000-0000-4000-8000-000000000002', '{}'::jsonb, now(), now());
+
+-- Exercise historical CAS assertions through a transaction-local adapter;
+-- 0018 separately proves this retired signature is absent in production.
+create function public.replace_user_daily_quests(
+  p_assigned_date date,
+  p_expected_revision bigint,
+  p_request_id uuid,
+  p_rows jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  uid uuid := auth.uid();
+  live_generation bigint;
+  response jsonb;
+begin
+  select generation into live_generation
+  from public.user_sync_state
+  where user_id = uid;
+  response := public.replace_user_daily_quests(
+    uid,
+    live_generation,
+    p_assigned_date,
+    p_expected_revision,
+    p_request_id,
+    p_rows
+  );
+  return response - 'generation';
+end;
+$function$;
+
+revoke execute on function public.replace_user_daily_quests(
+  date, bigint, uuid, jsonb
+) from public, anon;
+grant execute on function public.replace_user_daily_quests(
+  date, bigint, uuid, jsonb
+) to authenticated;
+
+-- Adapt the historical void purge only inside this rollback-only test.
+create function public.purge_user_data()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  uid uuid := auth.uid();
+  live_generation bigint;
+begin
+  select generation into live_generation
+  from public.user_sync_state
+  where user_id = uid;
+  perform public.purge_user_data(
+    uid,
+    live_generation,
+    extensions.gen_random_uuid()
+  );
+end;
+$function$;
+
+revoke execute on function public.purge_user_data() from public, anon;
+grant execute on function public.purge_user_data() to authenticated;
 
 -- Pin the authoritative 0014 Journey identity before exercising 0015.
 select has_column(
@@ -539,7 +605,7 @@ select throws_ok(
     '2026-07-26T12:00:00Z'
   )$$,
   '42501',
-  'new row violates row-level security policy for table "user_daily_quests"',
+  'account sync: authenticated user changed',
   'direct cross-owner insert is denied'
 );
 select is_empty(
@@ -589,7 +655,7 @@ select throws_ok(
     '2026-07-26T12:00:00Z'
   )$$,
   '42501',
-  'new row violates row-level security policy for table "user_daily_quests"',
+  'account sync: authenticated user changed',
   'first owner direct cross-owner insert is denied'
 );
 select is_empty(

@@ -119,10 +119,25 @@ Important safeguards:
   compare-and-swap, atomic delete/insert, completed-row preservation, and
   revision advance. It derives ownership from `auth.uid()`; no service role or
   caller-supplied owner reaches browser code.
-- Cached pre-`0015` bundles keep their owner-RLS direct writes during rollout.
-  A database trigger advances the opaque revision for those legacy writes, and
-  the new bundle falls back to its prior path only for exact missing-table/RPC
-  errors. Permission, policy, and malformed-response errors fail closed.
+- Migration `0016_mutable_account_sync_guards.sql` conditionally writes
+  profiles, settings, notification preferences, prayers, and reflections by
+  `updated_at`; its owner comes from `auth.uid()` and its acknowledgement
+  contains counts rather than row content.
+- Migration `0017_enforce_mutable_account_sync_boundary.sql` revokes cached
+  authenticated direct updates on those tables while preserving the guarded
+  definer RPC and intended SELECT/INSERT/DELETE grants. Its anonymous readiness
+  contract exposes only a fixed identity and boolean posture.
+- Migration `0018_bind_account_sync_identity_and_generation.sql` retains one
+  generation per owner, binds every recreating write to the expected user and
+  generation, guards My Quests and reading position, safely claims a blank
+  signup profile, and makes bounded deletion and whole-account purge
+  idempotent generation advances. Its v3 readiness contract is exact and
+  content-free.
+- Cached pre-`0015` daily-assignment bundles keep their owner-RLS direct writes
+  during rollout. A database trigger advances the opaque revision for those
+  legacy assignment writes. Migration `0017` deliberately rejects cached direct
+  UPDATE/conflict-upsert attempts on profiles, settings, notification preferences,
+  prayers, and reflections so stale mutable data fails closed.
 - The anonymous `daily_quest_sync_contract` readiness RPC exposes only a fixed
   contract identity and boolean posture. It never exposes user rows, policy
   text, grants, identifiers, or failure diagnostics.
