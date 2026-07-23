@@ -27,6 +27,8 @@ const EXPECTED_MIGRATIONS = [
   "0018_bind_account_sync_identity_and_generation.sql",
   "0019_server_ordered_account_sync_revisions.sql",
   "0020_self_service_account_deletion.sql",
+  "0021_generation_bound_account_deletion.sql",
+  "0022_resilient_account_deletion.sql",
 ];
 
 /** Hash a migration exactly as the release manifest does. */
@@ -95,6 +97,10 @@ describe("release migration contracts", () => {
     expect(report).toContain("'account_sync_contract'");
     expect(report).toContain("'advance_account_sync_revision'");
     expect(report).toContain("'delete_own_account'");
+    expect(report).toContain("'account_deletion_contract'");
+    expect(report).toContain(
+      "select public.account_deletion_contract() as account_deletion_contract;",
+    );
     expect(report).toContain("sync_revision");
     expect(report).toContain(
       "select public.mutable_account_sync_contract() as mutable_account_sync_contract;",

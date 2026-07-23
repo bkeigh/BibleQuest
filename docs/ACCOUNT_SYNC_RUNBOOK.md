@@ -32,7 +32,7 @@ database write. The exact production history was fetched and reviewed, then
 the repository SQL for `0008` through `0015` and the idempotent launch seed were
 applied under new forward-only production versions. The original `0015`
 readiness probe now passes every schema, content, and provider-configuration
-check. Account sync remains contained while `0016` through `0020`, signed
+check. Account sync remains contained while `0016` through `0022`, signed
 restore, real email delivery, and cached-client gates are completed.
 
 Run the same non-mutating probe at any time:
@@ -69,7 +69,7 @@ The launch record must select exactly one track:
 Guest-only does not turn active auth or sync tests into passes. Record SMTP,
 Gmail/iCloud, provider callback, signed-in sync, and A/B client behavior as
 `OUT OF SCOPE — APPROVED GUEST-ONLY` for that release. Migrations through
-`0020`, the complete RLS/grant report and anonymous denial checks, canonical
+`0022`, the complete RLS/grant report and anonymous denial checks, canonical
 content, backup/restore, privacy, device, legal, monitoring, and rollback gates
 remain mandatory. Finish every deferred active-account test before a later
 release enables auth or sync.
@@ -294,7 +294,7 @@ latch closed throughout schema, content, RLS, and isolation remediation and for
 the entire guest-only launch/watch window.
 
 This web release cannot stop JavaScript that is already running in an open v14
-tab or installed PWA window. The v18 worker evicts old BibleQuest caches after it
+tab or installed PWA window. The v19 worker evicts old BibleQuest caches after it
 installs and activates, but it does not forcibly reload an already controlled
 page; that page can retain its old authenticated sync behavior until it reloads
 or closes. If the incident requires an immediate zero-write boundary, use a
@@ -306,7 +306,7 @@ Use this order:
 1. Freeze account rollout and deploy the immutable contained bundle before any
    production migration or content write.
 2. Verify the health endpoint reports the intended guest-only posture, the
-   active worker reports v18, account-action controls are absent (status-only
+   active worker reports v19, account-action controls are absent (status-only
    containment copy is allowed), callbacks do not
    exchange credentials, normal proxy requests do not refresh sessions, and
    the browser sync path does not create a Supabase client.
@@ -314,7 +314,7 @@ Use this order:
    any remaining v14 observation as residual exposure; do not declare the
    incident contained solely because the deployment alias changed.
 4. With the latch still closed, apply and verify the approved migrations through
-   `0020`, then seed content separately and complete the full RLS/grant,
+   `0022`, then seed content separately and complete the full RLS/grant,
    anonymous denial, backup/restore, content, privacy, device, legal, monitoring,
    and rollback evidence. Complete the local-first core/persistence/export/clear/
    offline matrix and record a sanitized browser request summary with no

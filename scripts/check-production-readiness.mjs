@@ -188,7 +188,7 @@ function safeHealthBody(value) {
     typeof candidate.canonical_origin_matches !== "boolean" ||
     !["configured", "guest-only", "invalid"].includes(candidate.auth_posture) ||
     !["configured", "disabled", "invalid"].includes(candidate.analytics_posture) ||
-    candidate.schema_contract !== "0020" ||
+    candidate.schema_contract !== "0022" ||
     candidate.content_contract !== "seed-manifest-v1" ||
     !/^biblequest-v\d{1,4}$/.test(candidate.service_worker_version) ||
     !["coming-soon", "sandbox", "live", "invalid"].includes(
@@ -429,7 +429,50 @@ async function checkSchema() {
     );
   }
 
-  // An anonymous invocation must reach the sealed 0020 RPC and be rejected.
+  // The 0022 contract must prove deletion is generation-bound and resilient.
+  try {
+    const response = await supabaseFetch(
+      "/rest/v1/rpc/account_deletion_contract",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      },
+    );
+    const body = await jsonBody(response);
+    const ok =
+      response.ok &&
+      body?.contract === "generation_bound_account_deletion_v2" &&
+      body?.ready === true &&
+      Object.keys(body).length === 2;
+    schemaEvidence.push({
+      contract: "generation_bound_account_deletion_v2",
+      migration: "0022",
+      ok,
+    });
+    result(
+      ok,
+      "generation-bound account deletion",
+      response.ok
+        ? ok
+          ? "real-user deletion path matches 0022"
+          : "invalid bounded contract"
+        : safeProviderCode(body?.code, response.status),
+    );
+  } catch (error) {
+    schemaEvidence.push({
+      contract: "generation_bound_account_deletion_v2",
+      migration: "0022",
+      ok: false,
+    });
+    result(
+      false,
+      "generation-bound account deletion",
+      safeRequestFailure(error),
+    );
+  }
+
+  // An anonymous invocation must still reach the sealed RPC and be rejected.
   // A missing function returns 404, so this prevents health metadata from
   // claiming account deletion is ready when the migration is absent.
   try {
@@ -444,7 +487,7 @@ async function checkSchema() {
     const ok = response.status === 401;
     schemaEvidence.push({
       contract: "delete_own_account_authenticated_only",
-      migration: "0020",
+      migration: "0022",
       ok,
     });
     result(
@@ -455,7 +498,7 @@ async function checkSchema() {
   } catch (error) {
     schemaEvidence.push({
       contract: "delete_own_account_authenticated_only",
-      migration: "0020",
+      migration: "0022",
       ok: false,
     });
     result(

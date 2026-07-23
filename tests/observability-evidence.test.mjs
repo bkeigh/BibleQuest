@@ -527,7 +527,7 @@ describe("sanitized launch evidence", () => {
 
   it("builds complete fixture evidence with every required posture", () => {
     expect(fixtureReadiness()).toMatchObject({
-      check_count: 19,
+      check_count: 20,
       failed_check_count: 0,
     });
     const aggregate = aggregateClientSignals(fixtureSignals());
@@ -554,7 +554,7 @@ describe("sanitized launch evidence", () => {
       rollback_target_sha: "b".repeat(40),
     });
     expect(evidence.service_worker_version.observed).toEqual([
-      "biblequest-v18",
+      "biblequest-v19",
     ]);
     expect(evidence.alerts).toEqual([
       expect.objectContaining({

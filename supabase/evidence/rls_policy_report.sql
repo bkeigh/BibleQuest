@@ -116,6 +116,7 @@ where namespace.nspname = 'public'
     'account_sync_generation',
     'account_sync_contract',
     'delete_own_account',
+    'account_deletion_contract',
     'assert_user_sync_context',
     'enforce_user_sync_generation',
     'advance_account_sync_revision',
@@ -258,6 +259,7 @@ order by table_name;
 select public.daily_quest_sync_contract() as daily_quest_sync_contract;
 select public.mutable_account_sync_contract() as mutable_account_sync_contract;
 select public.account_sync_contract() as account_sync_contract;
+select public.account_deletion_contract() as account_deletion_contract;
 
 -- 9. Unbound security-definer entry points remain absent after 0019.
 select
