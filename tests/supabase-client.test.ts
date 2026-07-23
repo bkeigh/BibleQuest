@@ -12,6 +12,11 @@ describe("Supabase browser clients", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createBrowserClient.mockReset();
+    delete (
+      globalThis as typeof globalThis & {
+        __biblequestSupabaseBrowserClient?: unknown;
+      }
+    ).__biblequestSupabaseBrowserClient;
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://fixture.supabase.co");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "fixture-anon-key");
   });
@@ -45,5 +50,20 @@ describe("Supabase browser clients", () => {
     });
     expect(await options.accessToken()).toBe("fixture-access-token");
     expect(getSession).toHaveBeenCalledOnce();
+  });
+
+  it("keeps one auth client across every app consumer", async () => {
+    const authClient = { auth: { getSession: vi.fn() } };
+    mocks.createBrowserClient.mockReturnValue(authClient);
+    const { createClient } = await import("@/lib/supabase/client");
+
+    expect(createClient()).toBe(authClient);
+    expect(createClient()).toBe(authClient);
+    expect(mocks.createBrowserClient).toHaveBeenCalledOnce();
+    expect(mocks.createBrowserClient).toHaveBeenCalledWith(
+      "https://fixture.supabase.co",
+      "fixture-anon-key",
+      { isSingleton: true },
+    );
   });
 });
