@@ -16,6 +16,7 @@ import { VerseDemo } from "@/components/marketing/VerseDemo";
 import { getDailyVerse } from "@/lib/questos/verse-engine";
 import { questBySlug, seedQuests } from "@/data/seed/quests";
 import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
+import { SUPPORT_EMAIL } from "@/lib/brand";
 
 /* "Today's Verse" is date-derived — re-render hourly so it doesn't freeze at deploy. */
 export const revalidate = 3600;
@@ -33,7 +34,7 @@ const MARKETING_STRUCTURED_DATA = {
       "@id": "https://www.biblequest.co/#organization",
       name: "Winterhill Studio",
       url: "https://winterhill.studio",
-      email: "hello@biblequest.co",
+      email: SUPPORT_EMAIL,
     },
     {
       "@type": "SoftwareApplication",

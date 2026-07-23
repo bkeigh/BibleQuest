@@ -159,7 +159,7 @@ export function InstallPrompt() {
               type="button"
               onClick={dismiss}
               aria-label="Dismiss"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ash transition-colors hover:bg-linen hover:text-charcoal"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ash transition-colors hover:bg-linen hover:text-charcoal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <IconClose size={18} />
             </button>

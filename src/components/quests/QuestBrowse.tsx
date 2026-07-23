@@ -38,6 +38,7 @@ import {
 import { Disclosure } from "@/components/design-system/Disclosure";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
+import { SearchClearButton } from "@/components/design-system/SearchClearButton";
 import { useToast } from "@/components/design-system/Toast";
 import {
   IconPlus,
@@ -114,7 +115,6 @@ function QuestBrowseInner() {
     () => occupiedQuestAssignments(assignments, now),
     [assignments, now]
   );
-  const reservedSlots = occupiedPicks.length;
 
   // Released free-tier quests still own their original window. Keep them
   // visible here so "restore" is a direct action, not a catalog scavenger hunt.
@@ -306,6 +306,20 @@ function QuestBrowseInner() {
   }
 
   const hasFilters = activeFilterCount > 0;
+  // Keeps touch-screen status copy useful by omitting noisy zero counts and
+  // naming remaining capacity directly instead of showing slot arithmetic.
+  const todayStatusSummary = [
+    activePicks.length > 0 ? `${activePicks.length} active` : null,
+    readyPicks.length > 0 ? `${readyPicks.length} ready` : null,
+    donePicks.length > 0 ? `${donePicks.length} complete` : null,
+    isPlus
+      ? "Unlimited slots"
+      : Number.isFinite(slotsRemaining)
+        ? `${slotsRemaining} ${slotsRemaining === 1 ? "slot" : "slots"} open`
+        : null,
+  ]
+    .filter((item): item is string => Boolean(item))
+    .join(" · ");
 
   return (
     <>
@@ -323,15 +337,7 @@ function QuestBrowseInner() {
           <div className="flex items-baseline justify-between">
             <ShelfTitle>{t.quests.today}</ShelfTitle>
             <p aria-live="polite" className="text-caption text-ash">
-              {isPlus
-                ? `${activePicks.length} active · ${readyPicks.length} ready · Unlimited`
-                : `${activePicks.length} active · ${readyPicks.length} ready${
-                    donePicks.length > 0 ? ` · ${donePicks.length} done` : ""
-                  } · ${reservedSlots}/3 slots${
-                    Number.isFinite(slotsRemaining) && slotsRemaining > 0
-                      ? ` · ${slotsRemaining} open`
-                      : ""
-                  }`}
+              {todayStatusSummary}
             </p>
           </div>
           {picks.length === 0 ? (
@@ -469,14 +475,22 @@ function QuestBrowseInner() {
               >
                 {t.quests.search}
               </label>
-              <input
-                id="quest-search"
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Title, theme, or category"
-                className="mt-1.5 w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-body text-graphite outline-none transition-colors focus:border-accent/50"
-              />
+              <div className="relative mt-1.5">
+                <input
+                  id="quest-search"
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Title, theme, or category"
+                  className="w-full rounded-[var(--radius-button)] border border-mist bg-linen py-2.5 pl-3.5 pr-12 text-body text-graphite outline-none transition-colors focus:border-accent/50"
+                />
+                <SearchClearButton
+                  inputId="quest-search"
+                  visible={search.length > 0}
+                  onClear={() => setSearch("")}
+                  label="Clear quest search"
+                />
+              </div>
             </div>
 
             <FilterGroup label={t.quests.duration}>

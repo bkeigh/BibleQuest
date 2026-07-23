@@ -22,9 +22,9 @@ describe("launch content catalog", () => {
       "utf8",
     );
 
-    const accountSurface = home.indexOf("Profile, preferences &amp; accessibility");
+    const accountSurface = home.indexOf("Personal welcome");
     const verseEntry = home.indexOf("<TodaysVerseLink />");
-    const questSection = home.indexOf('id="active-quests"');
+    const questSection = home.indexOf("<HomeQuestDisclosure");
     expect(accountSurface).toBeGreaterThan(-1);
     expect(verseEntry).toBeGreaterThan(accountSurface);
     expect(questSection).toBeGreaterThan(verseEntry);
@@ -42,13 +42,18 @@ describe("launch content catalog", () => {
     expect(focusRule).not.toContain("transform:");
   });
 
-  it("keeps Home quests aligned in one vertical column", () => {
+  it("keeps Home quests collapsed above one aligned vertical column", () => {
     const home = readFileSync(
       path.join(process.cwd(), "src/components/home/HomeScreen.tsx"),
       "utf8",
     );
 
-    // Counts and status groups stay visible without turning the quest list into a rail.
+    // Counts stay in the disclosure header without turning the expanded list into a rail.
+    expect(home).toContain("<HomeQuestDisclosure");
+    expect(home).toContain("summary={questSummary}");
+    expect(home).toContain(
+      "defaultOpen={pickCount === 0 && hiddenReservationCount === 0}",
+    );
     expect(home).toContain('label: "Active quests"');
     expect(home).toContain('label: "Completed"');
     expect(home).toContain(
