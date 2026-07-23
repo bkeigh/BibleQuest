@@ -5,6 +5,7 @@ import {
 } from "@/components/marketing/MarketingPage";
 import { GentleLink } from "@/components/design-system/GentleButton";
 import { marketingMetadata } from "@/lib/metadata";
+import { SUPPORT_EMAIL, SUPPORT_EMAIL_HREF } from "@/lib/brand";
 
 export const metadata = marketingMetadata({
   title: "For Churches",
@@ -41,10 +42,10 @@ export default function ChurchesPage() {
         discipleship, we’d love your honest feedback on what would actually be
         useful for your community. Write to us at{" "}
         <a
-          href="mailto:hello@biblequest.co"
+          href={SUPPORT_EMAIL_HREF}
           className="text-accent underline underline-offset-4"
         >
-          hello@biblequest.co
+          {SUPPORT_EMAIL}
         </a>{" "}
         — we read everything.
       </Prose>

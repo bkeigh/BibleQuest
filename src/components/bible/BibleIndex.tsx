@@ -26,6 +26,7 @@ import { PaperCard } from "@/components/design-system/PaperCard";
 import { VerseCard } from "@/components/bible/VerseCard";
 import { VerseRefreshLimitDialog } from "@/components/bible/VerseRefreshLimitDialog";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { SearchClearButton } from "@/components/design-system/SearchClearButton";
 import {
   IconBookmark,
   IconChevronRight,
@@ -347,21 +348,30 @@ function BibleIndexInner() {
             </p>
           </div>
 
-          <label className="relative mt-3 block">
-            <span className="sr-only">Search Bible books</span>
+          <div className="relative mt-3">
+            <label htmlFor="bible-book-search" className="sr-only">
+              Search Bible books
+            </label>
             <IconSearch
               size={18}
               className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ash"
             />
             <input
+              id="bible-book-search"
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search Genesis, John, Psalms…"
               autoComplete="off"
-              className="min-h-12 w-full rounded-[var(--radius-card)] border border-mist bg-paper pl-11 pr-4 text-small text-graphite outline-none paper-shadow transition-colors placeholder:text-fog focus:border-accent/50"
+              className="min-h-12 w-full rounded-[var(--radius-card)] border border-mist bg-paper pl-11 pr-12 text-small text-graphite outline-none paper-shadow transition-colors placeholder:text-fog focus:border-accent/50"
             />
-          </label>
+            <SearchClearButton
+              inputId="bible-book-search"
+              visible={query.length > 0}
+              onClear={() => setQuery("")}
+              label="Clear Bible book search"
+            />
+          </div>
 
           {!normalizedQuery && (
             <div

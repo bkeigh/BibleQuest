@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
+import { SUPPORT_EMAIL, SUPPORT_EMAIL_HREF } from "@/lib/brand";
 
 export type LegalDocumentKind = "privacy" | "terms";
 
@@ -27,10 +28,10 @@ const ACCOUNT_SECURITY_COPY = ACCOUNT_SYNC_CONTAINED
 
 const ContactLink = () => (
   <a
-    href="mailto:hello@biblequest.co"
+    href={SUPPORT_EMAIL_HREF}
     className="text-accent underline underline-offset-4"
   >
-    hello@biblequest.co
+    {SUPPORT_EMAIL}
   </a>
 );
 

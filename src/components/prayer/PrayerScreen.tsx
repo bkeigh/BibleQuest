@@ -12,6 +12,7 @@ import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { PixelMascot } from "@/components/design-system/PixelMascot";
+import { SearchClearButton } from "@/components/design-system/SearchClearButton";
 import { JournalEntryBody } from "@/components/journal/JournalEntryBody";
 import { JournalPrivacyNote } from "@/components/journal/JournalPrivacyNote";
 import { JournalComposeMenu } from "@/components/journal/JournalComposeMenu";
@@ -226,7 +227,13 @@ function PrayerScreenInner() {
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search your journal"
                   autoComplete="off"
-                  className="h-12 w-full rounded-[var(--radius-button)] border border-mist bg-paper pl-10 pr-4 text-[0.9375rem] text-graphite outline-none placeholder:text-fog focus:border-accent"
+                  className="h-12 w-full rounded-[var(--radius-button)] border border-mist bg-paper pl-10 pr-12 text-[0.9375rem] text-graphite outline-none placeholder:text-fog focus:border-accent"
+                />
+                <SearchClearButton
+                  inputId="journal-search"
+                  visible={query.length > 0}
+                  onClear={() => setQuery("")}
+                  label="Clear journal search"
                 />
               </div>
             </motion.div>

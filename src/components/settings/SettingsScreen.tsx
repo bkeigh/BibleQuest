@@ -15,6 +15,7 @@ import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosure";
+import { SearchClearButton } from "@/components/design-system/SearchClearButton";
 import { Avatar } from "@/components/profile/Avatar";
 import { applyAppearance } from "@/lib/theme";
 import { saveAvatar, clearAvatar } from "@/lib/utils/avatar";
@@ -53,6 +54,7 @@ import {
   MIN_GLASS_OPACITY,
   normalizeGlassOpacity,
 } from "@/lib/glass-opacity";
+import { SUPPORT_EMAIL, SUPPORT_EMAIL_HREF } from "@/lib/brand";
 
 function Row({
   label,
@@ -650,14 +652,22 @@ function BibleTranslationPicker({
           <label htmlFor="translation-search" className="text-caption text-ash">
             {copy.searchLabel}
           </label>
-          <input
-            id="translation-search"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={copy.searchPlaceholder}
-            className="mt-1.5 w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-[0.9375rem] text-graphite outline-none focus:border-accent/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          />
+          <div className="relative mt-1.5">
+            <input
+              id="translation-search"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={copy.searchPlaceholder}
+              className="w-full rounded-[var(--radius-button)] border border-mist bg-linen py-2.5 pl-3.5 pr-12 text-[0.9375rem] text-graphite outline-none focus:border-accent/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            />
+            <SearchClearButton
+              inputId="translation-search"
+              visible={query.length > 0}
+              onClear={() => setQuery("")}
+              label="Clear Bible translation search"
+            />
+          </div>
           <div className="mt-3 max-h-80 space-y-4 overflow-y-auto pr-1">
             {onlineLanguages.map(([language, editions]) => (
               <div key={language}>
@@ -1311,6 +1321,15 @@ function SettingsInner() {
                 <Link href="/privacy" className="block py-3 text-charcoal hover:text-accent">
                   Privacy Policy
                 </Link>
+              </li>
+              <li>
+                <a
+                  href={SUPPORT_EMAIL_HREF}
+                  className="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-1 py-3 text-charcoal hover:text-accent"
+                >
+                  <span>Email support</span>
+                  <span className="text-caption text-ash">{SUPPORT_EMAIL}</span>
+                </a>
               </li>
             </ul>
           </Disclosure>

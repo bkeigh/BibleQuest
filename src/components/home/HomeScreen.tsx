@@ -12,7 +12,6 @@ import { motion } from "framer-motion";
 import {
   useQuestOS,
   selectStreak,
-  FREE_QUEST_SLOTS,
 } from "@/lib/questos/store";
 import { calculateTreeState, stageProgress } from "@/lib/questos/growth-engine";
 import {
@@ -42,6 +41,7 @@ import { SeasonalAtmosphere } from "@/components/design-system/SeasonalAtmospher
 import { CATEGORY_SPRITE, PixelIcon } from "@/components/design-system/PixelIcon";
 import { Avatar } from "@/components/profile/Avatar";
 import { StreakCard } from "@/components/home/StreakCard";
+import { HomeQuestDisclosure } from "@/components/home/HomeQuestDisclosure";
 import {
   IconArrowRight,
   IconChevronRight,
@@ -51,6 +51,7 @@ import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { seedQuests, questBySlug } from "@/data/seed/quests";
 import { usePlus } from "@/lib/revenuecat/usePlus";
 import { ExplorePlusLink } from "@/components/plus/ExplorePlusLink";
+import { homeQuestSummary } from "@/lib/questos/home-quest-summary";
 
 function HomeInner() {
   const profile = useQuestOS((s) => s.profile);
@@ -160,6 +161,24 @@ function HomeInner() {
     occupiedPicks.length - pickCount
   );
   const canAddQuest = isPlus || slotsRemaining > 0;
+  const questSummary = homeQuestSummary({
+    activeCount: activePickedQuests.length,
+    readyCount: readyPickedQuests.length,
+    completedCount,
+    visibleCount: pickCount,
+    occupiedCount: occupiedPicks.length,
+    hiddenReservationCount,
+  });
+  const questAnnouncement =
+    pickCount === 0
+      ? hiddenReservationCount > 0
+        ? questSummary
+        : t.quests.emptyTitle
+      : allDone
+        ? canAddQuest
+          ? "Your open quests are complete."
+          : t.dayComplete.title
+        : `${t.quests.completedToday}: ${completedCount}/${pickCount}`;
 
   // Suggested quests for the open day — the same deterministic shelf as the
   // browse page, so home and browse always agree on today's offer.
@@ -204,6 +223,12 @@ function HomeInner() {
                 size="lg"
                 className="ring-1 ring-paper/70 shadow-[0_8px_24px_rgb(18_33_27_/_0.14)] max-[360px]:h-[4.5rem] max-[360px]:w-[4.5rem]"
               />
+              <span
+                aria-hidden="true"
+                className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-paper text-accent ring-1 ring-mist paper-shadow"
+              >
+                <IconSettings size={14} />
+              </span>
             </Link>
             <div className="min-w-0 flex-1">
               <p className="font-display text-[1rem] leading-tight text-accent max-[360px]:text-[0.875rem]">
@@ -220,17 +245,6 @@ function HomeInner() {
             </div>
             <StreakCard streak={streak} dayKey={dayKey} />
           </div>
-          <Link
-            href="/app/settings"
-            className="relative z-10 mt-3 flex min-h-11 items-center gap-2.5 rounded-[10px] bg-linen/80 px-3 text-small font-medium text-charcoal ring-1 ring-mist transition-colors hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:mt-4"
-          >
-            <IconSettings size={18} className="shrink-0 text-accent" />
-            <span>Settings</span>
-            <span className="ml-1 truncate text-caption font-normal text-ash max-[390px]:hidden">
-              Profile, preferences &amp; accessibility
-            </span>
-            <IconChevronRight className="ml-auto shrink-0 text-fog" />
-          </Link>
         </header>
 
         <div className="space-y-4 pb-4">
@@ -238,52 +252,14 @@ function HomeInner() {
               while the compact treatment leaves quests as Home's main work. */}
           <TodaysVerseLink />
 
-          {/* Today's quests — empty, picked (1-3), or day complete */}
-          <section
-            id="active-quests"
-            aria-label={t.home.todaysQuests}
-            tabIndex={-1}
-            className="scroll-mt-6 outline-none"
+          {/* Today's quests stay summarized until opened, preserving the
+              original aligned vertical cards without lengthening Home. */}
+          <HomeQuestDisclosure
+            title={t.home.todaysQuests}
+            summary={questSummary}
+            announcement={questAnnouncement}
+            defaultOpen={pickCount === 0 && hiddenReservationCount === 0}
           >
-            {/* The loudest title on the page — the day's work anchors it. */}
-            <div className="mb-2.5 flex items-center justify-between gap-3 px-1">
-              <h2 className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent min-[380px]:text-[1.75rem]">
-                {t.home.todaysQuests}
-              </h2>
-              {pickCount === 0 ? (
-                hiddenReservationCount > 0 ? (
-                  <p className="text-caption text-ash">
-                    {occupiedPicks.length}/{FREE_QUEST_SLOTS} slots reserved
-                  </p>
-                ) : (
-                  <PixelIcon name="scroll" size={5} />
-                )
-              ) : (
-                <p className="text-caption text-ash">
-                  {activePickedQuests.length > 0
-                    ? `${activePickedQuests.length} active${
-                        readyPickedQuests.length > 0
-                          ? ` · ${readyPickedQuests.length} ready`
-                          : ""
-                      }${completedCount > 0 ? ` · ${completedCount} done` : ""}`
-                    : completedCount > 0
-                      ? `${completedCount}/${pickCount} done`
-                      : `${readyPickedQuests.length} ready`}
-                </p>
-              )}
-            </div>
-
-            {/* Announce pick/completion changes to screen readers. */}
-            <p aria-live="polite" className="sr-only">
-              {pickCount === 0
-                ? t.quests.emptyTitle
-                : allDone
-                  ? canAddQuest
-                    ? "Your open quests are complete."
-                    : t.dayComplete.title
-                  : `${t.quests.completedToday}: ${completedCount}/${pickCount}`}
-            </p>
-
             {pickCount === 0 && (
               <>
                 <p className="mb-3 px-1 text-small text-ash">
@@ -387,7 +363,7 @@ function HomeInner() {
                 </PaperCard>
               </motion.div>
             )}
-          </section>
+          </HomeQuestDisclosure>
 
           {/* Growth preview — the journey, one glance */}
           <Link href="/app/journey" className="block">
