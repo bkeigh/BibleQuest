@@ -18,12 +18,20 @@ import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosu
 import { Avatar } from "@/components/profile/Avatar";
 import { applyAppearance } from "@/lib/theme";
 import { saveAvatar, clearAvatar } from "@/lib/utils/avatar";
-import { parseSnapshot } from "@/lib/questos/import-schema";
+import {
+  MAX_IMPORT_FILE_BYTES,
+  parseSnapshot,
+} from "@/lib/questos/import-schema";
 import { createExportSnapshot } from "@/lib/questos/snapshot";
 import { clearAllDeviceLocalJournalDrafts } from "@/lib/questos/journal-drafts";
 import { clearLastSyncedUserId } from "@/lib/sync/last-user";
 import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 import { useSession } from "@/lib/supabase/useSession";
+import { deleteOwnAccount } from "@/lib/auth/account-deletion";
+import { stopSync } from "@/lib/sync/engine";
+import { clearStoredAccountSyncGenerations } from "@/lib/sync/generation";
+import { clearStoredDailyQuestSyncContext } from "@/lib/sync/daily-quests";
+import { clearStoredMutableRevisionContext } from "@/lib/sync/mutable-revisions";
 import type { QuestOSSnapshot } from "@/lib/questos/types";
 import { useStrings, LANGUAGES, languageMeta, fmt } from "@/lib/i18n";
 import { IconCheck, IconChevronRight } from "@/components/design-system/icons";
@@ -697,6 +705,10 @@ function SettingsInner() {
   const store = useQuestOS;
 
   const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [pendingImport, setPendingImport] =
@@ -769,6 +781,10 @@ function SettingsInner() {
     const file = e.target.files?.[0];
     e.target.value = ""; // reset so re-picking the same file still fires onChange
     if (!file) return;
+    if (file.size > MAX_IMPORT_FILE_BYTES) {
+      setImportError("That journey is too large to restore safely.");
+      return;
+    }
     let text: string;
     try {
       text = await file.text();
@@ -796,6 +812,42 @@ function SettingsInner() {
     setPendingImport(null);
     applyAppearance(store.getState().settings.appearance);
     toast("Restored.", { variant: "success" });
+  }
+
+  // Server deletion must succeed before any irreplaceable device data is removed.
+  async function deleteAccount() {
+    if (
+      !user ||
+      ACCOUNT_SYNC_CONTAINED ||
+      deleteConfirmation !== "DELETE" ||
+      deletingAccount
+    ) {
+      return;
+    }
+    setDeletingAccount(true);
+    setDeleteAccountError(false);
+
+    try {
+      await deleteOwnAccount();
+    } catch {
+      setDeletingAccount(false);
+      setDeleteAccountError(true);
+      return;
+    }
+
+    // Stop every subscriber before removing the deleted account's local copy.
+    stopSync();
+    clearAllData();
+    clearAllDeviceLocalJournalDrafts();
+    clearLastSyncedUserId();
+    clearStoredAccountSyncGenerations();
+    clearStoredDailyQuestSyncContext();
+    clearStoredMutableRevisionContext();
+    await clearAvatar();
+    toast("Your account and saved journey were deleted.", {
+      variant: "success",
+    });
+    router.replace("/onboarding");
   }
 
   return (
@@ -933,6 +985,88 @@ function SettingsInner() {
               <IconChevronRight size={15} />
             </span>
           </Link>
+          {!ACCOUNT_SYNC_CONTAINED && user && (
+            <div className="border-t border-mist/70 px-4 py-4">
+              {!confirmDeleteAccount ? (
+                <>
+                  <p className="text-[0.875rem] leading-relaxed text-ash">
+                    Permanently close your login and delete its synced journey.
+                    This device’s journey will also be cleared.
+                  </p>
+                  <GentleButton
+                    variant="danger"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => {
+                      setDeleteAccountError(false);
+                      setConfirmDeleteAccount(true);
+                    }}
+                  >
+                    Delete account
+                  </GentleButton>
+                </>
+              ) : (
+                <>
+                  <p className="text-[0.9375rem] leading-relaxed text-charcoal">
+                    This permanently deletes your account, prayers,
+                    reflections, progress, and this device’s journey. It can’t
+                    be undone.
+                  </p>
+                  <label
+                    htmlFor="delete-account-confirmation"
+                    className="mt-3 block text-caption text-ash"
+                  >
+                    Type DELETE to confirm
+                  </label>
+                  <input
+                    id="delete-account-confirmation"
+                    value={deleteConfirmation}
+                    onChange={(event) => {
+                      setDeleteConfirmation(event.target.value);
+                      setDeleteAccountError(false);
+                    }}
+                    autoComplete="off"
+                    spellCheck={false}
+                    disabled={deletingAccount}
+                    className="mt-1.5 w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-body text-graphite outline-none focus:border-accent/50"
+                  />
+                  {deleteAccountError && (
+                    <p role="alert" className="mt-2 text-caption text-rose-700">
+                      We couldn’t delete your account. Nothing on this device
+                      was removed. Check your connection and try again.
+                    </p>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-2.5">
+                    <GentleButton
+                      variant="danger"
+                      size="sm"
+                      disabled={
+                        deleteConfirmation !== "DELETE" || deletingAccount
+                      }
+                      aria-busy={deletingAccount}
+                      onClick={() => void deleteAccount()}
+                    >
+                      {deletingAccount
+                        ? "Deleting account…"
+                        : "Permanently delete account"}
+                    </GentleButton>
+                    <GentleButton
+                      variant="ghost"
+                      size="sm"
+                      disabled={deletingAccount}
+                      onClick={() => {
+                        setConfirmDeleteAccount(false);
+                        setDeleteConfirmation("");
+                        setDeleteAccountError(false);
+                      }}
+                    >
+                      Keep my account
+                    </GentleButton>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </PaperCard>
 
         {/* Always visible — text size and bold text are comfort settings
@@ -1048,7 +1182,14 @@ function SettingsInner() {
 
           <Disclosure
             variant="card"
-            label={t.settings.language}
+            label={
+              <span className="inline-flex items-center gap-2">
+                {t.settings.language}
+                <span className="rounded-full bg-accent-surface px-2 py-0.5 text-[0.6875rem] font-medium uppercase tracking-[0.06em] text-accent">
+                  Beta
+                </span>
+              </span>
+            }
             summary={<span className="text-[0.8125rem] text-ash">{languageMeta(language).endonym}</span>}
           >
             <p className="pb-1 text-[0.875rem] leading-relaxed text-ash">
@@ -1163,7 +1304,7 @@ function SettingsInner() {
               </li>
               <li>
                 <Link href="/terms" className="block py-3 text-charcoal hover:text-accent">
-                  Terms of Service
+                  Terms of Use
                 </Link>
               </li>
               <li>

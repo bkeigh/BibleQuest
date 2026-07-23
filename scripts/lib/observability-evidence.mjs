@@ -29,11 +29,12 @@ const CATEGORIES = [
 ];
 const STAGES = {
   auth: ["session", "request_email", "request_oauth", "callback"],
-  sync: ["initial", "push"],
+  sync: ["initial", "push", "reconciliation"],
   service_worker: ["registration"],
 };
 
 export const DAILY_QUEST_SYNC_CONTRACT = "biblequest_daily_quest_sync_v1";
+export const ACCOUNT_SYNC_CONTRACT = "biblequest_account_sync_v4";
 
 /** Accepts only the two-field public CAS posture response. */
 export function isDailyQuestSyncContract(value) {
@@ -41,6 +42,16 @@ export function isDailyQuestSyncContract(value) {
   return (
     Object.keys(value).sort().join(",") === "contract,ok" &&
     value.contract === DAILY_QUEST_SYNC_CONTRACT &&
+    value.ok === true
+  );
+}
+
+/** Accepts only the two-field live mutable-account boundary response. */
+export function isAccountSyncContract(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return (
+    Object.keys(value).sort().join(",") === "contract,ok" &&
+    value.contract === ACCOUNT_SYNC_CONTRACT &&
     value.ok === true
   );
 }
@@ -379,6 +390,21 @@ export function fixtureReadiness() {
     migration: "0015",
     ok: true,
   });
+  schemaChecks.push({
+    contract: ACCOUNT_SYNC_CONTRACT,
+    migration: "0019",
+    ok: true,
+  });
+  schemaChecks.push({
+    contract: "generation_bound_account_deletion_v2",
+    migration: "0022",
+    ok: true,
+  });
+  schemaChecks.push({
+    contract: "delete_own_account_authenticated_only",
+    migration: "0022",
+    ok: true,
+  });
   const contentChecks = [
     "quest_templates",
     "daily_verses",
@@ -414,7 +440,7 @@ export function fixtureReadiness() {
       google_enabled: true,
       phone_disabled: true,
     },
-    check_count: 18,
+    check_count: 21,
     failed_check_count: 0,
   };
 }
@@ -452,6 +478,14 @@ export function buildLaunchEvidence(
       (check) =>
         check?.contract === DAILY_QUEST_SYNC_CONTRACT &&
         check?.migration === "0015" &&
+        check?.ok === true,
+    );
+  const accountSyncReady =
+    Array.isArray(schemaChecks) &&
+    schemaChecks.some(
+      (check) =>
+        check?.contract === ACCOUNT_SYNC_CONTRACT &&
+        check?.migration === "0019" &&
         check?.ok === true,
     );
   const add = (condition, severity, code, owner, action) => {
@@ -514,7 +548,9 @@ export function buildLaunchEvidence(
     "confirm the launch explicitly intends guest-only mode",
   );
   add(
-    readiness?.schema_parity?.ok !== true || dailyQuestSyncReady !== true,
+    readiness?.schema_parity?.ok !== true ||
+      dailyQuestSyncReady !== true ||
+      accountSyncReady !== true,
     "critical",
     "schema_parity_failed",
     "[DATABASE OWNER]",

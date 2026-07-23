@@ -11,6 +11,15 @@
  * bundle. See docs/SECURITY.md.
  */
 import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const BROWSER_CLIENT_KEY = "__biblequestSupabaseBrowserClient";
+
+type BibleQuestClientGlobal = typeof globalThis & {
+  [BROWSER_CLIENT_KEY]?: SupabaseClient;
+};
 
 export function isSupabaseConfigured(): boolean {
   return Boolean(
@@ -25,8 +34,47 @@ export function createClient() {
       "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY — see docs/SETUP.md."
     );
   }
+  // Keep one GoTrue owner across route chunks and client navigations.
+  const scope = globalThis as BibleQuestClientGlobal;
+  scope[BROWSER_CLIENT_KEY] ??= createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { isSingleton: true },
+  );
+  return scope[BROWSER_CLIENT_KEY];
+}
+
+/** Create a non-singleton data client pinned to one observed sync generation. */
+export function createSyncClient(expectedUserId: string, generation: number) {
+  if (!UUID.test(expectedUserId) || !Number.isSafeInteger(generation) || generation < 0) {
+    throw new Error("Invalid account sync boundary.");
+  }
+  if (!isSupabaseConfigured()) {
+    throw new Error(
+      "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY — see docs/SETUP.md.",
+    );
+  }
+  const authClient = createClient();
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      // Sync generations change after destructive operations, so a shared
+      // singleton could silently retain stale global headers. Reuse the auth
+      // singleton only as the token source so data clients do not create
+      // competing GoTrue instances under the same browser storage key.
+      isSingleton: false,
+      accessToken: async () => {
+        const { data, error } = await authClient.auth.getSession();
+        if (error) throw error;
+        return data.session?.access_token ?? null;
+      },
+      global: {
+        headers: {
+          "x-biblequest-expected-user": expectedUserId,
+          "x-biblequest-sync-generation": String(generation),
+        },
+      },
+    },
   );
 }

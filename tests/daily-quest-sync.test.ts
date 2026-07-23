@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DailyQuestAssignment } from "@/lib/questos/types";
 import {
+  clearStoredDailyQuestSyncContext,
   configureDailyQuestSyncContext,
   createDailyQuestSyncContext,
   isMissingDailyQuestRevisionTable,
@@ -27,6 +28,8 @@ interface PayloadRow {
 }
 
 interface ReplaceArgs {
+  p_expected_user_id: string;
+  p_expected_generation: number;
   p_assigned_date: string;
   p_expected_revision: number;
   p_request_id: string;
@@ -57,6 +60,7 @@ class FakeCasServer {
   calls: ReplaceArgs[] = [];
   failBeforeCommit = false;
   loseNextResponse = false;
+  normalizeResponseTimestamps = false;
 
   client(): SupabaseClient {
     return {
@@ -123,13 +127,29 @@ class FakeCasServer {
 
   /** Return the same bounded JSON shape as the production RPC. */
   private response(status: "applied" | "conflict", duplicate: boolean) {
+    // Hosted PostgreSQL returns equivalent timestamptz values with +00:00.
+    const rows = this.normalizeResponseTimestamps
+      ? this.rows.map((row) => ({
+          ...row,
+          started_at: postgresTimestamp(row.started_at),
+          completed_at: postgresTimestamp(row.completed_at),
+          picked_at: postgresTimestamp(row.picked_at) ?? row.picked_at,
+          expires_at: postgresTimestamp(row.expires_at) ?? row.expires_at,
+        }))
+      : structuredClone(this.rows);
     return {
       status,
       revision: this.revision,
       duplicate,
-      rows: structuredClone(this.rows),
+      rows,
+      generation: 0,
     };
   }
+}
+
+/** Format a fixture timestamp the same way hosted PostgreSQL returns it. */
+function postgresTimestamp(value: string | null) {
+  return value?.replace(".000Z", "+00:00") ?? null;
 }
 
 /** Create a deterministic per-device request-id generator. */
@@ -163,7 +183,36 @@ class FakeStorage {
   }
 }
 
+/** Persist once, then emulate a browser storage write fault. */
+class FailAfterOneDailyWriteStorage extends FakeStorage {
+  private writesRemaining = 1;
+
+  override setItem(key: string, value: string) {
+    if (this.writesRemaining-- === 0) throw new Error("storage unavailable");
+    super.setItem(key, value);
+  }
+}
+
 describe("transactional daily-quest sync", () => {
+  it("removes persisted daily metadata with a deleted device journey", () => {
+    const storage = new FakeStorage();
+    const active = createDailyQuestSyncContext(() => "active-request");
+    restoreDailyQuestSyncContext(active, "owner-a", false, storage);
+    configureDailyQuestSyncContext(
+      active,
+      [{ assigned_date: DAY, revision: 1 }],
+      true,
+      { [DAY]: [assignment("quest-a")] },
+    );
+    expect(
+      storage.getItem("biblequest:daily-quest-cas:v1"),
+    ).not.toBeNull();
+
+    clearStoredDailyQuestSyncContext(storage);
+
+    expect(storage.getItem("biblequest:daily-quest-cas:v1")).toBeNull();
+  });
+
   it("falls back only for the exact missing revision table contract", () => {
     expect(isMissingDailyQuestRevisionTable({
       code: "PGRST205",
@@ -262,6 +311,22 @@ describe("transactional daily-quest sync", () => {
     expect(server.calls[1].p_request_id).toBe(server.calls[0].p_request_id);
     expect(server.revision).toBe(1);
     expect(server.rows).toHaveLength(1);
+  });
+
+  it("accepts PostgreSQL timestamp formatting as the applied canonical day", async () => {
+    const server = new FakeCasServer();
+    const device = context("aaaaaaaa");
+    server.normalizeResponseTimestamps = true;
+
+    const result = await writeDailyQuestAssignments(
+      server.client(),
+      "owner-a",
+      { [DAY]: [assignment("quest-a")] },
+      device,
+    );
+
+    expect(result.conflicts).toEqual({});
+    expect(server.revision).toBe(1);
   });
 
   it("atomically deletes an unpicked unfinished assignment", async () => {
@@ -415,6 +480,33 @@ describe("transactional daily-quest sync", () => {
     expect(reopened.revisions.get(DAY)).toBe(2);
   });
 
+  it("invalidates an older daily base when a canonical rewrite cannot persist", () => {
+    const storage = new FailAfterOneDailyWriteStorage();
+    const original = assignment("original");
+    const active = createDailyQuestSyncContext(() => "active-request");
+    restoreDailyQuestSyncContext(active, "owner-a", false, storage);
+    reconcileDailyQuestPull(
+      active,
+      { [DAY]: [original] },
+      { [DAY]: [original] },
+      [{ assigned_date: DAY, revision: 1 }],
+      true,
+    );
+    reconcileDailyQuestPull(
+      active,
+      { [DAY]: [original] },
+      { [DAY]: [] },
+      [{ assigned_date: DAY, revision: 2 }],
+      true,
+    );
+
+    const reopened = createDailyQuestSyncContext(() => "reopened-request");
+    restoreDailyQuestSyncContext(reopened, "owner-a", true, storage);
+
+    expect(reopened.revisions.size).toBe(0);
+    expect(reopened.bases.size).toBe(0);
+  });
+
   it("does not repeat a committed request after an offline reload", async () => {
     const storage = new FakeStorage();
     const server = new FakeCasServer();
@@ -502,6 +594,36 @@ describe("transactional daily-quest sync", () => {
     })).toBe(false);
   });
 
+  it("fails closed when a v3 engine loses the transactional RPC", async () => {
+    const query = {
+      delete: () => query,
+      eq: () => query,
+      insert: async () => ({ data: null, error: null }),
+    };
+    const client = {
+      rpc: async () => ({
+        data: null,
+        error: {
+          code: "PGRST202",
+          message:
+            "Could not find the function public.replace_user_daily_quests in the schema cache",
+        },
+      }),
+      from: () => query,
+    } as unknown as SupabaseClient;
+
+    await expect(
+      writeDailyQuestAssignments(
+        client,
+        "owner-a",
+        { [DAY]: [assignment("quest-a")] },
+        context("aaaaaaaa"),
+        0,
+        false,
+      ),
+    ).rejects.toMatchObject({ code: "PGRST202" });
+  });
+
   it("never sends a caller-controlled owner or day inside the row payload", async () => {
     const server = new FakeCasServer();
     await writeDailyQuestAssignments(
@@ -512,6 +634,10 @@ describe("transactional daily-quest sync", () => {
     );
 
     expect(server.calls[0]).not.toHaveProperty("p_user_id");
+    expect(server.calls[0]).toMatchObject({
+      p_expected_user_id: "owner-a",
+      p_expected_generation: 0,
+    });
     expect(server.calls[0].p_rows[0]).not.toHaveProperty("user_id");
     expect(server.calls[0].p_rows[0]).not.toHaveProperty("assigned_date");
   });
@@ -523,7 +649,33 @@ describe("transactional daily-quest sync", () => {
           status: "applied",
           revision: 1,
           duplicate: false,
+          generation: 0,
           rows: [{ quest_slug: "missing-required-fields" }],
+        },
+        error: null,
+      }),
+    } as unknown as SupabaseClient;
+
+    await expect(
+      writeDailyQuestAssignments(
+        client,
+        "owner-a",
+        { [DAY]: [assignment("quest-a")] },
+        context("aaaaaaaa"),
+      ),
+    ).rejects.toThrow("Invalid daily quest transaction response.");
+  });
+
+  it("fails closed on an expanded canonical RPC response", async () => {
+    const client = {
+      rpc: async () => ({
+        data: {
+          status: "applied",
+          revision: 1,
+          duplicate: false,
+          generation: 0,
+          rows: [],
+          diagnostic: "not part of the bounded contract",
         },
         error: null,
       }),

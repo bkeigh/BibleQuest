@@ -39,6 +39,8 @@ function assertIncludes(directives, name, expected) {
 }
 
 function assertSharedSecurityContract(response, production) {
+  assert.equal(response.headers.get("x-powered-by"), null);
+
   const rawCsp = response.headers.get("content-security-policy");
   assert.ok(rawCsp, "response must include Content-Security-Policy");
   const csp = parseCsp(rawCsp);
@@ -163,7 +165,7 @@ async function withNextServer(command, callback) {
 
   try {
     const response = await waitForResponse(child, `http://127.0.0.1:${port}/`, logs);
-    await callback(response);
+    await callback(response, logs);
   } finally {
     await stop(child);
     if (command === "dev") {
@@ -191,8 +193,12 @@ test(
   "a development Next.js response keeps HSTS out and unsafe-eval scoped to dev",
   { timeout: 120_000 },
   async () => {
-    await withNextServer("dev", (response) => {
-      assert.ok(response.status >= 200 && response.status < 400);
+    await withNextServer("dev", async (response, logs) => {
+      const body = await response.text();
+      assert.ok(
+        response.status >= 200 && response.status < 400,
+        `development server returned ${response.status}\n${body}\n${logs.join("")}`,
+      );
       assertSharedSecurityContract(response, false);
     });
   },

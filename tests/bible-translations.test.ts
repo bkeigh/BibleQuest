@@ -206,6 +206,8 @@ describe("Bible translation preference and licensing boundary", () => {
     const settings = {
       ...DEFAULT_SETTINGS,
       preferredBibleTranslation: "nlt",
+      updatedAt: "2026-07-22T19:30:00.000Z",
+      notificationsUpdatedAt: "2026-07-22T19:31:00.000Z",
     };
     const rows = settingsToRows("user-a", settings);
     expect(rows.settings.preferred_bible_translation).toBe("nlt");
@@ -235,7 +237,7 @@ describe("Bible translation preference and licensing boundary", () => {
       ),
       "utf8",
     );
-    expect(store).toContain("version: 13");
+    expect(store).toContain("version: 14");
     expect(store).toContain("if (version < 9)");
     expect(store).toContain("DEFAULT_BIBLE_TRANSLATION_KEY");
     expect(preferenceMigration).toContain("preferred_bible_translation");

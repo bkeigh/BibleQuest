@@ -1,7 +1,11 @@
 -- Exercise migration 0014 backfill, compatibility, and identity guarantees.
 begin;
 
+-- Linked CLI tests enter through a restricted login; use the database owner.
+set role postgres;
+grant usage on schema extensions to public;
 create extension if not exists pgtap with schema extensions;
+set local search_path = public, extensions;
 
 select plan(15);
 

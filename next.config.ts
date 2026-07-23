@@ -197,6 +197,8 @@ const privateNoStoreHeader = {
 };
 
 const nextConfig: NextConfig = {
+  // Avoid exposing framework identity on every response.
+  poweredByHeader: false,
   // This repository can sit beneath unrelated lockfiles on a workstation.
   // Pin Turbopack to the actual app root so dev tracing and diagnostics do not
   // silently widen to a parent directory.

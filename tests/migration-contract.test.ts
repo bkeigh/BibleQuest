@@ -22,6 +22,13 @@ const EXPECTED_MIGRATIONS = [
   "0012_kjv_bible_translation_default.sql",
   "0014_journey_event_identity.sql",
   "0015_transactional_daily_quest_sync.sql",
+  "0016_mutable_account_sync_guards.sql",
+  "0017_enforce_mutable_account_sync_boundary.sql",
+  "0018_bind_account_sync_identity_and_generation.sql",
+  "0019_server_ordered_account_sync_revisions.sql",
+  "0020_self_service_account_deletion.sql",
+  "0021_generation_bound_account_deletion.sql",
+  "0022_resilient_account_deletion.sql",
 ];
 
 /** Hash a migration exactly as the release manifest does. */
@@ -30,7 +37,7 @@ function sha256(path: string) {
 }
 
 describe("release migration contracts", () => {
-  it("keeps 0014 immutable and places CAS at the next forward-safe identity", () => {
+  it("keeps 0014 immutable and preserves the forward-only sync order", () => {
     const migrations = readdirSync(MIGRATIONS_DIR)
       .filter((name) => name.endsWith(".sql"))
       .sort();
@@ -80,8 +87,27 @@ describe("release migration contracts", () => {
     const expectedTables = report.match(/    \('[a-z_]+', '[^']+'\)/g) ?? [];
     const worker = readFileSync(join(ROOT, "public", "sw.js"), "utf8");
 
-    expect(expectedTables).toHaveLength(28);
+    expect(expectedTables).toHaveLength(29);
     expect(report).toContain("('user_daily_quest_days', 'user-owned')");
+    expect(report).toContain(
+      "('user_sync_state', 'retained user-owned state')",
+    );
+    expect(report).toContain("'mutable_account_sync_contract'");
+    expect(report).toContain("'account_sync_generation'");
+    expect(report).toContain("'account_sync_contract'");
+    expect(report).toContain("'advance_account_sync_revision'");
+    expect(report).toContain("'delete_own_account'");
+    expect(report).toContain("'account_deletion_contract'");
+    expect(report).toContain(
+      "select public.account_deletion_contract() as account_deletion_contract;",
+    );
+    expect(report).toContain("sync_revision");
+    expect(report).toContain(
+      "select public.mutable_account_sync_contract() as mutable_account_sync_contract;",
+    );
+    expect(report).toContain(
+      "select public.account_sync_contract() as account_sync_contract;",
+    );
     expect(worker).toContain(
       `const CACHE_VERSION = "${observability.serviceWorkerVersion}";`,
     );

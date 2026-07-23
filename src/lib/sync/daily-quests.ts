@@ -70,6 +70,7 @@ interface DailyQuestRpcResponse {
   revision: number;
   duplicate: boolean;
   rows: DailyQuestPayloadRow[];
+  generation: number;
 }
 
 /** A bounded CAS conflict is safe to retry after the canonical day is merged. */
@@ -103,6 +104,18 @@ export function resetDailyQuestSyncContext(context: DailyQuestSyncContext) {
   context.pending.clear();
   context.storage = null;
   context.userId = null;
+}
+
+/** Remove persisted daily CAS bases with a deleted device journey. */
+export function clearStoredDailyQuestSyncContext(
+  storage: DailyQuestSyncStorage | null = browserDailyQuestSyncStorage(),
+) {
+  if (!storage) return;
+  try {
+    storage.removeItem(DAILY_QUEST_SYNC_STORAGE_KEY);
+  } catch {
+    // Private browsing may make local storage unavailable.
+  }
 }
 
 /** Restore bounded per-owner CAS observations after an offline reload. */
@@ -245,8 +258,13 @@ export async function writeDailyQuestAssignments(
   userId: string,
   assignments: Record<string, DailyQuestAssignment[]>,
   context: DailyQuestSyncContext,
+  expectedGeneration = 0,
+  allowLegacyFallback = true,
 ): Promise<DailyQuestWriteResult> {
   if (context.mode === "legacy") {
+    if (!allowLegacyFallback) {
+      throw new Error("The transactional daily quest contract is unavailable.");
+    }
     await writeLegacyDailyQuestAssignments(supabase, userId, assignments);
     return { conflicts: {}, usedLegacy: true };
   }
@@ -270,13 +288,17 @@ export async function writeDailyQuestAssignments(
     persistDailyQuestSyncContext(context);
 
     const result = await supabase.rpc("replace_user_daily_quests", {
+      p_expected_user_id: userId,
+      p_expected_generation: expectedGeneration,
       p_assigned_date: day,
       p_expected_revision: context.revisions.get(day) ?? 0,
       p_request_id: pending.requestId,
       p_rows: payloadRows,
     });
     if (result.error) {
-      if (!isMissingDailyQuestRpc(result.error)) throw result.error;
+      if (!isMissingDailyQuestRpc(result.error) || !allowLegacyFallback) {
+        throw result.error;
+      }
       context.mode = "legacy";
       context.revisions.clear();
       context.bases.clear();
@@ -286,7 +308,7 @@ export async function writeDailyQuestAssignments(
       return { conflicts: {}, usedLegacy: true };
     }
 
-    const response = parseRpcResponse(result.data);
+    const response = parseRpcResponse(result.data, expectedGeneration);
     const previousBase = context.bases.get(day) ?? [];
     const canonical = response.rows.map((row) =>
       rowToAssignment({
@@ -394,11 +416,23 @@ function sameAssignment(
     left.questSlug === right.questSlug &&
     left.status === right.status &&
     left.rerolls === right.rerolls &&
-    (left.startedAt ?? null) === (right.startedAt ?? null) &&
-    (left.completedAt ?? null) === (right.completedAt ?? null) &&
-    left.pickedAt === right.pickedAt &&
-    left.expiresAt === right.expiresAt
+    sameTimestamp(left.startedAt, right.startedAt) &&
+    sameTimestamp(left.completedAt, right.completedAt) &&
+    sameTimestamp(left.pickedAt, right.pickedAt) &&
+    sameTimestamp(left.expiresAt, right.expiresAt)
   );
+}
+
+/** Compare equivalent instants across browser and PostgreSQL timestamp formats. */
+function sameTimestamp(left?: string | null, right?: string | null) {
+  return canonicalTimestamp(left) === canonicalTimestamp(right);
+}
+
+/** Normalize valid timestamps so PostgreSQL's +00:00 output matches browser ISO. */
+function canonicalTimestamp(value?: string | null): string | null {
+  if (value == null) return null;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : value;
 }
 
 /** Serialize a day exactly as the RPC hashes it. */
@@ -465,7 +499,12 @@ function persistDailyQuestSyncContext(context: DailyQuestSyncContext) {
     };
     context.storage.setItem(DAILY_QUEST_SYNC_STORAGE_KEY, JSON.stringify(state));
   } catch {
-    // Storage failure leaves the in-memory CAS path and local journey usable.
+    // Never leave an older daily CAS base behind after a failed rewrite.
+    try {
+      context.storage.removeItem(DAILY_QUEST_SYNC_STORAGE_KEY);
+    } catch {
+      // Storage can be wholly unavailable; this session still uses memory.
+    }
   }
 }
 
@@ -574,20 +613,32 @@ function assignmentPayload(
   );
   void _owner;
   void _day;
-  return payload;
+  return {
+    ...payload,
+    started_at: canonicalTimestamp(payload.started_at),
+    completed_at: canonicalTimestamp(payload.completed_at),
+    picked_at: canonicalTimestamp(payload.picked_at) ?? payload.picked_at,
+    expires_at: canonicalTimestamp(payload.expires_at) ?? payload.expires_at,
+  };
 }
 
 /** Validate the narrow JSON contract returned by the transactional RPC. */
-function parseRpcResponse(data: unknown): DailyQuestRpcResponse {
+function parseRpcResponse(
+  data: unknown,
+  expectedGeneration: number,
+): DailyQuestRpcResponse {
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     throw new Error("Invalid daily quest transaction response.");
   }
   const candidate = data as Partial<DailyQuestRpcResponse>;
+  const keys = Object.keys(data).sort().join(",");
   if (
+    keys !== "duplicate,generation,revision,rows,status" ||
     (candidate.status !== "applied" && candidate.status !== "conflict") ||
     !Number.isSafeInteger(candidate.revision) ||
     (candidate.revision ?? -1) < 0 ||
     typeof candidate.duplicate !== "boolean" ||
+    candidate.generation !== expectedGeneration ||
     !Array.isArray(candidate.rows) ||
     !candidate.rows.every(isDailyQuestPayloadRow)
   ) {
