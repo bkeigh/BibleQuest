@@ -60,6 +60,7 @@ class FakeCasServer {
   calls: ReplaceArgs[] = [];
   failBeforeCommit = false;
   loseNextResponse = false;
+  normalizeResponseTimestamps = false;
 
   client(): SupabaseClient {
     return {
@@ -126,14 +127,29 @@ class FakeCasServer {
 
   /** Return the same bounded JSON shape as the production RPC. */
   private response(status: "applied" | "conflict", duplicate: boolean) {
+    // Hosted PostgreSQL returns equivalent timestamptz values with +00:00.
+    const rows = this.normalizeResponseTimestamps
+      ? this.rows.map((row) => ({
+          ...row,
+          started_at: postgresTimestamp(row.started_at),
+          completed_at: postgresTimestamp(row.completed_at),
+          picked_at: postgresTimestamp(row.picked_at) ?? row.picked_at,
+          expires_at: postgresTimestamp(row.expires_at) ?? row.expires_at,
+        }))
+      : structuredClone(this.rows);
     return {
       status,
       revision: this.revision,
       duplicate,
-      rows: structuredClone(this.rows),
+      rows,
       generation: 0,
     };
   }
+}
+
+/** Format a fixture timestamp the same way hosted PostgreSQL returns it. */
+function postgresTimestamp(value: string | null) {
+  return value?.replace(".000Z", "+00:00") ?? null;
 }
 
 /** Create a deterministic per-device request-id generator. */
@@ -295,6 +311,22 @@ describe("transactional daily-quest sync", () => {
     expect(server.calls[1].p_request_id).toBe(server.calls[0].p_request_id);
     expect(server.revision).toBe(1);
     expect(server.rows).toHaveLength(1);
+  });
+
+  it("accepts PostgreSQL timestamp formatting as the applied canonical day", async () => {
+    const server = new FakeCasServer();
+    const device = context("aaaaaaaa");
+    server.normalizeResponseTimestamps = true;
+
+    const result = await writeDailyQuestAssignments(
+      server.client(),
+      "owner-a",
+      { [DAY]: [assignment("quest-a")] },
+      device,
+    );
+
+    expect(result.conflicts).toEqual({});
+    expect(server.revision).toBe(1);
   });
 
   it("atomically deletes an unpicked unfinished assignment", async () => {

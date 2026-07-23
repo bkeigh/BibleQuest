@@ -416,11 +416,23 @@ function sameAssignment(
     left.questSlug === right.questSlug &&
     left.status === right.status &&
     left.rerolls === right.rerolls &&
-    (left.startedAt ?? null) === (right.startedAt ?? null) &&
-    (left.completedAt ?? null) === (right.completedAt ?? null) &&
-    left.pickedAt === right.pickedAt &&
-    left.expiresAt === right.expiresAt
+    sameTimestamp(left.startedAt, right.startedAt) &&
+    sameTimestamp(left.completedAt, right.completedAt) &&
+    sameTimestamp(left.pickedAt, right.pickedAt) &&
+    sameTimestamp(left.expiresAt, right.expiresAt)
   );
+}
+
+/** Compare equivalent instants across browser and PostgreSQL timestamp formats. */
+function sameTimestamp(left?: string | null, right?: string | null) {
+  return canonicalTimestamp(left) === canonicalTimestamp(right);
+}
+
+/** Normalize valid timestamps so PostgreSQL's +00:00 output matches browser ISO. */
+function canonicalTimestamp(value?: string | null): string | null {
+  if (value == null) return null;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : value;
 }
 
 /** Serialize a day exactly as the RPC hashes it. */
@@ -601,7 +613,13 @@ function assignmentPayload(
   );
   void _owner;
   void _day;
-  return payload;
+  return {
+    ...payload,
+    started_at: canonicalTimestamp(payload.started_at),
+    completed_at: canonicalTimestamp(payload.completed_at),
+    picked_at: canonicalTimestamp(payload.picked_at) ?? payload.picked_at,
+    expires_at: canonicalTimestamp(payload.expires_at) ?? payload.expires_at,
+  };
 }
 
 /** Validate the narrow JSON contract returned by the transactional RPC. */
