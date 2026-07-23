@@ -430,7 +430,7 @@ export function fixtureReadiness() {
       google_enabled: true,
       phone_disabled: true,
     },
-    check_count: 20,
+    check_count: 21,
     failed_check_count: 0,
   };
 }

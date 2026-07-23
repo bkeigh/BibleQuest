@@ -527,7 +527,7 @@ describe("sanitized launch evidence", () => {
 
   it("builds complete fixture evidence with every required posture", () => {
     expect(fixtureReadiness()).toMatchObject({
-      check_count: 20,
+      check_count: 21,
       failed_check_count: 0,
     });
     const aggregate = aggregateClientSignals(fixtureSignals());
