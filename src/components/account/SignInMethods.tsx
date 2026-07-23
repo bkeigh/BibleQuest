@@ -34,6 +34,8 @@ const RESEND_COOLDOWN_SECONDS = 60;
 
 interface SignInMethodsProps {
   source: "account" | "onboarding";
+  /** Changes account creation copy and prevents email signup in returning-user mode. */
+  intent?: "create" | "signin";
   /** Fired after Supabase accepts a magic-link request (not a delivery claim). */
   onEmailSent?: () => void;
   /** Lets onboarding expose its local fallback after auth is unavailable. */
@@ -44,6 +46,7 @@ interface SignInMethodsProps {
 
 export function SignInMethods({
   source,
+  intent = "signin",
   onEmailSent,
   onUnavailable,
   nextPath = "/app",
@@ -94,7 +97,7 @@ export function SignInMethods({
         email: address,
         options: {
           emailRedirectTo: callbackUrl(),
-          shouldCreateUser: true,
+          shouldCreateUser: intent === "create",
         },
       });
       if (requestError) {
@@ -281,7 +284,9 @@ export function SignInMethods({
         >
           {emailStatus === "sending"
             ? "Requesting…"
-            : "Email me a sign-in link"}
+            : intent === "create"
+              ? "Create account with email"
+              : "Email me a sign-in link"}
         </GentleButton>
       </form>
 
@@ -296,7 +301,11 @@ export function SignInMethods({
         disabled={oauthPending || emailStatus === "sending"}
         aria-busy={oauthPending}
       >
-        {oauthPending ? "Opening Google…" : "Continue with Google"}
+        {oauthPending
+          ? "Opening Google…"
+          : intent === "create"
+            ? "Create account with Google"
+            : "Continue with Google"}
       </GentleButton>
 
       {error && <FailureNotice failure={error} />}

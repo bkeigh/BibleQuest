@@ -1,11 +1,9 @@
 /**
  * PixelIcon — tiny hand-placed pixel sprites.
  *
- * A thin resolver over the pixel-asset registry (pixel-assets.ts).
- * Grid assets render as crisp SVG <rect>s so they scale without blur;
- * PNG assets render from their native source dimensions into a separate,
- * integer-sized logical layout box, so changing source resolution never
- * changes a call site's footprint.
+ * A thin resolver over the production PNG registry (pixel-assets.ts).
+ * Source dimensions stay separate from the integer-sized logical layout box,
+ * so artwork upgrades never change a call site's footprint.
  * These are one of BibleQuest's signatures: a modern spiritual
  * storybook, never retro-arcade.
  */
@@ -35,71 +33,29 @@ export function PixelIcon({
   const asset = PIXEL_SPRITES[name];
   if (!asset) return null;
 
-  if (asset.kind === "png") {
-    const cell = Math.max(1, Math.round(size * (asset.cellScale ?? 1)));
-    const renderedWidth = asset.cols * cell;
-    const renderedHeight = asset.rows * cell;
-    return (
-      // eslint-disable-next-line @next/next/no-img-element -- tiny local pixel art; next/image would blur and lazy-load it
-      <img
-        src={asset.src}
-        width={asset.nativeWidth}
-        height={asset.nativeHeight}
-        style={{ width: renderedWidth, height: renderedHeight }}
-        alt={title ?? ""}
-        role={title ? "img" : "presentation"}
-        aria-hidden={title ? undefined : true}
-        draggable={false}
-        decoding="async"
-        className={cn(
-          "pixelated block shrink-0 object-contain",
-          animate && "ambient",
-          animate && asset.ambientClassName,
-          className
-        )}
-      />
-    );
-  }
-
-  const rows = asset.rows;
-  const cols = Math.max(...rows.map((r) => r.length));
   const cell = Math.max(1, Math.round(size * (asset.cellScale ?? 1)));
-  const width = cols * cell;
-  const height = rows.length * cell;
-  const ambientChars = asset.ambient?.chars ?? "";
+  const renderedWidth = asset.cols * cell;
+  const renderedHeight = asset.rows * cell;
 
   return (
-    <svg
-      width={width}
-      height={height}
-      viewBox={`0 0 ${cols} ${rows.length}`}
-      shapeRendering="crispEdges"
-      preserveAspectRatio="xMidYMid meet"
-      focusable="false"
-      className={cn("pixelated shrink-0", animate && "ambient", className)}
+    // eslint-disable-next-line @next/next/no-img-element -- local pixel art must stay crisp and load without image optimization
+    <img
+      src={asset.src}
+      width={asset.nativeWidth}
+      height={asset.nativeHeight}
+      style={{ width: renderedWidth, height: renderedHeight }}
+      alt={title ?? ""}
       role={title ? "img" : "presentation"}
-      aria-label={title}
       aria-hidden={title ? undefined : true}
-    >
-      {rows.flatMap((row, y) =>
-        row.split("").map((ch, x) => {
-          const fill = asset.palette[ch];
-          if (!fill || fill === "transparent") return null;
-          const isAmbient = animate && ambientChars.includes(ch);
-          return (
-            <rect
-              key={`${x}-${y}`}
-              x={x}
-              y={y}
-              width={1.02}
-              height={1.02}
-              fill={fill}
-              className={isAmbient ? asset.ambient?.className : undefined}
-            />
-          );
-        })
+      draggable={false}
+      decoding="async"
+      className={cn(
+        "pixelated block shrink-0 object-contain",
+        animate && "ambient",
+        animate && asset.ambientClassName,
+        className
       )}
-    </svg>
+    />
   );
 }
 

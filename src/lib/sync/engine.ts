@@ -149,6 +149,14 @@ export function isMissingBibleSyncColumn(
   return isMissingSyncColumn(error, column);
 }
 
+/** Recognize only the two additive Journey identity columns during rollout. */
+export function isMissingJourneySyncColumn(
+  error: unknown,
+  column: "date_key" | "source_id",
+): boolean {
+  return isMissingSyncColumn(error, column);
+}
+
 export function isMissingRecentVersesTable(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const candidate = error as { code?: unknown; message?: unknown };
@@ -1135,12 +1143,41 @@ async function pushFields(
   if (fields.has("journeyEvents") && snap.journeyEvents.length) {
     // Append-only table (no UPDATE policy): insert new rows, skip existing.
     jobs.push(
-      run(
-        supabase.from("journey_events").upsert(
-          snap.journeyEvents.map((e) => journeyEventToRow(uid, e)),
-          { onConflict: "id", ignoreDuplicates: true }
-        )
-      )
+      (async () => {
+        let rows = snap.journeyEvents.map((event) =>
+          journeyEventToRow(uid, event),
+        );
+
+        // Migration 0014 is additive. Remove only the exact missing columns
+        // PostgREST reports so an older production schema can still restore
+        // and sync the core Journey while the migration is rolling out.
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const result = await supabase.from("journey_events").upsert(rows, {
+            onConflict: "id",
+            ignoreDuplicates: true,
+          });
+          if (!result.error) return;
+
+          const missingDateKey = isMissingJourneySyncColumn(
+            result.error,
+            "date_key",
+          );
+          const missingSourceId = isMissingJourneySyncColumn(
+            result.error,
+            "source_id",
+          );
+          if (!missingDateKey && !missingSourceId) throw result.error;
+
+          rows = rows.map((row) => {
+            const compatible = { ...row };
+            if (missingDateKey) delete compatible.date_key;
+            if (missingSourceId) delete compatible.source_id;
+            return compatible;
+          });
+        }
+
+        throw new Error("Journey sync compatibility retries exhausted.");
+      })(),
     );
   }
   if (fields.has("growthEvents") && snap.growthEvents.length) {

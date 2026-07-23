@@ -5,6 +5,8 @@ import {
   isOnboardingResumePending,
   onboardingLaunchDestination,
   setOnboardingResumeStage,
+  shouldAdvanceOnboardingAccountStep,
+  shouldKeepCompletedProfileOnOnboarding,
   shouldRedirectAppToOnboarding,
   shouldTrackOnboardingStarted,
   type OnboardingResumeStage,
@@ -15,9 +17,12 @@ describe("onboarding account hand-off", () => {
 
   it.each<OnboardingResumeStage>([
     "account",
+    "guide",
     "quest",
+    "plus",
     "launch",
     "launch_quests",
+    "launch_plus",
   ])(
     "persists the non-PII %s stage across an auth or PWA round trip",
     (stage) => {
@@ -35,18 +40,21 @@ describe("onboarding account hand-off", () => {
     },
   );
 
-  it("treats account and quest as unfinished but launch as intentional", () => {
+  it("recognizes onboarding screens without treating launches as pending", () => {
     expect(isOnboardingResumePending("account")).toBe(true);
+    expect(isOnboardingResumePending("guide")).toBe(true);
     expect(isOnboardingResumePending("quest")).toBe(true);
+    expect(isOnboardingResumePending("plus")).toBe(true);
     expect(isOnboardingResumePending("launch")).toBe(false);
     expect(isOnboardingResumePending("launch_quests")).toBe(false);
+    expect(isOnboardingResumePending("launch_plus")).toBe(false);
     expect(isOnboardingResumePending(null)).toBe(false);
   });
 
-  it.each(["account", "quest"] as const)(
-    "redirects a completed PWA reopened at /app while %s is pending",
+  it.each(["account", "guide", "quest", "plus"] as const)(
+    "does not let stale %s state override a completed PWA journey",
     (stage) => {
-      expect(shouldRedirectAppToOnboarding(true, stage)).toBe(true);
+      expect(shouldRedirectAppToOnboarding(true, stage)).toBe(false);
     },
   );
 
@@ -61,6 +69,7 @@ describe("onboarding account hand-off", () => {
     expect(onboardingLaunchDestination("launch_quests")).toBe(
       "/app/quests",
     );
+    expect(onboardingLaunchDestination("launch_plus")).toBe("/app/plus");
     expect(onboardingLaunchDestination("quest")).toBeNull();
   });
 
@@ -69,8 +78,21 @@ describe("onboarding account hand-off", () => {
     expect(shouldRedirectAppToOnboarding(false, "launch")).toBe(true);
   });
 
-  it("does not double-count onboarding when resuming account or quest", () => {
+  it("keeps only the intentional Plus preview on the onboarding route", () => {
+    expect(shouldKeepCompletedProfileOnOnboarding(true, "plus")).toBe(true);
+    expect(shouldKeepCompletedProfileOnOnboarding(true, "account")).toBe(false);
+    expect(shouldKeepCompletedProfileOnOnboarding(false, "plus")).toBe(false);
+  });
+
+  it("advances an incomplete restored session past the account form", () => {
+    expect(shouldAdvanceOnboardingAccountStep(false, "account-a")).toBe(true);
+    expect(shouldAdvanceOnboardingAccountStep(false, null)).toBe(false);
+    expect(shouldAdvanceOnboardingAccountStep(true, "account-a")).toBe(false);
+  });
+
+  it("does not double-count onboarding when resuming any guide stage", () => {
     expect(shouldTrackOnboardingStarted(true, "account")).toBe(false);
+    expect(shouldTrackOnboardingStarted(false, "guide")).toBe(false);
     expect(shouldTrackOnboardingStarted(true, "quest")).toBe(false);
     expect(shouldTrackOnboardingStarted(false, null)).toBe(true);
   });
