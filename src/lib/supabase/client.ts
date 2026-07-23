@@ -44,13 +44,21 @@ export function createSyncClient(expectedUserId: string, generation: number) {
       "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY — see docs/SETUP.md.",
     );
   }
+  const authClient = createClient();
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       // Sync generations change after destructive operations, so a shared
-      // singleton could silently retain stale global headers.
+      // singleton could silently retain stale global headers. Reuse the auth
+      // singleton only as the token source so data clients do not create
+      // competing GoTrue instances under the same browser storage key.
       isSingleton: false,
+      accessToken: async () => {
+        const { data, error } = await authClient.auth.getSession();
+        if (error) throw error;
+        return data.session?.access_token ?? null;
+      },
       global: {
         headers: {
           "x-biblequest-expected-user": expectedUserId,
