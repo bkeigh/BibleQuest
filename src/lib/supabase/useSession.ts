@@ -5,8 +5,9 @@
  * loading, and user state consistently while deduplicating sign-in analytics
  * across the several mounted consumers and open browser tabs.
  */
-import { useEffect, useState } from "react";
-import type { User } from "@supabase/supabase-js";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { createClient, isSupabaseConfigured } from "./client";
 import { track } from "@/lib/analytics/events";
 import {
@@ -19,6 +20,11 @@ import {
 } from "@/lib/auth/completion-signal";
 import { accountSyncAvailable } from "@/lib/sync/containment";
 import { withDeadline } from "@/lib/async/deadline";
+import {
+  authEventRequiresUserVerification,
+  decideSessionVerification,
+  observedSessionBoundary,
+} from "./session-verification";
 
 // One funnel event per real sign-in — not per mounted hook instance
 // (several components subscribe at once) and not per open tab (supabase
@@ -27,6 +33,59 @@ import { withDeadline } from "@/lib/async/deadline";
 let signInTracked = false;
 const SIGNIN_STAMP_KEY = "biblequest:signin-tracked";
 export const SESSION_LOOKUP_DEADLINE_MS = 12_000;
+
+interface VerifiedUserResult {
+  data: { user: User | null };
+  error: unknown;
+}
+
+// Every mounted consumer shares the same network check for a given JWT.
+const verificationLookups = new Map<string, Promise<VerifiedUserResult>>();
+let invalidSessionSignOut: Promise<void> | null = null;
+
+/** Verifies the exact observed JWT instead of trusting its cached user object. */
+function getVerifiedUser(
+  supabase: SupabaseClient,
+  accessToken: string,
+): Promise<VerifiedUserResult> {
+  const pending = verificationLookups.get(accessToken);
+  if (pending) return pending;
+
+  const lookup = withDeadline(
+    supabase.auth.getUser(accessToken),
+    SESSION_LOOKUP_DEADLINE_MS,
+    "Account session lookup",
+  );
+  verificationLookups.set(accessToken, lookup);
+  void lookup.then(
+    () => {
+      if (verificationLookups.get(accessToken) === lookup) {
+        verificationLookups.delete(accessToken);
+      }
+    },
+    () => {
+      if (verificationLookups.get(accessToken) === lookup) {
+        verificationLookups.delete(accessToken);
+      }
+    },
+  );
+  return lookup;
+}
+
+/** Removes one terminal session locally and broadcasts SIGNED_OUT once. */
+function clearInvalidLocalSession(supabase: SupabaseClient): Promise<void> {
+  if (invalidSessionSignOut) return invalidSessionSignOut;
+
+  const signOut = supabase.auth
+    .signOut({ scope: "local" })
+    .then(() => undefined)
+    .catch(() => undefined);
+  invalidSessionSignOut = signOut;
+  void signOut.then(() => {
+    if (invalidSessionSignOut === signOut) invalidSessionSignOut = null;
+  });
+  return signOut;
+}
 
 function firstTabToTrack(userId: string): boolean {
   try {
@@ -69,74 +128,142 @@ function trackCompletedSignIn(userId: string) {
 export function useSession(): SessionState {
   // Guest-only containment suppresses auth enrollment and session-driven sync.
   const configured = accountSyncAvailable(isSupabaseConfigured());
+  const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(configured);
+  const verifiedUserId = useRef<string | null>(null);
 
   useEffect(() => {
     if (!configured) return;
     const supabase = createClient();
     let active = true;
-    let authEventSeen = false;
+    let verificationRun = 0;
+    let latestSession: Parameters<
+      Parameters<typeof supabase.auth.onAuthStateChange>[0]
+    >[1] = null;
 
-    // The auth subscription remains authoritative if it settles before the
-    // network-backed identity check, including after that check times out.
-    void withDeadline(
-      supabase.auth.getUser(),
-      SESSION_LOOKUP_DEADLINE_MS,
-      "Account session lookup",
-    )
-      .then(({ data, error }) => {
-        if (!active || authEventSeen) return;
-        if (error) {
+    /** Applies only the result for the latest observed auth session. */
+    const verifySession = (
+      session: NonNullable<typeof latestSession>,
+      completedSignIn: boolean,
+      preserveVerifiedUserOnRetryableFailure: boolean,
+    ) => {
+      const run = ++verificationRun;
+      void getVerifiedUser(supabase, session.access_token)
+        .then(({ data, error }) => {
+          if (!active || run !== verificationRun) return;
+          const verifiedUser = data.user ?? null;
+          const decision = decideSessionVerification(
+            Boolean(verifiedUser),
+            error,
+          );
+
+          if (
+            decision === "accept" &&
+            verifiedUser?.id === session.user.id
+          ) {
+            verifiedUserId.current = verifiedUser.id;
+            if (completedSignIn) trackCompletedSignIn(verifiedUser.id);
+            setUser(verifiedUser);
+            setLoading(false);
+            return;
+          }
+
+          if (error) {
+            reportClientSignal({
+              surface: "auth",
+              stage: "session",
+              outcome: "failure",
+              category: classifyOperationalError(error),
+            });
+          }
+          if (
+            decision === "clear-local-auth" ||
+            (decision === "accept" &&
+              verifiedUser?.id !== session.user.id)
+          ) {
+            verifiedUserId.current = null;
+            setUser(null);
+            setLoading(false);
+            void clearInvalidLocalSession(supabase);
+            return;
+          }
+
+          // Retryable offline/timeout failures never erase the local journey
+          // or accept the unverified cached identity.
+          if (!preserveVerifiedUserOnRetryableFailure) {
+            verifiedUserId.current = null;
+            setUser(null);
+          }
+          setLoading(false);
+        })
+        .catch((error: unknown) => {
+          if (!active || run !== verificationRun) return;
           reportClientSignal({
             surface: "auth",
             stage: "session",
             outcome: "failure",
             category: classifyOperationalError(error),
           });
-        }
-        if (data.user && consumeAuthCompletionSignal()) {
-          trackCompletedSignIn(data.user.id);
-        }
-        setUser(data.user ?? null);
-        setLoading(false);
-      })
-      .catch((error: unknown) => {
-        if (!active || authEventSeen) return;
-        reportClientSignal({
-          surface: "auth",
-          stage: "session",
-          outcome: "failure",
-          category: classifyOperationalError(error),
+          setLoading(false);
         });
+    };
+
+    /** Isolates a changed account before starting its remote verification. */
+    const observeSession = (
+      session: NonNullable<typeof latestSession>,
+      completedSignIn: boolean,
+    ) => {
+      const boundary = observedSessionBoundary(
+        verifiedUserId.current,
+        session.user.id,
+      );
+      if (boundary.isolateUntilVerified) {
+        verifiedUserId.current = null;
         setUser(null);
-        setLoading(false);
-      });
+        setLoading(true);
+      }
+      verifySession(
+        session,
+        completedSignIn,
+        boundary.preserveVerifiedUserOnRetryableFailure,
+      );
+    };
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      authEventSeen = true;
+      latestSession = session;
+      if (event === "SIGNED_OUT" || !session) {
+        verificationRun += 1;
+        verifiedUserId.current = null;
+        if (event === "SIGNED_OUT") signInTracked = false;
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+      if (!authEventRequiresUserVerification(event)) return;
+
       // Server callback round trips restore as INITIAL_SESSION, while in-page
       // auth can emit SIGNED_IN. The one-shot cookie makes both paths count
       // exactly once without putting identity or tokens in client state.
-      const callbackCompleted = session?.user
-        ? consumeAuthCompletionSignal()
-        : false;
-      if (
-        session?.user &&
-        authEventCompletesSignIn(event, callbackCompleted)
-      ) {
-        trackCompletedSignIn(session.user.id);
-      }
-      if (event === "SIGNED_OUT") signInTracked = false;
-      setUser(session?.user ?? null);
-      setLoading(false);
+      const callbackCompleted = consumeAuthCompletionSignal();
+      observeSession(
+        session,
+        authEventCompletesSignIn(event, callbackCompleted),
+      );
     });
+
+    /** Retries a provisional session when connectivity returns. */
+    const verifyAfterReconnect = () => {
+      if (latestSession) observeSession(latestSession, false);
+    };
+    window.addEventListener("online", verifyAfterReconnect);
 
     return () => {
       active = false;
+      window.removeEventListener("online", verifyAfterReconnect);
       sub.subscription.unsubscribe();
     };
-  }, [configured]);
+  }, [configured, pathname]);
 
   return { user, loading, configured };
 }
