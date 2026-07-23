@@ -15,7 +15,7 @@ import {
   fetchBibleProviderPassage,
   serializeBibleProviderChapter,
 } from "@/lib/bible/provider-dispatcher";
-import { resolveSharedVerse } from "@/app/(marketing)/verse/[book]/[chapter]/[verse]/page";
+import { resolveSharedVerse } from "@/lib/bible/shared-verse";
 
 function chapterPayload({
   translationId = "BSB",

@@ -493,8 +493,8 @@ describe("service-worker lifecycle and upgrades", () => {
     ]);
     expect((await harness.caches.keys()).sort()).toEqual([
       "another-app-runtime",
-      "biblequest-v19-runtime",
-      "biblequest-v19-shell",
+      "biblequest-v20-runtime",
+      "biblequest-v20-shell",
     ]);
     expect(harness.state.claimed).toBe(true);
   });

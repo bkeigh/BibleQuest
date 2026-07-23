@@ -65,10 +65,11 @@ In **Supabase → Authentication → URL Configuration**:
   [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md). Keep the localhost
   callbacks for development and avoid a broad production wildcard.
 
-In **Authentication → Email Templates**, use the `RedirectTo`/`TokenHash`
-template from the same runbook. This lets a link opened from iPhone Mail,
-Safari, an installed PWA, or another browser complete without relying on the
-browser that requested it. See [Supabase redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls)
+In **Authentication → Email Templates**, publish the checked-in confirmation
+and magic-link templates from [`supabase/templates/`](../supabase/templates/).
+They include both `Token` for an installed PWA to verify inside its own storage
+context and the established `RedirectTo`/`TokenHash` browser link. See
+[Supabase redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls)
 and [email templates](https://supabase.com/docs/guides/auth/auth-email-templates).
 
 Before calling auth fixed, complete the schema/content recovery steps in

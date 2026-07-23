@@ -99,7 +99,7 @@ export interface AuthRequestFailure {
   unavailable: boolean;
 }
 
-/** Actionable messages for magic-link request failures. */
+/** Actionable messages for passwordless-email request failures. */
 export function emailRequestFailure(
   error: unknown,
   online = true,
@@ -111,7 +111,7 @@ export function emailRequestFailure(
   if (!online || message.includes("failed to fetch") || code === "request_timeout") {
     return {
       message:
-        "You appear to be offline. Reconnect to request a sign-in link, or continue on this device.",
+        "You appear to be offline. Reconnect to request a sign-in email, or continue on this device.",
       reference: "AUTH-NETWORK",
       unavailable: true,
     };
@@ -131,7 +131,7 @@ export function emailRequestFailure(
   ) {
     return {
       message:
-        "Too many links were requested. Wait at least one minute, then try again.",
+        "Too many emails were requested. Wait at least one minute, then try again.",
       reference: "AUTH-RATE-LIMIT",
       unavailable: false,
     };
@@ -157,9 +157,54 @@ export function emailRequestFailure(
   }
   return {
     message:
-      "We couldn’t request the link. Check your connection, wait a moment, and try again.",
+      "We couldn’t request the email. Check your connection, wait a moment, and try again.",
     reference: "AUTH-EMAIL-REQUEST",
     unavailable: !online,
+  };
+}
+
+/** Maps a user-entered email OTP failure without exposing provider details. */
+export function emailOtpFailure(
+  error: unknown,
+  online = true,
+): AuthRequestFailure {
+  const code = errorCode(error);
+  const message = errorMessage(error);
+  const status = errorShape(error).status;
+
+  if (!online || message.includes("failed to fetch") || code === "request_timeout") {
+    return {
+      message:
+        "You appear to be offline. Reconnect, then enter the code again.",
+      reference: "AUTH-NETWORK",
+      unavailable: true,
+    };
+  }
+  if (
+    code === "otp_expired" ||
+    code === "token_expired" ||
+    code === "invalid_otp" ||
+    code === "validation_failed"
+  ) {
+    return {
+      message:
+        "That code is invalid or has expired. Check the email or request a new code.",
+      reference: "AUTH-CODE-INVALID",
+      unavailable: false,
+    };
+  }
+  if (code === "over_request_rate_limit" || status === 429) {
+    return {
+      message: "Too many attempts. Wait a minute, then request a new code.",
+      reference: "AUTH-RATE-LIMIT",
+      unavailable: false,
+    };
+  }
+  return {
+    message:
+      "We couldn’t verify that code. Check it carefully or request a new one.",
+    reference: "AUTH-CODE-VERIFY",
+    unavailable: false,
   };
 }
 

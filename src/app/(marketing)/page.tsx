@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { EditorialSection, Eyebrow } from "@/components/design-system/EditorialSection";
 import { GentleLink } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
@@ -10,6 +11,7 @@ import { SeasonalAtmosphere } from "@/components/design-system/SeasonalAtmospher
 import { Reveal } from "@/components/marketing/Reveal";
 import { QuestDemo, PrayerDemo } from "@/components/marketing/Demos";
 import { MarketingGrowthLoop } from "@/components/marketing/MarketingGrowthLoop";
+import { HeroBackdrop } from "@/components/marketing/HeroBackdrop";
 import { VerseDemo } from "@/components/marketing/VerseDemo";
 import { getDailyVerse } from "@/lib/questos/verse-engine";
 import { questBySlug, seedQuests } from "@/data/seed/quests";
@@ -23,7 +25,7 @@ export const metadata: Metadata = {
 };
 
 // Describes the product and its publisher without adding invented ratings or claims.
-export const MARKETING_STRUCTURED_DATA = {
+const MARKETING_STRUCTURED_DATA = {
   "@context": "https://schema.org",
   "@graph": [
     {
@@ -90,6 +92,94 @@ const FAQ = [
   },
 ];
 
+/** Keeps the hero's invitation visible and unmistakable without arcade styling. */
+function HeroAction({
+  href,
+  icon,
+  title,
+  detail,
+  primary = false,
+}: {
+  href: string;
+  icon: "open-book" | "path";
+  title: string;
+  detail: string;
+  primary?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`group relative isolate flex min-h-[4.75rem] w-full items-center gap-3 overflow-hidden rounded-[var(--radius-card)] border px-4 py-3 text-left paper-shadow-lg transition-all duration-300 [transition-timing-function:var(--ease-gentle)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0 sm:w-auto sm:min-w-[15rem] lg:min-h-[5.25rem] lg:min-w-[17rem] lg:px-5 ${
+        primary
+          ? "border-evergreen-600 bg-evergreen-700 text-[#fdfbf3] hover:-translate-y-0.5 hover:bg-evergreen-600"
+          : "border-accent/45 bg-paper/75 text-accent backdrop-blur-sm hover:-translate-y-0.5 hover:border-accent/70 hover:bg-paper"
+      }`}
+    >
+      {primary && (
+        <span
+          aria-hidden="true"
+          className="ambient absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gold-300/15 blur-2xl [animation:var(--animate-twinkle)]"
+        />
+      )}
+      <span
+        className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] ring-1 lg:h-12 lg:w-12 ${
+          primary
+            ? "bg-[#fdfbf3]/10 ring-[#fdfbf3]/20"
+            : "bg-evergreen-50 ring-evergreen-600/15"
+        }`}
+      >
+        <PixelIcon name={icon} size={4} />
+      </span>
+      <span className="relative min-w-0 flex-1">
+        <span className="block font-display text-[1.125rem] leading-tight lg:text-[1.25rem]">
+          {title}
+        </span>
+        <span
+          className={`mt-1 block text-[0.8125rem] leading-snug ${
+            primary ? "text-[#fdfbf3]/70" : "text-ash"
+          }`}
+        >
+          {detail}
+        </span>
+      </span>
+      <IconArrowRight className="relative shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
+    </Link>
+  );
+}
+
+/** Gives visitors an obvious, quiet path into the rest of the landing story. */
+function ScrollCue({ mobile = false }: { mobile?: boolean }) {
+  return (
+    <a
+      href="#why"
+      aria-label="Scroll to learn more about BibleQuest"
+      className={`group flex flex-col items-center gap-1 text-fog transition-colors hover:text-accent ${
+        mobile ? "mt-7 lg:hidden" : ""
+      }`}
+    >
+      <span className="font-pixel text-[0.75rem] uppercase tracking-[0.14em]">
+        Scroll
+      </span>
+      <span className="flex h-10 w-10 items-center justify-center rounded-full border border-mist/80 bg-paper/65 backdrop-blur-sm transition-colors group-hover:border-olive-300">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          className="transition-transform group-hover:translate-y-0.5"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </span>
+    </a>
+  );
+}
+
 export default function LandingPage() {
   const verse = getDailyVerse();
   const quest =
@@ -110,14 +200,11 @@ export default function LandingPage() {
       />
       {/* Hero */}
       <section className="relative isolate min-h-[100svh] overflow-hidden">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(55%_55%_at_84%_36%,var(--color-gold-50),transparent_72%),radial-gradient(45%_55%_at_0%_75%,var(--color-evergreen-50),transparent_75%)]"
-        />
-        <div className="relative mx-auto grid min-h-[100svh] w-full max-w-6xl content-start items-start gap-8 px-5 pb-14 pt-24 sm:px-8 sm:pb-20 sm:pt-28 lg:content-center lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:gap-16 lg:pb-20 lg:pt-24">
-          <div className="text-left">
+        <HeroBackdrop />
+        <div className="relative mx-auto grid min-h-[100svh] w-full max-w-[90rem] content-start items-start gap-10 px-5 pb-14 pt-24 sm:px-8 sm:pb-20 sm:pt-28 lg:content-center lg:grid-cols-[1.12fr_0.88fr] lg:items-center lg:gap-16 lg:px-12 lg:pb-20 lg:pt-28 xl:gap-20 xl:px-16">
+          <div className="text-center lg:text-left">
             <Reveal>
-              <span className="inline-flex items-center gap-2 rounded-full border border-mist bg-paper/70 px-3.5 py-1.5 text-[0.8125rem] text-accent backdrop-blur">
+              <span className="mx-auto inline-flex items-center justify-center gap-2 rounded-full border border-mist bg-paper/70 px-4 py-2 text-[0.875rem] text-accent backdrop-blur lg:mx-0 lg:text-[0.9375rem]">
                 <PixelIcon name="candle" size={3} animate /> A daily guide for living your faith
               </span>
             </Reveal>
@@ -125,64 +212,56 @@ export default function LandingPage() {
               <h1
                 id="homepage-heading"
                 tabIndex={-1}
-                className="mt-6 max-w-3xl font-display text-[clamp(3rem,6vw,5rem)] leading-[0.98] tracking-[-0.035em] text-graphite outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+                className="mx-auto mt-6 max-w-3xl font-display text-[clamp(3rem,13vw,4.75rem)] leading-[0.98] tracking-[-0.035em] text-graphite outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent lg:mx-0 lg:max-w-[44rem] lg:text-[clamp(4.5rem,5.25vw,5.5rem)]"
               >
-                Bring faith into the life you already live.
+                <strong className="font-semibold">Bring faith</strong> into{" "}
+                <span className="underline decoration-gold-500/65 decoration-[0.08em] underline-offset-[0.12em]">
+                  the life you live.
+                </span>
               </h1>
             </Reveal>
             <Reveal delay={0.16}>
-              <p className="mt-6 max-w-xl text-[1.125rem] leading-relaxed text-charcoal sm:text-[1.25rem]">
+              <p className="mx-auto mt-7 max-w-xl text-[1.125rem] leading-relaxed text-charcoal sm:text-[1.25rem] lg:mx-0 lg:max-w-2xl lg:text-[1.375rem]">
                 Read Scripture, make space to pray, and take one meaningful
                 step. BibleQuest helps faith become part of your everyday life.
               </p>
             </Reveal>
             <Reveal delay={0.24}>
-              <div className="mt-8 flex flex-wrap items-center gap-3">
-                <GentleLink variant="primary" size="lg" href="/onboarding">
-                  Get BibleQuest <IconArrowRight />
-                </GentleLink>
-                <GentleLink variant="outline" size="lg" href="/#how">
-                  See how it works
-                </GentleLink>
+              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
+                <HeroAction
+                  primary
+                  href="/onboarding"
+                  icon="open-book"
+                  title="Get BibleQuest"
+                  detail="Begin your daily rhythm"
+                />
+                <HeroAction
+                  href="/#how"
+                  icon="path"
+                  title="See how it works"
+                  detail="Walk through the app"
+                />
               </div>
             </Reveal>
             <Reveal delay={0.3}>
-              <p className="mt-4 text-[0.875rem] text-ash">
+              <p className="mt-5 text-[0.875rem] text-ash lg:text-[0.9375rem]">
                 Free to begin. Made for Christians from every tradition.
               </p>
             </Reveal>
+            <ScrollCue mobile />
           </div>
 
           <Reveal delay={0.28} className="w-full lg:justify-self-end">
-            <div className="mx-auto w-full max-w-lg lg:mx-0">
+            <div className="mx-auto w-full max-w-lg lg:mx-0 lg:max-w-[37rem]">
               <VerseDemo verse={verse} />
             </div>
           </Reveal>
 
           <Reveal
             delay={0.4}
-            className="absolute bottom-5 left-1/2 hidden -translate-x-1/2 sm:block"
+            className="absolute bottom-8 left-1/2 hidden -translate-x-1/2 lg:block xl:bottom-10"
           >
-            <a
-              href="#why"
-              aria-label="Continue to learn more about BibleQuest"
-              className="group flex h-11 w-11 items-center justify-center rounded-full border border-mist/80 bg-paper/55 text-fog backdrop-blur-sm transition-colors hover:border-olive-300 hover:text-accent"
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                className="transition-transform group-hover:translate-y-0.5"
-              >
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-            </a>
+            <ScrollCue />
           </Reveal>
         </div>
       </section>

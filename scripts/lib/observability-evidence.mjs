@@ -28,7 +28,7 @@ const CATEGORIES = [
   "unknown",
 ];
 const STAGES = {
-  auth: ["session", "request_email", "request_oauth", "callback"],
+  auth: ["session", "request_email", "verify_email", "request_oauth", "callback"],
   sync: ["initial", "push", "reconciliation"],
   service_worker: ["registration"],
 };

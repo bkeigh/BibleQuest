@@ -155,7 +155,6 @@ function HomeInner() {
     },
   ].filter((group) => group.items.length > 0);
   const allDone = pickCount >= 1 && completedCount === pickCount;
-  const useCompactQuestRail = pickCount > FREE_QUEST_SLOTS;
   const hiddenReservationCount = Math.max(
     0,
     occupiedPicks.length - pickCount
@@ -323,22 +322,12 @@ function HomeInner() {
                       <h3 className="mb-2 px-1 text-caption uppercase tracking-[0.16em] text-ash">
                         {group.label}
                       </h3>
-                      <ul
-                        aria-label={group.label}
-                        className={
-                          useCompactQuestRail
-                            ? "-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-8 sm:px-8"
-                            : "space-y-3"
-                        }
-                      >
+                      {/* Keep every quest in the Home column so its edges align
+                          with the verse, growth, and account surfaces. */}
+                      <ul aria-label={group.label} className="space-y-3">
                         {group.items.map(({ pick, quest }) => (
                           <li
                             key={`${pick.pickedAt}:${quest.slug}`}
-                            className={
-                              useCompactQuestRail
-                                ? "w-[min(84vw,20rem)] shrink-0 snap-start"
-                                : undefined
-                            }
                           >
                             <QuestSlip
                               quest={quest}
@@ -346,7 +335,6 @@ function HomeInner() {
                               assignmentStatus={pick.status}
                               completed={pick.status === "completed"}
                               expiresAt={pick.expiresAt}
-                              compact={useCompactQuestRail}
                             />
                           </li>
                         ))}
@@ -354,11 +342,6 @@ function HomeInner() {
                     </div>
                   ))}
                 </div>
-                {useCompactQuestRail && (
-                  <p className="mt-1 px-1 text-caption text-ash">
-                    Swipe sideways to review every open quest.
-                  </p>
-                )}
                 {canAddQuest && (
                   <div className="mt-2.5">
                     <GentleLink variant="text" size="sm" href="/app/quests">
