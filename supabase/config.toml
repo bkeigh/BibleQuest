@@ -257,6 +257,15 @@ otp_expiry = 3600
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
+# Local auth mirrors production's code-first PWA-safe account emails.
+[auth.email.template.confirmation]
+subject = "Your BibleQuest confirmation code"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.magic_link]
+subject = "Your BibleQuest sign-in code"
+content_path = "./supabase/templates/magic-link.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true

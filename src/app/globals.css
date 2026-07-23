@@ -566,6 +566,14 @@ html.theme-dark .milestone-glass-surface[data-milestone-state="reached"] {
   line-height: 1.5;
 }
 
+/* The wide marketing hero gives Scripture more room and a stronger presence. */
+@media (min-width: 64rem) {
+  .verse-text-hero {
+    font-size: clamp(1.375rem, calc(1.2rem + 0.45vw), 1.625rem);
+    line-height: 1.55;
+  }
+}
+
 /* Today's card stays readable while leaving the Bible shortcuts in view. */
 .verse-text-card {
   font-size: 1rem;

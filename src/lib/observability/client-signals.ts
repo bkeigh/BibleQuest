@@ -29,6 +29,7 @@ export type ClientSignalCategory = (typeof CLIENT_SIGNAL_CATEGORIES)[number];
 export type ClientSignalStage =
   | "session"
   | "request_email"
+  | "verify_email"
   | "request_oauth"
   | "callback"
   | "initial"
@@ -56,7 +57,7 @@ const STAGES_BY_SURFACE: Record<
   ClientSignalSurface,
   readonly ClientSignalStage[]
 > = {
-  auth: ["session", "request_email", "request_oauth", "callback"],
+  auth: ["session", "request_email", "verify_email", "request_oauth", "callback"],
   sync: ["initial", "push", "reconciliation"],
   service_worker: ["registration"],
 };

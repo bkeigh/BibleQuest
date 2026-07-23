@@ -55,6 +55,19 @@ describe("privacy-safe observability contract", () => {
   it("reconstructs only the exact bounded client signal", () => {
     expect(
       sanitizeClientSignal({
+        surface: "auth",
+        stage: "verify_email",
+        outcome: "success",
+        category: "ok",
+      }),
+    ).toEqual({
+      surface: "auth",
+      stage: "verify_email",
+      outcome: "success",
+      category: "ok",
+    });
+    expect(
+      sanitizeClientSignal({
         surface: "sync",
         stage: "initial",
         outcome: "failure",
@@ -300,7 +313,7 @@ describe("privacy-safe observability contract", () => {
       auth_posture: "configured",
       analytics_posture: "configured",
       schema_contract: "0022",
-      service_worker_version: "biblequest-v19",
+      service_worker_version: "biblequest-v20",
       billing_mode: "coming-soon",
     });
 

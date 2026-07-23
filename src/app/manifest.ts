@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/app",
     name: "BibleQuest",
     short_name: "BibleQuest",
     description:

@@ -42,6 +42,32 @@ describe("launch content catalog", () => {
     expect(focusRule).not.toContain("transform:");
   });
 
+  it("keeps Home quests aligned in one vertical column", () => {
+    const home = readFileSync(
+      path.join(process.cwd(), "src/components/home/HomeScreen.tsx"),
+      "utf8",
+    );
+
+    // Counts and status groups stay visible without turning the quest list into a rail.
+    expect(home).toContain('label: "Active quests"');
+    expect(home).toContain('label: "Completed"');
+    expect(home).toContain(
+      '<ul aria-label={group.label} className="space-y-3">',
+    );
+    expect(home).not.toContain("Swipe sideways to review every open quest.");
+    expect(home).not.toContain("useCompactQuestRail");
+  });
+
+  it("uses the approved social preview tagline", () => {
+    const iconBuilder = readFileSync(
+      path.join(process.cwd(), "scripts/build-icons.mjs"),
+      "utf8",
+    );
+
+    expect(iconBuilder).toContain("A daily guide to living in faith");
+    expect(iconBuilder).not.toContain("A daily guide to living your faith");
+  });
+
   it("ships exactly 150 unique, reviewed free quests with useful depth", () => {
     expect(seedQuests).toHaveLength(150);
     expect(new Set(seedQuests.map((quest) => quest.slug))).toHaveLength(150);

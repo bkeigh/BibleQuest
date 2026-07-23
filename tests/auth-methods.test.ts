@@ -9,6 +9,8 @@ vi.mock("@/lib/sync/containment", () => ({
 }));
 
 import {
+  isEmailOtpReady,
+  normalizeEmailOtp,
   SignInMethods,
   shouldCreateAccount,
 } from "@/components/account/SignInMethods";
@@ -19,7 +21,7 @@ describe("production sign-in methods", () => {
       createElement(SignInMethods, { source: "account" }),
     );
 
-    expect(markup).toContain("Email me a sign-in link");
+    expect(markup).toContain("Email me a sign-in code");
     expect(markup).toContain("Continue with Google");
     expect(markup).not.toContain("Text me a code");
     expect(markup).not.toContain('type="tel"');
@@ -41,12 +43,21 @@ describe("production sign-in methods", () => {
 
     expect(createMarkup).toContain("Create account with email");
     expect(createMarkup).toContain("Create account with Google");
-    expect(signInMarkup).toContain("Email me a sign-in link");
+    expect(signInMarkup).toContain("Email me a sign-in code");
     expect(signInMarkup).toContain("Continue with Google");
   });
 
   it("allows email identity creation only from explicit create mode", () => {
     expect(shouldCreateAccount("create")).toBe(true);
     expect(shouldCreateAccount("signin")).toBe(false);
+  });
+
+  it("normalizes current Supabase email-code lengths", () => {
+    expect(normalizeEmailOtp(" 12-34 56 ")).toBe("123456");
+    expect(normalizeEmailOtp("123456789")).toBe("12345678");
+    expect(isEmailOtpReady("123456")).toBe(true);
+    expect(isEmailOtpReady("12345678")).toBe(true);
+    expect(isEmailOtpReady("12345")).toBe(false);
+    expect(isEmailOtpReady("12345a")).toBe(false);
   });
 });

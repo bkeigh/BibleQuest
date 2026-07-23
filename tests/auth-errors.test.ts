@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   authFailureMessage,
   authFailureReason,
+  emailOtpFailure,
   emailRequestFailure,
   parseAuthFailureReason,
 } from "@/lib/auth/errors";
@@ -42,6 +43,19 @@ describe("auth diagnostics", () => {
         .reference,
     ).toBe("AUTH-RATE-LIMIT");
     expect(emailRequestFailure(new TypeError("Failed to fetch"), false)).toMatchObject(
+      {
+        reference: "AUTH-NETWORK",
+        unavailable: true,
+      },
+    );
+  });
+
+  it("keeps email-code verification failures bounded and actionable", () => {
+    expect(emailOtpFailure({ code: "otp_expired" })).toMatchObject({
+      reference: "AUTH-CODE-INVALID",
+      unavailable: false,
+    });
+    expect(emailOtpFailure(new TypeError("Failed to fetch"), false)).toMatchObject(
       {
         reference: "AUTH-NETWORK",
         unavailable: true,

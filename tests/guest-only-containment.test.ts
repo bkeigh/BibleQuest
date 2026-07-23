@@ -134,7 +134,7 @@ describe("guest-only account-sync containment", () => {
     );
 
     expect(markup).toContain("Account sync is temporarily unavailable");
-    expect(markup).not.toContain("Email me a sign-in link");
+    expect(markup).not.toContain("Email me a sign-in code");
     expect(markup).not.toContain("Continue with Google");
     expect(markup).not.toContain("<input");
   });
