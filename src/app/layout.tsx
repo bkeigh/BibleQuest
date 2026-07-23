@@ -31,12 +31,20 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_APP_URL ?? "https://www.biblequest.co"
   ),
   title: {
-    default: "BibleQuest — Scripture, prayer, and real-life quests",
+    default: "BibleQuest — A daily guide to living your faith",
     template: "%s — BibleQuest",
   },
   description:
-    "Faith, one small step at a time. One verse, one prayer, and a small step you can live out today.",
+    "Read Scripture, pray, reflect, and put faith into action with daily verses, private prayer journaling, real-life quests, and a journey that grows with you.",
   applicationName: "BibleQuest",
+  category: "Faith and spirituality",
+  keywords: [
+    "Bible app",
+    "daily Bible verse",
+    "Christian prayer app",
+    "faith journal",
+    "Christian daily devotional",
+  ],
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -44,27 +52,40 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
   },
   openGraph: {
-    title: "BibleQuest — Scripture, prayer, and real-life quests",
+    title: "BibleQuest — A daily guide to living your faith",
     description:
-      "Faith, one small step at a time. One verse, one prayer, and a small step you can live out today.",
+      "Read Scripture, pray, reflect, and put faith into action with a gentle daily rhythm that grows with you.",
     url: "/",
     siteName: "BibleQuest",
     type: "website",
-    images: [{ url: "/og.png", width: 1200, height: 630 }],
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "BibleQuest, a daily guide to living your faith",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "BibleQuest — Scripture, prayer, and real-life quests",
+    title: "BibleQuest — A daily guide to living your faith",
     description:
-      "Faith, one small step at a time. One verse, one prayer, and a small step you can live out today.",
+      "Read Scripture, pray, reflect, and put faith into action with a gentle daily rhythm that grows with you.",
     images: ["/og.png"],
   },
   icons: {
     icon: [
-      { url: "/icons/icon.svg", type: "image/svg+xml" },
+      {
+        url: "/icons/favicon-48.png?v=2",
+        sizes: "48x48",
+        type: "image/png",
+      },
+      { url: "/icons/icon.svg?v=2", type: "image/svg+xml", sizes: "any" },
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
     ],
-    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+    shortcut: ["/icons/favicon-48.png?v=2"],
+    apple: [{ url: "/icons/apple-touch-icon.png?v=2", sizes: "180x180" }],
   },
 };
 

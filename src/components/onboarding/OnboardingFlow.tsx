@@ -1,9 +1,8 @@
 "use client";
 
 /**
- * First-run onboarding state machine. It collects only the profile and rhythm
- * needed to personalize the daily loop, keeps intermediate answers local, and
- * commits onboarding to QuestOS only after the final confirmation.
+ * First-run guide. Account access comes first, then concise product explainers,
+ * one active quest, and an optional Plus invitation.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -13,12 +12,18 @@ import { useSession } from "@/lib/supabase/useSession";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { PixelMascot } from "@/components/design-system/PixelMascot";
-import type { PixelMascotName } from "@/components/design-system/PixelMascot";
+import {
+  PixelMascot,
+  type PixelMascotName,
+} from "@/components/design-system/PixelMascot";
+import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { SignInMethods } from "@/components/account/SignInMethods";
 import { QuestSlip } from "@/components/quests/QuestSlip";
-import { VerseCard } from "@/components/bible/VerseCard";
-import { getDailyVerse } from "@/lib/questos/verse-engine";
+import {
+  LEGAL_DOCUMENTS,
+  LegalSummary,
+  type LegalDocumentKind,
+} from "@/components/legal/LegalSummary";
 import { selectSuggestedQuests } from "@/lib/questos/quest-engine";
 import { seedQuests } from "@/data/seed/quests";
 import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
@@ -26,94 +31,42 @@ import { toDateKey } from "@/lib/utils/dates";
 import { track } from "@/lib/analytics/events";
 import { authFailureMessage, type AuthFailureReason } from "@/lib/auth/errors";
 import {
-  clearOnboardingResumeStage,
   getOnboardingResumeStage,
-  isOnboardingResumePending,
   setOnboardingResumeStage,
+  shouldAdvanceOnboardingAccountStep,
   shouldTrackOnboardingStarted,
 } from "@/lib/auth/onboarding-resume";
 import { riseIn, stepTransition } from "@/lib/motion";
 import { DEFAULT_SETTINGS } from "@/lib/questos/types";
-import type {
-  Calling,
-  DailyRhythm,
-  PrimaryGoal,
-  QuestStyle,
-  QuestTemplate,
-  Tradition,
-} from "@/lib/questos/types";
-
-interface Choice<T> {
-  value: T;
-  label: string;
-}
-
-const GOALS: Choice<PrimaryGoal>[] = [
-  { value: "grow_closer", label: "Grow closer to God" },
-  { value: "read_scripture", label: "Read Scripture more often" },
-  { value: "prayer_habit", label: "Build a prayer habit" },
-  { value: "practice_kindness", label: "Practice kindness" },
-  { value: "return_to_faith", label: "Return to faith" },
-  { value: "explore_christianity", label: "Explore Christianity" },
-  { value: "family_church", label: "Support my family or church life" },
-];
-
-const TRADITIONS: Choice<Tradition>[] = [
-  { value: "catholic", label: "Catholic" },
-  { value: "protestant", label: "Protestant" },
-  { value: "orthodox", label: "Orthodox" },
-  { value: "non_denominational", label: "Non-denominational" },
-  { value: "exploring", label: "Exploring" },
-  { value: "prefer_not_to_say", label: "Prefer not to say" },
-];
-
-const RHYTHMS: Choice<DailyRhythm>[] = [
-  { value: "morning", label: "Morning" },
-  { value: "afternoon", label: "Afternoon" },
-  { value: "evening", label: "Evening" },
-  { value: "flexible", label: "Flexible" },
-];
-
-const STYLES: Choice<QuestStyle>[] = [
-  { value: "quiet", label: "Quiet and reflective" },
-  { value: "scripture", label: "Scripture-focused" },
-  { value: "service", label: "Service-focused" },
-  { value: "kindness", label: "Kindness-focused" },
-  { value: "discipline", label: "Discipline-focused" },
-  { value: "surprise", label: "Surprise me" },
-];
-
-const CALLINGS: Choice<Calling>[] = [
-  { value: "student", label: "Student" },
-  { value: "parent", label: "Parent" },
-  { value: "creative", label: "Creative" },
-  { value: "business_owner", label: "Business owner" },
-  { value: "teacher", label: "Teacher" },
-  { value: "healthcare", label: "Healthcare worker" },
-  { value: "caregiver", label: "Caregiver" },
-  { value: "athlete", label: "Athlete" },
-  { value: "new_believer", label: "New believer" },
-  { value: "returning", label: "Returning to faith" },
-  { value: "retired", label: "Retired" },
-  { value: "prefer_not_to_say", label: "Prefer not to say" },
-];
+import type { QuestTemplate } from "@/lib/questos/types";
 
 interface Draft {
   displayName: string;
-  primaryGoal?: PrimaryGoal;
-  tradition?: Tradition;
-  dailyRhythm?: DailyRhythm;
-  questStyle?: QuestStyle;
-  calling?: Calling;
 }
 
-const TOTAL_STEPS = 8;
-/** Account creation is deliberately the last gate before the first quest. */
-const ACCOUNT_STEP = 6;
-const FIRST_QUEST_STEP = 7;
+const ACCOUNT_STEP = 0;
+const NAME_STEP = 1;
+const WELCOME_STEP = 2;
+const DENOMINATIONS_STEP = 3;
+const HOME_STEP = 4;
+const QUESTS_STEP = 5;
+const BIBLE_STEP = 6;
+const PRAYER_STEP = 7;
+const FIRST_QUEST_STEP = 8;
+const PLUS_STEP = 9;
+const TOTAL_STEPS = PLUS_STEP + 1;
 
-/** The one heading rendered per step — focus lands here on step change. */
 const STEP_HEADING_ID = "onboarding-step-heading";
+
+// Uses retained stills only, giving the guide a taste of app artwork without video cost.
+const STEP_BACKGROUNDS: Partial<Record<number, string>> = {
+  [WELCOME_STEP]: "/wallpapers/01-let-there-be-light/poster.webp",
+  [DENOMINATIONS_STEP]: "/wallpapers/the-olive-grove/poster.webp",
+  [HOME_STEP]: "/wallpapers/galilee-be-still/poster.webp",
+  [QUESTS_STEP]: "/wallpapers/the-sheltering-tree/poster.webp",
+  [BIBLE_STEP]: "/wallpapers/12-baptism-in-the-jordan/poster.webp",
+  [PRAYER_STEP]: "/wallpapers/20-empty-tomb-at-dawn/poster.webp",
+};
 
 function OnboardingInner({
   authFailure,
@@ -122,66 +75,43 @@ function OnboardingInner({
 }) {
   const router = useRouter();
   const { user, configured } = useSession();
-  const completeOnboarding = useQuestOS((s) => s.completeOnboarding);
-  const pickQuest = useQuestOS((s) => s.pickQuest);
-  const markAccountNudgeShown = useQuestOS((s) => s.markAccountNudgeShown);
-  const profile = useQuestOS((s) => s.profile);
+  const completeOnboarding = useQuestOS((state) => state.completeOnboarding);
+  const pickQuest = useQuestOS((state) => state.pickQuest);
+  const markAccountNudgeShown = useQuestOS(
+    (state) => state.markAccountNudgeShown,
+  );
+  const profile = useQuestOS((state) => state.profile);
   const alreadyDone = profile?.onboardingCompleted ?? false;
   const resumeStage = getOnboardingResumeStage();
-  const resumingAccountOnboarding =
-    alreadyDone && isOnboardingResumePending(resumeStage);
-  const trackOnboardingStart = shouldTrackOnboardingStarted(
-    alreadyDone,
-    resumeStage,
-  );
+  const continuingPlus = alreadyDone && resumeStage === "plus";
   const [step, setStep] = useState(() =>
-    resumingAccountOnboarding
-      ? resumeStage === "quest" || user || !configured
-        ? FIRST_QUEST_STEP
-        : ACCOUNT_STEP
-      : 0,
+    continuingPlus ? PLUS_STEP : user ? NAME_STEP : ACCOUNT_STEP,
   );
-  const [draft, setDraft] = useState<Draft>(() =>
-    resumingAccountOnboarding && profile
-      ? {
-          displayName: profile.displayName,
-          primaryGoal: profile.primaryGoal,
-          tradition: profile.tradition,
-          dailyRhythm: profile.dailyRhythm,
-          questStyle: profile.questStyle,
-          calling: profile.calling,
-        }
-      : { displayName: "" },
-  );
-  const visibleStep = step === ACCOUNT_STEP && user ? FIRST_QUEST_STEP : step;
-  // Only move focus after the user navigates — never on first paint.
+  const [draft, setDraft] = useState<Draft>(() => ({
+    displayName: profile?.displayName === "friend" ? "" : profile?.displayName ?? "",
+  }));
+  const [legalDocument, setLegalDocument] =
+    useState<LegalDocumentKind | null>(null);
   const hasNavigated = useRef(false);
+  // Separate session hooks can settle one render apart; derive the safe entry
+  // screen so a restored account never sees the account form a second time.
+  const visibleStep =
+    step === ACCOUNT_STEP &&
+    shouldAdvanceOnboardingAccountStep(alreadyDone, user?.id ?? null)
+      ? NAME_STEP
+      : step;
+  const background = STEP_BACKGROUNDS[visibleStep];
 
   useEffect(() => {
-    if (!alreadyDone && resumeStage) {
-      clearOnboardingResumeStage();
+    if (alreadyDone) return;
+    setOnboardingResumeStage(user ? "guide" : "account");
+  }, [alreadyDone, user]);
+
+  useEffect(() => {
+    if (shouldTrackOnboardingStarted(alreadyDone, resumeStage)) {
+      track("onboarding_started");
     }
   }, [alreadyDone, resumeStage]);
-
-  useEffect(() => {
-    if (step === ACCOUNT_STEP && user && resumeStage === "account") {
-      setOnboardingResumeStage("quest");
-    }
-  }, [resumeStage, step, user]);
-
-  useEffect(() => {
-    if (trackOnboardingStart) track("onboarding_started");
-  }, [trackOnboardingStart]);
-
-  const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
-  const next = () => {
-    hasNavigated.current = true;
-    setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
-  };
-  const back = () => {
-    hasNavigated.current = true;
-    setStep((s) => Math.max(s - 1, 0));
-  };
 
   const suggestedQuest = useMemo<QuestTemplate | null>(
     () =>
@@ -189,8 +119,7 @@ function OnboardingInner({
         quests: seedQuests,
         dateKey: toDateKey(),
         profile: {
-          displayName: "friend",
-          questStyle: draft.questStyle,
+          displayName: draft.displayName.trim() || "friend",
           onboardingCompleted: false,
           createdAt: new Date(0).toISOString(),
         },
@@ -199,90 +128,94 @@ function OnboardingInner({
         recentSlugs: [],
         count: 1,
       })[0] ?? null,
-    [draft.questStyle]
+    [draft.displayName],
   );
-  const previewVerse = useMemo(() => getDailyVerse(), []);
 
-  function saveProfile(nextDraft: Draft) {
-    const rhythm = nextDraft.dailyRhythm ?? "flexible";
-    completeOnboarding(
-      {
-        displayName: nextDraft.displayName.trim() || "friend",
-        primaryGoal: nextDraft.primaryGoal,
-        tradition: nextDraft.tradition,
-        dailyRhythm: nextDraft.dailyRhythm,
-        questStyle: nextDraft.questStyle,
-        calling: nextDraft.calling,
-      },
-      { notifications: { ...DEFAULT_SETTINGS.notifications, preferredTime: rhythm } }
-    );
-  }
-
-  /**
-   * Persist profile setup before an external auth round trip. The separate,
-   * non-personal marker keeps /onboarding at this account/quest hand-off rather
-   * than letting the completed profile skip straight into the app.
-   */
-  function prioritizeAccount(patch?: Partial<Draft>) {
-    const nextDraft = { ...draft, ...patch };
-    setDraft(nextDraft);
+  // Moves between guide pages while preserving predictable focus behavior.
+  function goTo(nextStep: number) {
     hasNavigated.current = true;
-    const nextStep = configured && !user ? ACCOUNT_STEP : FIRST_QUEST_STEP;
-    setOnboardingResumeStage(
-      nextStep === ACCOUNT_STEP ? "account" : "quest",
-    );
-    saveProfile(nextDraft);
-    setStep(nextStep);
+    setStep(Math.max(ACCOUNT_STEP, Math.min(nextStep, PLUS_STEP)));
   }
 
-  function finish(opts?: { pickSlug?: string; destination?: string }) {
-    if (!alreadyDone) {
-      setOnboardingResumeStage("quest");
-      saveProfile(draft);
-    }
-    if (opts?.pickSlug) {
-      // Returns false when the day is full or the slug is unknown — either
-      // way the user still lands in the app with a working day.
-      pickQuest(opts.pickSlug);
-    }
+  // Commits only fields the revised guide actually asks for.
+  function saveProfile() {
+    completeOnboarding({
+      displayName: draft.displayName.trim() || "friend",
+    });
+  }
+
+  // Starts a local guide even when account services are unavailable or declined.
+  function continueWithoutAccount() {
+    setOnboardingResumeStage("guide");
+    goTo(NAME_STEP);
+  }
+
+  // Adds the suggested quest before showing the optional membership invitation.
+  function startFirstQuest() {
+    setOnboardingResumeStage("plus");
+    if (!alreadyDone) saveProfile();
+    if (suggestedQuest) pickQuest(suggestedQuest.slug);
     markAccountNudgeShown("onboarding");
-    const destination = opts?.destination ?? "/app";
-    // Launch stages distinguish an intentional destination from closing and
-    // reopening while the account or quest screen is still pending.
+    goTo(PLUS_STEP);
+  }
+
+  // Finalizes a safe app destination and clears the onboarding hand-off in the app gate.
+  function finish(destination: "/app" | "/app/plus") {
+    if (!alreadyDone) saveProfile();
+    markAccountNudgeShown("onboarding");
     setOnboardingResumeStage(
-      destination === "/app/quests" ? "launch_quests" : "launch",
+      destination === "/app/plus" ? "launch_plus" : "launch",
     );
     router.replace(destination);
   }
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="relative flex min-h-dvh flex-col bg-parchment px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-safe">
-        {/* Progress — dots, no numbers, no pressure */}
+      <div className="relative flex min-h-dvh flex-col overflow-hidden bg-parchment px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-safe">
+        {background && (
+          <>
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 bg-cover bg-center"
+              style={{ backgroundImage: `url(${background})` }}
+            />
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 bg-gradient-to-b from-dusk/45 via-dusk/25 to-dusk/55"
+            />
+          </>
+        )}
+
         <div
           role="progressbar"
           aria-valuemin={1}
           aria-valuemax={TOTAL_STEPS}
           aria-valuenow={visibleStep + 1}
           aria-valuetext={`Step ${visibleStep + 1} of ${TOTAL_STEPS}`}
-          className="mx-auto flex w-full max-w-md items-center justify-center gap-1.5 pt-6"
+          className="relative z-10 mx-auto flex w-full max-w-md items-center justify-center gap-1.5 pt-6"
         >
-          {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+          {Array.from({ length: TOTAL_STEPS }).map((_, index) => (
             <span
-              key={i}
-              aria-hidden
+              key={index}
+              aria-hidden="true"
               className={`h-1.5 rounded-full transition-all duration-500 ${
-                i === visibleStep
-                  ? "w-6 bg-accent"
-                  : i < visibleStep
-                    ? "w-1.5 bg-accent/40"
-                    : "w-1.5 bg-mist"
+                index === visibleStep
+                  ? background
+                    ? "w-6 bg-paper"
+                    : "w-6 bg-accent"
+                  : index < visibleStep
+                    ? background
+                      ? "w-1.5 bg-paper/55"
+                      : "w-1.5 bg-accent/40"
+                    : background
+                      ? "w-1.5 bg-paper/30"
+                      : "w-1.5 bg-mist"
               }`}
             />
           ))}
         </div>
 
-        <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-5">
+        <div className="relative z-10 mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-5">
           <AnimatePresence mode="wait">
             <motion.div
               key={visibleStep}
@@ -296,390 +229,211 @@ function OnboardingInner({
                 }
               }}
             >
-              {visibleStep === 0 && (
-                <StepWelcome
-                  name={draft.displayName}
-                  onName={(displayName) => set({ displayName })}
-                  onNext={next}
-                  accountEnabled={configured}
-                  authFailure={authFailure}
-                />
-              )}
-              {visibleStep === 1 && (
-                <StepChoice
-                  mascot="map"
-                  title="What brings you here?"
-                  hint="This shapes your first quests. Pick the closest fit."
-                  choices={GOALS}
-                  value={draft.primaryGoal}
-                  onSelect={(primaryGoal) => {
-                    set({ primaryGoal });
-                    next();
-                  }}
-                />
-              )}
-              {visibleStep === 2 && (
-                <StepChoice
-                  mascot="scroll"
-                  title="Your tradition"
-                  hint="Optional — it tunes the language. You’re welcome here either way."
-                  choices={TRADITIONS}
-                  value={draft.tradition}
-                  onSelect={(tradition) => {
-                    set({ tradition });
-                    next();
-                  }}
-                />
-              )}
-              {visibleStep === 3 && (
-                <StepChoice
-                  mascot="lantern"
-                  title="When’s a good time for your daily quest?"
-                  hint="We’ll time reminders around it. You can change this anytime."
-                  choices={RHYTHMS}
-                  value={draft.dailyRhythm}
-                  onSelect={(dailyRhythm) => {
-                    set({ dailyRhythm });
-                    next();
-                  }}
-                />
-              )}
-              {visibleStep === 4 && (
-                <StepChoice
-                  mascot="campfire"
-                  title="What kind of quests fit you?"
-                  hint="A starting point, not a box. Your quests will still surprise you."
-                  choices={STYLES}
-                  value={draft.questStyle}
-                  onSelect={(questStyle) => {
-                    set({ questStyle });
-                    next();
-                  }}
-                />
-              )}
-              {visibleStep === 5 && (
-                <StepChoice
-                  mascot="dove"
-                  title="What’s your day-to-day?"
-                  hint="Optional. It helps quests fit your real life."
-                  choices={CALLINGS}
-                  value={draft.calling}
-                  onSelect={(calling) => prioritizeAccount({ calling })}
-                />
-              )}
               {visibleStep === ACCOUNT_STEP && (
                 <StepAccount
-                  name={draft.displayName.trim() || "friend"}
+                  accountEnabled={configured}
                   authFailure={authFailure}
-                  onContinueOffline={() => {
-                    hasNavigated.current = true;
-                    setOnboardingResumeStage("quest");
-                    setStep(FIRST_QUEST_STEP);
+                  onContinue={continueWithoutAccount}
+                  onOpenLegal={setLegalDocument}
+                />
+              )}
+              {visibleStep === NAME_STEP && (
+                <StepName
+                  name={draft.displayName}
+                  onName={(displayName) => setDraft({ displayName })}
+                  onNext={() => {
+                    setOnboardingResumeStage("guide");
+                    goTo(WELCOME_STEP);
                   }}
+                />
+              )}
+              {visibleStep === WELCOME_STEP && (
+                <StepGuide
+                  mascot="lamb"
+                  eyebrow="Welcome to BibleQuest"
+                  title="Your daily guide to living your faith"
+                  body="Come as you are. BibleQuest helps you make space for Scripture, prayer, and one meaningful step each day."
+                  points={[
+                    "A clear daily rhythm, not another noisy feed",
+                    "Gentle progress that reflects practice, not perfection",
+                  ]}
+                  onNext={() => goTo(DENOMINATIONS_STEP)}
+                />
+              )}
+              {visibleStep === DENOMINATIONS_STEP && (
+                <StepGuide
+                  mascot="dove"
+                  eyebrow="A wide-open welcome"
+                  title="Made for Christians across denominations"
+                  body="BibleQuest does not ask you to fit into a label. It keeps the focus on Scripture and everyday faith while respecting traditions where Christians differ."
+                  points={[
+                    "Multiple Bible editions with clear attribution",
+                    "Language designed to welcome new and lifelong believers",
+                  ]}
+                  onNext={() => goTo(HOME_STEP)}
+                />
+              )}
+              {visibleStep === HOME_STEP && (
+                <StepGuide
+                  mascot="lantern"
+                  eyebrow="Home"
+                  title="A calm place to begin each day"
+                  body="Your Home brings today’s verse, your active quests, and a simple invitation to pray or reflect into one clear view."
+                  points={[
+                    "A daily verse chosen for your journey",
+                    "Your next faithful steps, easy to find",
+                  ]}
+                  onNext={() => goTo(QUESTS_STEP)}
+                />
+              )}
+              {visibleStep === QUESTS_STEP && (
+                <StepGuide
+                  mascot="map"
+                  eyebrow="Quests"
+                  title="Turn faith into something you can live"
+                  body="Quests are reviewed, practical invitations to serve, pray, read, forgive, give, or slow down."
+                  points={[
+                    "Choose what fits your real day",
+                    "Keep active quests close until you are ready",
+                  ]}
+                  onNext={() => goTo(BIBLE_STEP)}
+                />
+              )}
+              {visibleStep === BIBLE_STEP && (
+                <StepGuide
+                  mascot="scroll"
+                  eyebrow="Bible"
+                  title="Read Scripture without losing your place"
+                  body="Move through the full Bible, choose from available editions, save verses, and return to recent passages whenever you need them."
+                  points={[
+                    "World English Bible works offline",
+                    "Bookmarks and reading progress stay with your journey",
+                  ]}
+                  onNext={() => goTo(PRAYER_STEP)}
+                />
+              )}
+              {visibleStep === PRAYER_STEP && (
+                <StepGuide
+                  mascot="campfire"
+                  eyebrow="Prayer and Journey"
+                  title="Keep what matters close"
+                  body="Write private prayers and reflections, revisit answered prayers, and watch your Journey grow from the practices you choose."
+                  points={[
+                    "Your writing stays out of analytics",
+                    "You can export or clear your data in Settings",
+                  ]}
+                  onNext={() => {
+                    setOnboardingResumeStage("quest");
+                    goTo(FIRST_QUEST_STEP);
+                  }}
+                  footer={
+                    <LegalLinks onOpen={setLegalDocument} />
+                  }
                 />
               )}
               {visibleStep === FIRST_QUEST_STEP && (
                 <StepFirstQuest
                   name={draft.displayName.trim() || "friend"}
-                  verse={previewVerse}
                   quest={suggestedQuest}
-                  onStart={() =>
-                    finish(
-                      suggestedQuest ? { pickSlug: suggestedQuest.slug } : undefined
-                    )
-                  }
-                  onBrowse={() => finish({ destination: "/app/quests" })}
+                  onStart={startFirstQuest}
+                />
+              )}
+              {visibleStep === PLUS_STEP && (
+                <StepPlus
+                  onExplore={() => finish("/app/plus")}
+                  onSkip={() => finish("/app")}
                 />
               )}
             </motion.div>
           </AnimatePresence>
         </div>
 
-        {/* Account and first-quest steps are intentional forward hand-offs. */}
-        <div className="mx-auto flex w-full max-w-md items-center justify-between">
-          {visibleStep > 0 && visibleStep < ACCOUNT_STEP ? (
+        <div className="relative z-10 mx-auto flex min-h-11 w-full max-w-md items-center">
+          {visibleStep > NAME_STEP && visibleStep < FIRST_QUEST_STEP ? (
             <button
-              onClick={back}
-              className="text-small text-ash transition-colors hover:text-charcoal"
+              type="button"
+              onClick={() => goTo(visibleStep - 1)}
+              className={`min-h-11 text-small underline-offset-4 hover:underline ${
+                background ? "text-paper" : "text-ash hover:text-charcoal"
+              }`}
             >
               Back
             </button>
-          ) : (
-            <span />
-          )}
-          {visibleStep > 0 && visibleStep < ACCOUNT_STEP && (
+          ) : visibleStep === NAME_STEP && !user ? (
             <button
-              onClick={() =>
-                visibleStep === 5 ? prioritizeAccount() : next()
-              }
-              className="text-small text-ash transition-colors hover:text-charcoal"
+              type="button"
+              onClick={() => goTo(ACCOUNT_STEP)}
+              className="min-h-11 text-small text-ash underline-offset-4 hover:text-charcoal hover:underline"
             >
-              Skip
+              Back
             </button>
-          )}
+          ) : null}
         </div>
+
+        {legalDocument && (
+          <LegalDialog
+            kind={legalDocument}
+            onClose={() => setLegalDocument(null)}
+          />
+        )}
       </div>
     </MotionConfig>
   );
 }
 
-/** One centered mascot per step, always above the heading. */
-function StepMascot({ name, size = 9 }: { name: PixelMascotName; size?: number }) {
+// Keeps one centered brand companion above each onboarding heading.
+function StepMascot({
+  name,
+  size = 8,
+}: {
+  name: PixelMascotName;
+  size?: number;
+}) {
   return (
-    <motion.div
-      variants={riseIn}
-      initial="hidden"
-      animate="visible"
-      className="mb-4"
-    >
+    <motion.div variants={riseIn} initial="hidden" animate="visible" className="mb-4">
       <PixelMascot name={name} size={size} />
     </motion.div>
   );
 }
 
-function StepWelcome({
-  name,
-  onName,
-  onNext,
+function StepAccount({
   accountEnabled,
   authFailure,
+  onContinue,
+  onOpenLegal,
 }: {
-  name: string;
-  onName: (v: string) => void;
-  onNext: () => void;
   accountEnabled: boolean;
   authFailure: AuthFailureReason | null;
+  onContinue: () => void;
+  onOpenLegal: (kind: LegalDocumentKind) => void;
 }) {
-  const [signInOpen, setSignInOpen] = useState(Boolean(authFailure));
-
-  return (
-    <div className="text-center">
-      <StepMascot name="lamb" size={10} />
-      <h1
-        id={STEP_HEADING_ID}
-        tabIndex={-1}
-        className="font-display text-editorial text-graphite outline-none"
-      >
-        Welcome to BibleQuest
-      </h1>
-      <p className="mx-auto mt-3 max-w-xs text-[1.0625rem] leading-relaxed text-charcoal">
-        One verse, one prayer, one quest, one step at a time.
-      </p>
-      <div className="mt-8 text-left">
-        <label htmlFor="name" className="mb-1.5 block text-caption text-ash">
-          What should we call you?
-        </label>
-        <input
-          id="name"
-          value={name}
-          onChange={(e) => onName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && onNext()}
-          placeholder="Your first name"
-          autoComplete="given-name"
-          className="w-full rounded-[var(--radius-button)] border border-mist bg-paper px-4 py-3 text-body text-graphite outline-none transition-colors focus:border-accent/50"
-        />
-        <p className="mt-1.5 text-caption text-ash">
-          Optional — skip it if you like.
-        </p>
-      </div>
-      <GentleButton
-        variant="primary"
-        size="lg"
-        fullWidth
-        className="mt-6"
-        onClick={onNext}
-      >
-        Begin
-      </GentleButton>
-      {accountEnabled && (
-        <div className="mt-5 border-t border-mist pt-4">
-          <GentleButton
-            variant="text"
-            size="sm"
-            className="min-h-11"
-            aria-expanded={signInOpen}
-            aria-controls="returning-user-sign-in"
-            onClick={() => setSignInOpen((open) => !open)}
-          >
-            Already have an account? Sign in
-          </GentleButton>
-
-          {signInOpen && (
-            <div id="returning-user-sign-in" className="mt-4 text-left">
-              {authFailure && <CallbackFailureNotice reason={authFailure} />}
-              <PaperCard variant="paper" padding="md">
-                <h2 className="text-[1.0625rem] font-medium text-graphite">
-                  Welcome back
-                </h2>
-                <p className="mb-4 mt-1 text-caption leading-relaxed text-ash">
-                  Sign in and we’ll restore your saved journey before opening
-                  the app.
-                </p>
-                <SignInMethods source="onboarding" nextPath="/onboarding" />
-              </PaperCard>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function StepChoice<T extends string>({
-  mascot,
-  title,
-  hint,
-  choices,
-  value,
-  onSelect,
-}: {
-  mascot: PixelMascotName;
-  title: string;
-  hint: string;
-  choices: Choice<T>[];
-  value?: T;
-  onSelect: (v: T) => void;
-}) {
-  return (
-    <div>
-      <div className="text-center">
-        <StepMascot name={mascot} />
-        <h2
-          id={STEP_HEADING_ID}
-          tabIndex={-1}
-          className="font-display text-editorial text-graphite outline-none"
-        >
-          {title}
-        </h2>
-        <p className="mx-auto mt-2 max-w-sm text-small leading-relaxed text-ash">
-          {hint}
-        </p>
-      </div>
-      <div className="mt-6 flex flex-col gap-2.5">
-        {choices.map((c) => (
-          <button
-            key={c.value}
-            onClick={() => onSelect(c.value)}
-            aria-pressed={value === c.value}
-            className={`rounded-[var(--radius-button)] border px-4 py-3.5 text-left text-body transition-all duration-300 ${
-              value === c.value
-                ? "border-accent bg-accent-surface text-accent-ink"
-                : "border-mist bg-paper text-charcoal hover:border-accent/40 hover:bg-linen"
-            }`}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function StepFirstQuest({
-  name,
-  verse,
-  quest,
-  onStart,
-  onBrowse,
-}: {
-  name: string;
-  verse: ReturnType<typeof getDailyVerse>;
-  quest: QuestTemplate | null;
-  onStart: () => void;
-  onBrowse: () => void;
-}) {
-  return (
-    <div>
-      <div className="text-center">
-        <StepMascot name="sprout" size={7} />
-        <h2
-          id={STEP_HEADING_ID}
-          tabIndex={-1}
-          className="font-display text-[1.375rem] leading-snug text-graphite outline-none"
-        >
-          You’re set, {name}.
-        </h2>
-        <p className="mt-1.5 text-small text-ash">
-          Here’s today’s verse{quest ? " and a suggested first quest" : ""}.
-        </p>
-      </div>
-      <div className="mt-4 space-y-3">
-        {/* preview: display-only — the card's Save/Reflect actions lead into
-            /app, and OnboardingGate would bounce back here, restarting the
-            flow and losing every answer. */}
-        <VerseCard verse={verse} preview />
-        {quest && (
-          <div>
-            <p className="mb-1.5 text-caption uppercase tracking-[0.14em] text-accent">
-              Suggested first quest
-            </p>
-            {/* compact + no prayer card: the quest page itself carries the
-                invitation and prayer prompt — this step just has to fit a
-                phone screen without scrolling. */}
-            <QuestSlip quest={quest} compact />
-          </div>
-        )}
-      </div>
-      <GentleButton
-        variant="primary"
-        size="lg"
-        fullWidth
-        className="mt-5"
-        onClick={onStart}
-      >
-        {quest ? "Start with this quest" : "Open BibleQuest"}
-      </GentleButton>
-      <div className="mt-2.5 text-center">
-        <GentleButton variant="text" size="sm" onClick={onBrowse}>
-          Or browse all quests
-        </GentleButton>
-      </div>
-    </div>
-  );
-}
-
-/** Account creation is the final setup step before revealing the first quest. */
-function StepAccount({
-  name,
-  authFailure,
-  onContinueOffline,
-}: {
-  name: string;
-  authFailure: AuthFailureReason | null;
-  onContinueOffline: () => void;
-}) {
-  const [offline, setOffline] = useState(
-    () => typeof navigator !== "undefined" && navigator.onLine === false,
+  const [intent, setIntent] = useState<"create" | "signin">(
+    authFailure ? "signin" : "create",
   );
   const [authUnavailable, setAuthUnavailable] = useState(
     authFailure === "configuration",
   );
 
-  useEffect(() => {
-    const update = () => setOffline(navigator.onLine === false);
-    window.addEventListener("online", update);
-    window.addEventListener("offline", update);
-    return () => {
-      window.removeEventListener("online", update);
-      window.removeEventListener("offline", update);
-    };
-  }, []);
-
   return (
     <div>
       <div className="text-center">
         <StepMascot name="key" size={7} />
-        <h2
+        <p className="text-caption uppercase tracking-[0.16em] text-accent">
+          Get BibleQuest
+        </p>
+        <h1
           id={STEP_HEADING_ID}
           tabIndex={-1}
-          className="font-display text-[1.375rem] leading-snug text-graphite outline-none"
+          className="mt-1.5 font-display text-[1.75rem] leading-tight text-graphite outline-none"
         >
-          Save your journey, {name}
-        </h2>
-        <p className="mx-auto mt-1.5 max-w-sm text-caption leading-relaxed text-ash">
-          Create your free account now, before your first quest. It keeps your
-          progress with you across devices. Prayer and reflection text stays
-          out of analytics and AI.
+          {intent === "create"
+            ? "Create your free account"
+            : "Welcome back"}
+        </h1>
+        <p className="mx-auto mt-2 max-w-sm text-small leading-relaxed text-charcoal">
+          {intent === "create"
+            ? "Keep your journey with you across devices. Your private writing stays out of analytics."
+            : "Sign in and we’ll restore your saved journey before opening the app."}
         </p>
       </div>
 
@@ -689,33 +443,389 @@ function StepAccount({
         </div>
       )}
 
-      <PaperCard variant="paper" padding="md" className="mt-4">
-        <SignInMethods
-          source="onboarding"
-          nextPath="/onboarding"
-          onUnavailable={() => setAuthUnavailable(true)}
-        />
-      </PaperCard>
-
-      {(offline || authUnavailable) && (
-        <div className="mt-3 rounded-[var(--radius-card)] border border-mist p-3 text-center">
-          <p className="text-caption leading-relaxed text-ash">
-            Account sign-in isn’t available right now. Your setup is saved on
-            this device, so you can continue locally and sign in later.
+      {accountEnabled ? (
+        <PaperCard variant="paper" padding="md" className="mt-5">
+          <SignInMethods
+            source="onboarding"
+            nextPath="/onboarding"
+            intent={intent}
+            onUnavailable={() => setAuthUnavailable(true)}
+          />
+        </PaperCard>
+      ) : (
+        <PaperCard variant="linen" padding="md" className="mt-5 text-center">
+          <p className="text-small leading-relaxed text-charcoal">
+            Account sign-in is unavailable here. BibleQuest still works on this
+            device.
           </p>
-        </div>
+        </PaperCard>
+      )}
+
+      {accountEnabled && (
+        <button
+          type="button"
+          className="mt-3 min-h-11 w-full text-small text-accent underline underline-offset-4"
+          onClick={() =>
+            setIntent((current) =>
+              current === "create" ? "signin" : "create",
+            )
+          }
+        >
+          {intent === "create"
+            ? "Already have an account? Sign in"
+            : "New to BibleQuest? Create an account"}
+        </button>
+      )}
+
+      {(authUnavailable || !accountEnabled) && (
+        <p className="mt-1 text-center text-caption leading-relaxed text-ash">
+          Your setup can stay safely on this device until account access is
+          available.
+        </p>
       )}
 
       <GentleButton
         variant="ghost"
         size="sm"
         fullWidth
-        className="mt-3 min-h-11 text-ash"
-        onClick={onContinueOffline}
+        className="mt-2 text-ash"
+        onClick={onContinue}
       >
-        Not now — continue on this device
+        Continue without an account
+      </GentleButton>
+      <div className="mt-3 text-center">
+        <LegalLinks onOpen={onOpenLegal} />
+      </div>
+    </div>
+  );
+}
+
+function StepName({
+  name,
+  onName,
+  onNext,
+}: {
+  name: string;
+  onName: (value: string) => void;
+  onNext: () => void;
+}) {
+  return (
+    <div className="text-center">
+      <StepMascot name="lamb" size={9} />
+      <h1
+        id={STEP_HEADING_ID}
+        tabIndex={-1}
+        className="font-display text-editorial text-graphite outline-none"
+      >
+        What should we call you?
+      </h1>
+      <p className="mx-auto mt-2 max-w-xs text-small leading-relaxed text-ash">
+        A first name is enough. You can leave this blank and change it later.
+      </p>
+      <label htmlFor="onboarding-name" className="sr-only">
+        First name
+      </label>
+      <input
+        id="onboarding-name"
+        value={name}
+        onChange={(event) => onName(event.target.value)}
+        onKeyDown={(event) => event.key === "Enter" && onNext()}
+        placeholder="Your first name"
+        autoComplete="given-name"
+        maxLength={80}
+        className="mt-7 w-full rounded-[var(--radius-button)] border border-mist bg-paper px-4 py-3 text-body text-graphite outline-none transition-colors focus:border-accent/50"
+      />
+      <GentleButton
+        variant="primary"
+        size="lg"
+        fullWidth
+        className="mt-5"
+        onClick={onNext}
+      >
+        Continue
       </GentleButton>
     </div>
+  );
+}
+
+function StepGuide({
+  mascot,
+  eyebrow,
+  title,
+  body,
+  points,
+  onNext,
+  footer,
+}: {
+  mascot: PixelMascotName;
+  eyebrow: string;
+  title: string;
+  body: string;
+  points: string[];
+  onNext: () => void;
+  footer?: React.ReactNode;
+}) {
+  return (
+    <PaperCard variant="quiet" padding="lg" className="border-paper/50 bg-paper/90 backdrop-blur-md">
+      <div className="text-center">
+        <StepMascot name={mascot} size={7} />
+        <p className="text-caption uppercase tracking-[0.16em] text-accent">
+          {eyebrow}
+        </p>
+        <h2
+          id={STEP_HEADING_ID}
+          tabIndex={-1}
+          className="mt-1.5 font-display text-[1.625rem] leading-tight text-graphite outline-none"
+        >
+          {title}
+        </h2>
+        <p className="mt-3 text-small leading-relaxed text-charcoal">{body}</p>
+      </div>
+      <ul className="mt-5 space-y-2.5">
+        {points.map((point) => (
+          <li
+            key={point}
+            className="flex gap-2.5 text-small leading-relaxed text-charcoal"
+          >
+            <span
+              aria-hidden="true"
+              className="mt-[0.45rem] h-1.5 w-1.5 shrink-0 rounded-full bg-accent"
+            />
+            {point}
+          </li>
+        ))}
+      </ul>
+      <GentleButton
+        variant="primary"
+        size="lg"
+        fullWidth
+        className="mt-6"
+        onClick={onNext}
+      >
+        Next
+      </GentleButton>
+      {footer && <div className="mt-3 text-center">{footer}</div>}
+    </PaperCard>
+  );
+}
+
+function StepFirstQuest({
+  name,
+  quest,
+  onStart,
+}: {
+  name: string;
+  quest: QuestTemplate | null;
+  onStart: () => void;
+}) {
+  return (
+    <div>
+      <div className="text-center">
+        <StepMascot name="sprout" size={7} />
+        <p className="text-caption uppercase tracking-[0.16em] text-accent">
+          Your first step
+        </p>
+        <h2
+          id={STEP_HEADING_ID}
+          tabIndex={-1}
+          className="mt-1.5 font-display text-[1.5rem] leading-snug text-graphite outline-none"
+        >
+          Start your journey, {name}
+        </h2>
+        <p className="mx-auto mt-2 max-w-sm text-small leading-relaxed text-ash">
+          We picked one gentle quest for today. Starting it adds it to your
+          active quests.
+        </p>
+      </div>
+      {quest && (
+        <div className="mt-5">
+          <QuestSlip quest={quest} compact />
+        </div>
+      )}
+      <GentleButton
+        variant="primary"
+        size="lg"
+        fullWidth
+        className="mt-5"
+        onClick={onStart}
+      >
+        {quest ? "Start with this quest" : "Continue to BibleQuest"}
+      </GentleButton>
+    </div>
+  );
+}
+
+function StepPlus({
+  onExplore,
+  onSkip,
+}: {
+  onExplore: () => void;
+  onSkip: () => void;
+}) {
+  return (
+    <PaperCard variant="atmospheric" padding="lg" className="text-center">
+      <motion.div
+        variants={riseIn}
+        initial="hidden"
+        animate="visible"
+        className="mb-4 flex justify-center"
+      >
+        <PixelIcon name="crown" size={8} />
+      </motion.div>
+      <p className="text-caption uppercase tracking-[0.16em] text-gilt">
+        BibleQuest Plus
+      </p>
+      <h2
+        id={STEP_HEADING_ID}
+        tabIndex={-1}
+        className="mt-1.5 font-display text-[1.625rem] leading-tight text-graphite outline-none"
+      >
+        More room to go deeper
+      </h2>
+      <p className="mt-3 text-small leading-relaxed text-charcoal">
+        The heart of BibleQuest stays free. Plus adds unlimited active quests,
+        every wallpaper, and more ways to find the right next step.
+      </p>
+      <GentleButton
+        variant="primary"
+        size="lg"
+        fullWidth
+        className="mt-6"
+        onClick={onExplore}
+      >
+        Explore BibleQuest Plus
+      </GentleButton>
+      <GentleButton
+        variant="ghost"
+        size="sm"
+        fullWidth
+        className="mt-2 text-ash"
+        onClick={onSkip}
+      >
+        Not now
+      </GentleButton>
+    </PaperCard>
+  );
+}
+
+// Opens the full summaries in-place so first-run users do not lose guide progress.
+function LegalDialog({
+  kind,
+  onClose,
+}: {
+  kind: LegalDocumentKind;
+  onClose: () => void;
+}) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const legalCopy = LEGAL_DOCUMENTS[kind];
+
+  useEffect(() => {
+    const previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable?.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="legal-dialog-title"
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-dusk/55 p-3 backdrop-blur-sm sm:items-center"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <PaperCard
+        variant="paper"
+        padding="none"
+        className="flex max-h-[88dvh] w-full max-w-lg flex-col overflow-hidden"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-mist px-5 py-4">
+          <div>
+            <p className="text-caption uppercase tracking-[0.16em] text-accent">
+              {legalCopy.eyebrow}
+            </p>
+            <h2
+              id="legal-dialog-title"
+              className="mt-1 font-display text-[1.375rem] text-graphite"
+            >
+              {legalCopy.title}
+            </h2>
+          </div>
+          <button
+            ref={closeRef}
+            type="button"
+            onClick={onClose}
+            className="min-h-11 rounded-[var(--radius-button)] px-3 text-small text-accent underline underline-offset-4"
+          >
+            Close
+          </button>
+        </div>
+        <div className="overflow-y-auto px-5 py-5">
+          <LegalSummary kind={kind} />
+        </div>
+      </PaperCard>
+    </div>
+  );
+}
+
+function LegalLinks({
+  onOpen,
+}: {
+  onOpen: (kind: LegalDocumentKind) => void;
+}) {
+  return (
+    <p className="text-caption leading-relaxed text-ash">
+      By continuing, you agree to the{" "}
+      <button
+        type="button"
+        className="text-accent underline underline-offset-4"
+        onClick={() => onOpen("terms")}
+      >
+        Terms of Use
+      </button>{" "}
+      and acknowledge the{" "}
+      <button
+        type="button"
+        className="text-accent underline underline-offset-4"
+        onClick={() => onOpen("privacy")}
+      >
+        Privacy Policy
+      </button>
+      .
+    </p>
   );
 }
 

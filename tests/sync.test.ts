@@ -27,6 +27,7 @@ vi.mock("@/lib/sync/containment", () => ({
 import {
   filterByTombstones,
   isMissingBibleSyncColumn,
+  isMissingJourneySyncColumn,
   isMissingRecentVersesTable,
   mergeSnapshots,
   retrySync,
@@ -160,6 +161,96 @@ describe("sync ownership, lifecycle, and merge safety", () => {
         "translation_key",
       ),
     ).toBe(false);
+  });
+
+  it("downgrades only the two additive Journey columns during migration rollout", () => {
+    expect(
+      isMissingJourneySyncColumn(
+        {
+          code: "PGRST204",
+          message: "Could not find the 'date_key' column of 'journey_events'",
+        },
+        "date_key",
+      ),
+    ).toBe(true);
+    expect(
+      isMissingJourneySyncColumn(
+        {
+          code: "42703",
+          message: 'column "source_id" of relation "journey_events" does not exist',
+        },
+        "source_id",
+      ),
+    ).toBe(true);
+    expect(
+      isMissingJourneySyncColumn(
+        {
+          code: "42501",
+          message: "permission denied for journey_events",
+        },
+        "date_key",
+      ),
+    ).toBe(false);
+  });
+
+  it("restores through a pre-0014 Journey schema", async () => {
+    const attempts: Array<Record<string, unknown>> = [];
+    useQuestOS.setState({
+      journeyEvents: [
+        {
+          id: "3db75860-d157-47e1-b14e-7a6b042227db",
+          type: "prayer_created",
+          title: "Prayer written",
+          dateKey: "2026-07-20",
+          sourceId: "prayer:source-record",
+          occurredAt: "2026-07-20T12:00:00.000Z",
+        },
+      ],
+    });
+    mocks.createClient.mockReturnValue(
+      fakeClient(undefined, async (table, rows) => {
+        if (table !== "journey_events") return OK;
+        const row = (rows as Array<Record<string, unknown>>)[0];
+        attempts.push(row);
+        if ("date_key" in row) {
+          return {
+            data: null,
+            error: {
+              code: "PGRST204",
+              message:
+                "Could not find the 'date_key' column of 'journey_events'",
+            },
+          };
+        }
+        if ("source_id" in row) {
+          return {
+            data: null,
+            error: {
+              code: "PGRST204",
+              message:
+                "Could not find the 'source_id' column of 'journey_events'",
+            },
+          };
+        }
+        return OK;
+      }),
+    );
+
+    await startSync("account-a");
+
+    expect(attempts).toHaveLength(3);
+    expect(attempts[0]).toMatchObject({
+      date_key: "2026-07-20",
+      source_id: "prayer:source-record",
+    });
+    expect(attempts[1]).not.toHaveProperty("date_key");
+    expect(attempts[1]).toHaveProperty(
+      "source_id",
+      "prayer:source-record",
+    );
+    expect(attempts[2]).not.toHaveProperty("date_key");
+    expect(attempts[2]).not.toHaveProperty("source_id");
+    expect(useSyncStatus.getState().state).toBe("idle");
   });
 
   it("recognizes only the exact additive recent-verse table as optional", () => {

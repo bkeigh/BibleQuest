@@ -1,7 +1,7 @@
 /**
  * Verse engine — daily verse rotation over the curated pool.
- * Deterministic by calendar day so everyone shares the same quiet rhythm,
- * cycling the pool without repeats until it wraps.
+ * Deterministic by calendar day and account so each person receives their own
+ * stable selection, cycling the pool without repeats until it wraps.
  *
  * `refresh` supports the gentle "Another verse" control: each refresh count
  * maps to one more deterministic pick for that day (never repeating a verse
@@ -36,11 +36,21 @@ export function canRefreshDailyVerse(
   );
 }
 
-export function getDailyVerse(dateKey?: string, refresh = 0): DailyVerse {
+export function getDailyVerse(
+  dateKey?: string,
+  refresh = 0,
+  audienceKey?: string,
+): DailyVerse {
   const key = dateKey ?? toDateKey();
   const day = dayNumber(fromDateKey(key));
   const len = POOL.length;
-  const base = ((day % len) + len) % len;
+
+  // Give every account a stable offset while preserving the pool-wide cycle.
+  const normalizedAudienceKey = audienceKey?.trim() ?? "";
+  const audienceOffset = normalizedAudienceKey
+    ? hashString(`daily-verse:${normalizedAudienceKey}`) % len
+    : 0;
+  const base = (((day + audienceOffset) % len) + len) % len;
 
   // Wrap the refresh count across the complete daily order so Plus accounts
   // can keep refreshing without sticking on the pool's final verse.
@@ -55,7 +65,9 @@ export function getDailyVerse(dateKey?: string, refresh = 0): DailyVerse {
   const shown = new Set([base]);
   let index = base;
   for (let i = 1; i <= steps; i++) {
-    const rand = seededRandom(hashString(`${key}:verse:${i}`));
+    const rand = seededRandom(
+      hashString(`${key}:${normalizedAudienceKey}:verse:${i}`),
+    );
     let pick = Math.floor(rand() * len);
     while (shown.has(pick)) pick = (pick + 1) % len;
     shown.add(pick);

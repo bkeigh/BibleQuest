@@ -17,25 +17,22 @@ interface SafeLocalJourneyInput {
   localOnboardingCompleted: boolean;
   lastSyncedUserId: string | null;
   userId: string | null;
-  initialSyncPending?: boolean;
 }
 
 /**
  * Only a journey already stamped to this exact account can open before a new
- * initial sync completes. First-account guest adoption must finish its pull →
- * merge → push before UI mutations can race the subscriber attachment.
+ * initial sync completes. Once the account owns a completed local journey,
+ * PWA launch stays local-first while a network retry runs in the background.
  */
 export function hasSafeLocalJourney({
   localOnboardingCompleted,
   lastSyncedUserId,
   userId,
-  initialSyncPending = false,
 }: SafeLocalJourneyInput): boolean {
   return Boolean(
     localOnboardingCompleted &&
       userId &&
-      lastSyncedUserId === userId &&
-      !initialSyncPending,
+      lastSyncedUserId === userId,
   );
 }
 

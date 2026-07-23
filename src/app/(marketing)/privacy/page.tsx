@@ -1,16 +1,9 @@
 import {
   MarketingPage,
-  Prose,
-  ProseHeading,
 } from "@/components/marketing/MarketingPage";
-import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
+import { LegalSummary } from "@/components/legal/LegalSummary";
 
 export const metadata = { title: "Privacy Policy" };
-
-// Keep the storage promise aligned with the single containment release latch.
-const ACCOUNT_STORAGE_COPY = ACCOUNT_SYNC_CONTAINED
-  ? "Account sync is temporarily unavailable, so saved app data currently stays in this browser on this device."
-  : "If you sign in, saved app data also syncs to your BibleQuest account.";
 
 export default function PrivacyPage() {
   return (
@@ -19,84 +12,7 @@ export default function PrivacyPage() {
       title="Your prayers are yours."
       intro="This is a plain-language summary of how BibleQuest handles your data. It reflects how the app works today; a formal policy will accompany public launch."
     >
-      <ProseHeading>Where your data lives</ProseHeading>
-      <Prose>
-        When you use BibleQuest without an account, your prayers, reflections,
-        quests, bookmarks, and journey are stored in this browser on your device.
-        {" "}{ACCOUNT_STORAGE_COPY} You can export everything to a file, or clear
-        it entirely, from Settings.
-      </Prose>
-
-      <ProseHeading>What we never do</ProseHeading>
-      <Prose>
-        We never sell your personal data. Analytics are off by default and run
-        only after you choose to share limited usage counts in Settings. They
-        never include prayer, reflection, note, or verse text; email, phone,
-        user or record IDs; auth tokens; URL queries or hashes; or anything else
-        you write. Your private text is never sent to analytics or logs, and is
-        never used to train or prompt AI without your explicit action and consent.
-      </Prose>
-
-      <ProseHeading>If you enable analytics</ProseHeading>
-      <Prose>
-        BibleQuest sends allowlisted event names and small bounded values directly
-        to Plausible. URLs are reduced to safe route shapes and requests send no
-        referrer. Offline retries are capped and sanitized. Turning analytics off
-        clears pending events immediately and keeps them off across tabs and future
-        sessions. Browser Do Not Track and Global Privacy Control are respected.
-      </Prose>
-
-      <ProseHeading>If you join the waitlist</ProseHeading>
-      <Prose>
-        The name and email address you choose to submit are sent directly to
-        Tally, which hosts our temporary pre-launch form, so we can contact you
-        about BibleQuest. Waitlist details are not included in app analytics,
-        and the form does not ask for prayers, reflections, or other spiritual
-        journal content.
-      </Prose>
-
-      <ProseHeading>If you choose an online Bible edition</ProseHeading>
-      <Prose>
-        For a reviewed public-domain online edition, BibleQuest’s server asks
-        the HelloAO Free Use Bible API for the requested book and chapter. It
-        does not send your name, contact details, account ID, prayers, or
-        reflections. For a separately licensed edition, API.Bible receives the
-        requested passage plus random device and session identifiers required
-        to report that its text was viewed; it receives none of that personal or
-        spiritual content either. Choosing bundled WEB avoids either third-party
-        Scripture request.
-      </Prose>
-
-      <ProseHeading>If you create an account</ProseHeading>
-      <Prose>
-        Synced journal content is protected by per-user database access controls,
-        so one account cannot read another account’s rows. Server credentials
-        that can administer the database never reach your browser. Account sync
-        is not end-to-end encrypted, so we do not claim that infrastructure
-        operators or someone with access to your unlocked device could never
-        access readable content.
-      </Prose>
-
-      <ProseHeading>Sensitive moments</ProseHeading>
-      <Prose>
-        BibleQuest is a spiritual companion, not a crisis service. If you are in
-        danger or distress, please reach out to trusted people, a pastor or
-        priest, a professional, or local emergency services. We’ll always point
-        you toward real help rather than pretend to be it.
-      </Prose>
-
-      <ProseHeading>Questions</ProseHeading>
-      <Prose>
-        This policy will grow more formal before public launch. If you have a
-        concern in the meantime, email{" "}
-        <a
-          href="mailto:hello@biblequest.co"
-          className="text-accent underline underline-offset-4"
-        >
-          hello@biblequest.co
-        </a>
-        .
-      </Prose>
+      <LegalSummary kind="privacy" showIntro={false} />
     </MarketingPage>
   );
 }

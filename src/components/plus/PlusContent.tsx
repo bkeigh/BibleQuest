@@ -4,6 +4,7 @@ import { IconCheck, IconSparkle } from "@/components/design-system/icons";
 import { PlusCta } from "@/components/plus/PlusCta";
 import { getRevenueCatAvailability } from "@/lib/revenuecat/client";
 import { GentleLink } from "@/components/design-system/GentleButton";
+import { Disclosure } from "@/components/design-system/Disclosure";
 
 const FREE_INCLUDES = [
   "150 reviewed quests across 14 categories",
@@ -24,25 +25,25 @@ const PLUS_FEATURES = [
 
 /**
  * Plus content — shared between the marketing pricing page and the in-app
- * Plus page. Free is presented first and fully; Plus is depth, not a wall.
+ * Plus page. The free promise stays close without pushing Plus below the fold.
  */
 export function PlusContent({ compact = false }: { compact?: boolean }) {
   const revenueCat = getRevenueCatAvailability();
 
   return (
     <div className={compact ? "space-y-5" : "space-y-6"}>
-      {/* The free promise, stated plainly and first */}
-      <PaperCard variant="paper" padding="lg">
-        <p className="text-[0.75rem] uppercase tracking-[0.16em] text-accent">
-          Free, always
-        </p>
-        <h3 className="mt-1.5 font-display text-[1.5rem] text-graphite">
-          Everything that matters is free
-        </h3>
-        <p className="mt-2 text-[0.9375rem] leading-relaxed text-charcoal">
+      {/* Keep the full free promise available without hiding the Plus offer. */}
+      <Disclosure
+        variant="card"
+        label={
+          <span className="text-[0.8125rem] uppercase tracking-[0.14em] text-accent">
+            Included for free
+          </span>
+        }
+      >
+        <p className="text-[0.9375rem] leading-relaxed text-charcoal">
           Your relationship with God is never paywalled. Scripture, prayer,
-          reflection, quests, and your journey are free — and complete. This is
-          the whole app, and it’s what you get today.
+          reflection, quests, and your journey are free and complete.
         </p>
         <ul className="mt-4 grid gap-2 sm:grid-cols-2">
           {FREE_INCLUDES.map((f) => (
@@ -51,17 +52,19 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
             </li>
           ))}
         </ul>
-      </PaperCard>
+      </Disclosure>
 
-      {/* Plus — candlelight, not gold-plated */}
+      {/* Plus — crown in the content flow so it never crowds a corner. */}
       <PaperCard variant="atmospheric" padding="lg" className="relative overflow-hidden">
-        <div className="pointer-events-none absolute -right-4 -top-3 opacity-40">
-          <PixelIcon name="lantern" size={9} animate />
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-gold-500/15 ring-1 ring-gold-500/35">
+            <PixelIcon name="crown" size={4} />
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-gold-500/45 bg-gold-500/15 px-3 py-1 text-[0.75rem] text-gilt">
+            <IconSparkle size={14} /> BibleQuest Plus
+            {revenueCat.configured ? "" : " — coming soon"}
+          </span>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-gold-500/45 bg-gold-500/15 px-3 py-1 text-[0.75rem] text-gilt">
-          <IconSparkle size={14} /> BibleQuest Plus
-          {revenueCat.configured ? "" : " — coming soon"}
-        </span>
         <h3 className="mt-3 font-display text-[1.5rem] text-graphite">
           Go deeper, when you’re ready
         </h3>
