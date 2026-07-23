@@ -35,6 +35,7 @@ import { GET as authCallback } from "@/app/auth/callback/route";
 import { useQuestOS } from "@/lib/questos/store";
 import {
   ACCOUNT_SYNC_CONTAINED,
+  accountSyncContained,
   accountSyncAvailable,
 } from "@/lib/sync/containment";
 import { retrySync, startSync, stopSync } from "@/lib/sync/engine";
@@ -54,6 +55,15 @@ describe("guest-only account-sync containment", () => {
       userId: null,
       initialSyncComplete: false,
     });
+  });
+
+  it("keeps the default launch build behind a fail-closed latch", () => {
+    expect(ACCOUNT_SYNC_CONTAINED).toBe(true);
+    expect(accountSyncContained(undefined)).toBe(true);
+    expect(accountSyncContained("false")).toBe(true);
+    expect(accountSyncContained("TRUE")).toBe(true);
+    expect(accountSyncContained("true")).toBe(false);
+    expect(accountSyncAvailable(true)).toBe(false);
   });
 
   it.each(["current 0014 columns", "missing 0014 columns"])(

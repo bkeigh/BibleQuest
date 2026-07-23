@@ -9,7 +9,7 @@ successful sign-in. It is not evidence of a bad connection and it is not an
 SMTP failure: the session exists, but the deployed client cannot complete its
 initial database pull.
 
-## Current production finding
+## Historical production finding
 
 A read-only check using the browser-safe Supabase publishable key found:
 
@@ -26,6 +26,14 @@ A read-only check using the browser-safe Supabase publishable key found:
 | Auth methods | Email + Google on; phone off | Email + Google on; phone off | MATCHED |
 | Canonical metadata | `https://www.biblequest.co` | `www` canonical and Open Graph URL | MATCHED |
 | Auth email delivery | Custom SMTP with a verified sender | Not proven by the public readiness probe | MANUAL GATE |
+
+On July 23, 2026, a contained `biblequest-v15` release was promoted before any
+database write. The exact production history was fetched and reviewed, then
+the repository SQL for `0008` through `0015` and the idempotent launch seed were
+applied under new forward-only production versions. The original `0015`
+readiness probe now passes every schema, content, and provider-configuration
+check. Account sync remains contained while `0016` through `0020`, signed
+restore, real email delivery, and cached-client gates are completed.
 
 Run the same non-mutating probe at any time:
 
@@ -47,8 +55,8 @@ The launch record must select exactly one track:
 - **Auth + sync enabled:** complete every founder action in this runbook,
   including custom SMTP, real Gmail and iCloud delivery/callbacks, both-direction
   A/B isolation, transactional/cached-client sync, and signed restore evidence.
-- **Guest-only contained:** keep the frozen source's `ACCOUNT_SYNC_CONTAINED`
-  constant set to `true`; require health to
+- **Guest-only contained:** omit `NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED` or set it
+  to anything except the exact string `true`; require health to
   report `guest-only`; prove enrollment, sign-in, and account-action controls
   are absent (a status-only containment notice/page is allowed); callback exchange,
   middleware session refresh, and sync/client creation are no-ops; prove clean
@@ -61,7 +69,7 @@ The launch record must select exactly one track:
 Guest-only does not turn active auth or sync tests into passes. Record SMTP,
 Gmail/iCloud, provider callback, signed-in sync, and A/B client behavior as
 `OUT OF SCOPE — APPROVED GUEST-ONLY` for that release. Migrations through
-`0015`, the complete RLS/grant report and anonymous denial checks, canonical
+`0020`, the complete RLS/grant report and anonymous denial checks, canonical
 content, backup/restore, privacy, device, legal, monitoring, and rollback gates
 remain mandatory. Finish every deferred active-account test before a later
 release enables auth or sync.
@@ -205,6 +213,31 @@ and zero browser Supabase auth/sync traffic instead.
 
 ### Production
 
+Production has a preserved timestamp history that predates the repository's
+renumbered `0001`–`0015` files. A normal push from the repository root is
+therefore expected to stop. Never bypass that stop with `--include-all` or
+`migration repair`.
+
+The reviewed production mapping applied on July 23 is:
+
+| Production version | Repository SQL |
+| --- | --- |
+| `20260723150000` | `0008_reassert_rls_and_purge.sql` |
+| `20260723150100` | `0009_analytics_consent_opt_in.sql` |
+| `20260723150200` | `0010_rolling_quest_windows_and_recent_verses.sql` |
+| `20260723150300` | `0011_bible_translation_preference.sql` |
+| `20260723150400` | `0012_kjv_bible_translation_default.sql` |
+| `20260723150500` | `0014_journey_event_identity.sql` |
+| `20260723150600` | `0015_transactional_daily_quest_sync.sql` |
+| `20260723150700` | `supabase/seed.sql` |
+
+Future production work must use an isolated checkout, fetch the authoritative
+remote history, remove only the checkout's unmatched numeric files, and add
+new versions above the last remote version that point to the byte-identical,
+reviewed repository SQL. Capture `migration list` and a dry run, review every
+proposed filename, then push from that isolated checkout. Do not commit fetched
+remote history or temporary symlinks over the canonical staging migrations.
+
 1. Open [Supabase backups](https://supabase.com/dashboard/project/iacnjqnssovaaojswjoh/database/backups/scheduled)
    and record a current backup/PITR decision. A backup listing is not a restore
    drill; keep the non-production restore test as a separate launch gate.
@@ -252,15 +285,16 @@ production. Correct a verified defect with a new higher-numbered migration.
 
 ### Guest-only containment release order
 
-The launch-hardening bundle uses `ACCOUNT_SYNC_CONTAINED` as one release latch.
-While it is `true`, current clients hide enrollment, the auth callback refuses
+The launch-hardening bundle derives `ACCOUNT_SYNC_CONTAINED` from the
+fail-closed `NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED` build flag. Unless that flag is
+exactly `true`, current clients hide enrollment, the auth callback refuses
 to exchange codes or token hashes, the request proxy does not refresh Supabase
 sessions, and the browser sync engine stops before it creates a client. Keep the
 latch closed throughout schema, content, RLS, and isolation remediation and for
 the entire guest-only launch/watch window.
 
 This web release cannot stop JavaScript that is already running in an open v14
-tab or installed PWA window. The v15 worker evicts old BibleQuest caches after it
+tab or installed PWA window. The v18 worker evicts old BibleQuest caches after it
 installs and activates, but it does not forcibly reload an already controlled
 page; that page can retain its old authenticated sync behavior until it reloads
 or closes. If the incident requires an immediate zero-write boundary, use a
@@ -272,7 +306,7 @@ Use this order:
 1. Freeze account rollout and deploy the immutable contained bundle before any
    production migration or content write.
 2. Verify the health endpoint reports the intended guest-only posture, the
-   active worker reports v15, account-action controls are absent (status-only
+   active worker reports v18, account-action controls are absent (status-only
    containment copy is allowed), callbacks do not
    exchange credentials, normal proxy requests do not refresh sessions, and
    the browser sync path does not create a Supabase client.
@@ -280,7 +314,7 @@ Use this order:
    any remaining v14 observation as residual exposure; do not declare the
    incident contained solely because the deployment alias changed.
 4. With the latch still closed, apply and verify the approved migrations through
-   `0015`, then seed content separately and complete the full RLS/grant,
+   `0020`, then seed content separately and complete the full RLS/grant,
    anonymous denial, backup/restore, content, privacy, device, legal, monitoring,
    and rollback evidence. Complete the local-first core/persistence/export/clear/
    offline matrix and record a sanitized browser request summary with no

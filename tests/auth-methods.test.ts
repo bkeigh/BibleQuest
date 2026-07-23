@@ -8,7 +8,10 @@ vi.mock("@/lib/sync/containment", () => ({
   accountSyncAvailable: (configured: boolean) => configured,
 }));
 
-import { SignInMethods } from "@/components/account/SignInMethods";
+import {
+  SignInMethods,
+  shouldCreateAccount,
+} from "@/components/account/SignInMethods";
 
 describe("production sign-in methods", () => {
   it("offers email and Google without advertising disabled phone auth", () => {
@@ -40,5 +43,10 @@ describe("production sign-in methods", () => {
     expect(createMarkup).toContain("Create account with Google");
     expect(signInMarkup).toContain("Email me a sign-in link");
     expect(signInMarkup).toContain("Continue with Google");
+  });
+
+  it("allows email identity creation only from explicit create mode", () => {
+    expect(shouldCreateAccount("create")).toBe(true);
+    expect(shouldCreateAccount("signin")).toBe(false);
   });
 });

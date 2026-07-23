@@ -66,7 +66,7 @@ function assertSafeCollectionTarget(environment) {
   }
 }
 
-/** Runs the existing read-only probe and parses only its JSON contract. */
+/** Runs the existing non-mutating probe and parses only its JSON contract. */
 function collectReadiness() {
   try {
     const output = execFileSync(

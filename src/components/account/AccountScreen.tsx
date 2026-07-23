@@ -25,6 +25,7 @@ function AccountInner() {
   const { toast } = useToast();
   const { user, loading, configured } = useSession();
   const sync = useSyncStatus();
+  const [intent, setIntent] = useState<"create" | "signin">("create");
 
   // A failed magic link / OAuth round-trip lands here as ?error=signin
   // (src/app/auth/callback/route.ts). This component only renders on the
@@ -134,10 +135,19 @@ function AccountInner() {
 
   return (
     <Frame
-      title="Sign in"
-      subtitle="Optional — everything works without an account."
+      title={intent === "create" ? "Create your account" : "Welcome back"}
+      subtitle={
+        intent === "create"
+          ? "Keep your journey with you."
+          : "Restore your saved journey."
+      }
     >
-      <PixelMascot name="key" size={9} title="Sign in" className="mb-6" />
+      <PixelMascot
+        name="key"
+        size={9}
+        title={intent === "create" ? "Create account" : "Sign in"}
+        className="mb-6"
+      />
 
       {callbackFailure && (
         <div
@@ -155,9 +165,9 @@ function AccountInner() {
 
       <PaperCard variant="paper" padding="lg">
         <p className="text-small leading-relaxed text-charcoal">
-          Without an account, your journey stays in this browser. A free
-          account syncs it across devices behind per-user access controls;
-          journal text stays out of analytics and AI.
+          {intent === "create"
+            ? "A free account syncs this device’s journey across your devices behind per-user access controls. Journal text stays out of analytics and AI."
+            : "Use the email or Google account connected to BibleQuest. We’ll restore its saved journey before opening the app."}
         </p>
 
         <ul className="mt-4 space-y-2">
@@ -178,8 +188,37 @@ function AccountInner() {
           ))}
         </ul>
 
-        <div className="mt-5">
-          <SignInMethods source="account" />
+        <div
+          role="group"
+          aria-label="Choose account access"
+          className="mt-5 grid grid-cols-2 gap-2 rounded-[var(--radius-button)] bg-linen p-1"
+        >
+          {(["create", "signin"] as const).map((option) => {
+            const selected = intent === option;
+            return (
+              <button
+                key={option}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => setIntent(option)}
+                className={`min-h-11 rounded-[calc(var(--radius-button)-0.25rem)] px-3 text-small transition-colors ${
+                  selected
+                    ? "bg-paper font-medium text-accent shadow-sm"
+                    : "text-ash hover:text-charcoal"
+                }`}
+              >
+                {option === "create" ? "Create account" : "Sign in"}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-4">
+          <SignInMethods
+            key={intent}
+            source="account"
+            intent={intent}
+          />
         </div>
       </PaperCard>
     </Frame>

@@ -9,6 +9,7 @@ template in [`../.env.example`](../.env.example).
 | `BIBLEQUEST_ROLLBACK_SHA` | Launch gate | **Server-only.** Exact approved 40-character rollback commit reported by health; never a branch, URL, or deployment ID. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Optional | Enables account sync. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Optional | Publishable client key (safe in browser). |
+| `NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED` | Launch gate | Must be exactly `true` to expose account auth and sync after the full migration, RLS, provider, restore, and PWA gates pass. Missing or any other value stays guest-only. |
 | `NEXT_PUBLIC_ANALYTICS_ENABLED` | Optional | Must be exactly `true`; otherwise analytics is a silent no-op. |
 | `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | Optional | Plausible site domain. Required when analytics is enabled. |
 | `NEXT_PUBLIC_PLAUSIBLE_HOST` | Optional | HTTPS Plausible API origin; defaults to `https://plausible.io`. Paths, credentials, query strings, hashes, and HTTP are rejected. |

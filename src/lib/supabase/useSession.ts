@@ -18,6 +18,7 @@ import {
   consumeAuthCompletionSignal,
 } from "@/lib/auth/completion-signal";
 import { accountSyncAvailable } from "@/lib/sync/containment";
+import { withDeadline } from "@/lib/async/deadline";
 
 // One funnel event per real sign-in — not per mounted hook instance
 // (several components subscribe at once) and not per open tab (supabase
@@ -25,6 +26,7 @@ import { accountSyncAvailable } from "@/lib/sync/containment";
 // localStorage stamp; localStorage failures just fall back to per-tab.
 let signInTracked = false;
 const SIGNIN_STAMP_KEY = "biblequest:signin-tracked";
+export const SESSION_LOOKUP_DEADLINE_MS = 12_000;
 
 function firstTabToTrack(userId: string): boolean {
   try {
@@ -74,11 +76,17 @@ export function useSession(): SessionState {
     if (!configured) return;
     const supabase = createClient();
     let active = true;
+    let authEventSeen = false;
 
-    void supabase.auth
-      .getUser()
+    // The auth subscription remains authoritative if it settles before the
+    // network-backed identity check, including after that check times out.
+    void withDeadline(
+      supabase.auth.getUser(),
+      SESSION_LOOKUP_DEADLINE_MS,
+      "Account session lookup",
+    )
       .then(({ data, error }) => {
-        if (!active) return;
+        if (!active || authEventSeen) return;
         if (error) {
           reportClientSignal({
             surface: "auth",
@@ -94,7 +102,7 @@ export function useSession(): SessionState {
         setLoading(false);
       })
       .catch((error: unknown) => {
-        if (!active) return;
+        if (!active || authEventSeen) return;
         reportClientSignal({
           surface: "auth",
           stage: "session",
@@ -106,6 +114,7 @@ export function useSession(): SessionState {
       });
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      authEventSeen = true;
       // Server callback round trips restore as INITIAL_SESSION, while in-page
       // auth can emit SIGNED_IN. The one-shot cookie makes both paths count
       // exactly once without putting identity or tokens in client state.

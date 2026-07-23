@@ -33,6 +33,7 @@ export type ClientSignalStage =
   | "callback"
   | "initial"
   | "push"
+  | "reconciliation"
   | "registration";
 
 export interface ClientSignal {
@@ -56,7 +57,7 @@ const STAGES_BY_SURFACE: Record<
   readonly ClientSignalStage[]
 > = {
   auth: ["session", "request_email", "request_oauth", "callback"],
-  sync: ["initial", "push"],
+  sync: ["initial", "push", "reconciliation"],
   service_worker: ["registration"],
 };
 

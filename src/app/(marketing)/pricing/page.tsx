@@ -2,12 +2,14 @@ import { PlusContent } from "@/components/plus/PlusContent";
 import { Eyebrow } from "@/components/design-system/EditorialSection";
 import { GentleLink } from "@/components/design-system/GentleButton";
 import { PlusProvider } from "@/lib/revenuecat/usePlus";
+import { marketingMetadata } from "@/lib/metadata";
 
-export const metadata = {
+export const metadata = marketingMetadata({
   title: "Pricing",
   description:
     "BibleQuest is free for everything that matters — Scripture, prayer, reflection, quests, and your journey. Plus is coming later and adds depth, never access.",
-};
+  path: "/pricing",
+});
 
 export default function PricingPage() {
   // Marketing lives outside the persistent app provider, so pricing owns one

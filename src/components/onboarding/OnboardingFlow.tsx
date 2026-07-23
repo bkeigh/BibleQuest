@@ -171,7 +171,7 @@ function OnboardingInner({
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="relative flex min-h-dvh flex-col overflow-hidden bg-parchment px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-safe">
+      <div className="relative flex min-h-dvh flex-col overflow-x-hidden overflow-y-auto bg-parchment px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-safe">
         {background && (
           <>
             <div
@@ -215,7 +215,7 @@ function OnboardingInner({
           ))}
         </div>
 
-        <div className="relative z-10 mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-5">
+        <div className="relative z-10 mx-auto flex w-full max-w-md flex-1 flex-col justify-start py-6 [@media(min-height:700px)]:justify-center [@media(min-height:700px)]:py-5">
           <AnimatePresence mode="wait">
             <motion.div
               key={visibleStep}
@@ -572,13 +572,13 @@ function StepGuide({
         <p className="text-caption uppercase tracking-[0.16em] text-accent">
           {eyebrow}
         </p>
-        <h2
+        <h1
           id={STEP_HEADING_ID}
           tabIndex={-1}
           className="mt-1.5 font-display text-[1.625rem] leading-tight text-graphite outline-none"
         >
           {title}
-        </h2>
+        </h1>
         <p className="mt-3 text-small leading-relaxed text-charcoal">{body}</p>
       </div>
       <ul className="mt-5 space-y-2.5">
@@ -625,13 +625,13 @@ function StepFirstQuest({
         <p className="text-caption uppercase tracking-[0.16em] text-accent">
           Your first step
         </p>
-        <h2
+        <h1
           id={STEP_HEADING_ID}
           tabIndex={-1}
           className="mt-1.5 font-display text-[1.5rem] leading-snug text-graphite outline-none"
         >
           Start your journey, {name}
-        </h2>
+        </h1>
         <p className="mx-auto mt-2 max-w-sm text-small leading-relaxed text-ash">
           We picked one gentle quest for today. Starting it adds it to your
           active quests.
@@ -675,13 +675,13 @@ function StepPlus({
       <p className="text-caption uppercase tracking-[0.16em] text-gilt">
         BibleQuest Plus
       </p>
-      <h2
+      <h1
         id={STEP_HEADING_ID}
         tabIndex={-1}
         className="mt-1.5 font-display text-[1.625rem] leading-tight text-graphite outline-none"
       >
         More room to go deeper
-      </h2>
+      </h1>
       <p className="mt-3 text-small leading-relaxed text-charcoal">
         The heart of BibleQuest stays free. Plus adds unlimited active quests,
         every wallpaper, and more ways to find the right next step.
@@ -783,6 +783,9 @@ function LegalDialog({
             >
               {legalCopy.title}
             </h2>
+            <p className="mt-1 text-caption text-ash">
+              Effective {legalCopy.effectiveDate}
+            </p>
           </div>
           <button
             ref={closeRef}

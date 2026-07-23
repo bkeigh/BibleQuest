@@ -17,6 +17,7 @@ with expected (table_name, classification) as (
     ('milestones', 'public content'),
     ('feature_flags', 'public content'),
     ('profiles', 'user-owned'),
+    ('user_sync_state', 'retained user-owned state'),
     ('user_settings', 'user-owned'),
     ('user_daily_quests', 'user-owned'),
     ('user_daily_quest_days', 'user-owned'),
@@ -93,15 +94,32 @@ select
   ) as anon_can_execute,
   pg_catalog.has_function_privilege(
     'authenticated', procedure.oid, 'EXECUTE'
-  ) as authenticated_can_execute
+  ) as authenticated_can_execute,
+  pg_catalog.has_function_privilege(
+    'service_role', procedure.oid, 'EXECUTE'
+  ) as service_role_can_execute,
+  pg_catalog.pg_get_function_identity_arguments(procedure.oid) as arguments
 from pg_catalog.pg_proc as procedure
 join pg_catalog.pg_namespace as namespace
   on namespace.oid = procedure.pronamespace
 where namespace.nspname = 'public'
   and procedure.proname in (
     'purge_user_data',
+    'purge_user_data_internal',
     'replace_user_daily_quests',
+    'replace_user_daily_quests_internal',
     'daily_quest_sync_contract',
+    'upsert_mutable_account_rows',
+    'upsert_mutable_account_rows_internal',
+    'mutable_account_sync_contract',
+    'delete_user_sync_rows',
+    'account_sync_generation',
+    'account_sync_contract',
+    'delete_own_account',
+    'assert_user_sync_context',
+    'enforce_user_sync_generation',
+    'advance_account_sync_revision',
+    'handle_new_user',
     'bump_daily_quest_revision_for_legacy_write',
     'preserve_daily_quest_completion_for_legacy_write'
   )
@@ -120,8 +138,31 @@ where table_schema = 'public'
 group by grantee, table_name
 order by table_name, grantee;
 
--- 6. Internal triggers preserve newest recent verses and expose old-client
--- daily-quest writes to CAS revisions. Definitions contain no application rows.
+-- Revision-guarded mutable tables must have no column-level mutation bypass.
+select
+  grantee,
+  table_name,
+  column_name,
+  privilege_type
+from information_schema.column_privileges
+where table_schema = 'public'
+  and table_name in (
+    'profiles',
+    'user_settings',
+    'notification_preferences',
+    'prayers',
+    'reflections',
+    'user_quests',
+    'reading_progress',
+    'verse_bookmarks',
+    'user_recent_verses'
+  )
+  and grantee = 'authenticated'
+  and privilege_type in ('INSERT', 'UPDATE')
+order by table_name, column_name;
+
+-- 6. Internal triggers assign server revisions, expose old-client daily-quest
+-- writes to CAS revisions, and bind all synced writes to retained generation.
 select
   trigger.tgname as trigger_name,
   trigger.tgenabled as enabled,
@@ -133,8 +174,22 @@ join pg_catalog.pg_namespace as table_namespace
   on table_namespace.oid = table_class.relnamespace
 where table_namespace.nspname = 'public'
   and table_class.relname in (
+    'profiles',
+    'user_settings',
+    'notification_preferences',
     'user_recent_verses',
-    'user_daily_quests'
+    'user_daily_quests',
+    'user_daily_quest_days',
+    'user_quests',
+    'quest_completions',
+    'prayers',
+    'reflections',
+    'journey_events',
+    'growth_events',
+    'user_milestones',
+    'verse_bookmarks',
+    'reading_progress',
+    'chapters_read'
   )
   and not trigger.tgisinternal
 order by table_class.relname, trigger.tgname;
@@ -155,14 +210,16 @@ join pg_catalog.pg_namespace as namespace
 where namespace.nspname = 'public'
   and procedure.proname in (
     'keep_newest_recent_verse',
+    'advance_account_sync_revision',
+    'delete_own_account',
     'bump_daily_quest_revision_for_legacy_write',
     'preserve_daily_quest_completion_for_legacy_write'
   )
   and pg_catalog.pg_get_function_identity_arguments(procedure.oid) = ''
 order by procedure.proname;
 
--- 7. The revision table intentionally exposes only the day and opaque
--- revision to authenticated clients; the raw owner column remains hidden.
+-- 7. Revision and retained generation state exposes only opaque concurrency
+-- values to authenticated clients; raw request history stays hidden.
 select
   grantee,
   table_name,
@@ -170,10 +227,46 @@ select
   privilege_type
 from information_schema.column_privileges
 where table_schema = 'public'
-  and table_name = 'user_daily_quest_days'
+  and table_name in ('user_daily_quest_days', 'user_sync_state')
   and grantee in ('anon', 'authenticated', 'service_role')
 order by grantee, column_name, privilege_type;
 
--- 8. The public readiness surface returns only its fixed identity and one
--- boolean derived from the live RLS, grant, RPC, and trigger posture.
+select
+  table_name,
+  column_name,
+  data_type,
+  is_nullable,
+  column_default
+from information_schema.columns
+where table_schema = 'public'
+  and table_name in (
+    'profiles',
+    'user_settings',
+    'notification_preferences',
+    'prayers',
+    'reflections',
+    'user_quests',
+    'reading_progress',
+    'verse_bookmarks',
+    'user_recent_verses'
+  )
+  and column_name = 'sync_revision'
+order by table_name;
+
+-- 8. Public readiness surfaces return only fixed identities and booleans
+-- derived from the live RLS, grant, RPC, trigger, and update-boundary posture.
 select public.daily_quest_sync_contract() as daily_quest_sync_contract;
+select public.mutable_account_sync_contract() as mutable_account_sync_contract;
+select public.account_sync_contract() as account_sync_contract;
+
+-- 9. Unbound security-definer entry points remain absent after 0019.
+select
+  pg_catalog.to_regprocedure(
+    'public.replace_user_daily_quests(date,bigint,uuid,jsonb)'
+  ) is null as old_daily_replace_absent,
+  pg_catalog.to_regprocedure(
+    'public.upsert_mutable_account_rows(text,jsonb)'
+  ) is null as old_mutable_write_absent,
+  pg_catalog.to_regprocedure(
+    'public.purge_user_data()'
+  ) is null as old_purge_absent;

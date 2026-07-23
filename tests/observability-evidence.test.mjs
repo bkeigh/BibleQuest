@@ -9,6 +9,8 @@ import {
   fixtureReadiness,
   fixtureSignals,
   isDailyQuestSyncContract,
+  isAccountSyncContract,
+  ACCOUNT_SYNC_CONTRACT,
   signalsFromJsonLines,
 } from "../scripts/lib/observability-evidence.mjs";
 
@@ -94,6 +96,34 @@ describe("sanitized launch evidence", () => {
     expect(
       isDailyQuestSyncContract({
         contract: "biblequest_daily_quest_sync_v1",
+        ok: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("accepts only the bounded account-generation boundary contract", () => {
+    expect(
+      isAccountSyncContract({
+        contract: "biblequest_account_sync_v4",
+        ok: true,
+      }),
+    ).toBe(true);
+    expect(
+      isAccountSyncContract({
+        contract: "biblequest_account_sync_v4",
+        ok: true,
+        diagnostic: PRIVATE_MARKERS[4],
+      }),
+    ).toBe(false);
+    expect(
+      isAccountSyncContract({
+        contract: "biblequest_account_sync_v2",
+        ok: true,
+      }),
+    ).toBe(false);
+    expect(
+      isAccountSyncContract({
+        contract: "biblequest_account_sync_v4",
         ok: false,
       }),
     ).toBe(false);
@@ -420,6 +450,22 @@ describe("sanitized launch evidence", () => {
     expect(casEvidence.alerts).toContainEqual(
       expect.objectContaining({ code: "schema_parity_failed" }),
     );
+
+    const missingMutableGuard = fixtureReadiness();
+    missingMutableGuard.schema_parity.checks =
+      missingMutableGuard.schema_parity.checks.filter(
+        (check) => check.contract !== ACCOUNT_SYNC_CONTRACT,
+      );
+    const mutableEvidence = buildLaunchEvidence(
+      missingMutableGuard,
+      aggregateClientSignals(fixtureSignals()),
+      "preflight",
+      "fixture",
+    );
+    expect(mutableEvidence.decision).toBe("HOLD");
+    expect(mutableEvidence.alerts).toContainEqual(
+      expect.objectContaining({ code: "schema_parity_failed" }),
+    );
   });
 
   it("requires an explicit verified gate for live billing", () => {
@@ -480,6 +526,10 @@ describe("sanitized launch evidence", () => {
   });
 
   it("builds complete fixture evidence with every required posture", () => {
+    expect(fixtureReadiness()).toMatchObject({
+      check_count: 19,
+      failed_check_count: 0,
+    });
     const aggregate = aggregateClientSignals(fixtureSignals());
     const evidence = buildLaunchEvidence(
       fixtureReadiness(),
@@ -504,7 +554,7 @@ describe("sanitized launch evidence", () => {
       rollback_target_sha: "b".repeat(40),
     });
     expect(evidence.service_worker_version.observed).toEqual([
-      "biblequest-v15",
+      "biblequest-v18",
     ]);
     expect(evidence.alerts).toEqual([
       expect.objectContaining({

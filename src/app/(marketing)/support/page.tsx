@@ -2,12 +2,14 @@ import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleLink } from "@/components/design-system/GentleButton";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { isStripeDonationConfigured } from "@/lib/support/server";
+import { marketingMetadata } from "@/lib/metadata";
 
-export const metadata = {
+export const metadata = marketingMetadata({
   title: "Support BibleQuest",
   description:
     "Help keep BibleQuest's Scripture, prayer, reflection, and essential quests free for everyone.",
-};
+  path: "/support",
+});
 
 export const dynamic = "force-dynamic";
 

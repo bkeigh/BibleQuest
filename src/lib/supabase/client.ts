@@ -12,6 +12,9 @@
  */
 import { createBrowserClient } from "@supabase/ssr";
 
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export function isSupabaseConfigured(): boolean {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -28,5 +31,32 @@ export function createClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
+
+/** Create a non-singleton data client pinned to one observed sync generation. */
+export function createSyncClient(expectedUserId: string, generation: number) {
+  if (!UUID.test(expectedUserId) || !Number.isSafeInteger(generation) || generation < 0) {
+    throw new Error("Invalid account sync boundary.");
+  }
+  if (!isSupabaseConfigured()) {
+    throw new Error(
+      "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY — see docs/SETUP.md.",
+    );
+  }
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      // Sync generations change after destructive operations, so a shared
+      // singleton could silently retain stale global headers.
+      isSingleton: false,
+      global: {
+        headers: {
+          "x-biblequest-expected-user": expectedUserId,
+          "x-biblequest-sync-generation": String(generation),
+        },
+      },
+    },
   );
 }

@@ -177,6 +177,7 @@ export interface ProfileRow {
   quest_style: string | null;
   onboarding_completed: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 export interface UserSettingsRow {
@@ -189,6 +190,7 @@ export interface UserSettingsRow {
   language: string;
   preferred_bible_translation: string;
   analytics_consent: boolean;
+  updated_at: string;
 }
 
 export interface NotificationPrefsRow {
@@ -198,6 +200,7 @@ export interface NotificationPrefsRow {
   prayer_reminders_enabled: boolean;
   weekly_recap_enabled: boolean;
   preferred_time: string | null;
+  updated_at: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -372,6 +375,7 @@ export function profileToRow(uid: string, p: Profile): ProfileRow {
     quest_style: p.questStyle ?? null,
     onboarding_completed: p.onboardingCompleted,
     created_at: p.createdAt,
+    updated_at: p.updatedAt ?? p.createdAt,
   };
 }
 
@@ -379,6 +383,8 @@ export function settingsToRows(
   uid: string,
   s: Settings
 ): { settings: UserSettingsRow; notifications: NotificationPrefsRow } {
+  const updatedAt = s.updatedAt ?? "1970-01-01T00:00:00.000Z";
+  const notificationsUpdatedAt = s.notificationsUpdatedAt ?? updatedAt;
   return {
     settings: {
       user_id: uid,
@@ -390,6 +396,7 @@ export function settingsToRows(
       language: s.language,
       preferred_bible_translation: s.preferredBibleTranslation,
       analytics_consent: s.analyticsConsent,
+      updated_at: updatedAt,
     },
     notifications: {
       user_id: uid,
@@ -398,6 +405,7 @@ export function settingsToRows(
       prayer_reminders_enabled: s.notifications.prayerReminders,
       weekly_recap_enabled: s.notifications.weeklyRecap,
       preferred_time: s.notifications.preferredTime,
+      updated_at: notificationsUpdatedAt,
     },
   };
 }
@@ -561,6 +569,7 @@ export function rowToProfile(row: ProfileRow): Profile {
     questStyle: (row.quest_style ?? undefined) as Profile["questStyle"],
     onboardingCompleted: row.onboarding_completed,
     createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -602,5 +611,8 @@ export function rowsToSettings(
       settings?.preferred_bible_translation ?? d.preferredBibleTranslation,
     ),
     analyticsConsent: settings?.analytics_consent ?? d.analyticsConsent,
+    updatedAt: settings?.updated_at ?? d.updatedAt,
+    notificationsUpdatedAt:
+      notifications?.updated_at ?? d.notificationsUpdatedAt,
   };
 }

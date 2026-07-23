@@ -4,12 +4,14 @@ import {
   ProseHeading,
 } from "@/components/marketing/MarketingPage";
 import { GentleLink } from "@/components/design-system/GentleButton";
+import { marketingMetadata } from "@/lib/metadata";
 
-export const metadata = {
+export const metadata = marketingMetadata({
   title: "For Churches",
   description:
     "BibleQuest helps faith become a daily rhythm through the week. Church and small-group tools are on the way.",
-};
+  path: "/churches",
+});
 
 export default function ChurchesPage() {
   return (

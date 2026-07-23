@@ -1,0 +1,12 @@
+# Source artwork and QA renders are not used by the Next.js runtime.
+output/
+
+# Local worktrees, build products, and test caches must not enter deployments.
+.codex-worktrees/
+.next/
+.next-*/
+coverage/
+.turbo/
+*.tsbuildinfo
+*.log
+.DS_Store

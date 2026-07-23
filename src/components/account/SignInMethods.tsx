@@ -24,6 +24,7 @@ import {
   ACCOUNT_SYNC_CONTAINED,
   ACCOUNT_SYNC_CONTAINMENT_NOTICE,
 } from "@/lib/sync/containment";
+import { withDeadline } from "@/lib/async/deadline";
 
 type EmailStatus = "idle" | "sending" | "requested";
 
@@ -31,6 +32,12 @@ type EmailStatus = "idle" | "sending" | "requested";
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 /** Supabase's default per-address magic-link window is 60 seconds. */
 const RESEND_COOLDOWN_SECONDS = 60;
+const AUTH_REQUEST_DEADLINE_MS = 12_000;
+
+/** Only explicit enrollment may let Supabase create a new email identity. */
+export function shouldCreateAccount(intent: "create" | "signin"): boolean {
+  return intent === "create";
+}
 
 interface SignInMethodsProps {
   source: "account" | "onboarding";
@@ -93,13 +100,17 @@ export function SignInMethods({
     }
 
     try {
-      const { error: requestError } = await createClient().auth.signInWithOtp({
-        email: address,
-        options: {
-          emailRedirectTo: callbackUrl(),
-          shouldCreateUser: intent === "create",
-        },
-      });
+      const { error: requestError } = await withDeadline(
+        createClient().auth.signInWithOtp({
+          email: address,
+          options: {
+            emailRedirectTo: callbackUrl(),
+            shouldCreateUser: shouldCreateAccount(intent),
+          },
+        }),
+        AUTH_REQUEST_DEADLINE_MS,
+        "Magic-link request",
+      );
       if (requestError) {
         reportClientSignal({
           surface: "auth",
@@ -141,10 +152,14 @@ export function SignInMethods({
     setOauthPending(true);
     track("sign_in_started", { method: "google", source });
     try {
-      const { error: requestError } = await createClient().auth.signInWithOAuth({
-        provider,
-        options: { redirectTo: callbackUrl() },
-      });
+      const { error: requestError } = await withDeadline(
+        createClient().auth.signInWithOAuth({
+          provider,
+          options: { redirectTo: callbackUrl() },
+        }),
+        AUTH_REQUEST_DEADLINE_MS,
+        "Google sign-in request",
+      );
       if (requestError) {
         reportClientSignal({
           surface: "auth",
@@ -189,7 +204,7 @@ export function SignInMethods({
             Check your email
           </p>
           <p className="mt-1 break-all text-center text-caption text-accent-ink">
-            We requested a sign-in link for {requestedEmail}.
+            We requested a secure account link for {requestedEmail}.
           </p>
           <p className="mt-2 text-center text-caption leading-relaxed text-ash">
             Delivery can take a minute. Check Spam or Junk, and search for

@@ -22,6 +22,46 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
+// Describes the product and its publisher without adding invented ratings or claims.
+export const MARKETING_STRUCTURED_DATA = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.biblequest.co/#organization",
+      name: "Winterhill Studio",
+      url: "https://winterhill.studio",
+      email: "hello@biblequest.co",
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://www.biblequest.co/#application",
+      name: "BibleQuest",
+      url: "https://www.biblequest.co",
+      description:
+        "A daily Christian companion for Scripture, prayer, reflection, and practical acts of faith.",
+      applicationCategory: "LifestyleApplication",
+      operatingSystem: "Web",
+      isAccessibleForFree: true,
+      publisher: {
+        "@id": "https://www.biblequest.co/#organization",
+      },
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+      },
+      featureList: [
+        "Daily Bible verses",
+        "Bible reading and bookmarks",
+        "Private prayer and reflection journal",
+        "Practical faith quests",
+        "Personal faith journey",
+      ],
+    },
+  ],
+} as const;
+
 const RHYTHM = [
   { sprite: "book", title: "Read", body: "One verse, chosen for today. Slow enough to actually land." },
   { sprite: "candle", title: "Pray", body: "A private-by-default place to speak honestly and remember." },
@@ -59,13 +99,22 @@ export default function LandingPage() {
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(MARKETING_STRUCTURED_DATA).replaceAll(
+            "<",
+            "\\u003c",
+          ),
+        }}
+      />
       {/* Hero */}
       <section className="relative isolate min-h-[100svh] overflow-hidden">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(55%_55%_at_84%_36%,var(--color-gold-50),transparent_72%),radial-gradient(45%_55%_at_0%_75%,var(--color-evergreen-50),transparent_75%)]"
         />
-        <div className="relative mx-auto grid min-h-[100svh] w-full max-w-6xl items-center gap-10 px-5 pb-20 pt-28 sm:px-8 sm:pb-24 lg:grid-cols-[1.08fr_0.92fr] lg:gap-16 lg:pb-20 lg:pt-24">
+        <div className="relative mx-auto grid min-h-[100svh] w-full max-w-6xl content-start items-start gap-8 px-5 pb-14 pt-24 sm:px-8 sm:pb-20 sm:pt-28 lg:content-center lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:gap-16 lg:pb-20 lg:pt-24">
           <div className="text-left">
             <Reveal>
               <span className="inline-flex items-center gap-2 rounded-full border border-mist bg-paper/70 px-3.5 py-1.5 text-[0.8125rem] text-accent backdrop-blur">
