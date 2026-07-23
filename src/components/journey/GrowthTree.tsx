@@ -13,7 +13,7 @@
  * nearest cell multiple of `size` and then holds still, so surrounding
  * layout never shifts). Around the sprite the scene stays quiet — a
  * candlelight glow once reflection has brought sunlight, a soft ground
- * shadow, and a few flowers and fruit resting at the base. A stage change
+ * shadow, and a few flowers and fruit rooted around the base. A stage change
  * breathes in on a gentle spring — never a pop — and all motion honors
  * stillness (the OS reduced-motion query OR the in-app setting).
  */
@@ -32,6 +32,13 @@ function stageSprite(stage: TreeStage): PixelSpriteName {
 
 /** All tree-stage sprites share one true 32x32 logical grid. */
 const GRID = 32;
+
+/** Grounded slots keep flowers natural and clear of the trunk. */
+const FLOWER_SLOTS = [
+  { left: "20%", bottomCells: 0.75, scale: 0.72 },
+  { left: "31%", bottomCells: 0.25, scale: 0.58 },
+  { left: "72%", bottomCells: 0.55, scale: 0.68 },
+] as const;
 
 interface GrowthTreeProps {
   state: GrowthTreeState;
@@ -114,26 +121,25 @@ export function GrowthTree({
         <PixelIcon name={stageSprite(state.stage)} size={cell} animate />
       </motion.div>
 
-      {/* Flowers — gratitude, gathered left of the trunk. Each blooms once in
-          its own slot; the ones already there never move. */}
-      {flowerCount > 0 && (
-        <div
-          className="pointer-events-none absolute flex flex-row-reverse items-end"
-          style={{ bottom: cell * 3, right: "50%", marginRight: cell * 3, gap: cell }}
-        >
-          {Array.from({ length: flowerCount }, (_, i) => (
-            <motion.span
-              key={`flower-${i}`}
-              className="origin-bottom"
-              initial={still ? false : { scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={still ? { duration: 0 } : grow}
-            >
-              <PixelIcon name="flower" size={mini} />
-            </motion.span>
-          ))}
-        </div>
-      )}
+      {/* Flowers — gratitude rooted around the tree instead of floating in a row. */}
+      {Array.from({ length: flowerCount }, (_, i) => {
+        const slot = FLOWER_SLOTS[i];
+        return (
+          <motion.span
+            key={`flower-${i}`}
+            className="pointer-events-none absolute origin-bottom"
+            style={{
+              left: slot.left,
+              bottom: cell * slot.bottomCells,
+            }}
+            initial={still ? false : { scale: 0, opacity: 0 }}
+            animate={{ scale: slot.scale, opacity: 1 }}
+            transition={still ? { duration: 0 } : grow}
+          >
+            <PixelIcon name="flower" size={mini} />
+          </motion.span>
+        );
+      })}
 
       {/* Fruit — service, set down right of the trunk. */}
       {fruitCount > 0 && (

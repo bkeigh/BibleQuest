@@ -104,15 +104,14 @@ describe("safe local journey detection", () => {
     ).toBe(true);
   });
 
-  it("blocks first adoption after ownership lands but initial sync is pending", () => {
+  it("keeps an owned completed journey available during a retry", () => {
     expect(
       hasSafeLocalJourney({
         localOnboardingCompleted: true,
         lastSyncedUserId: "account-a",
         userId: "account-a",
-        initialSyncPending: true,
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("never opens a journey stamped to a different account", () => {

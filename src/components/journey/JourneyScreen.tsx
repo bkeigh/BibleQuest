@@ -22,7 +22,6 @@ import { treeStageLabels, emptyStates } from "@/lib/questos/copy";
 import { seedMilestones } from "@/data/seed/milestones";
 import { questBySlug } from "@/data/seed/quests";
 import { formatShortDate } from "@/lib/utils/dates";
-import { SeasonalAtmosphere } from "@/components/design-system/SeasonalAtmosphere";
 import { useCurrentDayKey } from "@/lib/use-current-day-key";
 import type {
   GrowthType,
@@ -375,9 +374,6 @@ function JourneyScreenInner() {
       <PageContainer>
         {/* Growth tree hero */}
         <PaperCard variant="atmospheric" padding="lg" className="relative overflow-hidden text-center">
-          <div className="pointer-events-none absolute inset-0">
-            <SeasonalAtmosphere density={6} />
-          </div>
           <div className="relative flex justify-center">
             <GrowthTree state={tree} size={224} />
           </div>

@@ -1,17 +1,20 @@
 "use client";
 
 /**
- * Non-personal state for the short profile → account → first-quest hand-off.
- * Profile answers remain in QuestOS; this value records only which screen is
- * pending so reopening the PWA at `/app` cannot bypass onboarding.
+ * Non-personal state for the account → guide → first-quest hand-off.
+ * The completed QuestOS profile remains canonical; this value only resumes a
+ * public onboarding screen after an auth round trip or same-tab navigation.
  */
 const KEY = "biblequest:onboarding-account-pending";
 
 export const ONBOARDING_RESUME_STAGES = [
   "account",
+  "guide",
   "quest",
+  "plus",
   "launch",
   "launch_quests",
+  "launch_plus",
 ] as const;
 
 export type OnboardingResumeStage =
@@ -49,28 +52,54 @@ export function clearOnboardingResumeStage() {
   }
 }
 
-/** Account/quest are unfinished; launch means the finish CTA was intentional. */
+/** These stages belong to onboarding, but never override a completed app profile. */
 export function isOnboardingResumePending(
   stage: OnboardingResumeStage | null,
 ): boolean {
-  return stage === "account" || stage === "quest";
+  return (
+    stage === "account" ||
+    stage === "guide" ||
+    stage === "quest" ||
+    stage === "plus"
+  );
 }
 
 /** Exact safe destination selected by the first-quest CTA, if launch began. */
 export function onboardingLaunchDestination(
   stage: OnboardingResumeStage | null,
-): "/app" | "/app/quests" | null {
+): "/app" | "/app/quests" | "/app/plus" | null {
   if (stage === "launch") return "/app";
   if (stage === "launch_quests") return "/app/quests";
+  if (stage === "launch_plus") return "/app/plus";
   return null;
 }
 
-/** Pure app-gate decision, exported so the PWA reopen contract stays tested. */
+/**
+ * A completed profile is the canonical app-access signal. A stale onboarding
+ * marker must never trap an established account in a PWA redirect loop.
+ */
 export function shouldRedirectAppToOnboarding(
   onboardingCompleted: boolean,
   stage: OnboardingResumeStage | null,
 ): boolean {
-  return !onboardingCompleted || isOnboardingResumePending(stage);
+  void stage;
+  return !onboardingCompleted;
+}
+
+/** Keeps only the intentional post-quest Plus preview on the public route. */
+export function shouldKeepCompletedProfileOnOnboarding(
+  onboardingCompleted: boolean,
+  stage: OnboardingResumeStage | null,
+): boolean {
+  return onboardingCompleted && stage === "plus";
+}
+
+/** A newly restored session skips the account form even when another hook loaded first. */
+export function shouldAdvanceOnboardingAccountStep(
+  onboardingCompleted: boolean,
+  userId: string | null,
+): boolean {
+  return !onboardingCompleted && Boolean(userId);
 }
 
 /** Resume/reload is continuation, not a second onboarding funnel start. */
@@ -78,5 +107,5 @@ export function shouldTrackOnboardingStarted(
   onboardingCompleted: boolean,
   stage: OnboardingResumeStage | null,
 ): boolean {
-  return !(onboardingCompleted && isOnboardingResumePending(stage));
+  return !(onboardingCompleted || isOnboardingResumePending(stage));
 }

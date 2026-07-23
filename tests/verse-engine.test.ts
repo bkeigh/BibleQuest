@@ -11,25 +11,33 @@ describe("daily verse refreshes", () => {
   const dateKey = "2026-07-21";
 
   it("keeps each date and refresh count deterministic", () => {
-    expect(getDailyVerse(dateKey, 17)).toEqual(getDailyVerse(dateKey, 17));
+    expect(getDailyVerse(dateKey, 17, "user-123")).toEqual(
+      getDailyVerse(dateKey, 17, "user-123"),
+    );
+  });
+
+  it("personalizes the daily rotation by account", () => {
+    expect(getDailyVerse(dateKey, 0, "user-123").id).not.toBe(
+      getDailyVerse(dateKey, 0, "user-456").id,
+    );
   });
 
   it("shows every verse once before repeating the deterministic order", () => {
     const poolLength = getVersePool().length;
     const firstCycle = Array.from({ length: poolLength }, (_, refresh) =>
-      getDailyVerse(dateKey, refresh).id,
+      getDailyVerse(dateKey, refresh, "user-123").id,
     );
 
     expect(new Set(firstCycle).size).toBe(poolLength);
-    expect(getDailyVerse(dateKey, poolLength)).toEqual(
-      getDailyVerse(dateKey, 0),
+    expect(getDailyVerse(dateKey, poolLength, "user-123")).toEqual(
+      getDailyVerse(dateKey, 0, "user-123"),
     );
   });
 
   it("never returns the same verse on consecutive Plus-style refreshes", () => {
     const poolLength = getVersePool().length;
     const verses = Array.from({ length: poolLength * 3 + 2 }, (_, refresh) =>
-      getDailyVerse(dateKey, refresh).id,
+      getDailyVerse(dateKey, refresh, "user-123").id,
     );
 
     for (let index = 1; index < verses.length; index += 1) {

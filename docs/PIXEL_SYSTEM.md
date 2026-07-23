@@ -25,11 +25,10 @@ stored. Production art begins with the approved BibleQuest reference sheet and
 subject anchors, is staged through reference-conditioned image generation, and
 is reconstructed on its native grid by `scripts/process-pixel-sprites.mjs`.
 Only reviewed, normalized PNGs are promoted to `public/pixel/`; image generation
-is not a runtime or build dependency. The deterministic character-grid renderer
-remains supported as a fallback and useful test fixture:
+is not a runtime or build dependency. The registry intentionally accepts only
+production PNGs:
 
 ```ts
-{ kind: "grid", rows, palette, ambient? }         // hand-placed characters
 { kind: "png", src, cols, rows, ambientClassName? } // pre-drawn file
 ```
 
@@ -41,16 +40,15 @@ remains supported as a fallback and useful test fixture:
   authored pixel grid used by QA and never affect rendered UI dimensions.
 - The `size` prop always means **px per cell**. A png entry declares its
   logical grid (`cols`/`rows`), so rendered dimensions are identical to the
-  grid it replaces — no call site ever changes.
+  established component footprint.
 - `cellScale` preserves historic component sizing while snapping every final
   cell to a whole CSS pixel. Small icons normally resolve to exactly 32×32.
   Production candles use `0.75`; mascots use `0.625` so size 7/8/9/10 call
   sites render at 128/160/192/192px without a 224px onboarding jump.
-- Palette colors come only from the named constants at the top of the file:
-  exact black outline (`#000000`), evergreen (`#0e533c`), olive, brand
-  gold (`#d3a336`), leather, parchment, charcoal, and restrained prayer blue,
-  rose, stone, skin, and flame ramps. Lighter and darker material ramps are
-  intentional pixel-art shades of those live brand anchors.
+- Authored palettes use the exact black outline (`#000000`), evergreen
+  (`#0e533c`), olive, brand gold (`#d3a336`), leather, parchment, charcoal,
+  and restrained prayer blue, rose, stone, skin, and flame ramps. Lighter and
+  darker material ramps are intentional shades of those live brand anchors.
 
 ### Staging and registering production PNGs
 
@@ -89,10 +87,9 @@ remains supported as a fallback and useful test fixture:
    copy the approved PNG into `public/pixel/`.
 7. Register the PNG with its divisor-compatible logical grid:
    `{ kind: "png", src: "/pixel/candle-halo.png", cols: 16, rows: 16 }`.
-8. If the grid had `ambient` per-cell motion, set `ambientClassName` to a
-   whole-image fallback (e.g. `"[animation:var(--animate-flicker)]"`), or
-   leave it off for stillness. PNGs cannot flicker a single flame cell —
-   for living details, grids remain the better medium.
+8. Set `ambientClassName` only when the whole image should move subtly
+   (for example `"[animation:var(--animate-flicker)]"`), or leave it off for
+   stillness.
 
 The service worker precaches the explicit 63-file catalogue, so new registry
 filenames must also be added to `PIXEL_ASSET_NAMES` in `public/sw.js`. When
@@ -105,8 +102,8 @@ file stay untouched.
 ## Grid & stroke rules
 
 - Every sprite uses a whole-cell logical grid and `image-rendering: pixelated`
-  (`pixelated` utility), whether its source is PNG or SVG rectangles. Never
-  scale to fractional cell sizes; never blur, never rotate.
+  (`pixelated` utility). Never scale to fractional cell sizes; never blur,
+  never rotate.
 - Every silhouette carries a single exact-black (`#000000`) outline. Small icons keep it
   sparse; mascots and feature sprites use it continuously so they remain
   recognizable on parchment, linen, and candle-mode surfaces.
@@ -130,7 +127,7 @@ file stay untouched.
 - **Streak candles (5, 128×128 source / 16×16 logical)**: `candle-unlit` → `candle-small` →
   `candle-steady` → `candle-sparks` → `candle-halo`. One shared body; only
   the flame and blessing details grow (see `candleStage` in
-  `lib/questos/streak-engine.ts`). Flame cells flicker via `ambient`.
+  `lib/questos/streak-engine.ts`). Lit candles flicker gently as a whole.
 - **Journey tree stages (20, 128×128 source / 32×32 logical)**:
   `seed` → `stirring-seed` → `first-root` → `first-shoot` → `sprout` →
   `rooted-sprout` → `young-sapling` → `branching-sapling` →
@@ -172,9 +169,8 @@ file stay untouched.
 ## Motion
 
 Ambient only — flicker / sway / twinkle via the CSS token keyframes, plus
-`pixelSparkle` (src/lib/motion.ts) for milestone reveals. Grid assets
-animate per cell (only the flame flickers, only the glints twinkle); png
-assets may animate as a whole via `ambientClassName`. All of it rides the
+`pixelSparkle` (src/lib/motion.ts) for milestone reveals. PNG assets may
+animate as a whole via `ambientClassName`. All of it rides the
 `.ambient` class / MotionConfig so reduced-motion kills it everywhere.
 
 ## Language guardrails

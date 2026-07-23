@@ -10,6 +10,10 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { track } from "@/lib/analytics/events";
+import {
+  classifyOperationalError,
+  reportClientSignal,
+} from "@/lib/observability/client-signals";
 import { authCallbackPath } from "@/lib/auth/redirect";
 import {
   emailRequestFailure,
@@ -26,6 +30,8 @@ const RESEND_COOLDOWN_SECONDS = 60;
 
 interface SignInMethodsProps {
   source: "account" | "onboarding";
+  /** Changes account creation copy and prevents email signup in returning-user mode. */
+  intent?: "create" | "signin";
   /** Fired after Supabase accepts a magic-link request (not a delivery claim). */
   onEmailSent?: () => void;
   /** Lets onboarding expose its local fallback after auth is unavailable. */
@@ -36,6 +42,7 @@ interface SignInMethodsProps {
 
 export function SignInMethods({
   source,
+  intent = "signin",
   onEmailSent,
   onUnavailable,
   nextPath = "/app",
@@ -86,10 +93,16 @@ export function SignInMethods({
         email: address,
         options: {
           emailRedirectTo: callbackUrl(),
-          shouldCreateUser: true,
+          shouldCreateUser: intent === "create",
         },
       });
       if (requestError) {
+        reportClientSignal({
+          surface: "auth",
+          stage: "request_email",
+          outcome: "failure",
+          category: classifyOperationalError(requestError, online()),
+        });
         showFailure(emailRequestFailure(requestError, online()));
         if (!resend) setEmailStatus("idle");
         return;
@@ -98,8 +111,20 @@ export function SignInMethods({
       setRequestedEmail(address);
       setEmailStatus("requested");
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
+      reportClientSignal({
+        surface: "auth",
+        stage: "request_email",
+        outcome: "success",
+        category: "ok",
+      });
       onEmailSent?.();
     } catch (requestError) {
+      reportClientSignal({
+        surface: "auth",
+        stage: "request_email",
+        outcome: "failure",
+        category: classifyOperationalError(requestError, online()),
+      });
       showFailure(emailRequestFailure(requestError, online()));
       if (!resend) setEmailStatus("idle");
     } finally {
@@ -117,11 +142,23 @@ export function SignInMethods({
         options: { redirectTo: callbackUrl() },
       });
       if (requestError) {
+        reportClientSignal({
+          surface: "auth",
+          stage: "request_oauth",
+          outcome: "failure",
+          category: classifyOperationalError(requestError, online()),
+        });
         setOauthPending(false);
         showFailure(oauthRequestFailure(requestError, online()));
       }
       // On success the browser navigates away; pending intentionally remains.
     } catch (requestError) {
+      reportClientSignal({
+        surface: "auth",
+        stage: "request_oauth",
+        outcome: "failure",
+        category: classifyOperationalError(requestError, online()),
+      });
       setOauthPending(false);
       showFailure(oauthRequestFailure(requestError, online()));
     }
@@ -234,7 +271,9 @@ export function SignInMethods({
         >
           {emailStatus === "sending"
             ? "Requesting…"
-            : "Email me a sign-in link"}
+            : intent === "create"
+              ? "Create account with email"
+              : "Email me a sign-in link"}
         </GentleButton>
       </form>
 
@@ -249,7 +288,11 @@ export function SignInMethods({
         disabled={oauthPending || emailStatus === "sending"}
         aria-busy={oauthPending}
       >
-        {oauthPending ? "Opening Google…" : "Continue with Google"}
+        {oauthPending
+          ? "Opening Google…"
+          : intent === "create"
+            ? "Create account with Google"
+            : "Continue with Google"}
       </GentleButton>
 
       {error && <FailureNotice failure={error} />}

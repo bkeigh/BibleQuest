@@ -94,7 +94,7 @@ await writeFile(
 );
 console.log("✓ favicon.ico");
 
-// OG image — deep Bible-cover green, gold rule, the mark + wordmark in cream
+// OG image — deep Bible-cover green, gold rule, the mark + wordmark in cream.
 const logo = await readFile(
   path.join(process.cwd(), "public", "brand", "bq-logo.svg")
 );
@@ -104,7 +104,7 @@ const og = Buffer.from(
      <rect x="14" y="14" width="1172" height="602" fill="none" stroke="#d3a336" stroke-width="3" rx="18"/>
      <image href="data:image/svg+xml;base64,${logo.toString("base64")}" x="497" y="88" width="206" height="262"/>
      <text x="600" y="452" text-anchor="middle" font-family="Georgia, serif" font-size="64" fill="#faf6ec">BibleQuest</text>
-     <text x="600" y="520" text-anchor="middle" font-family="Georgia, serif" font-size="28" fill="#e7c563">Scripture, prayer, and real-life quests — one step a day</text>
+     <text x="600" y="520" text-anchor="middle" font-family="Georgia, serif" font-size="28" fill="#e7c563">A daily guide to living your faith</text>
    </svg>`
 );
 await sharp(og).png().toFile(path.join(process.cwd(), "public", "og.png"));

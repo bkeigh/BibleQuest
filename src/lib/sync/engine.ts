@@ -34,7 +34,10 @@ import {
 } from "./last-user";
 import { track } from "@/lib/analytics/events";
 import {
-  assignmentToRow,
+  classifyOperationalError,
+  reportClientSignal,
+} from "@/lib/observability/client-signals";
+import {
   bookmarkToRow,
   chapterReadToRow,
   completionToRow,
@@ -63,6 +66,15 @@ import {
   rowToRecentVerse,
   rowToReflection,
 } from "./mapping";
+import {
+  configureDailyQuestSyncContext,
+  createDailyQuestSyncContext,
+  DailyQuestConflictError,
+  isMissingDailyQuestRevisionTable,
+  resetDailyQuestSyncContext,
+  writeDailyQuestAssignments,
+  type DailyQuestRevisionRow,
+} from "./daily-quests";
 
 type SyncedField =
   | "profile"
@@ -134,6 +146,14 @@ export function isMissingBibleSyncColumn(
   return isMissingSyncColumn(error, column);
 }
 
+/** Recognize only the two additive Journey identity columns during rollout. */
+export function isMissingJourneySyncColumn(
+  error: unknown,
+  column: "date_key" | "source_id",
+): boolean {
+  return isMissingSyncColumn(error, column);
+}
+
 export function isMissingRecentVersesTable(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const candidate = error as { code?: unknown; message?: unknown };
@@ -143,13 +163,6 @@ export function isMissingRecentVersesTable(error: unknown): boolean {
   return (
     mentionsSchemaIdentifier(message, "user_recent_verses") &&
     (code === "42P01" || code === "PGRST205")
-  );
-}
-
-function isMissingQuestWindowColumn(error: unknown): boolean {
-  return (
-    isMissingSyncColumn(error, "picked_at") ||
-    isMissingSyncColumn(error, "expires_at")
   );
 }
 
@@ -167,15 +180,21 @@ let pushing = false;
 let rerunAfterPush = false;
 let applyingRemote = false;
 const dirty = new Set<SyncedField>();
+const dailyQuestSyncContext = createDailyQuestSyncContext();
 
 function setStatus(
   state: "off" | "syncing" | "idle" | "error",
-  options?: { syncedNow?: boolean; initialSyncComplete?: boolean }
+  options?: {
+    syncedNow?: boolean;
+    initialSyncComplete?: boolean;
+    issue?: "daily-quest-conflict" | null;
+  },
 ) {
   useSyncStatus.getState().setState(state, {
     lastSyncedAt: options?.syncedNow ? new Date().toISOString() : undefined,
     userId: currentUserId,
     initialSyncComplete: options?.initialSyncComplete ?? false,
+    issue: options?.issue,
   });
 }
 
@@ -189,6 +208,7 @@ export function stopSync() {
   pushTimer = null;
   retryTimer = null;
   dirty.clear();
+  resetDailyQuestSyncContext(dailyQuestSyncContext);
   setStatus("off", { initialSyncComplete: false });
 }
 
@@ -228,14 +248,35 @@ export async function startSync(userId: string, retryingFailure = false) {
     clearInitialSyncPending(userId);
     setStatus("idle", { syncedNow: true, initialSyncComplete: true });
     track("sync_completed", { status: "initial" });
-  } catch {
+    reportClientSignal({
+      surface: "sync",
+      stage: "initial",
+      outcome: "success",
+      category: "ok",
+    });
+  } catch (error) {
     if (!isCurrent()) return;
     // One event per failure streak, not one per 30s retry — a long
     // offline stretch shouldn't flood the queue with identical failures.
     if (!wasError) {
       track("sync_failed", { status: "initial" });
+      reportClientSignal({
+        surface: "sync",
+        stage: "initial",
+        outcome: "failure",
+        category:
+          error instanceof DailyQuestConflictError
+            ? "conflict"
+            : classifyOperationalError(error),
+      });
     }
-    setStatus("error", { initialSyncComplete: false });
+    setStatus("error", {
+      initialSyncComplete: false,
+      issue:
+        error instanceof DailyQuestConflictError
+          ? "daily-quest-conflict"
+          : null,
+    });
     // NEVER fall through to write-through pushes before a successful pull —
     // a blind push would upsert this device's (possibly default/stale) data
     // over the account. Retry the full pull→merge instead, and install no
@@ -346,16 +387,37 @@ async function runPush() {
     setLastSyncedUserId(userId);
     if (currentUserId === userId) {
       setStatus("idle", { syncedNow: true, initialSyncComplete: true });
+      reportClientSignal({
+        surface: "sync",
+        stage: "push",
+        outcome: "success",
+        category: "ok",
+      });
     }
-  } catch {
+  } catch (error) {
     // Push failed (offline, etc.) — mark everything dirty again and retry.
     for (const f of SYNCED_FIELDS) dirty.add(f);
     if (currentUserId === userId) {
       // One event per failure streak (retries repeat every 30s).
       if (!wasError) {
         track("sync_failed", { status: "push" });
+        reportClientSignal({
+          surface: "sync",
+          stage: "push",
+          outcome: "failure",
+          category:
+            error instanceof DailyQuestConflictError
+              ? "conflict"
+              : classifyOperationalError(error),
+        });
       }
-      setStatus("error", { initialSyncComplete: true });
+      setStatus("error", {
+        initialSyncComplete: true,
+        issue:
+          error instanceof DailyQuestConflictError
+            ? "daily-quest-conflict"
+            : null,
+      });
       scheduleRetry();
     }
   } finally {
@@ -376,8 +438,14 @@ async function initialSync(
   userId: string,
   isCurrent: () => boolean
 ) {
-  const remote = await pullAll(supabase, userId);
+  const pulled = await pullAll(supabase, userId);
   if (!isCurrent()) return;
+  configureDailyQuestSyncContext(
+    dailyQuestSyncContext,
+    pulled.dailyQuestRevisions,
+    pulled.transactionalDailyQuestsAvailable,
+  );
+  const remote = pulled.snapshot;
 
   // Capture tombstones at merge time so deletions made while signed out (or
   // mid-sync) don't resurrect from the account copy.
@@ -451,12 +519,31 @@ function snapshotFromStore(): QuestOSSnapshot {
 
 type RemoteData = Partial<QuestOSSnapshot>;
 
+interface PulledData {
+  snapshot: RemoteData;
+  dailyQuestRevisions: DailyQuestRevisionRow[];
+  transactionalDailyQuestsAvailable: boolean;
+}
+
 async function pullAll(
   supabase: SupabaseClient,
-  userId: string
-): Promise<RemoteData> {
+  userId: string,
+): Promise<PulledData> {
   const from = (table: string) =>
     supabase.from(table).select("*").eq("user_id", userId);
+
+  // Observe revisions before rows. A write between these statements advances
+  // the revision and guarantees the later replace conflicts instead of pairing
+  // an older row snapshot with a newer revision.
+  const dailyRevisionRes = await supabase
+    .from("user_daily_quest_days")
+    .select("assigned_date,revision");
+  const dailyRevisionsUnavailable = isMissingDailyQuestRevisionTable(
+    dailyRevisionRes.error,
+  );
+  if (dailyRevisionRes.error && !dailyRevisionsUnavailable) {
+    throw dailyRevisionRes.error;
+  }
 
   const [
     profileRes,
@@ -535,27 +622,33 @@ async function pullAll(
   }
 
   return {
-    profile: profileRes.data ? rowToProfile(profileRes.data) : null,
-    settings:
-      settingsRes.data || notifRes.data
-        ? rowsToSettings(settingsRes.data ?? null, notifRes.data ?? null)
-        : undefined,
-    assignments,
-    myQuests,
-    completions: (completionsRes.data ?? []).map(rowToCompletion),
-    prayers: (prayersRes.data ?? []).map(rowToPrayer),
-    reflections: (reflectionsRes.data ?? []).map(rowToReflection),
-    bookmarks: (bookmarksRes.data ?? []).map(rowToBookmark),
-    readingPosition: readingRes.data
-      ? rowToReadingPosition(readingRes.data)
-      : null,
-    chaptersRead: (chaptersRes.data ?? []).map(rowToChapterRead),
-    recentVerses: recentVersesUnavailable
-      ? undefined
-      : (recentVersesRes.data ?? []).map(rowToRecentVerse),
-    journeyEvents: (journeyRes.data ?? []).map(rowToJourneyEvent),
-    growthEvents: (growthRes.data ?? []).map(rowToGrowthEvent),
-    earnedMilestones: (milestonesRes.data ?? []).map(rowToMilestone),
+    dailyQuestRevisions: dailyRevisionsUnavailable
+      ? []
+      : ((dailyRevisionRes.data ?? []) as DailyQuestRevisionRow[]),
+    transactionalDailyQuestsAvailable: !dailyRevisionsUnavailable,
+    snapshot: {
+      profile: profileRes.data ? rowToProfile(profileRes.data) : null,
+      settings:
+        settingsRes.data || notifRes.data
+          ? rowsToSettings(settingsRes.data ?? null, notifRes.data ?? null)
+          : undefined,
+      assignments,
+      myQuests,
+      completions: (completionsRes.data ?? []).map(rowToCompletion),
+      prayers: (prayersRes.data ?? []).map(rowToPrayer),
+      reflections: (reflectionsRes.data ?? []).map(rowToReflection),
+      bookmarks: (bookmarksRes.data ?? []).map(rowToBookmark),
+      readingPosition: readingRes.data
+        ? rowToReadingPosition(readingRes.data)
+        : null,
+      chaptersRead: (chaptersRes.data ?? []).map(rowToChapterRead),
+      recentVerses: recentVersesUnavailable
+        ? undefined
+        : (recentVersesRes.data ?? []).map(rowToRecentVerse),
+      journeyEvents: (journeyRes.data ?? []).map(rowToJourneyEvent),
+      growthEvents: (growthRes.data ?? []).map(rowToGrowthEvent),
+      earnedMilestones: (milestonesRes.data ?? []).map(rowToMilestone),
+    },
   };
 }
 
@@ -957,50 +1050,30 @@ async function pushFields(
     );
   }
   if (fields.has("assignments")) {
-    // Day-level replace: a day's pick list is owned wholesale by the device
-    // (mergeSnapshots gives local days precedence), so clear every locally
-    // known day and re-insert its picks. Upserting alone would leave stale
-    // rows behind after an unpick.
-    const days = Object.keys(snap.assignments);
-    if (days.length) {
-      const rows = Object.values(snap.assignments)
-        .flat()
-        .map((a) => assignmentToRow(uid, a));
-      jobs.push(
-        (async () => {
-          const del = await supabase
-            .from("user_daily_quests")
-            .delete()
-            .eq("user_id", uid)
-            .in("assigned_date", days);
-          if (del.error) throw del.error;
-          if (rows.length) {
-            const current = await supabase
-              .from("user_daily_quests")
-              .insert(rows);
-            if (!current.error) return;
-            if (!isMissingQuestWindowColumn(current.error)) {
-              throw current.error;
-            }
-            // Pre-0010 compatibility. The old schema cannot preserve exact
-            // rolling-window timestamps, but all prior quest fields still
-            // sync. Once 0010 lands, the next successful push writes the
-            // authoritative local timestamps.
-            const legacyRows = rows.map(
-              ({ picked_at: _pickedAt, expires_at: _expiresAt, ...row }) => {
-                void _pickedAt;
-                void _expiresAt;
-                return row;
-              },
-            );
-            const legacy = await supabase
-              .from("user_daily_quests")
-              .insert(legacyRows);
-            if (legacy.error) throw legacy.error;
-          }
-        })()
-      );
-    }
+    jobs.push(
+      (async () => {
+        const result = await writeDailyQuestAssignments(
+          supabase,
+          uid,
+          snap.assignments,
+          dailyQuestSyncContext,
+        );
+        if (!Object.keys(result.conflicts).length) return;
+
+        // Keep the UI local-first while adopting only the bounded conflicting
+        // days. The normal retry uses their newly observed revisions.
+        applyingRemote = true;
+        try {
+          const assignments = useQuestOS.getState().assignments;
+          useQuestOS.setState({
+            assignments: { ...assignments, ...result.conflicts },
+          });
+        } finally {
+          applyingRemote = false;
+        }
+        throw new DailyQuestConflictError();
+      })(),
+    );
   }
   if (fields.has("myQuests")) {
     const rows = Object.values(snap.myQuests ?? {}).map((q) =>
@@ -1046,12 +1119,41 @@ async function pushFields(
   if (fields.has("journeyEvents") && snap.journeyEvents.length) {
     // Append-only table (no UPDATE policy): insert new rows, skip existing.
     jobs.push(
-      run(
-        supabase.from("journey_events").upsert(
-          snap.journeyEvents.map((e) => journeyEventToRow(uid, e)),
-          { onConflict: "id", ignoreDuplicates: true }
-        )
-      )
+      (async () => {
+        let rows = snap.journeyEvents.map((event) =>
+          journeyEventToRow(uid, event),
+        );
+
+        // Migration 0014 is additive. Remove only the exact missing columns
+        // PostgREST reports so an older production schema can still restore
+        // and sync the core Journey while the migration is rolling out.
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const result = await supabase.from("journey_events").upsert(rows, {
+            onConflict: "id",
+            ignoreDuplicates: true,
+          });
+          if (!result.error) return;
+
+          const missingDateKey = isMissingJourneySyncColumn(
+            result.error,
+            "date_key",
+          );
+          const missingSourceId = isMissingJourneySyncColumn(
+            result.error,
+            "source_id",
+          );
+          if (!missingDateKey && !missingSourceId) throw result.error;
+
+          rows = rows.map((row) => {
+            const compatible = { ...row };
+            if (missingDateKey) delete compatible.date_key;
+            if (missingSourceId) delete compatible.source_id;
+            return compatible;
+          });
+        }
+
+        throw new Error("Journey sync compatibility retries exhausted.");
+      })(),
     );
   }
   if (fields.has("growthEvents") && snap.growthEvents.length) {

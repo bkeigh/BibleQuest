@@ -9,9 +9,8 @@ import { IconArrowRight } from "@/components/design-system/icons";
 import { SeasonalAtmosphere } from "@/components/design-system/SeasonalAtmosphere";
 import { Reveal } from "@/components/marketing/Reveal";
 import { QuestDemo, PrayerDemo } from "@/components/marketing/Demos";
+import { MarketingGrowthLoop } from "@/components/marketing/MarketingGrowthLoop";
 import { VerseDemo } from "@/components/marketing/VerseDemo";
-import { GrowthTree } from "@/components/journey/GrowthTree";
-import { calculateTreeState } from "@/lib/questos/growth-engine";
 import { getDailyVerse } from "@/lib/questos/verse-engine";
 import { questBySlug, seedQuests } from "@/data/seed/quests";
 
@@ -55,59 +54,63 @@ export default function LandingPage() {
     seedQuests.find((q) => q.category === "kindness") ??
     seedQuests[0];
 
-  // A demo tree partway along its pilgrimage.
-  const demoTree = calculateTreeState(
-    Array.from({ length: 22 }, (_, i) => ({
-      id: String(i),
-      growthType: (["roots", "branches", "leaves", "fruit", "sunlight", "flowers"] as const)[i % 6],
-      amount: 1,
-      sourceType: "quest_completed" as const,
-      occurredAt: new Date(0).toISOString(),
-    }))
-  );
-
   return (
     <>
       {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0">
-          <SeasonalAtmosphere density={14} />
-        </div>
-        <div className="pointer-events-none absolute inset-x-0 -top-20 h-80 bg-[radial-gradient(60%_60%_at_50%_0%,var(--color-gold-50),transparent)]" />
-        <div className="relative mx-auto flex min-h-[min(46rem,92svh)] max-w-3xl flex-col items-center justify-center px-5 pb-6 pt-20 text-center sm:px-8 sm:pb-10 sm:pt-28">
-          <Reveal>
-            <span className="inline-flex items-center gap-2 rounded-full border border-mist bg-paper/70 px-3.5 py-1.5 text-[0.8125rem] text-accent backdrop-blur">
-              <PixelIcon name="candle" size={3} animate /> Your candle is waiting.
-            </span>
-          </Reveal>
-          <Reveal delay={0.08}>
-            <h1
-              id="homepage-heading"
-              tabIndex={-1}
-              className="mt-5 font-display text-heading text-graphite outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent sm:text-display"
-            >
-              Faith, one small step at a time.
-            </h1>
-          </Reveal>
-          <Reveal delay={0.16}>
-            <p className="mx-auto mt-3 max-w-xl text-[1.125rem] leading-relaxed text-charcoal">
-              One verse, one prayer, and a small step you can live out today.
-            </p>
-          </Reveal>
-          <Reveal delay={0.24}>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              <GentleLink variant="primary" size="lg" href="/onboarding">
-                Start today — it’s free <IconArrowRight />
-              </GentleLink>
-              <GentleLink variant="outline" size="lg" href="/#how">
-                See how it works
-              </GentleLink>
+      <section className="relative isolate min-h-[100svh] overflow-hidden">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(55%_55%_at_84%_36%,var(--color-gold-50),transparent_72%),radial-gradient(45%_55%_at_0%_75%,var(--color-evergreen-50),transparent_75%)]"
+        />
+        <div className="relative mx-auto grid min-h-[100svh] w-full max-w-6xl items-center gap-10 px-5 pb-20 pt-28 sm:px-8 sm:pb-24 lg:grid-cols-[1.08fr_0.92fr] lg:gap-16 lg:pb-20 lg:pt-24">
+          <div className="text-left">
+            <Reveal>
+              <span className="inline-flex items-center gap-2 rounded-full border border-mist bg-paper/70 px-3.5 py-1.5 text-[0.8125rem] text-accent backdrop-blur">
+                <PixelIcon name="candle" size={3} animate /> A daily guide for living your faith
+              </span>
+            </Reveal>
+            <Reveal delay={0.08}>
+              <h1
+                id="homepage-heading"
+                tabIndex={-1}
+                className="mt-6 max-w-3xl font-display text-[clamp(3rem,6vw,5rem)] leading-[0.98] tracking-[-0.035em] text-graphite outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+              >
+                Bring faith into the life you already live.
+              </h1>
+            </Reveal>
+            <Reveal delay={0.16}>
+              <p className="mt-6 max-w-xl text-[1.125rem] leading-relaxed text-charcoal sm:text-[1.25rem]">
+                Read Scripture, make space to pray, and take one meaningful
+                step. BibleQuest helps faith become part of your everyday life.
+              </p>
+            </Reveal>
+            <Reveal delay={0.24}>
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                <GentleLink variant="primary" size="lg" href="/onboarding">
+                  Get BibleQuest <IconArrowRight />
+                </GentleLink>
+                <GentleLink variant="outline" size="lg" href="/#how">
+                  See how it works
+                </GentleLink>
+              </div>
+            </Reveal>
+            <Reveal delay={0.3}>
+              <p className="mt-4 text-[0.875rem] text-ash">
+                Free to begin. Made for Christians from every tradition.
+              </p>
+            </Reveal>
+          </div>
+
+          <Reveal delay={0.28} className="w-full lg:justify-self-end">
+            <div className="mx-auto w-full max-w-lg lg:mx-0">
+              <VerseDemo verse={verse} />
             </div>
           </Reveal>
-          <Reveal delay={0.34} className="mt-8 w-full max-w-md sm:mt-9">
-            <VerseDemo verse={verse} />
-          </Reveal>
-          <Reveal delay={0.4} className="mt-3 sm:mt-5">
+
+          <Reveal
+            delay={0.4}
+            className="absolute bottom-5 left-1/2 hidden -translate-x-1/2 sm:block"
+          >
             <a
               href="#why"
               aria-label="Continue to learn more about BibleQuest"
@@ -211,31 +214,23 @@ export default function LandingPage() {
           <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-10">
             <Reveal className="order-2 lg:order-1">
               <PaperCard variant="atmospheric" padding="lg" className="relative overflow-hidden text-center">
-                <div className="pointer-events-none absolute inset-0">
-                  <SeasonalAtmosphere density={6} />
-                </div>
-                <div className="relative flex justify-center">
-                  <GrowthTree state={demoTree} size={240} />
-                </div>
-                <p className="relative mt-2 font-display text-[1.25rem] text-graphite">
-                  {demoTree.stageLabel}
-                </p>
+                <MarketingGrowthLoop />
               </PaperCard>
             </Reveal>
             <Reveal delay={0.1} className="order-1 lg:order-2">
               <div>
                 <p className="mb-4 text-[0.8125rem] font-medium uppercase tracking-[0.18em] text-gold-300">
-                  Pilgrimage, not points
+                  Growth you can feel
                 </p>
                 <h2 className="font-display text-editorial text-moon-paper sm:text-heading">
-                  A living tree, not a score
+                  Your journey grows with you
                 </h2>
                 <div className="mt-5 h-0.5 w-12 bg-gold-500" aria-hidden />
                 <p className="mt-5 text-[1.0625rem] leading-relaxed text-moon-paper/75">
-                  Prayer feeds the roots. Scripture grows the branches. Kindness
-                  grows the leaves. No XP, no leaderboard, no decay. Miss a week
-                  and nothing is lost — the tree waits, and grows again when you
-                  come back.
+                  Prayer, Scripture, reflection, and kindness help your tree
+                  take shape. There are no leaderboards and nothing withers
+                  while you are away. Come back when you are ready. Your
+                  journey will be waiting.
                 </p>
               </div>
             </Reveal>

@@ -9,7 +9,6 @@ import { retrySync } from "@/lib/sync/engine";
 import { useSyncStatus } from "@/lib/sync/status";
 import {
   getLastSyncedUserId,
-  initialSyncIsPending,
   localDataBelongsToOtherUser,
 } from "@/lib/sync/last-user";
 import {
@@ -19,8 +18,8 @@ import {
 import {
   clearOnboardingResumeStage,
   getOnboardingResumeStage,
-  isOnboardingResumePending,
   onboardingLaunchDestination,
+  shouldKeepCompletedProfileOnOnboarding,
   shouldRedirectAppToOnboarding,
 } from "@/lib/auth/onboarding-resume";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
@@ -51,13 +50,26 @@ function Gate({ children }: { children: React.ReactNode }) {
       router.replace("/onboarding");
       return;
     }
+    // A completed profile makes any unfinished account/guide marker stale.
+    // Clear it on app launch so a repaired PWA cannot carry the loop forward.
+    if (completed && resumeStage && !launchDestination) {
+      clearOnboardingResumeStage();
+      return;
+    }
     // A launch stage is written only by a first-quest CTA immediately before
     // its intentional app navigation. Account/quest never reach this line.
     if (launchDestination) {
       clearOnboardingResumeStage();
       if (redirectToLaunch) router.replace(launchDestination);
     }
-  }, [launchDestination, redirectToLaunch, redirectToOnboarding, router]);
+  }, [
+    completed,
+    launchDestination,
+    redirectToLaunch,
+    redirectToOnboarding,
+    resumeStage,
+    router,
+  ]);
 
   if (redirectToOnboarding || redirectToLaunch) return <LoadingVeil />;
   return <>{children}</>;
@@ -68,17 +80,20 @@ function OnboardingRouteGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const completed = useQuestOS((s) => s.profile?.onboardingCompleted ?? false);
   const resumeStage = getOnboardingResumeStage();
-  const finishingAccountOnboarding =
-    completed && isOnboardingResumePending(resumeStage);
+  const continuingOnboarding = shouldKeepCompletedProfileOnOnboarding(
+    completed,
+    resumeStage,
+  );
   const launchDestination = onboardingLaunchDestination(resumeStage);
 
   useEffect(() => {
-    if (completed && !finishingAccountOnboarding) {
+    if (completed && !continuingOnboarding) {
+      clearOnboardingResumeStage();
       router.replace(launchDestination ?? "/app");
     }
-  }, [completed, finishingAccountOnboarding, launchDestination, router]);
+  }, [completed, continuingOnboarding, launchDestination, router]);
 
-  return completed && !finishingAccountOnboarding ? (
+  return completed && !continuingOnboarding ? (
     <LoadingVeil />
   ) : (
     <>{children}</>
@@ -194,7 +209,6 @@ function AccountRestoreBoundary({ children }: { children: React.ReactNode }) {
     localOnboardingCompleted,
     lastSyncedUserId: getLastSyncedUserId(),
     userId,
-    initialSyncPending: userId ? initialSyncIsPending(userId) : false,
   });
   const phase = accountRestorePhase({
     configured,

@@ -14,4 +14,24 @@ describe("production sign-in methods", () => {
     expect(markup).not.toContain("Text me a code");
     expect(markup).not.toContain('type="tel"');
   });
+
+  it("labels first-run account creation separately from returning sign-in", () => {
+    const createMarkup = renderToStaticMarkup(
+      createElement(SignInMethods, {
+        source: "onboarding",
+        intent: "create",
+      }),
+    );
+    const signInMarkup = renderToStaticMarkup(
+      createElement(SignInMethods, {
+        source: "onboarding",
+        intent: "signin",
+      }),
+    );
+
+    expect(createMarkup).toContain("Create account with email");
+    expect(createMarkup).toContain("Create account with Google");
+    expect(signInMarkup).toContain("Email me a sign-in link");
+    expect(signInMarkup).toContain("Continue with Google");
+  });
 });

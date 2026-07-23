@@ -33,15 +33,11 @@ function registryPngSources() {
     ...Object.values(PIXEL_SPRITES),
     ...Object.values(PIXEL_MASCOTS),
   ]
-    .filter(
-      (asset): asset is Extract<PixelAsset, { kind: "png" }> =>
-        asset.kind === "png"
-    )
     .map((asset) => asset.src)
     .sort();
 }
 
-function pngFile(name: string, asset: Extract<PixelAsset, { kind: "png" }>) {
+function pngFile(name: string, asset: PixelAsset) {
   expect(asset.src, `${name} must use the public pixel directory`).toMatch(
     /^\/pixel\/[a-z0-9-]+\.png$/
   );
@@ -55,31 +51,6 @@ function pngFile(name: string, asset: Extract<PixelAsset, { kind: "png" }>) {
 }
 
 function expectValidAsset(name: string, asset: PixelAsset) {
-  if (asset.kind === "grid") {
-    expect(asset.rows.length, `${name} has no rows`).toBeGreaterThan(0);
-    const width = asset.rows[0]?.length ?? 0;
-    expect(width, `${name} has no width`).toBeGreaterThan(0);
-    expect(
-      asset.rows.every((row) => row.length === width),
-      `${name} rows differ`
-    ).toBe(true);
-
-    const used = new Set(asset.rows.join(""));
-    for (const color of used) {
-      expect(
-        asset.palette[color],
-        `${name} uses undefined color '${color}'`
-      ).toBeDefined();
-    }
-    expect(asset.palette["."], `${name} needs a transparent color`).toBe(
-      "transparent"
-    );
-    expect(used.has("."), `${name} must preserve transparent canvas space`).toBe(
-      true
-    );
-    return;
-  }
-
   expect(asset.cols, `${name} has no logical width`).toBeGreaterThan(0);
   expect(asset.rows, `${name} has no logical height`).toBeGreaterThan(0);
   expect(asset.nativeWidth, `${name} registry native width`).toBe(NATIVE_CANVAS);
@@ -113,11 +84,7 @@ function expectValidAsset(name: string, asset: PixelAsset) {
 }
 
 function assetSignature(name: string, asset: PixelAsset) {
-  const content =
-    asset.kind === "grid"
-      ? Buffer.from(`${asset.rows.join("\n")}\n${JSON.stringify(asset.palette)}`)
-      : pngFile(name, asset);
-  return createHash("sha256").update(content).digest("hex");
+  return createHash("sha256").update(pngFile(name, asset)).digest("hex");
 }
 
 function expectLogicalCanvas(
@@ -126,18 +93,13 @@ function expectLogicalCanvas(
   width: number,
   height: number
 ) {
-  if (asset.kind === "grid") {
-    expect(asset.rows, name).toHaveLength(height);
-    expect(asset.rows.every((row) => row.length === width), name).toBe(true);
-    return;
-  }
   expect(asset.cols, `${name} logical width`).toBe(width);
   expect(asset.rows, `${name} logical height`).toBe(height);
 }
 
 async function expectProductionPng(
   name: string,
-  asset: Extract<PixelAsset, { kind: "png" }>
+  asset: PixelAsset
 ) {
   const bytes = pngFile(name, asset);
   const expected = physicalPngSpec();
@@ -301,6 +263,57 @@ describe("BibleQuest pixel art system", () => {
     expect(publicSources).toEqual(registrySources);
   });
 
+  it("preserves the complete public sprite and mascot key contract", () => {
+    expect(Object.keys(PIXEL_SPRITES)).toEqual([
+      "candle",
+      "leaf",
+      "star",
+      "bird",
+      "flower",
+      "chapel",
+      "book",
+      "open-book",
+      "bookmark",
+      "lantern",
+      "path",
+      "tree",
+      "sun",
+      "heart",
+      "hands",
+      "praying-hands",
+      "wheat",
+      "dove",
+      "cross",
+      "door",
+      "key",
+      "scroll",
+      "compass",
+      "crown",
+      "mountain",
+      "moon",
+      "service-basket",
+      "links",
+      "people",
+      "fountain",
+      "candle-unlit",
+      "candle-small",
+      "candle-steady",
+      "candle-sparks",
+      "candle-halo",
+      ...Array.from({ length: 20 }, (_, stage) => `tree-stage-${stage}`),
+    ]);
+    expect(Object.keys(PIXEL_MASCOTS)).toEqual([
+      "lamb",
+      "lantern",
+      "scroll",
+      "dove",
+      "sprout",
+      "key",
+      "map",
+      "campfire",
+    ]);
+  });
+
   it("keeps the manifest on the uniform 128x128 physical contract", () => {
     const manifest = JSON.parse(fs.readFileSync(ASSET_MANIFEST, "utf8")) as {
       schemaVersion: number;
@@ -385,19 +398,15 @@ describe("BibleQuest pixel art system", () => {
   it("keeps every production PNG on a native-detail 128x128 canvas", async () => {
     for (const [name, asset] of Object.entries(PIXEL_SPRITES)) {
       expect(asset.kind, `${name} must use a production PNG`).toBe("png");
-      if (asset.kind === "png") {
-        expect(asset.artCols, `${name} native art width`).toBe(128);
-        expect(asset.artRows, `${name} native art height`).toBe(128);
-        await expectProductionPng(name, asset);
-      }
+      expect(asset.artCols, `${name} native art width`).toBe(128);
+      expect(asset.artRows, `${name} native art height`).toBe(128);
+      await expectProductionPng(name, asset);
     }
     for (const [name, asset] of Object.entries(PIXEL_MASCOTS)) {
       expect(asset.kind, `mascot-${name} must use a production PNG`).toBe(
         "png"
       );
-      if (asset.kind === "png") {
-        await expectProductionPng(`mascot-${name}`, asset);
-      }
+      await expectProductionPng(`mascot-${name}`, asset);
     }
   });
 
@@ -433,10 +442,8 @@ describe("BibleQuest pixel art system", () => {
     }
     for (const [name, asset] of Object.entries(PIXEL_MASCOTS)) {
       expectLogicalCanvas(`mascot-${name}`, asset, 32, 32);
-      if (asset.kind === "png") {
-        expect(asset.artCols, `mascot-${name} native art width`).toBe(128);
-        expect(asset.artRows, `mascot-${name} native art height`).toBe(128);
-      }
+      expect(asset.artCols, `mascot-${name} native art width`).toBe(128);
+      expect(asset.artRows, `mascot-${name} native art height`).toBe(128);
       expect(asset.cellScale, `mascot-${name} cell scale`).toBe(0.625);
     }
   });

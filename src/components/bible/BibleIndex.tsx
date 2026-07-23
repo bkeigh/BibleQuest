@@ -38,6 +38,7 @@ import {
   translationPreferenceLabel,
 } from "@/lib/bible/translations";
 import { usePlus } from "@/lib/revenuecat/usePlus";
+import { useSession } from "@/lib/supabase/useSession";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 
 type Testament = "new" | "old";
@@ -69,7 +70,9 @@ function useCurrentDayKey() {
 
 function BibleIndexInner() {
   const plus = usePlus();
+  const { user } = useSession();
   const shouldReduceMotion = useShouldReduceMotion();
+  const profileCreatedAt = useQuestOS((state) => state.profile?.createdAt);
   const readingPosition = useQuestOS((state) => state.readingPosition);
   const bookmarks = useQuestOS((state) => state.bookmarks);
   const chaptersRead = useQuestOS((state) => state.chaptersRead);
@@ -91,9 +94,12 @@ function BibleIndexInner() {
       : "new",
   );
 
+  // Prefer the account id so the same person keeps one verse across devices;
+  // local-only profiles still receive their own stable daily selection.
+  const verseAudienceKey = user?.id ?? profileCreatedAt;
   const verse = useMemo(
-    () => getDailyVerse(dayKey, verseRefreshCount),
-    [dayKey, verseRefreshCount],
+    () => getDailyVerse(dayKey, verseRefreshCount, verseAudienceKey),
+    [dayKey, verseAudienceKey, verseRefreshCount],
   );
   const verseBookName = useMemo(
     () =>
