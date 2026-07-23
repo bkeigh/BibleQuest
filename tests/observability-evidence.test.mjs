@@ -529,6 +529,16 @@ describe("sanitized launch evidence", () => {
     expect(fixtureReadiness()).toMatchObject({
       check_count: 21,
       failed_check_count: 0,
+      schema_parity: {
+        ok: true,
+        checks: expect.arrayContaining([
+          expect.objectContaining({
+            contract: "generation_bound_account_deletion_v2",
+            migration: "0022",
+            ok: true,
+          }),
+        ]),
+      },
     });
     const aggregate = aggregateClientSignals(fixtureSignals());
     const evidence = buildLaunchEvidence(

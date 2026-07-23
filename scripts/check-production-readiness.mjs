@@ -684,7 +684,7 @@ if (JSON_OUTPUT) {
       canonical_metadata: { ok: canonicalEvidence },
       schema_parity: {
         ok:
-          schemaEvidence.length === REQUIRED_SCHEMA.length + 2 &&
+          schemaEvidence.length === REQUIRED_SCHEMA.length + 4 &&
           schemaEvidence.every((check) => check.ok),
         checks: schemaEvidence,
       },

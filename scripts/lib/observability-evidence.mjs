@@ -395,6 +395,16 @@ export function fixtureReadiness() {
     migration: "0019",
     ok: true,
   });
+  schemaChecks.push({
+    contract: "generation_bound_account_deletion_v2",
+    migration: "0022",
+    ok: true,
+  });
+  schemaChecks.push({
+    contract: "delete_own_account_authenticated_only",
+    migration: "0022",
+    ok: true,
+  });
   const contentChecks = [
     "quest_templates",
     "daily_verses",
