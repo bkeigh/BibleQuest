@@ -48,7 +48,7 @@ import {
 import { useStrings } from "@/lib/i18n";
 import { toDateKey } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils/cn";
-import { usePlus } from "@/lib/revenuecat/usePlus";
+import { usePlus } from "@/lib/billing/usePlus";
 import { QuestGenerator } from "@/components/quests/QuestGenerator";
 
 const DURATIONS: QuestDuration[] = [5, 10, 15, 30, 60, 240, 480];

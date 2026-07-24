@@ -11,7 +11,6 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const nextBin = fileURLToPath(
   new URL("../node_modules/next/dist/bin/next", import.meta.url),
 );
-const revenueCatAssetOrigin = "https://da08ctfrofx1b.cloudfront.net";
 const approvedFrameAncestors = [
   "'self'",
   "https://winterhill.studio",
@@ -51,37 +50,17 @@ function assertSharedSecurityContract(response, production) {
 
   assertIncludes(csp, "script-src", [
     "https://tally.so",
-    "https://js.stripe.com",
-    "https://*.js.stripe.com",
-    "https://checkout.stripe.com",
   ]);
   assertIncludes(csp, "connect-src", [
     "https://header-fixture.supabase.co",
-    "https://api.revenuecat.com",
-    "https://e.revenue.cat",
-    "https://api.stripe.com",
-    "https://checkout.stripe.com",
-    "https://link.com",
-    "https://*.link.com",
   ]);
-  assertIncludes(csp, "frame-src", [
-    "https://tally.so",
-    "https://js.stripe.com",
-    "https://*.js.stripe.com",
-    "https://hooks.stripe.com",
-    "https://checkout.stripe.com",
-    "https://link.com",
-    "https://*.link.com",
-  ]);
-  assertIncludes(csp, "img-src", [
-    revenueCatAssetOrigin,
-    "https://*.stripe.com",
-    "https://*.link.com",
-  ]);
-  assertIncludes(csp, "font-src", [revenueCatAssetOrigin]);
-  assertIncludes(csp, "media-src", [revenueCatAssetOrigin]);
+  assertIncludes(csp, "frame-src", ["https://tally.so"]);
+  assert.deepEqual(csp.get("img-src"), ["'self'", "data:", "blob:"]);
+  assert.deepEqual(csp.get("font-src"), ["'self'"]);
+  assert.deepEqual(csp.get("media-src"), ["'self'", "blob:"]);
 
   assert.equal(rawCsp.includes("https://api.rc-backup.com"), false);
+  assert.equal(/revenuecat|stripe|link\.com/i.test(rawCsp), false);
   assert.equal(rawCsp.includes("https://*.supabase.co"), false);
   assert.equal(rawCsp.includes("wss://*.supabase.co"), false);
   assert.equal(
@@ -154,8 +133,6 @@ async function withNextServer(command, callback) {
         BIBLEQUEST_HEADER_TEST_DIST_DIR:
           command === "dev" ? isolatedDevDistDir : "",
         NEXT_PUBLIC_SUPABASE_URL: "https://header-fixture.supabase.co",
-        NEXT_PUBLIC_REVENUECAT_BILLING_MODE: "live",
-        NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY: "rcb_headerfixture",
       },
       stdio: ["ignore", "pipe", "pipe"],
     },

@@ -38,17 +38,11 @@ function valuesFor(rules: HeaderRule[], key: string) {
 
 async function headerRules(
   nodeEnv: "production" | "development",
-  billing: "coming-soon" | "live" = "coming-soon",
 ) {
   vi.stubEnv("NODE_ENV", nodeEnv);
   vi.stubEnv(
     "NEXT_PUBLIC_SUPABASE_URL",
     "https://header-fixture.supabase.co",
-  );
-  vi.stubEnv("NEXT_PUBLIC_REVENUECAT_BILLING_MODE", billing);
-  vi.stubEnv(
-    "NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY",
-    billing === "live" ? "rcb_headerfixture" : "",
   );
   vi.resetModules();
 
@@ -98,57 +92,32 @@ describe("Winterhill iframe security contract", () => {
 });
 
 describe("transport and payment header scope", () => {
-  it("serves HSTS and exact RevenueCat/Stripe sources in a live production build", async () => {
-    const rules = await headerRules("production", "live");
+  it("serves HSTS while hosted billing needs no client-side origins", async () => {
+    const rules = await headerRules("production");
     const policies = valuesFor(rules, "Content-Security-Policy");
     const csp = parseCsp(policies[0]);
 
     expect(valuesFor(rules, "Strict-Transport-Security")).toEqual([
       "max-age=15552000",
     ]);
-    expect(csp.get("script-src")).toEqual(
-      expect.arrayContaining([
-        "https://tally.so",
-        "https://js.stripe.com",
-        "https://*.js.stripe.com",
-        "https://checkout.stripe.com",
-      ]),
-    );
+    expect(csp.get("script-src")).toContain("https://tally.so");
     expect(csp.get("script-src")).not.toContain("'unsafe-eval'");
-    expect(csp.get("connect-src")).toEqual(
-      expect.arrayContaining([
-        "https://header-fixture.supabase.co",
-        "https://api.revenuecat.com",
-        "https://e.revenue.cat",
-        "https://api.stripe.com",
-        "https://checkout.stripe.com",
-        "https://link.com",
-        "https://*.link.com",
-      ]),
+    expect(csp.get("connect-src")).toContain(
+      "https://header-fixture.supabase.co",
     );
-    expect(csp.get("frame-src")).toEqual([
-      "'self'",
-      "https://tally.so",
-      "https://js.stripe.com",
-      "https://*.js.stripe.com",
-      "https://hooks.stripe.com",
-      "https://checkout.stripe.com",
-      "https://link.com",
-      "https://*.link.com",
-    ]);
-    expect(csp.get("img-src")).toEqual(
-      expect.arrayContaining([
-        "https://*.stripe.com",
-        "https://*.link.com",
-      ]),
-    );
+    expect(csp.get("frame-src")).toEqual(["'self'", "https://tally.so"]);
+    expect(csp.get("img-src")).toEqual(["'self'", "data:", "blob:"]);
     expect(policies[0]).not.toContain("api.rc-backup.com");
+    expect(policies[0]).not.toContain("revenuecat.com");
+    expect(policies[0]).not.toContain("stripe.com");
+    expect(policies[0]).not.toContain("link.com");
     expect(policies[0]).not.toContain("https://*.supabase.co");
     expect(policies[0]).not.toContain("wss://*.supabase.co");
+    expect(valuesFor(rules, "Permissions-Policy")[0]).toContain("payment=()");
   });
 
   it("keeps HSTS out of development and scopes unsafe-eval to development", async () => {
-    const rules = await headerRules("development", "live");
+    const rules = await headerRules("development");
     const policies = valuesFor(rules, "Content-Security-Policy");
     const csp = parseCsp(policies[0]);
 
@@ -157,7 +126,7 @@ describe("transport and payment header scope", () => {
     expect(csp.has("upgrade-insecure-requests")).toBe(false);
   });
 
-  it("omits optional billing origins while billing is coming soon", async () => {
+  it("keeps all billing origins out of the BibleQuest document policy", async () => {
     const rules = await headerRules("production");
     const policies = valuesFor(rules, "Content-Security-Policy");
     const csp = parseCsp(policies[0]);
@@ -168,7 +137,6 @@ describe("transport and payment header scope", () => {
       "https://tally.so",
     ]);
     expect(csp.get("frame-src")).toEqual(["'self'", "https://tally.so"]);
-    expect(csp.get("connect-src")).not.toContain("https://api.revenuecat.com");
-    expect(csp.get("connect-src")).not.toContain("https://api.stripe.com");
+    expect(policies[0]).not.toMatch(/revenuecat|stripe|link\.com/i);
   });
 });

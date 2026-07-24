@@ -130,8 +130,10 @@ needed — just don't remove that config.
       external uptime check through the content-free operational contract in
       [`OBSERVABILITY.md`](OBSERVABILITY.md) until a separately privacy-reviewed
       error provider exists.
-- [ ] Keep RevenueCat in `coming-soon` unless every sandbox-to-production gate
-      in [`REVENUECAT.md`](REVENUECAT.md) has evidence and explicit approval.
+- [ ] Keep direct Stripe Billing in `coming-soon` with purchases disabled unless
+      every test-to-live gate in
+      [`STRIPE_TEST_BILLING.md`](STRIPE_TEST_BILLING.md) has evidence and
+      explicit approval.
 - [ ] Keep the Free Use Bible API catalogue constrained to the reviewed
       public-domain allow-list in `src/lib/bible/translations.ts`. A provider
       catalogue entry is not, by itself, approval to expose that edition.

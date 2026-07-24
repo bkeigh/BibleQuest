@@ -129,45 +129,33 @@ Never rename this to `NEXT_PUBLIC_STRIPE_*`. If BibleQuest later needs custom
 Checkout Sessions, refunds, or webhooks, add narrowly scoped server-side Stripe
 credentials at that time; they are not part of the present Payment Link flow.
 
-## 3. Prepare subscriptions in RevenueCat sandbox
+## 3. Prepare direct Stripe subscriptions in test mode
 
-BibleQuest already has a deny-by-default RevenueCat Web SDK integration. Keep
-production in `coming-soon` while account sync and donation QA are being
-finished.
+BibleQuest has a deny-by-default direct Stripe integration. Stripe is the
+billing authority and Supabase holds only the server-projected membership
+state. Production remains `coming-soon` with purchase UI disabled.
 
-1. In RevenueCat, use the **Test Store** first and create the
-   `BibleQuest Plus` entitlement, products, current offering, packages, and a
-   published paywall. Follow [`REVENUECAT.md`](REVENUECAT.md) exactly.
-2. For local sandbox testing, copy the Test Store **public SDK key** (`test_…`)
-   into `.env.local`:
-
-```dotenv
-NEXT_PUBLIC_REVENUECAT_BILLING_MODE=sandbox
-NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY=test_...
-NEXT_PUBLIC_REVENUECAT_PLUS_ENTITLEMENT=BibleQuest Plus
-```
-
-3. Run every sandbox purchase, cancellation, restore, identity-switch, and
-   offline-return case in the RevenueCat runbook. Do not connect live Stripe or
-   put a secret RevenueCat `sk_…` key in this web app.
-4. When the sandbox gates pass, connect the BibleQuest Stripe account in
-   RevenueCat, create its Web Billing configuration, products/offering/paywall,
-   and retrieve the browser-safe Web Billing public key (`rcb_…`). RevenueCat's
-   provider connection holds the Stripe-side credentials; they do not belong
-   in Vercel.
-5. Only after the production release checklist is approved, set the following
-   in Vercel Production and redeploy:
+1. In a Stripe sandbox/test environment, create one **BibleQuest Plus** Product
+   and active monthly and annual recurring Prices using the same currency.
+2. Configure Customer Portal cancellation, payment-method, and invoice options.
+3. Apply migration `0025`, run its pgTAP evidence, and configure only test
+   values in ignored `.env.local` or an encrypted preview environment.
+4. Use the Stripe CLI to forward signed events to
+   `/api/billing/webhook`; store its signing secret only in that environment.
+5. Complete Checkout, 3DS, payment-failure, renewal, cancellation, Portal,
+   refund/dispute, duplicate, out-of-order, identity-switch, and deletion
+   evidence in
+   [`STRIPE_TEST_BILLING.md`](STRIPE_TEST_BILLING.md).
+6. Leave Vercel Production on:
 
 ```dotenv
-NEXT_PUBLIC_REVENUECAT_BILLING_MODE=live
-NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY=rcb_...
-NEXT_PUBLIC_REVENUECAT_PLUS_ENTITLEMENT=BibleQuest Plus
+STRIPE_BILLING_MODE=coming-soon
+BIBLEQUEST_STRIPE_PURCHASES_ENABLED=false
+STRIPE_LIVE_BILLING_APPROVED=false
 ```
 
-Official references: [RevenueCat Web SDK](https://www.revenuecat.com/docs/web/web-billing/web-sdk),
-[Web billing overview](https://www.revenuecat.com/docs/web/web-billing/overview),
-[RevenueCat API key types](https://www.revenuecat.com/docs/projects/authentication),
-and [Stripe Billing connection](https://www.revenuecat.com/docs/web/integrations/stripe).
+Do not create live Products/Prices, install live keys, or enable Production
+purchase UI without the separate written approval gate in the runbook.
 
 ## 4. Bible editions: free now, licensed later
 
@@ -201,14 +189,15 @@ API_BIBLE_COMMERCIALLY_LICENSED_BIBLE_IDS=id-one,id-two
 ## Final credential check
 
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: publishable/browser-safe; RLS is mandatory.
-- `NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY`: public SDK key only (`test_…` or
-  `rcb_…`), with a matching billing mode.
-- `STRIPE_DONATION_URL`: server-only Payment Link; not an API secret.
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`: non-secret key whose mode must match the
+  server-only Stripe key.
+- `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`: server-only secrets used only
+  by direct Checkout/Billing routes.
+- `STRIPE_DONATION_URL`: legacy server-only Payment Link rollback value.
 - `API_BIBLE_API_KEY`: server-only private key.
-- Supabase SMTP/Resend and RevenueCat/Stripe connection credentials: provider
-  dashboards only.
-- Supabase secret/service-role keys, Stripe secret keys, RevenueCat `sk_…`
-  keys, and database passwords: not consumed by the current app.
+- Supabase SMTP/Resend provider credentials: provider dashboards only.
+- Supabase service-role, Stripe secret/webhook keys, and database passwords:
+  consumed only by server paths and never by a browser bundle.
 
 After any provider or environment change, redeploy, run the automated checks,
 then repeat the relevant real-browser QA path. A green build alone does not

@@ -429,6 +429,7 @@ export function fixtureReadiness() {
         content_contract: observability.contentContract,
         service_worker_version: observability.serviceWorkerVersion,
         billing_mode: "coming-soon",
+        billing_purchases_enabled: false,
       },
     },
     canonical_metadata: { ok: true },
@@ -564,7 +565,7 @@ export function buildLaunchEvidence(
     "stop content rollout and compare the frozen manifest by natural key",
   );
   add(
-    release?.billing_mode === "invalid" || release?.billing_mode === "sandbox",
+    release?.billing_mode === "invalid" || release?.billing_mode === "test",
     "critical",
     "billing_posture_unsafe",
     "[BILLING OWNER]",
@@ -576,6 +577,14 @@ export function buildLaunchEvidence(
     "live_billing_gate_missing",
     "[BILLING OWNER]",
     "attach the approved live-billing evidence before using the explicit gate",
+  );
+  add(
+    release?.billing_purchases_enabled === true &&
+      (release?.billing_mode !== "live" || !liveBillingVerified),
+    "critical",
+    "billing_purchase_gate_unsafe",
+    "[BILLING OWNER]",
+    "disable purchase UI until the exact live-billing gate is approved",
   );
   add(
     release?.service_worker_version !== observability.serviceWorkerVersion,
@@ -616,6 +625,8 @@ export function buildLaunchEvidence(
       observed: Object.keys(aggregate.service_worker.versions),
     },
     billing_mode: release?.billing_mode ?? "unknown",
+    billing_purchases_enabled:
+      release?.billing_purchases_enabled === true,
     live_billing_gate_verified: liveBillingVerified,
     rollback_target_sha: release?.rollback_sha ?? null,
     alerts,

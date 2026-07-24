@@ -134,8 +134,7 @@ docs/                   # Codex + setup/deployment/security/content/QA guides
 - [`docs/ACCOUNT_SYNC_RUNBOOK.md`](docs/ACCOUNT_SYNC_RUNBOOK.md) — production sync, SMTP, auth-link, schema, and content recovery
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Vercel + domain
 - [`docs/ENV.md`](docs/ENV.md) — environment variables
-- [`docs/REVENUECAT.md`](docs/REVENUECAT.md) — Plus identity, sandbox QA, and production gates
-- [`docs/PLUS_7_DAY_TRIAL_HANDOFF.md`](docs/PLUS_7_DAY_TRIAL_HANDOFF.md) — founder decisions and safe 7-day trial setup
+- [`docs/STRIPE_TEST_BILLING.md`](docs/STRIPE_TEST_BILLING.md) — direct Stripe test billing, webhook evidence, and production gates
 - [`SECURITY.md`](SECURITY.md) — RLS, sensitive data, disclosure
 - [`docs/CONTENT_GUIDE.md`](docs/CONTENT_GUIDE.md) — quest/prayer/theology rules
 - [`docs/QA.md`](docs/QA.md) — manual QA checklist
@@ -150,9 +149,9 @@ docs/                   # Codex + setup/deployment/security/content/QA guides
   custom auth email, and two-user isolation gates in the recovery runbook pass.
 - Notification delivery and external quest-generation providers are not
   enabled for V1.
-- Plus billing uses RevenueCat configuration. One-time support uses a validated
-  server-side Stripe Payment Link and stays unavailable until
-  `STRIPE_DONATION_URL` is configured for the deployment.
+- Plus billing uses a server-authoritative direct Stripe projection and remains
+  coming-soon in Production pending explicit live approval. One-time support is
+  being moved from the legacy Payment Link to server-created Checkout.
 - Guest data lives in the browser (`localStorage`). After an explicit account
   connection, supported journey data also syncs to the user's RLS-protected
   Supabase rows. Export/clear controls are in Settings.

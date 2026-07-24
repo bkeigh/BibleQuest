@@ -10,8 +10,8 @@ while this one explains the implementation.
 BibleQuest is a local-first Next.js application. The interface reads from one
 persisted QuestOS store, so the full daily loop works without an account or a
 network connection. Supabase adds optional authentication and cross-device
-sync. RevenueCat adds optional Plus entitlement state. Neither service replaces
-the local store as the UI's immediate source of truth.
+sync. Direct Stripe Billing adds an optional server-projected Plus state.
+Neither service replaces the local store as the UI's immediate source of truth.
 
 ```mermaid
 flowchart LR
@@ -23,7 +23,9 @@ flowchart LR
   Store <--> Sync[Sync engine]
   Sync <--> Supabase[(Supabase + RLS)]
   Screens --> Plus[Plus hook]
-  Plus <--> RevenueCat[RevenueCat]
+  Plus --> BillingRoutes[Server billing routes]
+  BillingRoutes <--> Stripe[Stripe]
+  BillingRoutes <--> Supabase
   Screens --> Analytics[Privacy-first analytics]
   Worker[Service worker] --> Routes
 ```
@@ -41,7 +43,7 @@ flowchart LR
 | `src/lib/questos/` | Domain types, pure decision engines, persistence, migrations, and the central local-first store. |
 | `src/lib/sync/` | Supabase row mapping, pull/merge/push coordination, deletion tombstones, and sync status. |
 | `src/lib/supabase/` | Browser/server clients, auth-session middleware, and the client session hook. |
-| `src/lib/revenuecat/` | Deny-by-default billing configuration, identity-safe SDK access, pure entitlement modeling, and the React Plus hook. |
+| `src/lib/billing/` | Deny-by-default Stripe configuration, current-object projection, webhook processing, and the account-bound React Plus hook. |
 | `src/lib/analytics/` | Explicit-consent analytics schema, sanitization, offline queue, and transport. |
 | `src/lib/bible/` | Bible metadata and server-only chapter loading. |
 | `src/lib/i18n/` | English source strings, locale dictionaries, language metadata, and typed lookup helpers. |
@@ -249,7 +251,7 @@ pnpm build
 ```
 
 Security, billing, sync, service-worker, or schema changes also require the
-targeted checklists in `docs/QA.md`, `docs/REVENUECAT.md`, and
+targeted checklists in `docs/QA.md`, `docs/STRIPE_TEST_BILLING.md`, and
 `docs/SUPABASE_SECURITY_ROLLOUT.md`.
 
 ## Comment style

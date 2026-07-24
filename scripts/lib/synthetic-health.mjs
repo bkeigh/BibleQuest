@@ -454,6 +454,8 @@ export async function runSyntheticHealth({
     const health = safeJson(body);
     const expectedBilling =
       env.BIBLEQUEST_MONITOR_EXPECTED_BILLING_MODE?.trim() || "coming-soon";
+    const expectedBillingPurchases =
+      env.BIBLEQUEST_MONITOR_EXPECTED_BILLING_PURCHASES_ENABLED === "true";
     const expectedSha = env.BIBLEQUEST_MONITOR_EXPECTED_SHA?.trim().toLowerCase();
     releaseSha =
       typeof health?.release_sha === "string" && SHA.test(health.release_sha)
@@ -471,6 +473,7 @@ export async function runSyntheticHealth({
       health?.content_contract === expectations.contentContract &&
       health?.service_worker_version === expectations.serviceWorkerVersion &&
       health?.billing_mode === expectedBilling &&
+      health?.billing_purchases_enabled === expectedBillingPurchases &&
       health?.auth_posture ===
         (env.BIBLEQUEST_MONITOR_EXPECTED_AUTH_POSTURE?.trim() || "configured") &&
       releaseSha !== null &&

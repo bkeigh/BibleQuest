@@ -191,9 +191,10 @@ function safeHealthBody(value) {
     candidate.schema_contract !== "0022" ||
     candidate.content_contract !== "seed-manifest-v1" ||
     !/^biblequest-v\d{1,4}$/.test(candidate.service_worker_version) ||
-    !["coming-soon", "sandbox", "live", "invalid"].includes(
+    !["coming-soon", "test", "live", "invalid"].includes(
       candidate.billing_mode,
-    )
+    ) ||
+    typeof candidate.billing_purchases_enabled !== "boolean"
   ) {
     return null;
   }
@@ -208,6 +209,7 @@ function safeHealthBody(value) {
     content_contract: candidate.content_contract,
     service_worker_version: candidate.service_worker_version,
     billing_mode: candidate.billing_mode,
+    billing_purchases_enabled: candidate.billing_purchases_enabled,
   };
 }
 

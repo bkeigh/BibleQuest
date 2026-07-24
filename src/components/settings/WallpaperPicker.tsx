@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useRef } from "react";
 import { IconCheck } from "@/components/design-system/icons";
 import { useToast } from "@/components/design-system/Toast";
-import { usePlus } from "@/lib/revenuecat/usePlus";
+import { usePlus } from "@/lib/billing/usePlus";
 import {
   WALLPAPER_CATALOG,
   DEFAULT_WALLPAPER_ID,

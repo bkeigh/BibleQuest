@@ -3,7 +3,7 @@
 This is the execution record for the BibleQuest production launch targeted for
 **July 31, 2026**. It coordinates the detailed procedures in
 [`DEPLOYMENT.md`](DEPLOYMENT.md), [`QA.md`](QA.md),
-[`REVENUECAT.md`](REVENUECAT.md), and
+[`STRIPE_TEST_BILLING.md`](STRIPE_TEST_BILLING.md), and
 [`SUPABASE_SECURITY_ROLLOUT.md`](SUPABASE_SECURITY_ROLLOUT.md). Privacy-safe
 health, browser signals, thresholds, and synthetic routing use
 [`OBSERVABILITY.md`](OBSERVABILITY.md). Account sync,
@@ -47,7 +47,7 @@ Vercel deployments. A Preview build is never the production artifact.
 | Production backup | `[UTC TIMESTAMP]`; method `[DAILY BACKUP / PITR / OTHER]`; restore point `[ID WITHOUT CREDENTIALS]` | Provider backup record: `[RESTRICTED EVIDENCE URL]` | OPEN |
 | Previous known-good deployment | `[IMMUTABLE VERCEL DEPLOYMENT URL]`, commit `[SHA]` | Rollback rehearsal and PWA/privacy checks: `[EVIDENCE URL]` | OPEN |
 | Database compatibility decision | `[BACKWARD COMPATIBLE / APP FIRST / DB FIRST / ROLLBACK RESTRICTED]` | Signed decision: `[EVIDENCE URL]` | OPEN |
-| Billing posture | `[COMING SOON / LIVE WEB BILLING]` | RevenueCat/Vercel sanitized evidence: `[EVIDENCE URL]` | OPEN |
+| Billing posture | `[COMING SOON / LIVE DIRECT STRIPE]` | Stripe/Vercel sanitized evidence: `[EVIDENCE URL]` | OPEN |
 | Account launch posture | `[AUTH + SYNC ENABLED / GUEST-ONLY CONTAINED]` | Selected-track evidence and named account-posture-owner plus rollback-authority acceptance: `[EVIDENCE URL]` | OPEN |
 
 Freeze the migration manifest without revealing credentials:
@@ -280,22 +280,20 @@ billing, legal, monitoring, and rollback gates remain mandatory in both tracks.
 
 Select exactly one:
 
-- [ ] **Coming soon:** `NEXT_PUBLIC_REVENUECAT_BILLING_MODE` is unset or exactly
-      `coming-soon` and `NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY` is absent from the
-      production build environment; Plus shows coming-soon copy; no RevenueCat
-      request, purchase control, or test-store checkout is reachable; free
-      functionality is complete.
-- [ ] **Live Web Billing:** `NEXT_PUBLIC_REVENUECAT_BILLING_MODE=live` and a
-      production `rcb_…` public key are configured in
-      Vercel (never record its value); Stripe/RevenueCat Web Billing products,
-      packages, entitlement, prices, paywall or fallback, successful/declined
-      checkout, entitlement refresh, management URL, refund/cancellation, and
-      identity/restore posture all pass. A `test_…` key is a hard no-go.
+- [ ] **Coming soon:** `STRIPE_BILLING_MODE` is unset or exactly `coming-soon`,
+      `BIBLEQUEST_STRIPE_PURCHASES_ENABLED` is not `true`, and no Stripe secret
+      or test value is present in the Production environment; Plus shows
+      coming-soon copy and free functionality is complete.
+- [ ] **Live direct Stripe:** matching live keys/webhook/Prices are stored only
+      in encrypted Vercel settings, `STRIPE_LIVE_BILLING_APPROVED=true`, and the
+      separate purchase gate is enabled only after Product/Price, successful
+      and declined Checkout, 3DS, current-object entitlement, Portal,
+      renewal/failure, refund/dispute, identity, legal, and support evidence all
+      pass. Any test key or `test` mode in Production is a hard no-go.
 
-[`REVENUECAT.md`](REVENUECAT.md) currently recommends coming-soon for launch.
-Treat live billing as **OPEN** until every provider, legal, identity, CSP,
-staging, and production gate there passes; old development notes are not
-production evidence.
+[`STRIPE_TEST_BILLING.md`](STRIPE_TEST_BILLING.md) requires coming-soon for this
+change. Treat live billing as **OPEN** until every test, legal, identity,
+staging, and production gate there passes and written approval is attached.
 
 ## 5. Exact local verification
 
@@ -564,7 +562,7 @@ change active auth/sync rows from out of scope to pass.
 | --- | --- | --- | --- | --- |
 | T+0 | Evidence command reports correct SHA/origin/schema/content/worker/billing/rollback and selected account posture; enabled has auth/sync synthetics, while guest-only has a containment/no-traffic canary and zero auth/sync activity; no new 5xx/CSP errors; support path open | Monitoring + QA + account posture | `[URL / SUMMARY]` | `[CONTINUE / ROLLBACK]` |
 | T+5 | Health and landing latency remain normal; Vercel errors stable; enabled remains below auth/sync thresholds, while guest-only remains contained with no auth/sync activity; selected billing posture correct; support reviewed | Monitoring + account posture | `[URL / SUMMARY]` | `[CONTINUE / ROLLBACK]` |
-| T+15 | Repeat the evidence command and selected-posture canary; inspect Plausible shape/consent separately if enabled; review RevenueCat/Stripe aggregate signals only if live; triage support | Monitoring + QA | `[URL / SUMMARY]` | `[CONTINUE / ROLLBACK]` |
+| T+15 | Repeat the evidence command and selected-posture canary; inspect Plausible shape/consent separately if enabled; review bounded Stripe aggregate signals only if live; triage support | Monitoring + QA | `[URL / SUMMARY]` | `[CONTINUE / ROLLBACK]` |
 | T+30 | Repeat all signals; enabled tests a returning session and sync reconnect, while guest-only repeats local reopen/offline/reconnect plus containment/no-traffic; verify no stale-worker/private-cache report; summarize rates against prelaunch baseline | Monitoring + QA | `[URL / SUMMARY]` | `[CONTINUE / ROLLBACK]` |
 | T+60 | Repeat all signals; account for every support issue; record incident links; confirm production SHA, migration state, and rollback readiness; release commander requests final signatures | All owners | `[URL / SUMMARY]` | `[STABLE / INCIDENT]` |
 
@@ -657,7 +655,7 @@ vercel logs --environment production --status-code 5xx --since 5m
 ```
 
 Vercel plan limits may restrict eligible targets. A rollback restores old build
-output; it does **not** undo Supabase migrations, data writes, RevenueCat/Stripe
+output; it does **not** undo Supabase migrations, data writes, Stripe
 state, DNS changes, or other external effects. After rollback, production-domain
 auto-assignment is disabled until an approved deployment is promoted; do not
 re-enable it during the incident by accident.

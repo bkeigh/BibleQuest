@@ -10,7 +10,7 @@ The provider-neutral contract lives in
 adapter should implement `QuestGenerationProvider` on the server and preserve
 the structured request boundary. Before enabling an external adapter, add:
 
-- server-side Supabase authentication and RevenueCat entitlement validation;
+- server-side Supabase authentication and direct Stripe projection validation;
 - schema validation for provider output plus category/scripture allowlists;
 - safety and theological review, rate limits, and refusal/fallback behavior;
 - explicit privacy copy and retention controls.

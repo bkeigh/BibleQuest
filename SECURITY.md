@@ -92,25 +92,17 @@ business reason, and both allowed- and denied-origin browser tests.
 | `frame-ancestors` | `https://winterhill.studio`, `https://www.winterhill.studio` | Intentional Winterhill project preview; no other site may embed BibleQuest. |
 | `connect-src` | The exact validated `NEXT_PUBLIC_SUPABASE_URL` origin | Supabase Auth and PostgREST calls from `src/lib/supabase/*` and `src/lib/sync/engine.ts`; the source is absent when no URL is configured. No Realtime subscription exists, so no wildcard or `wss:` origin is allowed. |
 | `connect-src` | The validated HTTPS `NEXT_PUBLIC_PLAUSIBLE_HOST` origin | Consent-gated event POSTs in `src/lib/analytics/events.ts`; absent when analytics/domain/host validation is not enabled. Default is `https://plausible.io`. |
-| `connect-src` | `https://api.revenuecat.com` | Installed `@revenuecat/purchases-js` endpoint for offerings, customer info, and checkout. |
-| `connect-src` | `https://e.revenue.cat` | Installed RevenueCat SDK/paywall event endpoint. |
 | `script-src`, `frame-src` | `https://tally.so` | Temporary pre-launch waitlist widget and its dynamically sized form iframe on the public homepage; remove both sources with `WaitlistGate` at launch. |
-| `script-src`, `frame-src` | `https://js.stripe.com`, `https://*.js.stripe.com` | Stripe.js and Stripe child frames loaded by RevenueCat Web Billing. |
-| `connect-src` | `https://api.stripe.com` | Stripe.js API transport during RevenueCat checkout. |
-| `frame-src` | `https://hooks.stripe.com` | Stripe redirect and 3DS frames. |
-| `script-src`, `connect-src`, `frame-src` | `https://checkout.stripe.com` | Embedded Stripe Checkout path implemented by the installed RevenueCat SDK. |
-| `connect-src`, `frame-src` | `https://link.com`, `https://*.link.com` | Stripe Link Authentication Element mounted by the installed RevenueCat SDK. |
-| `img-src` | `https://*.stripe.com`, `https://*.link.com` | Stripe Checkout and Link-hosted imagery required by Stripe's CSP contract. |
-| `img-src`, `font-src`, `media-src` | `https://da08ctfrofx1b.cloudfront.net` | RevenueCat paywall branding images, optional brand font, and optional paywall video supported by the installed SDK. |
-| `Permissions-Policy: payment` | `https://js.stripe.com` | Delegates browser payment capability only to the same-origin app and the Stripe frame. |
+| Top-level navigation | `https://checkout.stripe.com`, `https://billing.stripe.com` | Server-created hosted Checkout and Customer Portal redirects are validated to these exact origins. They are navigations, not BibleQuest subresources, so they add no CSP source. |
+| `Permissions-Policy: payment` | none | BibleQuest embeds no payment element. Hosted Stripe pages run under Stripe’s own origin. |
 
 `ws://localhost:*` and `unsafe-eval` are development-only. App/PWA assets,
 the manifest, service worker, Next.js output, OG art, and runtime app fonts are
 self-hosted; avatar previews use `blob:` and the paper-noise SVG uses `data:`.
 `next/font/google` may contact Google while building, but it self-hosts the
 result and therefore needs no Google browser origin. The Bible import script's
-`raw.githubusercontent.com` access, RevenueCat dashboard links, Supabase/Google
-top-level OAuth redirects, and RevenueCat's returned management URL are
+`raw.githubusercontent.com` access, Stripe Dashboard/API calls, Supabase/Google
+top-level OAuth redirects, and Stripe’s hosted Checkout/Portal URLs are
 build/operator/navigation flows rather than browser subresources and are not
 CSP source allowances.
 
@@ -120,8 +112,8 @@ CSP source allowances.
   the deployed-header evidence.
 - The Winterhill integration owner owns both approved embed pages and the
   allowed/denied embed regression evidence.
-- The billing owner owns RevenueCat sandbox and Stripe 3DS acceptance whenever
-  the SDK, paywall, payment methods, or CSP payment origins change.
+- The billing owner owns direct Stripe test Checkout, Portal, webhook, 3DS,
+  refund/dispute, and live-gate acceptance.
 - The Supabase owner owns sign-in, magic-link callback, and sync acceptance
   whenever auth providers, custom domains, or project URLs change.
 

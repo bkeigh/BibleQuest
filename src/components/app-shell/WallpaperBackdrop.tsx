@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQuestOS } from "@/lib/questos/store";
-import { usePlus } from "@/lib/revenuecat/usePlus";
+import { usePlus } from "@/lib/billing/usePlus";
 import { resolveWallpaper } from "@/lib/wallpapers/catalog";
 import type { Wallpaper } from "@/lib/wallpapers/catalog";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { IconArrowRight } from "@/components/design-system/icons";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { cn } from "@/lib/utils/cn";
-import { usePlus } from "@/lib/revenuecat/usePlus";
+import { usePlus } from "@/lib/billing/usePlus";
 
 interface ExplorePlusLinkProps {
   className?: string;

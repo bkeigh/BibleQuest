@@ -221,6 +221,10 @@ describe("privacy-first analytics", () => {
       method: "x".repeat(100),
       source: "account",
     });
+    untypedTrack("plus_checkout_opened", {
+      interval: "monthly",
+      customer: "cus_private",
+    });
     await settle();
 
     expect(fetchMock).not.toHaveBeenCalled();
@@ -230,7 +234,29 @@ describe("privacy-first analytics", () => {
       track("prayer_created", { body: "fixture-private-marker" });
       // @ts-expect-error category is a closed enum, not arbitrary text
       track("quest_viewed", { category: "fixture-private-marker" });
+      track("plus_checkout_opened", {
+        interval: "monthly",
+        // @ts-expect-error billing analytics accepts no provider identifiers
+        customer: "cus_private",
+      });
     }
+  });
+
+  it("allows only the bounded Plus checkout interval", async () => {
+    localStorage.setItem(CONSENT_KEY, "1");
+    const fetchMock = vi.fn().mockResolvedValue(response());
+    vi.stubGlobal("fetch", fetchMock);
+    const { track } = await loadAnalytics();
+
+    track("plus_checkout_opened", { interval: "annual" });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      name: "plus_checkout_opened",
+      props: { interval: "annual" },
+    });
+    expect(String(init.body)).not.toMatch(/cus_|sub_|price_|card/i);
   });
 
   it("drops hostile persisted events instead of sending private data", async () => {

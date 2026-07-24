@@ -14,7 +14,7 @@
     "test": "vitest run",
     "test:analytics": "vitest run tests/analytics.test.ts",
     "test:observability": "vitest run tests/observability.test.ts tests/observability-evidence.test.mjs",
-    "test:headers": "NEXT_PUBLIC_SUPABASE_URL=https://header-fixture.supabase.co NEXT_PUBLIC_REVENUECAT_BILLING_MODE=live NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY=rcb_headerfixture pnpm build && pnpm test:headers:built",
+    "test:headers": "NEXT_PUBLIC_SUPABASE_URL=https://header-fixture.supabase.co pnpm build && pnpm test:headers:built",
     "test:headers:built": "node --test tests/security-headers.integration.test.mjs",
     "test:service-worker": "vitest run tests/service-worker.test.ts",
     "check:seed": "node scripts/build-supabase-seed.mjs && git diff --exit-code -- supabase/seed.sql supabase/seed-manifest.json",
@@ -26,7 +26,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@revenuecat/purchases-js": "^1.47.1",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.0",
     "framer-motion": "^12.42.2",
@@ -34,6 +33,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "sharp": "^0.35.3",
+    "stripe": "22.3.2",
     "web-push": "3.6.7",
     "zustand": "^5.0.14"
   },

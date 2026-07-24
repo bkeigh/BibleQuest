@@ -25,16 +25,22 @@ template in [`../.env.example`](../.env.example).
 | `BIBLEQUEST_MONITOR_EXPECTED_SHA` | Monitor gate | Non-secret 40-character deployed commit, stored as a repository variable after each approved release. |
 | `BIBLEQUEST_MONITOR_EXPECTED_AUTH_POSTURE` | Monitor gate | Expected bounded health posture; production default is `configured`. |
 | `BIBLEQUEST_MONITOR_EXPECTED_BILLING_MODE` | Monitor gate | Expected bounded billing posture; remains `coming-soon` until approved live billing. |
+| `BIBLEQUEST_MONITOR_EXPECTED_BILLING_PURCHASES_ENABLED` | Monitor gate | Expected public purchase-UI posture; remains `false` until an approved live rollout. |
 | `BIBLEQUEST_MONITOR_VERCEL_PROJECT_ID` | Optional monitor secret | Vercel project identifier for aggregate runtime 5xx inspection. |
 | `BIBLEQUEST_MONITOR_VERCEL_TEAM_ID` | Optional monitor secret | Matching Vercel team identifier. All three Vercel monitor values must be present together. |
 | `BIBLEQUEST_MONITOR_VERCEL_TOKEN` | Optional monitor secret | Narrow, expiring Vercel access token. Log messages and response bodies are never archived. |
 | `NEXT_PUBLIC_ANALYTICS_ENABLED` | Optional | Must be exactly `true`; otherwise analytics is a silent no-op. |
 | `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | Optional | Plausible site domain. Required when analytics is enabled. |
 | `NEXT_PUBLIC_PLAUSIBLE_HOST` | Optional | HTTPS Plausible API origin; defaults to `https://plausible.io`. Paths, credentials, query strings, hashes, and HTTP are rejected. |
-| `NEXT_PUBLIC_REVENUECAT_BILLING_MODE` | Recommended | `coming-soon` (default/off), `sandbox` (Test Store), or `live` (real billing after release gates). |
-| `NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY` | Optional | RevenueCat public key — Test Store (`test_…`) in dev, Web Billing (`rcb_…`) in prod. |
-| `NEXT_PUBLIC_REVENUECAT_PLUS_ENTITLEMENT` | Optional | Only if the entitlement is renamed in the RevenueCat dashboard. |
-| `STRIPE_DONATION_URL` | Optional | **Server-only.** Exact `https://buy.stripe.com/...` Payment Link used for one-time support through the validated same-origin redirect. |
+| `STRIPE_BILLING_MODE` | Billing gate | `coming-soon` (default/off), `test`, or `live`. Production stays `coming-soon` until explicit approval. |
+| `BIBLEQUEST_STRIPE_PURCHASES_ENABLED` | Purchase gate | Must be exactly `true` in addition to a complete test/live configuration before subscription Checkout appears. |
+| `STRIPE_LIVE_BILLING_APPROVED` | Live gate | Must be exactly `true` before a matching live key set is accepted. This is not a substitute for owner approval and evidence. |
+| `STRIPE_SECRET_KEY` | Billing secret | **Server-only.** Matching `sk_test_…` or `sk_live_…` key. |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Billing gate | Matching `pk_test_…` or `pk_live_…` key. It is non-secret but must never be substituted for the secret key. |
+| `STRIPE_WEBHOOK_SECRET` | Billing secret | **Server-only.** Signing secret for the exact Checkout/Billing webhook endpoint. |
+| `STRIPE_PLUS_MONTHLY_PRICE_ID` | Billing gate | Server-allowlisted active recurring monthly Price for the Plus product. |
+| `STRIPE_PLUS_ANNUAL_PRICE_ID` | Billing gate | Server-allowlisted active recurring annual Price for the same Plus product and currency. |
+| `STRIPE_DONATION_URL` | Legacy rollback only | **Server-only.** Old one-time Payment Link fallback. Normal support uses server-created Checkout after migration `0026`. |
 | `API_BIBLE_API_KEY` | Optional | **Server-only.** Enables the licensed API.Bible adapter. Not needed for reviewed Free Use Bible API editions. |
 | `API_BIBLE_COMMERCIALLY_LICENSED_BIBLE_IDS` | Optional | Comma-separated API.Bible IDs explicitly licensed for BibleQuest's commercial use. Catalogue visibility alone is not permission. |
 
@@ -55,14 +61,14 @@ template in [`../.env.example`](../.env.example).
   `RESEND_API_KEY` to Vercel or `.env.local` for SMTP. Lifecycle email, external
   AI, and third-party error reporting get environment variables only when a
   reviewed runtime integration exists.
-- A RevenueCat key alone never activates billing. The mode must match its
-  documented public-key type; unknown modes, secret keys, and mismatches fail
-  closed. Keep Vercel production on `coming-soon` until every gate in
-  [`REVENUECAT.md`](REVENUECAT.md) passes.
-- `STRIPE_DONATION_URL` is independent of RevenueCat/Plus. Keep it server-only
-  and use one exact HTTPS Stripe Payment Link with no credentials, query, or
-  fragment. The app rejects every other host/shape, shows an unavailable state
-  when invalid, and never sends a visitor through an unvalidated redirect.
+- A Stripe key alone never activates billing. Mode/key mismatches, incomplete
+  values, duplicate Prices, malformed origins, and unapproved live mode fail
+  closed. Subscription Checkout additionally requires the purchase gate.
+  Follow [`STRIPE_TEST_BILLING.md`](STRIPE_TEST_BILLING.md); keep Vercel
+  Production `coming-soon` until its live checklist is explicitly approved.
+- Stripe secrets belong only in ignored `.env.local` files and encrypted Vercel
+  settings. Use the Stripe CLI environment directly for local webhook tests;
+  never copy a secret into evidence, logs, source, an issue, or chat.
 - Push endpoints and browser keys are encrypted before database storage.
   Generate VAPID, endpoint-encryption, and scheduler secrets outside chat; put
   them only in encrypted environment stores. During rotation, retain old keys

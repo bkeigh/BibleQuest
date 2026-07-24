@@ -1,5 +1,5 @@
 import observability from "../../../config/observability.json";
-import { parseRevenueCatConfiguration } from "@/lib/revenuecat/config";
+import { stripeBillingAvailability } from "@/lib/billing/config";
 import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 
 const SHA = /^[a-f0-9]{40}$/i;
@@ -20,7 +20,8 @@ export interface ReleaseHealth {
   schema_contract: string;
   content_contract: string;
   service_worker_version: string;
-  billing_mode: "coming-soon" | "sandbox" | "live" | "invalid";
+  billing_mode: "coming-soon" | "test" | "live" | "invalid";
+  billing_purchases_enabled: boolean;
 }
 
 type PublicEnvironment = Record<string, string | undefined>;
@@ -54,17 +55,21 @@ function analyticsPosture(env: PublicEnvironment): AnalyticsPosture {
   return "configured";
 }
 
-/** Collapses the RevenueCat parser to the only billing states safe for health. */
-function billingMode(env: PublicEnvironment): ReleaseHealth["billing_mode"] {
-  const billing = parseRevenueCatConfiguration(
-    env.NEXT_PUBLIC_REVENUECAT_BILLING_MODE,
-    env.NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY,
-  );
-  return billing.status === "coming-soon" ||
-    billing.status === "sandbox" ||
-    billing.status === "live"
-    ? billing.status
-    : "invalid";
+/** Collapses full Stripe configuration to bounded mode and purchase posture. */
+function billingPosture(env: PublicEnvironment): {
+  mode: ReleaseHealth["billing_mode"];
+  purchasesEnabled: boolean;
+} {
+  const billing = stripeBillingAvailability(env);
+  return billing.status === "configured"
+    ? {
+        mode: billing.mode,
+        purchasesEnabled: billing.purchasesEnabled,
+      }
+    : {
+        mode: billing.status === "coming-soon" ? "coming-soon" : "invalid",
+        purchasesEnabled: false,
+      };
 }
 
 /** Builds a content-free release identity for external health evidence. */
@@ -72,6 +77,7 @@ export function buildReleaseHealth(
   env: PublicEnvironment = process.env,
   accountSyncContained = ACCOUNT_SYNC_CONTAINED,
 ): ReleaseHealth {
+  const billing = billingPosture(env);
   return {
     status: "ok",
     app: "biblequest",
@@ -86,6 +92,7 @@ export function buildReleaseHealth(
     schema_contract: observability.schemaContract,
     content_contract: observability.contentContract,
     service_worker_version: observability.serviceWorkerVersion,
-    billing_mode: billingMode(env),
+    billing_mode: billing.mode,
+    billing_purchases_enabled: billing.purchasesEnabled,
   };
 }

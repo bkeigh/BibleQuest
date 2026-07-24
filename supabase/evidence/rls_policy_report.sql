@@ -37,7 +37,11 @@ with expected (table_name, classification) as (
     ('push_reminder_preferences', 'server-managed user-owned'),
     ('push_subscriptions', 'server-managed user-owned'),
     ('push_deliveries', 'server-managed user-owned'),
-    ('push_test_claims', 'server-owned')
+    ('push_test_claims', 'server-owned'),
+    ('stripe_customers', 'server-owned financial'),
+    ('stripe_webhook_events', 'server-owned financial'),
+    ('stripe_action_claims', 'server-owned'),
+    ('stripe_billing_signals', 'server-owned financial')
 )
 select
   expected.table_name,
@@ -153,6 +157,10 @@ where namespace.nspname = 'public'
     'claim_push_test',
     'purge_stale_push_records',
     'push_reminder_contract',
+    'claim_stripe_webhook_event',
+    'complete_stripe_webhook_event',
+    'claim_stripe_action',
+    'stripe_billing_contract',
     'assert_user_sync_context',
     'enforce_user_sync_generation',
     'advance_account_sync_revision',
@@ -298,6 +306,7 @@ select public.account_sync_contract() as account_sync_contract;
 select public.account_deletion_contract() as account_deletion_contract;
 select public.profile_avatar_contract() as profile_avatar_contract;
 select public.push_reminder_contract() as push_reminder_contract;
+select public.stripe_billing_contract() as stripe_billing_contract;
 
 -- 9. Unbound security-definer entry points remain absent after 0019.
 select

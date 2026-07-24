@@ -299,7 +299,7 @@ describe("privacy-safe observability contract", () => {
       VERCEL_GIT_COMMIT_SHA: "a".repeat(40),
       BIBLEQUEST_ROLLBACK_SHA: "b".repeat(40),
       NEXT_PUBLIC_APP_URL: observability.canonicalOrigin,
-      NEXT_PUBLIC_REVENUECAT_BILLING_MODE: "coming-soon",
+      STRIPE_BILLING_MODE: "coming-soon",
       NEXT_PUBLIC_SUPABASE_URL: "https://project.supabase.co",
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "publishable-fixture",
       NEXT_PUBLIC_ANALYTICS_ENABLED: "true",
@@ -315,12 +315,31 @@ describe("privacy-safe observability contract", () => {
       schema_contract: "0022",
       service_worker_version: "biblequest-v21",
       billing_mode: "coming-soon",
+      billing_purchases_enabled: false,
     });
 
     // The public contract must report the effective guest-only latch even
     // when provider credentials remain available to the deployment.
     expect(buildReleaseHealth(configuredEnvironment).auth_posture).toBe(
       "guest-only",
+    );
+
+    const testBilling = buildReleaseHealth({
+      NEXT_PUBLIC_APP_URL: observability.canonicalOrigin,
+      STRIPE_BILLING_MODE: "test",
+      STRIPE_SECRET_KEY: `sk_test_${"a".repeat(24)}`,
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: `pk_test_${"b".repeat(24)}`,
+      STRIPE_WEBHOOK_SECRET: `whsec_${"c".repeat(24)}`,
+      STRIPE_PLUS_MONTHLY_PRICE_ID: "price_TestMonthly123",
+      STRIPE_PLUS_ANNUAL_PRICE_ID: "price_TestAnnual123",
+      BIBLEQUEST_STRIPE_PURCHASES_ENABLED: "true",
+    });
+    expect(testBilling).toMatchObject({
+      billing_mode: "test",
+      billing_purchases_enabled: true,
+    });
+    expect(JSON.stringify(testBilling)).not.toMatch(
+      /sk_test_|pk_test_|whsec_|price_/,
     );
 
     const hostile = buildReleaseHealth({
@@ -330,7 +349,7 @@ describe("privacy-safe observability contract", () => {
       NEXT_PUBLIC_SUPABASE_URL: PRIVATE_MARKERS[8],
       NEXT_PUBLIC_ANALYTICS_ENABLED: "true",
       NEXT_PUBLIC_PLAUSIBLE_DOMAIN: PRIVATE_MARKERS[4],
-      NEXT_PUBLIC_REVENUECAT_BILLING_MODE: PRIVATE_MARKERS[5],
+      STRIPE_BILLING_MODE: PRIVATE_MARKERS[5],
     });
     const serialized = JSON.stringify(hostile);
     expect(hostile.release_sha).toBeNull();

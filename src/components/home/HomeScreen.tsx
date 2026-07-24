@@ -46,7 +46,7 @@ import {
 } from "@/components/design-system/icons";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { seedQuests, questBySlug } from "@/data/seed/quests";
-import { usePlus } from "@/lib/revenuecat/usePlus";
+import { usePlus } from "@/lib/billing/usePlus";
 import { ExplorePlusLink } from "@/components/plus/ExplorePlusLink";
 import { homeQuestSummary } from "@/lib/questos/home-quest-summary";
 import { buildHomeQuestGroups } from "@/lib/questos/home-quest-groups";

@@ -1,7 +1,7 @@
 import { PlusContent } from "@/components/plus/PlusContent";
 import { Eyebrow } from "@/components/design-system/EditorialSection";
 import { GentleLink } from "@/components/design-system/GentleButton";
-import { PlusProvider } from "@/lib/revenuecat/usePlus";
+import { PlusProvider } from "@/lib/billing/usePlus";
 import { marketingMetadata } from "@/lib/metadata";
 
 export const metadata = marketingMetadata({

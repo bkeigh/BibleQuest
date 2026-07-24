@@ -8,7 +8,7 @@ sign-off in that runbook; an unchecked item is not a pass.
 
 ```bash
 pnpm test                # all Vitest risk tests; noninteractive and exits
-pnpm test:headers        # representative live-billing build + next start/dev header tests
+pnpm test:headers        # production build + next start/dev header tests
 pnpm test:headers:built  # rerun after that representative production build
 pnpm test:service-worker # cache policy, lifecycle, and offline fallback
 pnpm test:observability  # privacy allowlist, redaction, queue, and thresholds
@@ -42,16 +42,16 @@ The automated suite targets launch-critical behavior rather than UI snapshots:
   deterministically rejects private fields, safely queues offline categories,
   aggregates Vercel-shaped rows without identifiers/URLs, and applies the
   checked-in launch thresholds.
-- RevenueCat tests cover entitlement mapping, deny-by-default activation,
-  current-offering/paywall readiness, cancellation/failure containment,
-  anonymous persistence, guest → account identification, sign-out isolation,
-  account switching, and repeated configuration.
+- Direct Stripe tests cover deny-by-default/mode configuration, server-selected
+  Prices, current-object entitlement projection, Checkout/Portal origins,
+  signed replay-safe webhook boundaries, failure categories, account
+  isolation, and legally retained deletion posture.
 - The service worker default-denies sensitive/query-bearing navigations,
   validates responses before caching, and removes only BibleQuest-owned stale
   caches.
 - Live production and development responses preserve the exact Winterhill
   ancestor list, omit conflicting `X-Frame-Options`, scope HSTS/`unsafe-eval`
-  correctly, and retain the evidenced RevenueCat/Stripe CSP origins.
+  correctly, and keep hosted Stripe navigation out of the document CSP.
 
 Tests use deterministic time, UUID, and storage replacements and restore
 modified globals after every case. Fixtures are deliberately fake and tests
@@ -72,8 +72,8 @@ the evidence.
 | Supabase sign-in and sync (enabled track) | On a clean browser profile, sign in through each enabled method, create one non-sensitive test record, reload, and confirm the same account receives the synced record. | Auth calls reach only the configured Supabase project over HTTPS; the session survives; sync completes; no CSP errors or cross-account data appears. Guest-only records this active behavior `OUT OF SCOPE — APPROVED GUEST-ONLY`, not `PASS`. | Supabase owner |
 | Email sign-in + callback (enabled track) | Request an email for Gmail and iCloud addresses that are not Supabase organization members. Confirm the UI says the email was requested (not delivered), shows the target address, holds resend for 60 seconds, and keeps Google available. In a fresh installed PWA, enter the code without opening the email link; separately open a fresh link in a browser and observe `/auth/callback` through the first-quest hand-off. | Both messages have matching Supabase and SMTP-provider delivery events; the PWA code creates and retains its session inside standalone mode after a full close/reopen; callback stays on the BibleQuest origin, is `private, no-store`, and expired/used/browser-mismatch credentials show a bounded recovery reason with no raw token or provider text. Guest-only records provider delivery/round trips out of scope and runs the containment matrix below. | Supabase owner |
 | PWA | Fresh-install from the immutable candidate URL. Separately, use the approved controlled non-production alias to load compatible old and candidate staging-built artifacts that both use the confirmed staging Supabase pair and safe billing posture; abort on Production values. Remap the same origin for update/rollback rehearsal. Inspect `/sw.js`, Cache Storage, online/offline/reconnect, and record both deployment IDs plus alias changes. | Fresh install/launch works; only documented shell/build assets are cached; forbidden/private routes are absent; same-origin worker update, streaming navigation, and compatible rollback remain functional without Production backend traffic. | Repository owner |
-| RevenueCat sandbox paywall | Use the Test Store public key and a published sandbox paywall; open Plus, exercise paywall/package fallback, close/reopen, and complete a simulated purchase. | Offerings, branding image/font/media, entitlement refresh, and management action work without CSP errors; no Stripe request occurs for Test Store. | Billing owner |
-| Stripe 3DS | Use RevenueCat Web Billing in Stripe test mode with an official 3DS challenge test payment method; complete and cancel separate challenges while watching frames and requests. | Stripe.js loads from its allowed JS origin, API calls use `api.stripe.com`, 3DS renders through allowed Stripe/hooks frames, success updates entitlement, cancel returns safely, and no CSP source was broadened ad hoc. | Billing owner |
+| Direct Stripe Checkout | Use the test-only purchase gate and both configured recurring Prices; complete monthly/annual Checkout and cancel a separate session. | Displayed amounts come from Stripe; the server selects the Price; cancel grants nothing; success grants only after the signed webhook/current-object projection. | Billing owner |
+| Stripe 3DS | Use hosted Stripe Checkout in test mode with an official 3DS challenge test payment method; complete and cancel separate challenges. | Stripe owns the hosted challenge origin; success reconciles current Subscription state; cancellation grants nothing; BibleQuest CSP gains no Stripe subresource origin. | Billing owner |
 
 ## Manual — guest-only containment
 
@@ -190,34 +190,29 @@ remains separate from signed journey-restore and CAS evidence.
       export downloads JSON; clear-data returns to onboarding.
 - [ ] Plus: free promise shown first; nothing spiritual is gated.
 
-## Manual — RevenueCat (sandbox only)
+## Manual — direct Stripe (test only)
 
-Keep Vercel production in `coming-soon`. Use only an ignored local Test Store
-public key and `NEXT_PUBLIC_REVENUECAT_BILLING_MODE=sandbox`; never print the
-key or connect/create/change live billing state. Complete the detailed
-dashboard gates in [`REVENUECAT.md`](REVENUECAT.md) first.
+Keep Vercel Production `coming-soon` with purchases disabled. Use only ignored
+local or encrypted preview test credentials; never print them or create/change
+live billing state. Complete the full evidence matrix in
+[`STRIPE_TEST_BILLING.md`](STRIPE_TEST_BILLING.md).
 
-- [ ] Coming-soon/no-key: pricing and `/app/plus` render calm coming-soon copy,
-      no RevenueCat request, and no purchase control.
-- [ ] Invalid/mismatched mode and key: no SDK call and no purchase control.
-- [ ] Missing current offering, empty current offering, or unpublished paywall:
-      no direct package buttons and no purchase control.
-- [ ] Complete Test Store current offering + published paywall: exactly one
-      paywall CTA is shown; displayed products/prices come from RevenueCat.
-- [ ] Simulated cancellation: neutral “no changes” copy, no entitlement, retry
-      remains available.
-- [ ] Simulated failure: generic error only, no raw SDK/customer/purchase data,
-      no entitlement, retry remains available.
-- [ ] Simulated success: Plus activates immediately, then remains active after
-      close, reload, focus return, `pageshow`, visibility return, and reconnect.
-- [ ] Guest success → sign in: Plus follows the account. Sign out: the fresh
-      guest is free. Account A → B: A's Plus never appears or flashes for B.
-- [ ] Active Plus with a management URL opens it in a new isolated tab and
-      refreshes on return. With no URL, access remains active and an explicit
-      refresh action replaces the disabled management control.
-- [ ] Analytics/network inspection contains no App User ID, anonymous ID,
-      CustomerInfo identifier, transaction/purchase identifier, operation
-      session ID, management URL, or redemption data.
+- [ ] Coming-soon/no-key: pricing and `/app/plus` show calm coming-soon copy and
+      no purchase control.
+- [ ] Invalid, incomplete, mismatched-mode, or duplicate-Price configuration
+      fails closed and health reports `invalid` without exposing a value.
+- [ ] Test mode with purchase gate off shows no checkout control.
+- [ ] Monthly and annual controls display Stripe-authored amounts for the same
+      Product/currency and open only exact hosted Checkout.
+- [ ] Checkout cancellation and return query manipulation grant nothing.
+- [ ] Success, 3DS, initial failure, renewal failure/recovery, cancel-at-period,
+      Portal, refund, and dispute states match the server projection.
+- [ ] Duplicate and out-of-order webhook delivery cannot replay an entitlement.
+- [ ] Reload, focus, `pageshow`, visibility return, reconnect, and explicit
+      refresh restore current server state.
+- [ ] Sign out and Account A → B never show A’s status or management control.
+- [ ] Analytics/network/evidence contains no Customer, Subscription, Price,
+      Session, invoice, payment method, card, email, or webhook payload data.
 
 ## Manual — PWA & platform
 

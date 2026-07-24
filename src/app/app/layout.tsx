@@ -5,7 +5,7 @@ import { ThemeApplier } from "@/components/app-shell/ThemeApplier";
 import { MotionProvider } from "@/components/app-shell/MotionProvider";
 import { SyncManager } from "@/components/app-shell/SyncManager";
 import { AvatarSyncManager } from "@/components/app-shell/AvatarSyncManager";
-import { PlusProvider } from "@/lib/revenuecat/usePlus";
+import { PlusProvider } from "@/lib/billing/usePlus";
 import { PRIVATE_APP_METADATA } from "@/lib/metadata";
 
 export const metadata = PRIVATE_APP_METADATA;

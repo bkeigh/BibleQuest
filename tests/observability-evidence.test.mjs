@@ -471,6 +471,7 @@ describe("sanitized launch evidence", () => {
   it("requires an explicit verified gate for live billing", () => {
     const live = fixtureReadiness();
     live.external_health.release.billing_mode = "live";
+    live.external_health.release.billing_purchases_enabled = true;
     const aggregate = aggregateClientSignals(fixtureSignals());
     const held = buildLaunchEvidence(live, aggregate, "preflight", "fixture");
     expect(held.decision).toBe("HOLD");
@@ -487,6 +488,7 @@ describe("sanitized launch evidence", () => {
     );
     expect(verified.decision).toBe("REVIEW");
     expect(verified.live_billing_gate_verified).toBe(true);
+    expect(verified.billing_purchases_enabled).toBe(true);
   });
 
   it("supports an explicit preview fixture without changing the default", () => {

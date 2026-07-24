@@ -38,7 +38,7 @@ import {
   translationMetadata,
   translationPreferenceLabel,
 } from "@/lib/bible/translations";
-import { usePlus } from "@/lib/revenuecat/usePlus";
+import { usePlus } from "@/lib/billing/usePlus";
 import { useSession } from "@/lib/supabase/useSession";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 

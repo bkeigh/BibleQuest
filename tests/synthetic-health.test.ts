@@ -29,6 +29,7 @@ function health(overrides = {}) {
     content_contract: "seed-manifest-v1",
     service_worker_version: "biblequest-v21",
     billing_mode: "coming-soon",
+    billing_purchases_enabled: false,
     ...overrides,
   };
 }
