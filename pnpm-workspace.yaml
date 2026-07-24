@@ -5,6 +5,7 @@ allowBuilds:
   unrs-resolver: true
 verifyDepsBeforeRun: false
 overrides:
-  postcss: 8.5.16
+  # Pin the patched source-map path validation release.
+  postcss: 8.5.18
   # Keep Next's optional image runtime on the audited libvips build.
   next>sharp: 0.35.3

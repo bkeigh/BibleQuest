@@ -6,8 +6,15 @@ import type { QuestOSSnapshot } from "./types";
  * exported journey file.
  */
 export function createExportSnapshot(source: QuestOSSnapshot): QuestOSSnapshot {
+  // The marker is meaningful only beside this browser's IndexedDB image.
+  // Omitting it prevents a restore on another device from claiming a missing
+  // or unrelated local photo.
+  const profile = source.profile
+    ? { ...source.profile, avatarUpdatedAt: undefined }
+    : null;
+
   return {
-    profile: source.profile,
+    profile,
     settings: source.settings,
     assignments: source.assignments,
     myQuests: source.myQuests,

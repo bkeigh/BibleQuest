@@ -29,7 +29,9 @@ describe("journey import and export", () => {
   });
 
   it("round-trips the current snapshot including My Quests lifecycle and steps", () => {
-    const exported = createExportSnapshot(currentSnapshot());
+    const source = currentSnapshot();
+    source.profile!.avatarUpdatedAt = "2026-07-24T12:00:00.000Z";
+    const exported = createExportSnapshot(source);
     const result = parseSnapshot(JSON.stringify(exported));
 
     expect(result.ok).toBe(true);
@@ -41,6 +43,7 @@ describe("journey import and export", () => {
     ]);
     expect(result.data.myQuests?.["fixture-walk"]?.timesCompleted).toBe(2);
     expect(result.data.accountNudge?.shownContexts).toEqual(["onboarding"]);
+    expect(exported.profile?.avatarUpdatedAt).toBeUndefined();
     const { analyticsConsent, ...settingsWithoutConsent } = exported.settings;
     expect(analyticsConsent).toBe(false);
     expect(result.data).toEqual({
