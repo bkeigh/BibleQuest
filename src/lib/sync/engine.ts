@@ -1462,8 +1462,12 @@ async function reconcileRevisionedMutableSnapshot(
     }),
   );
 
+  const reconciledProfile = profiles[0]
+    ? rowToProfile(profiles[0].row as never)
+    : null;
+
   return {
-    profile: profiles[0] ? rowToProfile(profiles[0].row as never) : null,
+    profile: preserveDeviceAvatarMarker(reconciledProfile, local.profile),
     settings: mergedSettings,
     myQuests,
     prayers: prayers.map((result) => rowToPrayer(result.row as never)),
@@ -1534,6 +1538,20 @@ function unionById<T extends { id: string }>(
   return [...byId.values()];
 }
 
+/** Reattaches the on-device avatar marker after account rows are decoded. */
+function preserveDeviceAvatarMarker(
+  accountProfile: QuestOSSnapshot["profile"],
+  deviceProfile: QuestOSSnapshot["profile"],
+): QuestOSSnapshot["profile"] {
+  if (!accountProfile || !deviceProfile?.avatarUpdatedAt) {
+    return accountProfile;
+  }
+  return {
+    ...accountProfile,
+    avatarUpdatedAt: deviceProfile.avatarUpdatedAt,
+  };
+}
+
 export function mergeSnapshots(
   local: QuestOSSnapshot,
   remote: RemoteData
@@ -1549,6 +1567,7 @@ export function mergeSnapshots(
   } else if (localOnboarded && !remoteOnboarded && local.profile) {
     profile = local.profile;
   }
+  profile = preserveDeviceAvatarMarker(profile, local.profile);
   // Accessibility comfort and wallpaper choices are device-local (no remote
   // columns); a phone and desktop can keep different motion/art treatments.
   const remoteSettings = remote.settings;

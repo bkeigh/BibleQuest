@@ -1,18 +1,22 @@
 "use client";
 
 /**
- * Install guidance. On Android/desktop it uses the native
- * beforeinstallprompt; on iOS Safari (which has no such event) it shows
- * Add-to-Home-Screen instructions after a short delay. Never nags:
- * dismissed once, gone.
+ * Install guidance. Uses the native install prompt when available and gives
+ * platform-specific manual steps everywhere else after a short delay.
  */
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { GentleButton } from "@/components/design-system/GentleButton";
-import { IconClose, IconShare } from "@/components/design-system/icons";
+import { IconClose } from "@/components/design-system/icons";
 import { gentleEase } from "@/lib/motion";
 import { track } from "@/lib/analytics/events";
+import {
+  detectInstallPlatform,
+  installDirections,
+  installDismissalIsActive,
+  type InstallPlatform,
+} from "@/lib/pwa/install-guidance";
 
 interface BIPEvent extends Event {
   prompt: () => Promise<void>;
@@ -26,7 +30,9 @@ const DISMISS_KEY = "biblequest:install-dismissed";
  *  rather than crashing the shell. */
 function isDismissed(): boolean {
   try {
-    return Boolean(window.localStorage.getItem(DISMISS_KEY));
+    return installDismissalIsActive(
+      window.localStorage.getItem(DISMISS_KEY),
+    );
   } catch {
     return false;
   }
@@ -35,13 +41,18 @@ function isDismissed(): boolean {
 export function InstallPrompt() {
   const [show, setShow] = useState(false);
   const [deferred, setDeferred] = useState<BIPEvent | null>(null);
-  const [isIOS, setIsIOS] = useState(false);
+  const [platform] = useState<InstallPlatform>(() =>
+    typeof navigator === "undefined"
+      ? "other"
+      : detectInstallPlatform(navigator),
+  );
   // This component lives in the persistent /app layout and never unmounts on
   // soft navigation. Chrome, however, re-dispatches `beforeinstallprompt` on
   // later navigations while the app is still uninstalled — so the mount-time
   // localStorage guard alone can't keep a dismissed prompt down. This ref is
   // the in-session latch the re-fire path checks, so "Not now" actually sticks.
   const dismissedRef = useRef(false);
+  const shownRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -53,39 +64,30 @@ export function InstallPrompt() {
       (window.navigator as unknown as { standalone?: boolean }).standalone;
     if (standalone) return;
 
-    const ua = window.navigator.userAgent;
-    // iPadOS 13+ masquerades as "Macintosh"; a touch-capable Mac UA is really
-    // an iPad, which also needs the Add-to-Home-Screen hint (no BIP event).
-    const iPadOS =
-      /Macintosh/.test(ua) && (window.navigator.maxTouchPoints ?? 0) > 1;
-    const ios =
-      (/iphone|ipad|ipod/i.test(ua) || iPadOS) && !/crios|fxios/i.test(ua);
+    // Reveals at most once per mount so fallback and native events cannot
+    // double-count the same prompt impression.
+    const reveal = () => {
+      if (shownRef.current || dismissedRef.current || isDismissed()) return;
+      shownRef.current = true;
+      setShow(true);
+      track("pwa_install_prompt_viewed");
+    };
 
     const onBIP = (e: Event) => {
       e.preventDefault();
       setDeferred(e as BIPEvent);
-      // Re-check on every dispatch — the user may already have dismissed, and
-      // the browser fires this again on later navigations.
-      if (dismissedRef.current || isDismissed()) return;
-      setShow(true);
-      track("pwa_install_prompt_viewed");
+      reveal();
     };
     window.addEventListener("beforeinstallprompt", onBIP);
 
-    // iOS gets a delayed hint (no install event to wait for).
-    let iosTimer: ReturnType<typeof setTimeout> | undefined;
-    if (ios) {
-      iosTimer = setTimeout(() => {
-        if (dismissedRef.current || isDismissed()) return;
-        setIsIOS(true);
-        setShow(true);
-        track("pwa_install_prompt_viewed");
-      }, 12000);
-    }
+    // Every browser gets useful manual steps if no native event arrives.
+    const fallbackTimer = setTimeout(() => {
+      reveal();
+    }, 12000);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onBIP);
-      if (iosTimer) clearTimeout(iosTimer);
+      clearTimeout(fallbackTimer);
     };
   }, []);
 
@@ -93,18 +95,26 @@ export function InstallPrompt() {
     dismissedRef.current = true;
     setShow(false);
     try {
-      localStorage.setItem(DISMISS_KEY, "1");
+      localStorage.setItem(DISMISS_KEY, String(Date.now()));
     } catch {}
   }
 
   async function install() {
     if (!deferred) return;
-    await deferred.prompt();
-    const { outcome } = await deferred.userChoice;
-    track(
-      outcome === "accepted" ? "pwa_install_accepted" : "pwa_install_dismissed"
-    );
-    dismiss();
+    try {
+      await deferred.prompt();
+      const { outcome } = await deferred.userChoice;
+      track(
+        outcome === "accepted"
+          ? "pwa_install_accepted"
+          : "pwa_install_dismissed",
+      );
+      setDeferred(null);
+      dismiss();
+    } catch {
+      // A consumed or browser-cancelled event should fall back to directions.
+      setDeferred(null);
+    }
   }
 
   return (
@@ -123,19 +133,18 @@ export function InstallPrompt() {
               <p className="text-[1rem] text-graphite">
                 Use BibleQuest like an app
               </p>
-              {isIOS ? (
-                <p className="mt-1 text-[0.875rem] leading-relaxed text-ash">
-                  Tap <IconShare size={15} className="inline align-text-bottom" />{" "}
-                  Share, then <span className="text-charcoal">Add to Home Screen</span>.
-                  It opens full screen, one tap away.
-                </p>
-              ) : (
+              {deferred ? (
                 <p className="mt-1 text-[0.875rem] leading-relaxed text-ash">
                   Add it to your home screen and it opens in one tap.
                 </p>
+              ) : (
+                <p className="mt-1 text-[0.875rem] leading-relaxed text-ash">
+                  {installDirections(platform)} It then opens full screen, one
+                  tap away.
+                </p>
               )}
               <div className="mt-3 flex flex-col items-stretch gap-2 min-[360px]:flex-row min-[360px]:items-center">
-                {!isIOS && (
+                {deferred && (
                   <GentleButton
                     variant="primary"
                     size="sm"
