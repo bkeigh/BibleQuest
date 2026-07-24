@@ -79,7 +79,8 @@ flowchart LR
 - `store.ts` owns all user mutations and local persistence. Prayer and
   reflection bodies must never be sent to analytics or logs.
 - `quest-engine.ts` filters and deterministically suggests quests.
-- `quest-feed.ts` groups the persistent quest shelf for display.
+- `home-quest-groups.ts` deduplicates rolling assignments and the persistent
+  shelf into Home's Active, Ready, and Completed drawers.
 - `journal.ts` derives the mixed, date-grouped Prayer Journal timeline and
   performs in-memory search/filtering without persisting a search index.
 - `journal-drafts.ts` keeps scoped, expiring unfinished prayer/reflection

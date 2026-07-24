@@ -292,7 +292,7 @@ change. Never move the production domain for a rehearsal.
 - [ ] Run a production build, open the app, and in DevTools → Application →
       Service Workers confirm `/sw.js` controls the page at scope `/`.
 - [ ] In Application → Cache Storage, confirm only the current
-      `biblequest-v15-shell` and `biblequest-v15-runtime` caches are BibleQuest
+      `biblequest-v20-shell` and `biblequest-v20-runtime` caches are BibleQuest
       owned; unrelated-origin cache names are not touched by activation.
 - [ ] Inspect every shell entry: only `/offline`, `/app`, `/onboarding`,
       `/manifest.webmanifest`, and the exact `/pixel/` catalogue from `sw.js`

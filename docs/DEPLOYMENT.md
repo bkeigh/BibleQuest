@@ -118,8 +118,9 @@ needed — just don't remove that config.
       the production dry run, and obtain explicit approval before the database
       push (if enabling sync).
 - [ ] Complete [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md): apply
-      migrations through `0015` (including the authoritative `0014` Journey
-      identity change) with the reviewed seed applied separately,
+      migrations through `0022` (including the authoritative `0014` Journey
+      identity, transactional CAS, account-boundary, and deletion changes)
+      with the reviewed seed applied separately,
       configure custom SMTP, and pass production readiness, daily-quest CAS,
       cached-client, and two-user isolation checks.
 - [ ] Require the anonymous `daily_quest_sync_contract` readiness response to

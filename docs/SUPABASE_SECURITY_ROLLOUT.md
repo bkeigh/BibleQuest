@@ -6,7 +6,8 @@ This runbook covers the forward-only reconciliation migration
 preference/bookmark migration `0011_bible_translation_preference.sql`, the KJV
 default migration `0012_kjv_bible_translation_default.sql`, immutable Journey
 identity `0014_journey_event_identity.sql`, and transactional daily-quest
-migration `0015_transactional_daily_quest_sync.sql`. It is
+migration `0015_transactional_daily_quest_sync.sql`, followed by the reviewed
+account-sync and deletion boundary `0016` through `0022`. It is
 deliberately local/staging-first. Do not run any linked or remote command until
 the project reference and exact command have been reviewed and explicitly
 approved.
@@ -33,6 +34,8 @@ The repository timeline is:
 | 2026-07-20 | KJV default pass | Adds `0012_kjv_bible_translation_default.sql`: new account settings default to the app's keyless KJV edition; existing choices are unchanged. |
 | 2026-07-21 | Journey identity release | Adds immutable `0014_journey_event_identity.sql` with SHA-256 `9497b745c5efc0c3f6c4c82e43e57c4fd9b34e8cfae12e6193226d564da50789`. |
 | 2026-07-21 | Daily-quest CAS pass | Re-versions the reviewed but untracked local `0013` work as `0015_transactional_daily_quest_sync.sql`: owner-RLS day revisions, authenticated atomic replacement, bounded duplicate-request protection, completed-state preservation, legacy-client revision tracking, and complete purge coverage. `0013` remains absent because no immutable linked history proved insertion below `0014` safe. |
+| 2026-07-23 | Account boundary hardening | Adds `0016`–`0019`: mutable-row guards, an enforced account boundary, identity/generation binding, and server-ordered revisions. |
+| 2026-07-23 | Resilient self-service deletion | Adds `0020`–`0022`: authenticated self-service deletion, generation-bound deletion, and resilient cleanup. |
 
 If a database recorded an old `0002`, `0003`, or `0004` before the renames,
 the later filenames do not change those recorded versions. Conversely, a
@@ -51,7 +54,7 @@ history rows.
 | Server-owned | `subscriptions` | Authenticated owner `SELECT` only. Inserts, updates, and deletes require trusted service-role/webhook code. |
 | Internal | None in `public`. Supabase-managed schemas are outside this migration. |
 
-RLS is enabled on all 28 tables. Private prayers, reflections, recent Scripture
+RLS is enabled on all 29 tables. Private prayers, reflections, recent Scripture
 history, notes, and
 journey data have no anonymous policy and every authenticated policy includes
 an `auth.uid()` owner condition.
@@ -90,9 +93,16 @@ Expected migration order:
 0012_kjv_bible_translation_default.sql
 0014_journey_event_identity.sql
 0015_transactional_daily_quest_sync.sql
+0016_mutable_account_sync_guards.sql
+0017_enforce_mutable_account_sync_boundary.sql
+0018_bind_account_sync_identity_and_generation.sql
+0019_server_ordered_account_sync_revisions.sql
+0020_self_service_account_deletion.sql
+0021_generation_bound_account_deletion.sql
+0022_resilient_account_deletion.sql
 ```
 
-Evidence must show 28 existing tables with `rowsecurity = true`, only the
+Evidence must show 29 existing tables with `rowsecurity = true`, only the
 documented policy names, no `anon` role on user/server-owned policies, and
 `purge_user_data` as `security_definer = true`, `search_path=""`, anonymous
 execute false, authenticated execute true. Table grants must also match the

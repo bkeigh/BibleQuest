@@ -38,7 +38,6 @@ export const ru: UIStrings = {
   },
   home: {
     todaysVerse: "Стих дня",
-    todaysQuests: "Задания на сегодня",
     yourGrowth: "Ваше возрастание",
     recently: "Недавнее",
     quickPrayer: "Краткая молитва",
@@ -85,6 +84,9 @@ export const ru: UIStrings = {
     addToToday: "Добавить на сегодня",
     begin: "Начать",
     completedToday: "Выполнено сегодня",
+    groupActive: "Активные",
+    groupReady: "Готовые",
+    groupCompleted: "Завершённые",
   },
   dayComplete: {
     title: "На сегодня всё.",

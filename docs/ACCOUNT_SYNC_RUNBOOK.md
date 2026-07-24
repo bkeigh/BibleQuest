@@ -306,8 +306,8 @@ sessions, and the browser sync engine stops before it creates a client. Keep the
 latch closed throughout schema, content, RLS, and isolation remediation and for
 the entire guest-only launch/watch window.
 
-This web release cannot stop JavaScript that is already running in an open v14
-tab or installed PWA window. The v19 worker evicts old BibleQuest caches after it
+This web release cannot stop JavaScript that is already running in an old open
+tab or installed PWA window. The v20 worker evicts old BibleQuest caches after it
 installs and activates, but it does not forcibly reload an already controlled
 page; that page can retain its old authenticated sync behavior until it reloads
 or closes. If the incident requires an immediate zero-write boundary, use a
@@ -319,12 +319,12 @@ Use this order:
 1. Freeze account rollout and deploy the immutable contained bundle before any
    production migration or content write.
 2. Verify the health endpoint reports the intended guest-only posture, the
-   active worker reports v19, account-action controls are absent (status-only
+   active worker reports v20, account-action controls are absent (status-only
    containment copy is allowed), callbacks do not
    exchange credentials, normal proxy requests do not refresh sessions, and
    the browser sync path does not create a Supabase client.
 3. Reload browser clients and fully close/relaunch installed PWAs twice. Record
-   any remaining v14 observation as residual exposure; do not declare the
+   any remaining older-worker observation as residual exposure; do not declare the
    incident contained solely because the deployment alias changed.
 4. With the latch still closed, apply and verify the approved migrations through
    `0022`, then seed content separately and complete the full RLS/grant,

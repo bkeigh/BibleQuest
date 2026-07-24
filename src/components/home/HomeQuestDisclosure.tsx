@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Keeps Today's Quests to one calm summary row until the person asks for the
- * full vertical list. Hash navigation from quest detail pages opens the row
- * and returns keyboard focus to its trigger.
+ * Holds the unified Home quest collection. The outer drawer starts open while
+ * nested status drawers keep the page compact. Both the current and legacy
+ * hashes open the collection and return keyboard focus to its trigger.
  */
 import { useEffect, useId, useRef, useState } from "react";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
@@ -35,7 +35,12 @@ export function HomeQuestDisclosure({
     // Quest detail actions return to this hash; opening before focus keeps the
     // destination useful for keyboard and assistive-technology users.
     function openFromHash() {
-      if (window.location.hash !== "#active-quests") return;
+      if (
+        window.location.hash !== "#quests" &&
+        window.location.hash !== "#active-quests"
+      ) {
+        return;
+      }
       setOpen(true);
       window.requestAnimationFrame(() => triggerRef.current?.focus());
     }
@@ -51,6 +56,8 @@ export function HomeQuestDisclosure({
       aria-labelledby={triggerId}
       className="scroll-mt-6 outline-none"
     >
+      {/* New links use #quests; the section ID preserves old saved links. */}
+      <span id="quests" className="block scroll-mt-6" />
       <h2>
         <button
           ref={triggerRef}

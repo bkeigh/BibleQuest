@@ -54,7 +54,6 @@ export interface UIStrings {
   };
   home: {
     todaysVerse: string;
-    todaysQuests: string;
     yourGrowth: string;
     recently: string;
     quickPrayer: string;
@@ -111,6 +110,9 @@ export interface UIStrings {
     addToToday: string;
     begin: string;
     completedToday: string;
+    groupActive: string;
+    groupReady: string;
+    groupCompleted: string;
   };
   dayComplete: {
     title: string;

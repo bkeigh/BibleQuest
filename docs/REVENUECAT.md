@@ -188,6 +188,10 @@ manual RevenueCat/payment-provider, legal/tax/support, staging, and Vercel gates
 above are complete. This implementation does not attach/publish a paywall,
 connect Stripe, create products, change prices, deploy, or alter Vercel.
 
+The founder-ready 7-day trial decisions, provider steps, approved benefit
+boundary, test matrix, and dedicated implementation prompt live in
+[`PLUS_7_DAY_TRIAL_HANDOFF.md`](PLUS_7_DAY_TRIAL_HANDOFF.md).
+
 ## Primary references
 
 - [RevenueCat Web SDK](https://www.revenuecat.com/docs/web/web-billing/web-sdk)

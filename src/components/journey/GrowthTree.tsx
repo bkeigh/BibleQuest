@@ -45,6 +45,8 @@ interface GrowthTreeProps {
   size?: number;
   className?: string;
   showGround?: boolean;
+  /** Render only the stage sprite for compact previews such as Home. */
+  treeOnly?: boolean;
 }
 
 export function GrowthTree({
@@ -52,6 +54,7 @@ export function GrowthTree({
   size = 220,
   className,
   showGround = true,
+  treeOnly = false,
 }: GrowthTreeProps) {
   // Stillness: honor both the OS query and the in-app "Reduce motion" setting.
   const osReduced = useReducedMotion();
@@ -78,9 +81,10 @@ export function GrowthTree({
       aria-label={`Your growth: ${state.stageLabel}`}
     >
       {/* Soft sunlight — grows with reflection. Candlelight, not a spotlight. */}
-      {state.byType.sunlight > 0 && (
+      {!treeOnly && state.byType.sunlight > 0 && (
         <div
           aria-hidden="true"
+          data-growth-accent="sunlight"
           className="pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-full blur-lg"
           style={{
             top: cell * 2,
@@ -96,9 +100,10 @@ export function GrowthTree({
       {/* Ground — the sprites carry their own soil, so this is just one soft
           shadow to seat the tree. Semantic surface so it stays subtle in
           Candle mode (raw olive-100 would glow near-white on a dark canvas). */}
-      {showGround && (
+      {!treeOnly && showGround && (
         <div
           aria-hidden="true"
+          data-growth-accent="ground"
           className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center"
         >
           <div
@@ -122,11 +127,12 @@ export function GrowthTree({
       </motion.div>
 
       {/* Flowers — gratitude rooted around the tree instead of floating in a row. */}
-      {Array.from({ length: flowerCount }, (_, i) => {
+      {!treeOnly && Array.from({ length: flowerCount }, (_, i) => {
         const slot = FLOWER_SLOTS[i];
         return (
           <motion.span
             key={`flower-${i}`}
+            data-growth-accent="flower"
             className="pointer-events-none absolute origin-bottom"
             style={{
               left: slot.left,
@@ -142,8 +148,9 @@ export function GrowthTree({
       })}
 
       {/* Fruit — service, set down right of the trunk. */}
-      {fruitCount > 0 && (
+      {!treeOnly && fruitCount > 0 && (
         <div
+          data-growth-accent="fruit"
           className="pointer-events-none absolute flex items-end"
           style={{ bottom: cell * 3, left: "50%", marginLeft: cell * 3, gap: cell }}
         >

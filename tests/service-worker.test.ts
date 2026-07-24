@@ -432,7 +432,7 @@ describe("service-worker fetch behavior", () => {
 });
 
 describe("service-worker lifecycle and upgrades", () => {
-  it("installs the v15 shell and production sprite catalogue, omitting uncacheable responses", async () => {
+  it("installs the v20 shell and production sprite catalogue, omitting uncacheable responses", async () => {
     const harness = loadWorker(async (fetchRequest) => {
       if (fetchRequest.url.endsWith("/onboarding")) {
         return makeResponse("private", {
@@ -471,7 +471,7 @@ describe("service-worker lifecycle and upgrades", () => {
     });
   });
 
-  it("deletes old and incompatible BibleQuest caches during v19 activation", async () => {
+  it("deletes old and incompatible BibleQuest caches during v20 activation", async () => {
     const harness = loadWorker();
     await harness.caches.open("biblequest-v6-shell");
     await harness.caches.open("biblequest-v6-runtime");

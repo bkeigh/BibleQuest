@@ -42,25 +42,35 @@ describe("launch content catalog", () => {
     expect(focusRule).not.toContain("transform:");
   });
 
-  it("keeps Home quests collapsed above one aligned vertical column", () => {
+  it("keeps one default-open Home quest collection with nested status drawers", () => {
     const home = readFileSync(
       path.join(process.cwd(), "src/components/home/HomeScreen.tsx"),
       "utf8",
     );
 
-    // Counts stay in the disclosure header without turning the expanded list into a rail.
+    // Counts stay in one outer summary while every status owns a compact drawer.
     expect(home).toContain("<HomeQuestDisclosure");
+    expect(home).toContain("title={t.nav.quests}");
     expect(home).toContain("summary={questSummary}");
-    expect(home).toContain(
-      "defaultOpen={pickCount === 0 && hiddenReservationCount === 0}",
-    );
-    expect(home).toContain('label: "Active quests"');
-    expect(home).toContain('label: "Completed"');
-    expect(home).toContain(
-      '<ul aria-label={group.label} className="space-y-3">',
-    );
+    expect(home).toContain("defaultOpen");
+    expect(home).toContain("label={t.quests.groupActive}");
+    expect(home).toContain("label={t.quests.groupReady}");
+    expect(home).toContain("label={t.quests.groupCompleted}");
+    expect(home).toContain("buildHomeQuestGroups");
+    expect(home).not.toContain("<QuestFeed");
     expect(home).not.toContain("Swipe sideways to review every open quest.");
     expect(home).not.toContain("useCompactQuestRail");
+  });
+
+  it("uses a larger tree-only Home growth preview", () => {
+    const home = readFileSync(
+      path.join(process.cwd(), "src/components/home/HomeScreen.tsx"),
+      "utf8",
+    );
+
+    expect(home).toContain("size={96}");
+    expect(home).toContain("treeOnly");
+    expect(home).not.toContain("size={76}");
   });
 
   it("uses the approved social preview tagline", () => {
@@ -71,6 +81,24 @@ describe("launch content catalog", () => {
 
     expect(iconBuilder).toContain("A daily guide to living in faith");
     expect(iconBuilder).not.toContain("A daily guide to living your faith");
+  });
+
+  it("keeps Plus copy aligned with shipped benefits and undecided pricing", () => {
+    const plusContent = readFileSync(
+      path.join(process.cwd(), "src/components/plus/PlusContent.tsx"),
+      "utf8",
+    );
+    const plusCta = readFileSync(
+      path.join(process.cwd(), "src/components/plus/PlusCta.tsx"),
+      "utf8",
+    );
+
+    expect(plusContent).toContain("Unlimited active quest windows");
+    expect(plusContent).toContain("Unlimited daily verse refreshes");
+    expect(plusContent).toContain("The full still and live wallpaper collection");
+    expect(plusContent).toContain("never read your journals");
+    expect(plusCta).toContain("The exact price and trial terms will");
+    expect(`${plusContent}\n${plusCta}`).not.toMatch(/\$8\.99|29¢|AI Study/i);
   });
 
   it("ships exactly 150 unique, reviewed free quests with useful depth", () => {

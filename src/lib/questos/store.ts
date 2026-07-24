@@ -1845,8 +1845,8 @@ export function selectStreak(s: QuestOSState): StreakState {
 }
 
 /**
- * The quest shelf. Stable reference — the stored map itself. Derive
- * ordering/sections with buildQuestFeed inside useMemo (never here).
+ * The quest shelf. Stable reference — the stored map itself. Derive Home
+ * grouping inside useMemo (never inside this selector).
  */
 export function selectMyQuests(s: QuestOSState): Record<string, MyQuest> {
   return s.myQuests;

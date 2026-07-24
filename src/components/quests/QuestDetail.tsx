@@ -178,7 +178,7 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
       toast("Quest started. Return whenever you’re ready.", {
         variant: "success",
       });
-      router.push("/app#active-quests");
+      router.push("/app#quests");
       return;
     }
     toast(
@@ -232,10 +232,10 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
     <PageContainer className="pt-safe">
       <div className="pt-6">
         <Link
-          href={inProgress ? "/app#active-quests" : "/app/quests"}
+          href={inProgress ? "/app#quests" : "/app/quests"}
           className="inline-flex items-center gap-1.5 text-[0.875rem] text-ash transition-colors hover:text-charcoal"
         >
-          <IconArrowLeft size={16} /> {inProgress ? "Active quests" : "Quests"}
+          <IconArrowLeft size={16} /> Quests
         </Link>
       </div>
 
@@ -419,7 +419,7 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
                   <GentleLink
                     variant="text"
                     size="sm"
-                    href="/app#active-quests"
+                    href="/app#quests"
                     className="flex"
                   >
                     Back to active quests

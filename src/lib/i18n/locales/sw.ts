@@ -38,7 +38,6 @@ export const sw: UIStrings = {
   },
   home: {
     todaysVerse: "Mstari wa leo",
-    todaysQuests: "Mazoezi ya leo",
     yourGrowth: "Ukuaji wako",
     recently: "Hivi karibuni",
     quickPrayer: "Ombi fupi",
@@ -85,6 +84,9 @@ export const sw: UIStrings = {
     addToToday: "Ongeza kwa leo",
     begin: "Anza",
     completedToday: "Limekamilika leo",
+    groupActive: "Yanayoendelea",
+    groupReady: "Tayari",
+    groupCompleted: "Yaliyokamilika",
   },
   dayComplete: {
     title: "Umemaliza yote ya leo.",

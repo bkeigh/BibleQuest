@@ -38,7 +38,6 @@ export const fil: UIStrings = {
   },
   home: {
     todaysVerse: "Talata ngayong araw",
-    todaysQuests: "Mga gawain ngayong araw",
     yourGrowth: "Ang paglago mo",
     recently: "Kamakailan",
     quickPrayer: "Maikling panalangin",
@@ -85,6 +84,9 @@ export const fil: UIStrings = {
     addToToday: "Idagdag sa araw na ito",
     begin: "Simulan",
     completedToday: "Tapos na ngayong araw",
+    groupActive: "Aktibo",
+    groupReady: "Handa",
+    groupCompleted: "Tapos",
   },
   dayComplete: {
     title: "Tapos na ang lahat ngayong araw.",
