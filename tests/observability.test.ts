@@ -312,10 +312,11 @@ describe("privacy-safe observability contract", () => {
       canonical_origin_matches: true,
       auth_posture: "configured",
       analytics_posture: "configured",
-      schema_contract: "0022",
+      schema_contract: "0026",
       service_worker_version: "biblequest-v21",
       billing_mode: "coming-soon",
       billing_purchases_enabled: false,
+      billing_support_enabled: false,
     });
 
     // The public contract must report the effective guest-only latch even
@@ -333,10 +334,12 @@ describe("privacy-safe observability contract", () => {
       STRIPE_PLUS_MONTHLY_PRICE_ID: "price_TestMonthly123",
       STRIPE_PLUS_ANNUAL_PRICE_ID: "price_TestAnnual123",
       BIBLEQUEST_STRIPE_PURCHASES_ENABLED: "true",
+      BIBLEQUEST_STRIPE_SUPPORT_ENABLED: "true",
     });
     expect(testBilling).toMatchObject({
       billing_mode: "test",
       billing_purchases_enabled: true,
+      billing_support_enabled: true,
     });
     expect(JSON.stringify(testBilling)).not.toMatch(
       /sk_test_|pk_test_|whsec_|price_/,

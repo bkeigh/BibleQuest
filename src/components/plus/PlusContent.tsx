@@ -82,10 +82,10 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
         <PlusCta />
       </PaperCard>
 
-      {/* Patron */}
+      {/* One-time support stays separate from recurring Plus membership. */}
       <PaperCard variant="paper" padding="lg">
         <p className="text-[0.75rem] uppercase tracking-[0.16em] text-accent">
-          Patron
+          One-time support
         </p>
         <h3 className="mt-1.5 font-display text-[1.375rem] text-graphite">
           Support the mission
@@ -99,7 +99,7 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
         </GentleLink>
         <p className="mt-2 text-[0.75rem] leading-relaxed text-ash">
           One-time support is separate from Plus and is not tax-deductible.
-          Stripe checkout appears only when safely test-configured.
+          Stripe Checkout appears only when separately approved and enabled.
         </p>
       </PaperCard>
     </div>

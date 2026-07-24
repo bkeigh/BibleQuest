@@ -26,6 +26,7 @@ template in [`../.env.example`](../.env.example).
 | `BIBLEQUEST_MONITOR_EXPECTED_AUTH_POSTURE` | Monitor gate | Expected bounded health posture; production default is `configured`. |
 | `BIBLEQUEST_MONITOR_EXPECTED_BILLING_MODE` | Monitor gate | Expected bounded billing posture; remains `coming-soon` until approved live billing. |
 | `BIBLEQUEST_MONITOR_EXPECTED_BILLING_PURCHASES_ENABLED` | Monitor gate | Expected public purchase-UI posture; remains `false` until an approved live rollout. |
+| `BIBLEQUEST_MONITOR_EXPECTED_BILLING_SUPPORT_ENABLED` | Monitor gate | Expected one-time support posture; remains `false` until an approved live rollout. |
 | `BIBLEQUEST_MONITOR_VERCEL_PROJECT_ID` | Optional monitor secret | Vercel project identifier for aggregate runtime 5xx inspection. |
 | `BIBLEQUEST_MONITOR_VERCEL_TEAM_ID` | Optional monitor secret | Matching Vercel team identifier. All three Vercel monitor values must be present together. |
 | `BIBLEQUEST_MONITOR_VERCEL_TOKEN` | Optional monitor secret | Narrow, expiring Vercel access token. Log messages and response bodies are never archived. |
@@ -34,13 +35,13 @@ template in [`../.env.example`](../.env.example).
 | `NEXT_PUBLIC_PLAUSIBLE_HOST` | Optional | HTTPS Plausible API origin; defaults to `https://plausible.io`. Paths, credentials, query strings, hashes, and HTTP are rejected. |
 | `STRIPE_BILLING_MODE` | Billing gate | `coming-soon` (default/off), `test`, or `live`. Production stays `coming-soon` until explicit approval. |
 | `BIBLEQUEST_STRIPE_PURCHASES_ENABLED` | Purchase gate | Must be exactly `true` in addition to a complete test/live configuration before subscription Checkout appears. |
+| `BIBLEQUEST_STRIPE_SUPPORT_ENABLED` | Support gate | Must be exactly `true` in addition to a complete test/live configuration before one-time support Checkout appears. |
 | `STRIPE_LIVE_BILLING_APPROVED` | Live gate | Must be exactly `true` before a matching live key set is accepted. This is not a substitute for owner approval and evidence. |
 | `STRIPE_SECRET_KEY` | Billing secret | **Server-only.** Matching `sk_test_…` or `sk_live_…` key. |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Billing gate | Matching `pk_test_…` or `pk_live_…` key. It is non-secret but must never be substituted for the secret key. |
 | `STRIPE_WEBHOOK_SECRET` | Billing secret | **Server-only.** Signing secret for the exact Checkout/Billing webhook endpoint. |
 | `STRIPE_PLUS_MONTHLY_PRICE_ID` | Billing gate | Server-allowlisted active recurring monthly Price for the Plus product. |
 | `STRIPE_PLUS_ANNUAL_PRICE_ID` | Billing gate | Server-allowlisted active recurring annual Price for the same Plus product and currency. |
-| `STRIPE_DONATION_URL` | Legacy rollback only | **Server-only.** Old one-time Payment Link fallback. Normal support uses server-created Checkout after migration `0026`. |
 | `API_BIBLE_API_KEY` | Optional | **Server-only.** Enables the licensed API.Bible adapter. Not needed for reviewed Free Use Bible API editions. |
 | `API_BIBLE_COMMERCIALLY_LICENSED_BIBLE_IDS` | Optional | Comma-separated API.Bible IDs explicitly licensed for BibleQuest's commercial use. Catalogue visibility alone is not permission. |
 
@@ -63,9 +64,11 @@ template in [`../.env.example`](../.env.example).
   reviewed runtime integration exists.
 - A Stripe key alone never activates billing. Mode/key mismatches, incomplete
   values, duplicate Prices, malformed origins, and unapproved live mode fail
-  closed. Subscription Checkout additionally requires the purchase gate.
-  Follow [`STRIPE_TEST_BILLING.md`](STRIPE_TEST_BILLING.md); keep Vercel
-  Production `coming-soon` until its live checklist is explicitly approved.
+  closed. Subscription Checkout additionally requires the purchase gate;
+  one-time Checkout requires its separate support gate. Follow
+  [`STRIPE_TEST_BILLING.md`](STRIPE_TEST_BILLING.md) and
+  [`STRIPE_ONE_TIME_SUPPORT.md`](STRIPE_ONE_TIME_SUPPORT.md); keep Vercel
+  Production `coming-soon` until both live checklists are explicitly approved.
 - Stripe secrets belong only in ignored `.env.local` files and encrypted Vercel
   settings. Use the Stripe CLI environment directly for local webhook tests;
   never copy a secret into evidence, logs, source, an issue, or chat.

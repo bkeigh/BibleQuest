@@ -259,6 +259,25 @@ describe("privacy-first analytics", () => {
     expect(String(init.body)).not.toMatch(/cus_|sub_|price_|card/i);
   });
 
+  it("sends one-time support intent without amount or provider data", async () => {
+    localStorage.setItem(CONSENT_KEY, "1");
+    const fetchMock = vi.fn().mockResolvedValue(response());
+    vi.stubGlobal("fetch", fetchMock);
+    const { track } = await loadAnalytics();
+
+    track("support_checkout_opened");
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      name: "support_checkout_opened",
+    });
+    expect(JSON.parse(String(init.body))).not.toHaveProperty("props");
+    expect(String(init.body)).not.toMatch(
+      /amount|request|session|customer|payment|card/i,
+    );
+  });
+
   it("drops hostile persisted events instead of sending private data", async () => {
     localStorage.setItem(CONSENT_KEY, "1");
     localStorage.setItem(

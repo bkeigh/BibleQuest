@@ -4,6 +4,11 @@ import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StripeBillingConfiguration } from "./config.server";
 import { synchronizeSubscription } from "./records.server";
+import {
+  synchronizeSupportDispute,
+  synchronizeSupportRefund,
+  synchronizeSupportSession,
+} from "@/lib/support/records.server";
 
 const HANDLED_SUBSCRIPTION_EVENTS = new Set([
   "customer.subscription.created",
@@ -23,6 +28,7 @@ const HANDLED_CHECKOUT_EVENTS = new Set([
   "checkout.session.completed",
   "checkout.session.async_payment_succeeded",
   "checkout.session.async_payment_failed",
+  "checkout.session.expired",
 ]);
 const HANDLED_REFUND_EVENTS = new Set([
   "refund.created",
@@ -174,6 +180,13 @@ async function processCheckout(
 ): Promise<void> {
   const eventSession = event.data.object as Stripe.Checkout.Session;
   const session = await stripe.checkout.sessions.retrieve(eventSession.id);
+  if (
+    session.mode === "payment" &&
+    session.metadata?.purpose === "biblequest_support"
+  ) {
+    await synchronizeSupportSession(admin, session, event);
+    return;
+  }
   if (session.mode !== "subscription") return;
   await reconcileSubscriptionId(
     admin,
@@ -195,11 +208,24 @@ async function processRefund(
   const chargeId = id(refund.charge);
   let customerId: string | null = null;
   let subscriptionId: string | null = null;
+  let currentCharge: Stripe.Charge | null = null;
   if (chargeId) {
-    const charge = await stripe.charges.retrieve(chargeId);
-    const context = await subscriptionContextFromCharge(stripe, charge);
-    customerId = context.customerId;
-    subscriptionId = context.subscriptionId;
+    currentCharge = await stripe.charges.retrieve(chargeId);
+    customerId = id(currentCharge.customer);
+    // A known one-time payment has no invoice, so skip the unrelated lookup.
+    const supportPayment = await synchronizeSupportRefund(
+      admin,
+      currentCharge,
+      event,
+    );
+    if (!supportPayment) {
+      const context = await subscriptionContextFromCharge(
+        stripe,
+        currentCharge,
+      );
+      customerId = context.customerId;
+      subscriptionId = context.subscriptionId;
+    }
   }
   await storeBillingSignal(admin, {
     event_id: event.id,
@@ -232,11 +258,25 @@ async function processDispute(
   const chargeId = id(dispute.charge);
   let customerId: string | null = null;
   let subscriptionId: string | null = null;
+  let currentCharge: Stripe.Charge | null = null;
   if (chargeId) {
-    const charge = await stripe.charges.retrieve(chargeId);
-    const context = await subscriptionContextFromCharge(stripe, charge);
-    customerId = context.customerId;
-    subscriptionId = context.subscriptionId;
+    currentCharge = await stripe.charges.retrieve(chargeId);
+    customerId = id(currentCharge.customer);
+    // A known one-time payment has no invoice, so skip the unrelated lookup.
+    const supportPayment = await synchronizeSupportDispute(
+      admin,
+      currentCharge,
+      dispute,
+      event,
+    );
+    if (!supportPayment) {
+      const context = await subscriptionContextFromCharge(
+        stripe,
+        currentCharge,
+      );
+      customerId = context.customerId;
+      subscriptionId = context.subscriptionId;
+    }
   }
   await storeBillingSignal(admin, {
     event_id: event.id,
@@ -299,6 +339,12 @@ export async function processStripeWebhookEvent(
     return "ignored";
   } catch (error) {
     if (error instanceof StripeWebhookProcessingError) throw error;
+    if (
+      error instanceof Error &&
+      error.name === "StripeSupportProjectionError"
+    ) {
+      throw new StripeWebhookProcessingError("invalid");
+    }
     if (
       typeof error === "object" &&
       error !== null &&

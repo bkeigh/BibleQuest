@@ -25,16 +25,19 @@ describe("deny-by-default direct Stripe configuration", () => {
       mode: "test",
       livemode: false,
       purchasesEnabled: false,
+      supportEnabled: false,
     });
     expect(
       stripeBillingAvailability({
         ...TEST_ENVIRONMENT,
         BIBLEQUEST_STRIPE_PURCHASES_ENABLED: "true",
+        BIBLEQUEST_STRIPE_SUPPORT_ENABLED: "true",
       }),
     ).toMatchObject({
       status: "configured",
       mode: "test",
       purchasesEnabled: true,
+      supportEnabled: true,
     });
   });
 
@@ -94,6 +97,7 @@ describe("deny-by-default direct Stripe configuration", () => {
       mode: "live",
       livemode: true,
       purchasesEnabled: false,
+      supportEnabled: false,
     });
   });
 });

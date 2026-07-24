@@ -23,6 +23,7 @@ const CONFIGURATION: StripeBillingConfiguration = {
   appOrigin: "https://preview.biblequest.test",
   livemode: false,
   purchasesEnabled: true,
+  supportEnabled: false,
 };
 
 /** Builds the current Stripe shape without embedding stale event fields. */

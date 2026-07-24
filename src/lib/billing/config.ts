@@ -13,6 +13,7 @@ export interface StripeBillingConfiguration {
   appOrigin: string;
   livemode: boolean;
   purchasesEnabled: boolean;
+  supportEnabled: boolean;
 }
 
 export type StripeBillingAvailability =
@@ -102,5 +103,7 @@ export function stripeBillingAvailability(
     livemode: rawMode === "live",
     purchasesEnabled:
       env.BIBLEQUEST_STRIPE_PURCHASES_ENABLED === "true",
+    supportEnabled:
+      env.BIBLEQUEST_STRIPE_SUPPORT_ENABLED === "true",
   };
 }

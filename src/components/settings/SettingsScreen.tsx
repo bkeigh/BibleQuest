@@ -58,7 +58,7 @@ import {
 import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
 import { WallpaperPicker } from "@/components/settings/WallpaperPicker";
 import { ExplorePlusLink } from "@/components/plus/ExplorePlusLink";
-import { DonationLink } from "@/components/plus/DonationLink";
+import { SupportLink } from "@/components/plus/SupportLink";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 import {
   MAX_GLASS_OPACITY,
@@ -1431,7 +1431,7 @@ function SettingsInner() {
         <SectionTitle>Plus</SectionTitle>
         <div className="space-y-3">
           <ExplorePlusLink description="Discover the full wallpaper collection and extra ways to deepen your daily practice." />
-          <DonationLink />
+          <SupportLink />
         </div>
 
         {/* Danger zone — plain, calm, confirmed */}

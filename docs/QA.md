@@ -19,8 +19,7 @@ pnpm exec tsc --noEmit   # strict TypeScript — 0 errors
 pnpm build               # production build succeeds
 pnpm audit --prod        # production dependency audit
 git diff --check         # no whitespace errors
-supabase test db --local supabase/tests/0014_journey_event_identity.sql
-supabase test db --local supabase/tests/0015_daily_quest_cas.sql
+supabase test db --local # all account, avatar, push, billing, and support pgTAP
 ```
 
 The automated suite targets launch-critical behavior rather than UI snapshots:
@@ -46,6 +45,9 @@ The automated suite targets launch-critical behavior rather than UI snapshots:
   Prices, current-object entitlement projection, Checkout/Portal origins,
   signed replay-safe webhook boundaries, failure categories, account
   isolation, and legally retained deletion posture.
+- One-time support tests cover server-bounded amounts, guest/account separation,
+  idempotent Checkout creation, exact hosted origins, current-object
+  completion/refund/dispute projection, sealed records, and pressure-free copy.
 - The service worker default-denies sensitive/query-bearing navigations,
   validates responses before caching, and removes only BibleQuest-owned stale
   caches.
@@ -74,6 +76,7 @@ the evidence.
 | PWA | Fresh-install from the immutable candidate URL. Separately, use the approved controlled non-production alias to load compatible old and candidate staging-built artifacts that both use the confirmed staging Supabase pair and safe billing posture; abort on Production values. Remap the same origin for update/rollback rehearsal. Inspect `/sw.js`, Cache Storage, online/offline/reconnect, and record both deployment IDs plus alias changes. | Fresh install/launch works; only documented shell/build assets are cached; forbidden/private routes are absent; same-origin worker update, streaming navigation, and compatible rollback remain functional without Production backend traffic. | Repository owner |
 | Direct Stripe Checkout | Use the test-only purchase gate and both configured recurring Prices; complete monthly/annual Checkout and cancel a separate session. | Displayed amounts come from Stripe; the server selects the Price; cancel grants nothing; success grants only after the signed webhook/current-object projection. | Billing owner |
 | Stripe 3DS | Use hosted Stripe Checkout in test mode with an official 3DS challenge test payment method; complete and cancel separate challenges. | Stripe owns the hosted challenge origin; success reconciles current Subscription state; cancellation grants nothing; BibleQuest CSP gains no Stripe subresource origin. | Billing owner |
+| One-time support | Enable only the test support latch; complete guest and signed-in support, cancel, expire, refund, dispute, resend, and abuse checks from the dedicated matrix. | Server amount/currency and exact hosted origin hold; signed current objects alone update bounded financial state; no account is created, no Plus access appears, and no payment/contact data enters evidence. | Billing owner |
 
 ## Manual — guest-only containment
 
@@ -213,6 +216,29 @@ live billing state. Complete the full evidence matrix in
 - [ ] Sign out and Account A → B never show A’s status or management control.
 - [ ] Analytics/network/evidence contains no Customer, Subscription, Price,
       Session, invoice, payment method, card, email, or webhook payload data.
+
+## Manual — one-time support (test only)
+
+Keep the Production support latch off. Use only test credentials and complete
+the full matrix in
+[`STRIPE_ONE_TIME_SUPPORT.md`](STRIPE_ONE_TIME_SUPPORT.md).
+
+- [ ] Support-disabled and invalid billing postures show no payment control.
+- [ ] Presets/custom amount bounds, immutable request UUID, same-origin/body
+      guards, per-instance throttles, and Vercel Firewall all fail closed.
+- [ ] Guest Checkout creates no app account; signed-in Checkout remains
+      separate from Plus; both return only an exact hosted Stripe URL.
+- [ ] Cancel/return query manipulation never claims payment.
+- [ ] Signed current Session events cover success, async failure, and expiry;
+      duplicate/out-of-order delivery remains replay-safe.
+- [ ] Current Charge/Dispute state covers partial/full refund and
+      created/updated/won/lost dispute posture.
+- [ ] Account deletion detaches the user ID while preserving the bounded
+      financial record; browser roles cannot read or mutate any support row.
+- [ ] Stripe receipt/refund email, support inbox, pressure-free copy, desktop
+      browsers, and physical mobile Safari all pass.
+- [ ] Logs, analytics, network summaries, screenshots, and saved evidence
+      contain no contact/payment IDs, Checkout URLs, or raw webhook payloads.
 
 ## Manual — PWA & platform
 
@@ -357,5 +383,7 @@ change. Never move the production domain for a rehearsal.
   email, Gmail/iCloud, callback, transactional/cached-client, and both-direction
   two-user checks in [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md). A
   prior guest-only launch is not evidence for any of those active behaviors.
-- Notification delivery and external AI generation are not implemented. Plus
-  stays coming-soon unless its complete provider and release gates pass.
+- Private Web Push is implemented but remains deny-by-default until its
+  migration, encryption, scheduler, isolation, device, and live rollout gates
+  pass. External AI generation is not implemented. Plus and one-time support
+  stay disabled unless their complete provider and release gates pass.

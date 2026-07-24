@@ -100,34 +100,29 @@ credentials stay in Supabase; they are not Vercel variables. Keep the app's
 own `/auth/callback` URLs in the Supabase redirect allow-list described above.
 See [Supabase Login with Google](https://supabase.com/docs/guides/auth/social-login/auth-google).
 
-## 2. Enable one-time donations (Stripe Payment Link)
+## 2. Prepare one-time Support BibleQuest Checkout
 
-The current donation implementation deliberately does **not** need a Stripe API
-secret or webhook. It sends the user through a server-validated Stripe Payment
-Link, which is the smallest safe first release.
+One-time support uses the same complete direct Stripe test configuration as
+subscriptions, but a separate deny-by-default feature latch. The server fixes
+USD and the allowed amount range, creates an idempotent hosted Checkout
+Session, and projects only bounded payment/refund/dispute state.
 
-1. Sign in to the BibleQuest Stripe account and create a one-time product such
-   as **Support BibleQuest**.
-2. Create a [Stripe Payment Link](https://docs.stripe.com/payment-links) for the
-   one-time price. Configure the amount policy, receipt email, statement
-   descriptor, branding, and success message in Stripe. Start in Stripe test
-   mode.
-3. Copy only the clean `https://buy.stripe.com/...` link. Do not add query
-   parameters or donor-identifying prefill data.
-4. Add it to Vercel as a **server-only** variable, first in Preview and then in
-   Production after a successful test:
+1. Apply migration `0026` after `0025` and run its pgTAP evidence.
+2. Finish the test-mode keys, webhook, branding, statement descriptor, and
+   receipt-email setup described in section 3.
+3. In local or Preview only, set:
 
 ```dotenv
-STRIPE_DONATION_URL=https://buy.stripe.com/...
+STRIPE_BILLING_MODE=test
+BIBLEQUEST_STRIPE_SUPPORT_ENABLED=true
 ```
 
-5. Redeploy, open `/support`, press the donation button, complete a test-mode
-   payment, and verify the payment and receipt inside the BibleQuest Stripe
-   account. Repeat once on mobile Safari.
-
-Never rename this to `NEXT_PUBLIC_STRIPE_*`. If BibleQuest later needs custom
-Checkout Sessions, refunds, or webhooks, add narrowly scoped server-side Stripe
-credentials at that time; they are not part of the present Payment Link flow.
+4. Forward the signed webhook to `/api/billing/webhook`, then complete the
+   successful, canceled, expired, duplicate, refund, dispute, guest, signed-in,
+   mobile, and rate-limit checks in
+   [`STRIPE_ONE_TIME_SUPPORT.md`](STRIPE_ONE_TIME_SUPPORT.md).
+5. Leave Production support disabled until the test evidence, policy copy,
+   receipt/refund path, Firewall control, and explicit live approval all pass.
 
 ## 3. Prepare direct Stripe subscriptions in test mode
 
@@ -151,6 +146,7 @@ state. Production remains `coming-soon` with purchase UI disabled.
 ```dotenv
 STRIPE_BILLING_MODE=coming-soon
 BIBLEQUEST_STRIPE_PURCHASES_ENABLED=false
+BIBLEQUEST_STRIPE_SUPPORT_ENABLED=false
 STRIPE_LIVE_BILLING_APPROVED=false
 ```
 
@@ -193,7 +189,8 @@ API_BIBLE_COMMERCIALLY_LICENSED_BIBLE_IDS=id-one,id-two
   server-only Stripe key.
 - `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`: server-only secrets used only
   by direct Checkout/Billing routes.
-- `STRIPE_DONATION_URL`: legacy server-only Payment Link rollback value.
+- `BIBLEQUEST_STRIPE_SUPPORT_ENABLED`: server-only one-time Checkout latch;
+  keep false until the separate support checklist passes.
 - `API_BIBLE_API_KEY`: server-only private key.
 - Supabase SMTP/Resend provider credentials: provider dashboards only.
 - Supabase service-role, Stripe secret/webhook keys, and database passwords:

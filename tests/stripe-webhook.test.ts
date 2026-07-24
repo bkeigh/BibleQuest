@@ -6,8 +6,18 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/billing/records.server", () => ({
   synchronizeSubscription: vi.fn(),
 }));
+vi.mock("@/lib/support/records.server", () => ({
+  synchronizeSupportSession: vi.fn(),
+  synchronizeSupportRefund: vi.fn(),
+  synchronizeSupportDispute: vi.fn(),
+}));
 
 import { synchronizeSubscription } from "@/lib/billing/records.server";
+import {
+  synchronizeSupportDispute,
+  synchronizeSupportRefund,
+  synchronizeSupportSession,
+} from "@/lib/support/records.server";
 import {
   processStripeWebhookEvent,
   StripeWebhookProcessingError,
@@ -27,6 +37,7 @@ const CONFIGURATION = {
   appOrigin: "https://preview.biblequest.test",
   livemode: false,
   purchasesEnabled: true,
+  supportEnabled: false,
 } satisfies StripeBillingConfiguration;
 
 /** Creates only the fixed envelope fields used by the webhook dispatcher. */
@@ -43,6 +54,9 @@ function event(type: string, object: object): Stripe.Event {
 describe("order-tolerant Stripe webhook processing", () => {
   beforeEach(() => {
     vi.mocked(synchronizeSubscription).mockReset();
+    vi.mocked(synchronizeSupportSession).mockReset();
+    vi.mocked(synchronizeSupportRefund).mockReset();
+    vi.mocked(synchronizeSupportDispute).mockReset();
   });
 
   it("rehydrates the current subscription instead of trusting event payload", async () => {
@@ -147,6 +161,126 @@ describe("order-tolerant Stripe webhook processing", () => {
     expect(stripe.subscriptions.retrieve).not.toHaveBeenCalled();
   });
 
+  it("rehydrates and projects one-time support Checkout events", async () => {
+    const current = {
+      id: "cs_test_SupportSession123",
+      mode: "payment",
+      metadata: { purpose: "biblequest_support" },
+    };
+    const stripe = {
+      checkout: {
+        sessions: { retrieve: vi.fn().mockResolvedValue(current) },
+      },
+    } as unknown as Stripe;
+    const admin = {} as SupabaseClient;
+    const supportEvent = event("checkout.session.expired", {
+      id: "cs_test_SupportSession123",
+      mode: "payment",
+    });
+
+    await expect(
+      processStripeWebhookEvent(
+        admin,
+        stripe,
+        CONFIGURATION,
+        supportEvent,
+      ),
+    ).resolves.toBe("processed");
+    expect(synchronizeSupportSession).toHaveBeenCalledWith(
+      admin,
+      current,
+      supportEvent,
+    );
+    expect(synchronizeSubscription).not.toHaveBeenCalled();
+  });
+
+  it("projects one-time support refunds from the current Charge", async () => {
+    vi.mocked(synchronizeSupportRefund).mockResolvedValue(true);
+    const refund = {
+      id: "re_SupportRefund123",
+      charge: "ch_SupportCharge123",
+      status: "succeeded",
+      amount: 1_000,
+      currency: "usd",
+    };
+    const charge = {
+      id: "ch_SupportCharge123",
+      payment_intent: "pi_SupportIntent123",
+      customer: "cus_SupportCustomer123",
+    };
+    const upsert = vi.fn().mockResolvedValue({ error: null });
+    const admin = {
+      from: vi.fn().mockReturnValue({ upsert }),
+    } as unknown as SupabaseClient;
+    const stripe = {
+      refunds: { retrieve: vi.fn().mockResolvedValue(refund) },
+      charges: { retrieve: vi.fn().mockResolvedValue(charge) },
+      invoicePayments: {
+        list: vi.fn().mockResolvedValue({ data: [] }),
+      },
+    } as unknown as Stripe;
+    const refundEvent = event("refund.updated", {
+      id: refund.id,
+    });
+
+    await processStripeWebhookEvent(
+      admin,
+      stripe,
+      CONFIGURATION,
+      refundEvent,
+    );
+    expect(synchronizeSupportRefund).toHaveBeenCalledWith(
+      admin,
+      charge,
+      refundEvent,
+    );
+    expect(stripe.invoicePayments.list).not.toHaveBeenCalled();
+  });
+
+  it("projects one-time support disputes from current provider objects", async () => {
+    vi.mocked(synchronizeSupportDispute).mockResolvedValue(true);
+    const dispute = {
+      id: "dp_SupportDispute123",
+      charge: "ch_SupportCharge123",
+      status: "needs_response",
+      amount: 1_000,
+      currency: "usd",
+    };
+    const charge = {
+      id: "ch_SupportCharge123",
+      payment_intent: "pi_SupportIntent123",
+      customer: "cus_SupportCustomer123",
+    };
+    const upsert = vi.fn().mockResolvedValue({ error: null });
+    const admin = {
+      from: vi.fn().mockReturnValue({ upsert }),
+    } as unknown as SupabaseClient;
+    const stripe = {
+      disputes: { retrieve: vi.fn().mockResolvedValue(dispute) },
+      charges: { retrieve: vi.fn().mockResolvedValue(charge) },
+      invoicePayments: {
+        list: vi.fn().mockResolvedValue({ data: [] }),
+      },
+    } as unknown as Stripe;
+    const disputeEvent = event("charge.dispute.created", {
+      id: dispute.id,
+    });
+
+    await processStripeWebhookEvent(
+      admin,
+      stripe,
+      CONFIGURATION,
+      disputeEvent,
+    );
+    expect(synchronizeSupportDispute).toHaveBeenCalledWith(
+      admin,
+      charge,
+      dispute,
+      disputeEvent,
+    );
+    expect(stripe.invoicePayments.list).not.toHaveBeenCalled();
+  });
+
   it("categorizes provider failures without retaining provider details", async () => {
     const stripe = {
       subscriptions: {
@@ -169,6 +303,37 @@ describe("order-tolerant Stripe webhook processing", () => {
       category: "provider",
       message: "Stripe webhook processing failed.",
     } satisfies Partial<StripeWebhookProcessingError>);
+  });
+
+  it("categorizes a current support object mismatch as invalid", async () => {
+    const mismatch = new Error("private mismatch");
+    mismatch.name = "StripeSupportProjectionError";
+    vi.mocked(synchronizeSupportSession).mockRejectedValue(mismatch);
+    const stripe = {
+      checkout: {
+        sessions: {
+          retrieve: vi.fn().mockResolvedValue({
+            id: "cs_test_SupportSession123",
+            mode: "payment",
+            metadata: { purpose: "biblequest_support" },
+          }),
+        },
+      },
+    } as unknown as Stripe;
+
+    await expect(
+      processStripeWebhookEvent(
+        {} as SupabaseClient,
+        stripe,
+        CONFIGURATION,
+        event("checkout.session.completed", {
+          id: "cs_test_SupportSession123",
+        }),
+      ),
+    ).rejects.toMatchObject({
+      category: "invalid",
+      message: "Stripe webhook processing failed.",
+    });
   });
 
   it("rejects an event from the wrong Stripe mode", async () => {

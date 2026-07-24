@@ -472,6 +472,7 @@ describe("sanitized launch evidence", () => {
     const live = fixtureReadiness();
     live.external_health.release.billing_mode = "live";
     live.external_health.release.billing_purchases_enabled = true;
+    live.external_health.release.billing_support_enabled = true;
     const aggregate = aggregateClientSignals(fixtureSignals());
     const held = buildLaunchEvidence(live, aggregate, "preflight", "fixture");
     expect(held.decision).toBe("HOLD");
@@ -489,6 +490,7 @@ describe("sanitized launch evidence", () => {
     expect(verified.decision).toBe("REVIEW");
     expect(verified.live_billing_gate_verified).toBe(true);
     expect(verified.billing_purchases_enabled).toBe(true);
+    expect(verified.billing_support_enabled).toBe(true);
   });
 
   it("supports an explicit preview fixture without changing the default", () => {
@@ -529,7 +531,7 @@ describe("sanitized launch evidence", () => {
 
   it("builds complete fixture evidence with every required posture", () => {
     expect(fixtureReadiness()).toMatchObject({
-      check_count: 21,
+      check_count: 25,
       failed_check_count: 0,
       schema_parity: {
         ok: true,

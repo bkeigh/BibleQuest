@@ -25,11 +25,12 @@ function health(overrides = {}) {
     canonical_origin_matches: true,
     auth_posture: "configured",
     analytics_posture: "disabled",
-    schema_contract: "0022",
+    schema_contract: "0026",
     content_contract: "seed-manifest-v1",
     service_worker_version: "biblequest-v21",
     billing_mode: "coming-soon",
     billing_purchases_enabled: false,
+    billing_support_enabled: false,
     ...overrides,
   };
 }

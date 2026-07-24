@@ -405,6 +405,14 @@ export function fixtureReadiness() {
     migration: "0022",
     ok: true,
   });
+  for (const [contract, migration] of [
+    ["biblequest_profile_avatar_v1", "0023"],
+    ["biblequest_private_push_v1", "0024"],
+    ["biblequest_stripe_test_billing_v1", "0025"],
+    ["biblequest_stripe_one_time_support_v1", "0026"],
+  ]) {
+    schemaChecks.push({ contract, migration, ok: true });
+  }
   const contentChecks = [
     "quest_templates",
     "daily_verses",
@@ -430,6 +438,7 @@ export function fixtureReadiness() {
         service_worker_version: observability.serviceWorkerVersion,
         billing_mode: "coming-soon",
         billing_purchases_enabled: false,
+        billing_support_enabled: false,
       },
     },
     canonical_metadata: { ok: true },
@@ -441,7 +450,7 @@ export function fixtureReadiness() {
       google_enabled: true,
       phone_disabled: true,
     },
-    check_count: 21,
+    check_count: 25,
     failed_check_count: 0,
   };
 }
@@ -587,6 +596,14 @@ export function buildLaunchEvidence(
     "disable purchase UI until the exact live-billing gate is approved",
   );
   add(
+    release?.billing_support_enabled === true &&
+      (release?.billing_mode !== "live" || !liveBillingVerified),
+    "critical",
+    "billing_support_gate_unsafe",
+    "[BILLING OWNER]",
+    "disable one-time support until the exact live-billing gate is approved",
+  );
+  add(
     release?.service_worker_version !== observability.serviceWorkerVersion,
     "critical",
     "health_worker_version_mismatch",
@@ -627,6 +644,8 @@ export function buildLaunchEvidence(
     billing_mode: release?.billing_mode ?? "unknown",
     billing_purchases_enabled:
       release?.billing_purchases_enabled === true,
+    billing_support_enabled:
+      release?.billing_support_enabled === true,
     live_billing_gate_verified: liveBillingVerified,
     rollback_target_sha: release?.rollback_sha ?? null,
     alerts,

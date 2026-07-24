@@ -3,12 +3,12 @@ import { IconArrowRight } from "@/components/design-system/icons";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { cn } from "@/lib/utils/cn";
 
-interface DonationLinkProps {
+interface SupportLinkProps {
   className?: string;
 }
 
 /** Gives the one-time support path the same prominent treatment as Home's verse card. */
-export function DonationLink({ className }: DonationLinkProps) {
+export function SupportLink({ className }: SupportLinkProps) {
   return (
     <Link
       href="/support"
@@ -26,7 +26,7 @@ export function DonationLink({ className }: DonationLinkProps) {
       </span>
       <span className="relative min-w-0 flex-1">
         <span className="block font-display text-[1.125rem] leading-tight">
-          Make a one-time donation
+          Support BibleQuest once
         </span>
         <span className="mt-1 block text-caption text-[#fdfbf3]/70">
           Help keep BibleQuest free and growing.

@@ -32,6 +32,7 @@ const EXPECTED_MIGRATIONS = [
   "0023_private_profile_avatars.sql",
   "0024_private_push_reminders.sql",
   "0025_stripe_test_billing.sql",
+  "0026_stripe_one_time_support.sql",
 ];
 
 /** Hash a migration exactly as the release manifest does. */
@@ -90,7 +91,7 @@ describe("release migration contracts", () => {
     const expectedTables = report.match(/    \('[a-z_]+', '[^']+'\)/g) ?? [];
     const worker = readFileSync(join(ROOT, "public", "sw.js"), "utf8");
 
-    expect(expectedTables).toHaveLength(37);
+    expect(expectedTables).toHaveLength(38);
     expect(report).toContain("('user_daily_quest_days', 'user-owned')");
     expect(report).toContain(
       "('user_sync_state', 'retained user-owned state')",
@@ -113,6 +114,9 @@ describe("release migration contracts", () => {
     expect(report).toContain("'claim_stripe_webhook_event'");
     expect(report).toContain("'complete_stripe_webhook_event'");
     expect(report).toContain("'claim_stripe_action'");
+    expect(report).toContain("'stripe_support_contract'");
+    expect(report).toContain("'claim_stripe_support_checkout'");
+    expect(report).toContain("'complete_stripe_support_checkout'");
     expect(report).toContain(
       "select public.account_deletion_contract() as account_deletion_contract;",
     );
@@ -124,6 +128,9 @@ describe("release migration contracts", () => {
     );
     expect(report).toContain(
       "select public.stripe_billing_contract() as stripe_billing_contract;",
+    );
+    expect(report).toContain(
+      "select public.stripe_support_contract() as stripe_support_contract;",
     );
     expect(report).toContain("where schemaname = 'storage'");
     expect(report).toContain("sync_revision");

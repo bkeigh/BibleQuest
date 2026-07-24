@@ -73,6 +73,7 @@ export interface AnalyticsEventProps {
   plus_checkout_opened: { interval: BillingInterval };
   plus_billing_portal_opened: undefined;
   plus_billing_refreshed: undefined;
+  support_checkout_opened: undefined;
 }
 
 export type AnalyticsEvent = keyof AnalyticsEventProps;
@@ -180,6 +181,7 @@ const EVENT_RULES = {
   },
   plus_billing_portal_opened: noProps,
   plus_billing_refreshed: noProps,
+  support_checkout_opened: noProps,
 } as const satisfies Record<AnalyticsEvent, EventRule>;
 
 const QUEUE_KEY = "biblequest:analytics-queue";

@@ -22,6 +22,7 @@ export interface ReleaseHealth {
   service_worker_version: string;
   billing_mode: "coming-soon" | "test" | "live" | "invalid";
   billing_purchases_enabled: boolean;
+  billing_support_enabled: boolean;
 }
 
 type PublicEnvironment = Record<string, string | undefined>;
@@ -59,16 +60,19 @@ function analyticsPosture(env: PublicEnvironment): AnalyticsPosture {
 function billingPosture(env: PublicEnvironment): {
   mode: ReleaseHealth["billing_mode"];
   purchasesEnabled: boolean;
+  supportEnabled: boolean;
 } {
   const billing = stripeBillingAvailability(env);
   return billing.status === "configured"
     ? {
         mode: billing.mode,
         purchasesEnabled: billing.purchasesEnabled,
+        supportEnabled: billing.supportEnabled,
       }
     : {
         mode: billing.status === "coming-soon" ? "coming-soon" : "invalid",
         purchasesEnabled: false,
+        supportEnabled: false,
       };
 }
 
@@ -94,5 +98,6 @@ export function buildReleaseHealth(
     service_worker_version: observability.serviceWorkerVersion,
     billing_mode: billing.mode,
     billing_purchases_enabled: billing.purchasesEnabled,
+    billing_support_enabled: billing.supportEnabled,
   };
 }

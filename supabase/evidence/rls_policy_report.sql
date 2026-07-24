@@ -41,7 +41,8 @@ with expected (table_name, classification) as (
     ('stripe_customers', 'server-owned financial'),
     ('stripe_webhook_events', 'server-owned financial'),
     ('stripe_action_claims', 'server-owned'),
-    ('stripe_billing_signals', 'server-owned financial')
+    ('stripe_billing_signals', 'server-owned financial'),
+    ('stripe_support_payments', 'server-owned financial')
 )
 select
   expected.table_name,
@@ -161,6 +162,9 @@ where namespace.nspname = 'public'
     'complete_stripe_webhook_event',
     'claim_stripe_action',
     'stripe_billing_contract',
+    'claim_stripe_support_checkout',
+    'complete_stripe_support_checkout',
+    'stripe_support_contract',
     'assert_user_sync_context',
     'enforce_user_sync_generation',
     'advance_account_sync_revision',
@@ -307,6 +311,7 @@ select public.account_deletion_contract() as account_deletion_contract;
 select public.profile_avatar_contract() as profile_avatar_contract;
 select public.push_reminder_contract() as push_reminder_contract;
 select public.stripe_billing_contract() as stripe_billing_contract;
+select public.stripe_support_contract() as stripe_support_contract;
 
 -- 9. Unbound security-definer entry points remain absent after 0019.
 select

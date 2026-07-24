@@ -110,6 +110,35 @@ const REQUIRED_SCHEMA = [
   },
 ];
 
+// Each public RPC returns exactly one fixed identity plus an authorization
+// posture boolean; no user or financial row is read into this process.
+const POSTURE_CONTRACTS = [
+  {
+    rpc: "profile_avatar_contract",
+    contract: "biblequest_profile_avatar_v1",
+    migration: "0023",
+    label: "private profile avatar posture",
+  },
+  {
+    rpc: "push_reminder_contract",
+    contract: "biblequest_private_push_v1",
+    migration: "0024",
+    label: "private push reminder posture",
+  },
+  {
+    rpc: "stripe_billing_contract",
+    contract: "biblequest_stripe_test_billing_v1",
+    migration: "0025",
+    label: "direct Stripe billing posture",
+  },
+  {
+    rpc: "stripe_support_contract",
+    contract: "biblequest_stripe_one_time_support_v1",
+    migration: "0026",
+    label: "one-time Stripe support posture",
+  },
+];
+
 const supabaseUrlValue = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
 const appUrlValue =
@@ -188,13 +217,14 @@ function safeHealthBody(value) {
     typeof candidate.canonical_origin_matches !== "boolean" ||
     !["configured", "guest-only", "invalid"].includes(candidate.auth_posture) ||
     !["configured", "disabled", "invalid"].includes(candidate.analytics_posture) ||
-    candidate.schema_contract !== "0022" ||
+    candidate.schema_contract !== "0026" ||
     candidate.content_contract !== "seed-manifest-v1" ||
     !/^biblequest-v\d{1,4}$/.test(candidate.service_worker_version) ||
     !["coming-soon", "test", "live", "invalid"].includes(
       candidate.billing_mode,
     ) ||
-    typeof candidate.billing_purchases_enabled !== "boolean"
+    typeof candidate.billing_purchases_enabled !== "boolean" ||
+    typeof candidate.billing_support_enabled !== "boolean"
   ) {
     return null;
   }
@@ -210,6 +240,7 @@ function safeHealthBody(value) {
     service_worker_version: candidate.service_worker_version,
     billing_mode: candidate.billing_mode,
     billing_purchases_enabled: candidate.billing_purchases_enabled,
+    billing_support_enabled: candidate.billing_support_enabled,
   };
 }
 
@@ -509,6 +540,44 @@ async function checkSchema() {
       safeRequestFailure(error),
     );
   }
+
+  // New launch capabilities expose only fixed two-field readiness contracts.
+  for (const check of POSTURE_CONTRACTS) {
+    try {
+      const response = await supabaseFetch(`/rest/v1/rpc/${check.rpc}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const body = await jsonBody(response);
+      const ok =
+        response.ok &&
+        body?.contract === check.contract &&
+        body?.ok === true &&
+        Object.keys(body).sort().join(",") === "contract,ok";
+      schemaEvidence.push({
+        contract: check.contract,
+        migration: check.migration,
+        ok,
+      });
+      result(
+        ok,
+        check.label,
+        response.ok
+          ? ok
+            ? `bounded contract matches ${check.migration}`
+            : "invalid bounded contract"
+          : safeProviderCode(body?.code, response.status),
+      );
+    } catch (error) {
+      schemaEvidence.push({
+        contract: check.contract,
+        migration: check.migration,
+        ok: false,
+      });
+      result(false, check.label, safeRequestFailure(error));
+    }
+  }
 }
 
 async function checkContent() {
@@ -686,7 +755,8 @@ if (JSON_OUTPUT) {
       canonical_metadata: { ok: canonicalEvidence },
       schema_parity: {
         ok:
-          schemaEvidence.length === REQUIRED_SCHEMA.length + 4 &&
+          schemaEvidence.length ===
+            REQUIRED_SCHEMA.length + 4 + POSTURE_CONTRACTS.length &&
           schemaEvidence.every((check) => check.ok),
         checks: schemaEvidence,
       },

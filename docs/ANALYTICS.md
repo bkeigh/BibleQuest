@@ -28,7 +28,7 @@ and unrecognized or oversized strings reject the whole event.
 
 | Events | Allowed properties | Classification and bounds |
 | --- | --- | --- |
-| `onboarding_started`, `onboarding_completed`, `quest_picked`, `quest_unpicked`, `quest_started`, `quest_saved`, `quest_paused`, `quest_resumed`, `quest_archived`, `quest_removed`, `quest_reopened`, `reflection_created`, `prayer_created`, `prayer_answered`, `bible_chapter_opened`, `verse_bookmarked`, `verse_shared`, `sign_in_completed`, `sign_out`, `pwa_install_prompt_viewed`, `pwa_install_accepted`, `pwa_install_dismissed` | none | no properties accepted |
+| `onboarding_started`, `onboarding_completed`, `quest_picked`, `quest_unpicked`, `quest_started`, `quest_saved`, `quest_paused`, `quest_resumed`, `quest_archived`, `quest_removed`, `quest_reopened`, `reflection_created`, `prayer_created`, `prayer_answered`, `bible_chapter_opened`, `verse_bookmarked`, `verse_shared`, `sign_in_completed`, `sign_out`, `pwa_install_prompt_viewed`, `pwa_install_accepted`, `pwa_install_dismissed`, `plus_billing_portal_opened`, `plus_billing_refreshed`, `support_checkout_opened` | none | no properties accepted |
 | `quest_viewed`, `quest_completed`, `quest_card_expanded` | `category` | bounded quest-category enum |
 | `quest_step_completed` | `step` | `scripture`, `live`, `reflect`, or `pray` |
 | `reflection_started` | `source` | `quest` only |
@@ -37,6 +37,7 @@ and unrecognized or oversized strings reject the whole event.
 | `sign_in_started` | `method`, `source` | method: `magic_link` or `google`; source: `account` or `onboarding` |
 | `sync_completed` | `status` | `initial` only |
 | `sync_failed` | `status` | `initial` or `push` |
+| `plus_checkout_opened` | `interval` | `monthly` or `annual` |
 
 All other properties are forbidden. This includes prayer, reflection, note, and
 verse text; email; phone; user and record IDs; auth tokens; referrers; query

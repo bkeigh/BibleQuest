@@ -115,6 +115,7 @@ jobs:
       # test/live configuration belongs only in encrypted environments.
       STRIPE_BILLING_MODE: coming-soon
       BIBLEQUEST_STRIPE_PURCHASES_ENABLED: "false"
+      BIBLEQUEST_STRIPE_SUPPORT_ENABLED: "false"
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
