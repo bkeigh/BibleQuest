@@ -30,6 +30,7 @@ const EXPECTED_MIGRATIONS = [
   "0021_generation_bound_account_deletion.sql",
   "0022_resilient_account_deletion.sql",
   "0023_private_profile_avatars.sql",
+  "0024_private_push_reminders.sql",
 ];
 
 /** Hash a migration exactly as the release manifest does. */
@@ -88,7 +89,7 @@ describe("release migration contracts", () => {
     const expectedTables = report.match(/    \('[a-z_]+', '[^']+'\)/g) ?? [];
     const worker = readFileSync(join(ROOT, "public", "sw.js"), "utf8");
 
-    expect(expectedTables).toHaveLength(29);
+    expect(expectedTables).toHaveLength(33);
     expect(report).toContain("('user_daily_quest_days', 'user-owned')");
     expect(report).toContain(
       "('user_sync_state', 'retained user-owned state')",
@@ -102,11 +103,19 @@ describe("release migration contracts", () => {
     expect(report).toContain("'profile_avatar_contract'");
     expect(report).toContain("'set_profile_avatar'");
     expect(report).toContain("'clear_profile_avatar'");
+    expect(report).toContain("'push_reminder_contract'");
+    expect(report).toContain("'claim_push_delivery'");
+    expect(report).toContain("'complete_push_delivery'");
+    expect(report).toContain("'claim_push_test'");
+    expect(report).toContain("'purge_stale_push_records'");
     expect(report).toContain(
       "select public.account_deletion_contract() as account_deletion_contract;",
     );
     expect(report).toContain(
       "select public.profile_avatar_contract() as profile_avatar_contract;",
+    );
+    expect(report).toContain(
+      "select public.push_reminder_contract() as push_reminder_contract;",
     );
     expect(report).toContain("where schemaname = 'storage'");
     expect(report).toContain("sync_revision");

@@ -1,0 +1,44 @@
+name: Push reminder scheduler
+
+on:
+  schedule:
+    # Offset from the top of the hour; database claims make retries idempotent.
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: push-reminder-scheduler
+  cancel-in-progress: false
+
+jobs:
+  deliver:
+    name: Deliver due neutral reminders
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      vars.BIBLEQUEST_PUSH_SCHEDULE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PUSH_SCHEDULER_SECRET: ${{ secrets.PUSH_SCHEDULER_SECRET }}
+    steps:
+      - name: Invoke bounded production scheduler
+        shell: bash
+        run: |
+          if [[ -z "$PUSH_SCHEDULER_SECRET" ]]; then
+            echo "::error::Push scheduler secret is not configured."
+            exit 1
+          fi
+          curl \
+            --silent \
+            --show-error \
+            --fail \
+            --retry 2 \
+            --retry-all-errors \
+            --retry-delay 5 \
+            --max-time 55 \
+            --request POST \
+            --header "Authorization: Bearer $PUSH_SCHEDULER_SECRET" \
+            https://www.biblequest.co/api/push/schedule

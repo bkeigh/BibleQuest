@@ -66,6 +66,7 @@ import {
   normalizeGlassOpacity,
 } from "@/lib/glass-opacity";
 import { SUPPORT_EMAIL, SUPPORT_EMAIL_HREF } from "@/lib/brand";
+import { ReminderSettings } from "@/components/settings/ReminderSettings";
 
 function Row({
   label,
@@ -1308,11 +1309,7 @@ function SettingsInner() {
           </Disclosure>
 
           <Disclosure variant="card" label={t.settings.reminders}>
-            <p className="text-[0.875rem] leading-relaxed text-ash">
-              Reminders are coming soon. When they arrive, they’ll be
-              invitations — never pressure, never streak warnings. You’ll choose
-              exactly what and when.
-            </p>
+            <ReminderSettings />
           </Disclosure>
 
           <Disclosure variant="card" label="Privacy & data">

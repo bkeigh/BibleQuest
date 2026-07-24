@@ -83,8 +83,8 @@ and additive columns in place, and fall back to the last cached local image.
 
 Migration `0024` will:
 
-- extend notification preferences with an exact delivery time and quiet-hours
-  window while keeping every reminder disabled by default;
+- add sealed account-level preferences with an exact delivery time and
+  quiet-hours window while keeping every reminder disabled by default;
 - add encrypted `push_subscriptions`, idempotent `push_deliveries`, and bounded
   delivery-metric records;
 - add owner-only RLS for subscription management and server-only scheduler
@@ -101,12 +101,14 @@ Endpoints and key material will be AES-256-GCM encrypted with a server-only key.
 Only a SHA-256 endpoint fingerprint is indexed. VAPID private material,
 scheduler secrets, plaintext endpoints, and payload keys will never reach logs.
 
-The scheduler will run in 15-minute UTC intervals, derive each user's local
-date and time with an IANA timezone, shift delivery out of quiet hours, and use
-a unique `(subscription, reminder_kind, local_date)` claim. Permanent 404/410
-push responses remove the expired subscription. Transient failures receive
-bounded retry. Metrics store only kind, outcome category, status code class,
-attempt count, and timestamps.
+The scheduler will run from a GitHub Action at four offset minutes each hour.
+This avoids Vercel Hobby's once-daily cron limit while preserving a manual
+dispatch and a repository-variable rollout latch. It derives each user's local
+date and time with an IANA timezone, shifts delivery out of quiet hours, and
+uses a unique `(subscription, reminder_kind, local_date)` claim. Permanent
+404/410 push responses remove the expired subscription. Transient failures
+receive bounded retry. Metrics store only kind, outcome category, status code
+class, attempt count, and timestamps.
 
 The service worker will move to `biblequest-v21`, show only neutral copy, and
 navigate to a fixed allowlisted app route. Prayer text, journal text, quest
@@ -222,6 +224,7 @@ into chat.
 | `WEB_PUSH_VAPID_SUBJECT` | server | `mailto:` or HTTPS operator identity |
 | `PUSH_SUBSCRIPTION_ENCRYPTION_KEY` | server secret | 32-byte base64 AES key |
 | `PUSH_SUBSCRIPTION_KEY_VERSION` | server | encryption rotation label |
+| `PUSH_SUBSCRIPTION_ENCRYPTION_KEYS` | server secret | optional prior-key rotation ring |
 | `PUSH_SCHEDULER_SECRET` | server/GitHub secret | scheduler authentication |
 | `SUPABASE_SERVICE_ROLE_KEY` | server secret | scheduler and Stripe projection |
 | `STRIPE_BILLING_MODE` | server | `coming-soon`, `test`, or approved `live` |

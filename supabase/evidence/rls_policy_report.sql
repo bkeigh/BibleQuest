@@ -33,7 +33,11 @@ with expected (table_name, classification) as (
     ('growth_events', 'user-owned'),
     ('user_milestones', 'user-owned'),
     ('notification_preferences', 'user-owned'),
-    ('subscriptions', 'server-owned')
+    ('subscriptions', 'server-owned'),
+    ('push_reminder_preferences', 'server-managed user-owned'),
+    ('push_subscriptions', 'server-managed user-owned'),
+    ('push_deliveries', 'server-managed user-owned'),
+    ('push_test_claims', 'server-owned')
 )
 select
   expected.table_name,
@@ -144,6 +148,11 @@ where namespace.nspname = 'public'
     'set_profile_avatar',
     'clear_profile_avatar',
     'profile_avatar_contract',
+    'claim_push_delivery',
+    'complete_push_delivery',
+    'claim_push_test',
+    'purge_stale_push_records',
+    'push_reminder_contract',
     'assert_user_sync_context',
     'enforce_user_sync_generation',
     'advance_account_sync_revision',
@@ -288,6 +297,7 @@ select public.mutable_account_sync_contract() as mutable_account_sync_contract;
 select public.account_sync_contract() as account_sync_contract;
 select public.account_deletion_contract() as account_deletion_contract;
 select public.profile_avatar_contract() as profile_avatar_contract;
+select public.push_reminder_contract() as push_reminder_contract;
 
 -- 9. Unbound security-definer entry points remain absent after 0019.
 select
