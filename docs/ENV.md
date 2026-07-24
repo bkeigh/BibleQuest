@@ -20,6 +20,14 @@ template in [`../.env.example`](../.env.example).
 | `PUSH_SUBSCRIPTION_KEY_VERSION` | Push gate | Positive integer label for the active endpoint-encryption key. |
 | `PUSH_SUBSCRIPTION_ENCRYPTION_KEYS` | Optional rotation secret | **Server-only.** JSON object mapping retained integer key versions to 32-byte base64 keys. |
 | `PUSH_SCHEDULER_SECRET` | Push secret | **Server-only and GitHub Actions secret.** At least 32 random characters shared with the authenticated scheduler route. |
+| `BIBLEQUEST_MONITOR_SUPABASE_URL` | Monitor secret | Exact production Supabase HTTPS origin, stored as a GitHub Actions secret so reports never expose the project host. |
+| `BIBLEQUEST_MONITOR_SUPABASE_ANON_KEY` | Monitor secret | Production publishable key stored as a GitHub Actions secret; used only for anonymous public-content and auth-settings probes. |
+| `BIBLEQUEST_MONITOR_EXPECTED_SHA` | Monitor gate | Non-secret 40-character deployed commit, stored as a repository variable after each approved release. |
+| `BIBLEQUEST_MONITOR_EXPECTED_AUTH_POSTURE` | Monitor gate | Expected bounded health posture; production default is `configured`. |
+| `BIBLEQUEST_MONITOR_EXPECTED_BILLING_MODE` | Monitor gate | Expected bounded billing posture; remains `coming-soon` until approved live billing. |
+| `BIBLEQUEST_MONITOR_VERCEL_PROJECT_ID` | Optional monitor secret | Vercel project identifier for aggregate runtime 5xx inspection. |
+| `BIBLEQUEST_MONITOR_VERCEL_TEAM_ID` | Optional monitor secret | Matching Vercel team identifier. All three Vercel monitor values must be present together. |
+| `BIBLEQUEST_MONITOR_VERCEL_TOKEN` | Optional monitor secret | Narrow, expiring Vercel access token. Log messages and response bodies are never archived. |
 | `NEXT_PUBLIC_ANALYTICS_ENABLED` | Optional | Must be exactly `true`; otherwise analytics is a silent no-op. |
 | `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | Optional | Plausible site domain. Required when analytics is enabled. |
 | `NEXT_PUBLIC_PLAUSIBLE_HOST` | Optional | HTTPS Plausible API origin; defaults to `https://plausible.io`. Paths, credentials, query strings, hashes, and HTTP are rejected. |
@@ -61,6 +69,10 @@ template in [`../.env.example`](../.env.example).
   in `PUSH_SUBSCRIPTION_ENCRYPTION_KEYS` until old subscriptions are replaced.
   Keep the GitHub repository variable `BIBLEQUEST_PUSH_SCHEDULE_ENABLED`
   absent or `false` until the production route is ready.
+- Daily monitoring credentials belong in GitHub Actions secrets, not application
+  Vercel settings. The monitor archives only status, latency, attempt count,
+  fixed failure category, and a validated release SHA. See
+  [`SYNTHETIC_HEALTH.md`](SYNTHETIC_HEALTH.md).
 - The default KJV and other reviewed Free Use Bible API editions are keyless and
   require no environment variable. Their server-side allow-list is intentionally
   separate from API.Bible's future licensed-ID allow-list. See

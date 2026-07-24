@@ -21,6 +21,8 @@
     "check:production-readiness": "node --env-file-if-exists=.env.local scripts/check-production-readiness.mjs",
     "evidence:launch": "node --env-file-if-exists=.env.local scripts/collect-launch-evidence.mjs",
     "test:launch-evidence": "pnpm evidence:launch --phase=preflight --fixture",
+    "synthetic:health": "node --env-file-if-exists=.env.local scripts/run-synthetic-health.mjs",
+    "test:synthetic-health": "vitest run tests/synthetic-health.test.ts",
     "test:watch": "vitest"
   },
   "dependencies": {
