@@ -764,7 +764,10 @@ export const useQuestOS = create<QuestOSState>()(
           const profile = get().profile;
           if (!profile) return;
           const syncedChange = Object.keys(patch).some(
-            (key) => key !== "avatarUpdatedAt" && key !== "updatedAt",
+            (key) =>
+              key !== "avatarVersion" &&
+              key !== "avatarUpdatedAt" &&
+              key !== "updatedAt",
           );
           set({
             profile: {

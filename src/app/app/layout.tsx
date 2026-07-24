@@ -4,6 +4,7 @@ import { MilestoneReveal } from "@/components/journey/MilestoneReveal";
 import { ThemeApplier } from "@/components/app-shell/ThemeApplier";
 import { MotionProvider } from "@/components/app-shell/MotionProvider";
 import { SyncManager } from "@/components/app-shell/SyncManager";
+import { AvatarSyncManager } from "@/components/app-shell/AvatarSyncManager";
 import { PlusProvider } from "@/lib/revenuecat/usePlus";
 import { PRIVATE_APP_METADATA } from "@/lib/metadata";
 
@@ -17,6 +18,7 @@ export default function PrivateAppLayout({
   return (
     <>
       <SyncManager />
+      <AvatarSyncManager />
       <OnboardingGate>
         <PlusProvider>
           <ThemeApplier />

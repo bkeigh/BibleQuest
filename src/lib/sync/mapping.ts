@@ -178,6 +178,9 @@ export interface ProfileRow {
   onboarding_completed: boolean;
   created_at: string;
   updated_at: string;
+  avatar_path?: string | null;
+  avatar_version?: string | null;
+  avatar_updated_at?: string | null;
 }
 
 export interface UserSettingsRow {
@@ -570,6 +573,10 @@ export function rowToProfile(row: ProfileRow): Profile {
     onboardingCompleted: row.onboarding_completed,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    avatarVersion:
+      row.avatar_version === undefined ? undefined : row.avatar_version,
+    avatarUpdatedAt:
+      row.avatar_updated_at === undefined ? undefined : row.avatar_updated_at,
   };
 }
 

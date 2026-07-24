@@ -18,7 +18,18 @@ import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosu
 import { SearchClearButton } from "@/components/design-system/SearchClearButton";
 import { Avatar } from "@/components/profile/Avatar";
 import { applyAppearance } from "@/lib/theme";
-import { saveAvatar, clearAvatar } from "@/lib/utils/avatar";
+import {
+  clearAvatar,
+  clearLegacyAvatar,
+  profileAvatarMarker,
+  saveAvatar,
+  storeRemoteAvatar,
+} from "@/lib/utils/avatar";
+import {
+  deleteRemoteAvatar,
+  uploadRemoteAvatar,
+} from "@/lib/avatar/client";
+import { validateAvatarFile } from "@/lib/avatar/validation";
 import {
   MAX_IMPORT_FILE_BYTES,
   parseSnapshot,
@@ -28,7 +39,7 @@ import { clearAllDeviceLocalJournalDrafts } from "@/lib/questos/journal-drafts";
 import { clearLastSyncedUserId } from "@/lib/sync/last-user";
 import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 import { useSession } from "@/lib/supabase/useSession";
-import { deleteOwnAccount } from "@/lib/auth/account-deletion";
+import { deleteOwnAccountWithAvatar } from "@/lib/auth/account-deletion";
 import { stopSync } from "@/lib/sync/engine";
 import { clearStoredAccountSyncGenerations } from "@/lib/sync/generation";
 import { clearStoredDailyQuestSyncContext } from "@/lib/sync/daily-quests";
@@ -715,6 +726,7 @@ function SettingsInner() {
   const store = useQuestOS;
 
   const [confirmClear, setConfirmClear] = useState(false);
+  const [clearingData, setClearingData] = useState(false);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -725,6 +737,8 @@ function SettingsInner() {
     useState<Partial<QuestOSSnapshot> | null>(null);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const photoUploadControllerRef = useRef<AbortController | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
 
@@ -738,6 +752,14 @@ function SettingsInner() {
   const language = settings.language ?? "en";
   const bibleTranslation =
     settings.preferredBibleTranslation ?? DEFAULT_BIBLE_TRANSLATION_KEY;
+
+  // Cancel an obsolete upload when Settings unmounts or a newer pick starts.
+  useEffect(
+    () => () => {
+      photoUploadControllerRef.current?.abort();
+    },
+    [],
+  );
 
   function setAppearance(patch: Partial<typeof appearance>) {
     const next = { ...appearance, ...patch };
@@ -755,21 +777,71 @@ function SettingsInner() {
   async function onPhotoPicked(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = ""; // reset so re-picking the same file still fires onChange
-    if (!file) return;
-    const ok = await saveAvatar(file);
-    if (ok) {
-      // The photo lives in IndexedDB; the store only carries this marker so
-      // Avatar knows to refetch (and it syncs/exports as a harmless string).
-      updateProfile({ avatarUpdatedAt: new Date().toISOString() });
-      toast(t.settings.photoSaved, { variant: "success" });
-    } else {
+    if (!file || photoBusy) return;
+    setPhotoBusy(true);
+    if (sessionLoading || !(await validateAvatarFile(file))) {
       toast(t.settings.photoError);
+      setPhotoBusy(false);
+      return;
+    }
+
+    photoUploadControllerRef.current?.abort();
+    const controller = new AbortController();
+    photoUploadControllerRef.current = controller;
+    const previousMarker = profileAvatarMarker(profile);
+    try {
+      if (user) {
+        const remote = await uploadRemoteAvatar(file, controller.signal);
+        if (!(await storeRemoteAvatar(remote.blob, remote.version))) {
+          throw new Error("avatar cache unavailable");
+        }
+        updateProfile({
+          avatarVersion: remote.version,
+          avatarUpdatedAt: remote.updatedAt,
+        });
+        await clearLegacyAvatar();
+        if (previousMarker && previousMarker !== remote.version) {
+          await clearAvatar(previousMarker);
+        }
+      } else {
+        const nextMarker = new Date().toISOString();
+        if (!(await saveAvatar(file, nextMarker))) {
+          throw new Error("avatar cache unavailable");
+        }
+        updateProfile({
+          avatarVersion: null,
+          avatarUpdatedAt: nextMarker,
+        });
+        if (previousMarker && previousMarker !== nextMarker) {
+          await clearAvatar(previousMarker);
+        }
+      }
+      toast(t.settings.photoSaved, { variant: "success" });
+    } catch {
+      if (controller.signal.aborted) return;
+      toast(t.settings.photoError);
+    } finally {
+      if (photoUploadControllerRef.current === controller) {
+        photoUploadControllerRef.current = null;
+      }
+      setPhotoBusy(false);
     }
   }
 
   async function removePhoto() {
-    await clearAvatar();
-    updateProfile({ avatarUpdatedAt: null });
+    if (photoBusy) return;
+    setPhotoBusy(true);
+    const currentMarker = profileAvatarMarker(profile);
+    try {
+      if (user) await deleteRemoteAvatar();
+      if (currentMarker) await clearAvatar(currentMarker);
+      await clearLegacyAvatar();
+      updateProfile({ avatarVersion: null, avatarUpdatedAt: null });
+    } catch {
+      toast(t.settings.photoError);
+    } finally {
+      setPhotoBusy(false);
+    }
   }
 
   function exportData() {
@@ -818,7 +890,12 @@ function SettingsInner() {
     );
     // A restore whose profile carries no photo marker must not resurrect a
     // stale on-device photo blob for the incoming profile.
-    if (!pendingImport.profile?.avatarUpdatedAt) void clearAvatar();
+    if (
+      !pendingImport.profile?.avatarVersion &&
+      !pendingImport.profile?.avatarUpdatedAt
+    ) {
+      void clearAvatar();
+    }
     setPendingImport(null);
     applyAppearance(store.getState().settings.appearance);
     toast("Restored.", { variant: "success" });
@@ -838,7 +915,7 @@ function SettingsInner() {
     setDeleteAccountError(false);
 
     try {
-      await deleteOwnAccount();
+      await deleteOwnAccountWithAvatar();
     } catch {
       setDeletingAccount(false);
       setDeleteAccountError(true);
@@ -860,6 +937,23 @@ function SettingsInner() {
     router.replace("/onboarding");
   }
 
+  /** Removes account media before clearing every local and synced journey. */
+  async function clearJourneyData() {
+    if (clearingData) return;
+    setClearingData(true);
+    try {
+      if (user) await deleteRemoteAvatar(true);
+      clearAllData(user ? { purgeAccount: user.id } : undefined);
+      clearAllDeviceLocalJournalDrafts();
+      await clearAvatar();
+      clearLastSyncedUserId();
+      router.replace("/onboarding");
+    } catch {
+      toast("Your data could not be cleared. Nothing on this device was removed.");
+      setClearingData(false);
+    }
+  }
+
   return (
     <>
       <PageHeader title={t.titles.settings} />
@@ -869,7 +963,7 @@ function SettingsInner() {
           <div className="flex items-center gap-4 max-[360px]:flex-col max-[360px]:items-stretch sm:gap-5">
             <Avatar
               name={profile?.displayName}
-              marker={profile?.avatarUpdatedAt}
+              marker={profileAvatarMarker(profile)}
               size="lg"
               className="ring-1 ring-paper/70 shadow-[0_8px_24px_rgb(18_33_27_/_0.12)] max-[360px]:self-center"
             />
@@ -942,7 +1036,7 @@ function SettingsInner() {
                     <input
                       ref={photoInputRef}
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp"
                       className="sr-only"
                       // Proxy-triggered by the visible button; without this
                       // the sr-only input is an invisible tab stop.
@@ -954,15 +1048,17 @@ function SettingsInner() {
                       variant="outline"
                       size="sm"
                       className="min-h-11"
+                      disabled={sessionLoading || photoBusy}
                       onClick={() => photoInputRef.current?.click()}
                     >
-                      {t.settings.changePhoto}
+                      {photoBusy ? "Saving…" : t.settings.changePhoto}
                     </GentleButton>
-                    {profile?.avatarUpdatedAt && (
+                    {profileAvatarMarker(profile) && (
                       <GentleButton
                         variant="text"
                         size="sm"
                         className="min-h-11"
+                        disabled={photoBusy}
                         onClick={removePhoto}
                       >
                         {t.settings.removePhoto}
@@ -1369,24 +1465,10 @@ function SettingsInner() {
                 <GentleButton
                   variant="danger"
                   size="sm"
-                  onClick={() => {
-                    // Signed in, the purge marker condemns the account copy
-                    // too; the sync engine deletes it on the next push or
-                    // initial sync, even if that happens after a reload.
-                    clearAllData(user ? { purgeAccount: user.id } : undefined);
-                    clearAllDeviceLocalJournalDrafts();
-                    // "Everything on this device" includes the profile photo,
-                    // which lives beside the store in IndexedDB.
-                    void clearAvatar();
-                    // The device no longer holds anyone's journey — drop the
-                    // sync-ownership marker so the next sign-in isn't asked
-                    // about data that no longer exists. (If still signed in,
-                    // the next successful push re-stamps it.)
-                    clearLastSyncedUserId();
-                    router.replace("/onboarding");
-                  }}
+                  disabled={clearingData}
+                  onClick={() => void clearJourneyData()}
                 >
-                  Yes, clear everything
+                  {clearingData ? "Clearing…" : "Yes, clear everything"}
                 </GentleButton>
                 <GentleButton
                   variant="ghost"

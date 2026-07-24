@@ -29,6 +29,7 @@ const EXPECTED_MIGRATIONS = [
   "0020_self_service_account_deletion.sql",
   "0021_generation_bound_account_deletion.sql",
   "0022_resilient_account_deletion.sql",
+  "0023_private_profile_avatars.sql",
 ];
 
 /** Hash a migration exactly as the release manifest does. */
@@ -98,9 +99,16 @@ describe("release migration contracts", () => {
     expect(report).toContain("'advance_account_sync_revision'");
     expect(report).toContain("'delete_own_account'");
     expect(report).toContain("'account_deletion_contract'");
+    expect(report).toContain("'profile_avatar_contract'");
+    expect(report).toContain("'set_profile_avatar'");
+    expect(report).toContain("'clear_profile_avatar'");
     expect(report).toContain(
       "select public.account_deletion_contract() as account_deletion_contract;",
     );
+    expect(report).toContain(
+      "select public.profile_avatar_contract() as profile_avatar_contract;",
+    );
+    expect(report).toContain("where schemaname = 'storage'");
     expect(report).toContain("sync_revision");
     expect(report).toContain(
       "select public.mutable_account_sync_contract() as mutable_account_sync_contract;",

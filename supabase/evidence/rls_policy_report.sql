@@ -66,6 +66,30 @@ from pg_catalog.pg_policies
 where schemaname = 'public'
 order by tablename, policyname;
 
+-- Private Storage media must remain owner-only and outside the public schema.
+select
+  schemaname,
+  tablename,
+  policyname,
+  permissive,
+  roles,
+  cmd,
+  qual as using_expression,
+  with_check as with_check_expression
+from pg_catalog.pg_policies
+where schemaname = 'storage'
+  and tablename = 'objects'
+  and policyname like 'profile avatars:%'
+order by policyname;
+
+select
+  id,
+  public,
+  file_size_limit,
+  allowed_mime_types
+from storage.buckets
+where id = 'profile-avatars';
+
 -- 3. Policy counts make missing or unexpected policy names easy to spot.
 select
   tables.tablename,
@@ -117,6 +141,9 @@ where namespace.nspname = 'public'
     'account_sync_contract',
     'delete_own_account',
     'account_deletion_contract',
+    'set_profile_avatar',
+    'clear_profile_avatar',
+    'profile_avatar_contract',
     'assert_user_sync_context',
     'enforce_user_sync_generation',
     'advance_account_sync_revision',
@@ -260,6 +287,7 @@ select public.daily_quest_sync_contract() as daily_quest_sync_contract;
 select public.mutable_account_sync_contract() as mutable_account_sync_contract;
 select public.account_sync_contract() as account_sync_contract;
 select public.account_deletion_contract() as account_deletion_contract;
+select public.profile_avatar_contract() as profile_avatar_contract;
 
 -- 9. Unbound security-definer entry points remain absent after 0019.
 select

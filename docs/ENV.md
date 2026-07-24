@@ -10,6 +10,7 @@ template in [`../.env.example`](../.env.example).
 | `NEXT_PUBLIC_SUPABASE_URL` | Optional | Enables account sync. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Optional | Publishable client key (safe in browser). |
 | `NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED` | Launch gate | Must be exactly `true` to expose account auth and sync after the full migration, RLS, provider, restore, and PWA gates pass. Missing or any other value stays guest-only. |
+| `BIBLEQUEST_AVATAR_SYNC_ENABLED` | Launch gate | **Server-only.** Must be exactly `true` after migration `0023`, private-bucket RLS, two-user isolation, and preview checks pass. Missing or any other value blocks avatar reads/uploads while account deletion cleanup remains available. |
 | `NEXT_PUBLIC_ANALYTICS_ENABLED` | Optional | Must be exactly `true`; otherwise analytics is a silent no-op. |
 | `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | Optional | Plausible site domain. Required when analytics is enabled. |
 | `NEXT_PUBLIC_PLAUSIBLE_HOST` | Optional | HTTPS Plausible API origin; defaults to `https://plausible.io`. Paths, credentials, query strings, hashes, and HTTP are rejected. |

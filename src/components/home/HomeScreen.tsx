@@ -50,6 +50,7 @@ import { usePlus } from "@/lib/revenuecat/usePlus";
 import { ExplorePlusLink } from "@/components/plus/ExplorePlusLink";
 import { homeQuestSummary } from "@/lib/questos/home-quest-summary";
 import { buildHomeQuestGroups } from "@/lib/questos/home-quest-groups";
+import { profileAvatarMarker } from "@/lib/utils/avatar";
 
 function HomeInner() {
   const profile = useQuestOS((s) => s.profile);
@@ -208,7 +209,7 @@ function HomeInner() {
             >
               <Avatar
                 name={profile?.displayName}
-                marker={profile?.avatarUpdatedAt}
+                marker={profileAvatarMarker(profile)}
                 size="lg"
                 className="ring-1 ring-paper/70 shadow-[0_8px_24px_rgb(18_33_27_/_0.14)] max-[360px]:h-[4.5rem] max-[360px]:w-[4.5rem]"
               />

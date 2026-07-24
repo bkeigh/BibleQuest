@@ -1,6 +1,7 @@
 "use client";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { deleteRemoteAvatar } from "@/lib/avatar/client";
 import { createClient } from "@/lib/supabase/client";
 import { withDeadline } from "@/lib/async/deadline";
 
@@ -33,4 +34,13 @@ export async function deleteOwnAccount(
   } catch {
     // The server identity is already gone; device cleanup remains authoritative.
   }
+}
+
+/** Removes Storage ownership first, then deletes the authenticated identity. */
+export async function deleteOwnAccountWithAvatar(
+  removeOwnedAvatars: () => Promise<void> = () => deleteRemoteAvatar(true),
+  deleteAccount: () => Promise<void> = () => deleteOwnAccount(),
+): Promise<void> {
+  await removeOwnedAvatars();
+  await deleteAccount();
 }
