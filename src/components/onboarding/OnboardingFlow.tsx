@@ -278,7 +278,7 @@ function OnboardingInner({
                   mascot="lantern"
                   eyebrow="Home"
                   title="A calm place to begin each day"
-                  body="Your Home brings today’s verse, your active quests, and a simple invitation to pray or reflect into one clear view."
+                  body="Your Home brings today’s verse, your quests, and a simple invitation to pray or reflect into one clear view."
                   points={[
                     "A daily verse chosen for your journey",
                     "Your next faithful steps, easy to find",
@@ -294,7 +294,7 @@ function OnboardingInner({
                   body="Quests are reviewed, practical invitations to serve, pray, read, forgive, give, or slow down."
                   points={[
                     "Choose what fits your real day",
-                    "Keep active quests close until you are ready",
+                    "Keep your quests close until you are ready",
                   ]}
                   onNext={() => goTo(BIBLE_STEP)}
                 />
@@ -633,8 +633,8 @@ function StepFirstQuest({
           Start your journey, {name}
         </h1>
         <p className="mx-auto mt-2 max-w-sm text-small leading-relaxed text-ash">
-          We picked one gentle quest for today. Starting it adds it to your
-          active quests.
+          We picked one gentle quest for today. Choosing it places it in your
+          Quests, ready whenever you are.
         </p>
       </div>
       {quest && (
@@ -683,7 +683,7 @@ function StepPlus({
         More room to go deeper
       </h1>
       <p className="mt-3 text-small leading-relaxed text-charcoal">
-        The heart of BibleQuest stays free. Plus adds unlimited active quests,
+        The heart of BibleQuest stays free. Plus adds unlimited quest windows,
         every wallpaper, and more ways to find the right next step.
       </p>
       <GentleButton

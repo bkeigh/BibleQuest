@@ -29,6 +29,7 @@ describe("HomeQuestDisclosure", () => {
     expect(html).toContain("inert");
     expect(html).toContain(`id="${contentId}"`);
     expect(html).toContain('role="region"');
+    expect(html.match(/role="region"/g)).toHaveLength(1);
     expect(html).toContain("1 active · 1 complete");
   });
 

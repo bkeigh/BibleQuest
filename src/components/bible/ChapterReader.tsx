@@ -90,7 +90,7 @@ function ReaderInner({
   const [readingProgress, setReadingProgress] = useState(0);
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
-  const verseRefs = useRef<Array<HTMLSpanElement | null>>([]);
+  const verseRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const readingRef = useRef<HTMLDivElement>(null);
   const instructionsId = useId();
   const resolved = usePreferredBibleChapter(content, translationOverride);
@@ -393,7 +393,7 @@ function ReaderInner({
             setFocusedVerse(num);
             setSelected(isSel ? null : num);
             if (!isSel) {
-              const safeVerseText = content.verses[i]?.trim();
+              const safeVerseText = persistableVerseText(i);
               if (safeVerseText) {
                 recordRecentVerse({
                   bookSlug: content.bookSlug,
@@ -402,22 +402,23 @@ function ReaderInner({
                   verseStart: num,
                   verseEnd: num,
                   reference: `${content.bookName} ${content.chapter}:${num}`,
-                  // RecentVerse has no translation key, so retain WEB here.
+                  // Open editions keep the wording the person actually read;
+                  // licensed editions still fall back to the bundled WEB.
                   text: safeVerseText,
                 });
               }
             }
           };
           return (
-            <span
+            <button
+              type="button"
               key={num}
               ref={(node) => {
                 verseRefs.current[i] = node;
               }}
               id={`verse-${num}`}
-              role="button"
               tabIndex={!resolved.loading && focusedVerse === num ? 0 : -1}
-              aria-disabled={resolved.loading || undefined}
+              disabled={resolved.loading}
               aria-pressed={isSel}
               aria-current={isTargeted ? "location" : undefined}
               onClick={() => {
@@ -444,7 +445,7 @@ function ReaderInner({
                 }
               }}
               className={cn(
-                "scroll-mt-28 rounded transition-colors",
+                "inline scroll-mt-28 appearance-none rounded border-0 bg-transparent p-0 text-left transition-colors",
                 resolved.loading ? "cursor-wait" : "cursor-pointer",
                 isSel && "bg-gold-500/20",
                 isTargeted && !isSel && "bg-gold-500/15 ring-1 ring-gold-500/35",
@@ -460,7 +461,7 @@ function ReaderInner({
                 {text || "This verse is presented in this edition’s notes."}{" "}
               </span>
               {isSaved && <span className="sr-only">(saved)</span>}
-            </span>
+            </button>
           );
         })}
       </div>

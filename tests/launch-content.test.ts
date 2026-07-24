@@ -73,6 +73,39 @@ describe("launch content catalog", () => {
     expect(home).not.toContain("size={76}");
   });
 
+  it("keeps Bible verse taps semantic and history aligned with the shown edition", () => {
+    const reader = readFileSync(
+      path.join(process.cwd(), "src/components/bible/ChapterReader.tsx"),
+      "utf8",
+    );
+    const bibleIndex = readFileSync(
+      path.join(process.cwd(), "src/components/bible/BibleIndex.tsx"),
+      "utf8",
+    );
+    const questDetail = readFileSync(
+      path.join(process.cwd(), "src/components/quests/QuestDetail.tsx"),
+      "utf8",
+    );
+
+    expect(reader).toContain("<button");
+    expect(reader).not.toContain('role="button"');
+    expect(reader).toContain("persistableVerseText(i)");
+    expect(bibleIndex).toContain("onPresentedText={recordPresentedVerse}");
+    expect(questDetail).toContain("Back to Quests");
+    expect(questDetail).not.toContain("Back to active quests");
+  });
+
+  it("keeps onboarding quest language aligned with the consolidated Home section", () => {
+    const onboarding = readFileSync(
+      path.join(process.cwd(), "src/components/onboarding/OnboardingFlow.tsx"),
+      "utf8",
+    );
+
+    expect(onboarding).toContain("your quests");
+    expect(onboarding).toContain("unlimited quest windows");
+    expect(onboarding).not.toContain("active quests");
+  });
+
   it("uses the approved social preview tagline", () => {
     const iconBuilder = readFileSync(
       path.join(process.cwd(), "scripts/build-icons.mjs"),

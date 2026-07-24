@@ -422,7 +422,7 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
                     href="/app#quests"
                     className="flex"
                   >
-                    Back to active quests
+                    Back to Quests
                   </GentleLink>
                 </div>
               ) : todayPick ? (
