@@ -38,7 +38,6 @@ export const zh: UIStrings = {
   },
   home: {
     todaysVerse: "今日经文",
-    todaysQuests: "今日任务",
     yourGrowth: "你的成长",
     recently: "最近",
     quickPrayer: "简短祷告",
@@ -85,6 +84,9 @@ export const zh: UIStrings = {
     addToToday: "加入今天",
     begin: "开始",
     completedToday: "今天已完成",
+    groupActive: "进行中",
+    groupReady: "待开始",
+    groupCompleted: "已完成",
   },
   dayComplete: {
     title: "今天的一切都完成了。",

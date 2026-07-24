@@ -135,6 +135,7 @@ docs/                   # Codex + setup/deployment/security/content/QA guides
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Vercel + domain
 - [`docs/ENV.md`](docs/ENV.md) — environment variables
 - [`docs/REVENUECAT.md`](docs/REVENUECAT.md) — Plus identity, sandbox QA, and production gates
+- [`docs/PLUS_7_DAY_TRIAL_HANDOFF.md`](docs/PLUS_7_DAY_TRIAL_HANDOFF.md) — founder decisions and safe 7-day trial setup
 - [`SECURITY.md`](SECURITY.md) — RLS, sensitive data, disclosure
 - [`docs/CONTENT_GUIDE.md`](docs/CONTENT_GUIDE.md) — quest/prayer/theology rules
 - [`docs/QA.md`](docs/QA.md) — manual QA checklist

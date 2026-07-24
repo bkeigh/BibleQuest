@@ -7,7 +7,7 @@ interface HomeQuestSummaryInput {
   hiddenReservationCount: number;
 }
 
-/** Builds the compact status line that remains visible while quests are closed. */
+/** Builds the compact status line that remains visible above quest drawers. */
 export function homeQuestSummary({
   activeCount,
   readyCount,
@@ -23,7 +23,10 @@ export function homeQuestSummary({
   }
 
   if (completedCount === visibleCount) {
-    return `${completedCount} of ${visibleCount} complete`;
+    const complete = `${completedCount} of ${visibleCount} complete`;
+    return hiddenReservationCount > 0
+      ? `${complete} · ${hiddenReservationCount} ${hiddenReservationCount === 1 ? "slot" : "slots"} reserved`
+      : complete;
   }
 
   const parts = [
@@ -35,6 +38,9 @@ export function homeQuestSummary({
       : null,
     completedCount > 0
       ? `${completedCount} complete`
+      : null,
+    hiddenReservationCount > 0
+      ? `${hiddenReservationCount} ${hiddenReservationCount === 1 ? "slot" : "slots"} reserved`
       : null,
   ].filter((part): part is string => Boolean(part));
 

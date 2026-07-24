@@ -38,7 +38,6 @@ export const hi: UIStrings = {
   },
   home: {
     todaysVerse: "आज का वचन",
-    todaysQuests: "आज के क्वेस्ट",
     yourGrowth: "आपका विकास",
     recently: "हाल ही में",
     quickPrayer: "छोटी प्रार्थना",
@@ -85,6 +84,9 @@ export const hi: UIStrings = {
     addToToday: "आज में जोड़ें",
     begin: "शुरू करें",
     completedToday: "आज पूरा हुआ",
+    groupActive: "सक्रिय",
+    groupReady: "तैयार",
+    groupCompleted: "पूर्ण",
   },
   dayComplete: {
     title: "आज के लिए बस इतना ही।",

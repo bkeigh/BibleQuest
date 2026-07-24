@@ -38,7 +38,6 @@ export const el: UIStrings = {
   },
   home: {
     todaysVerse: "Ο στίχος της ημέρας",
-    todaysQuests: "Οι σημερινές αποστολές",
     yourGrowth: "Η πρόοδός σου",
     recently: "Πρόσφατα",
     quickPrayer: "Σύντομη προσευχή",
@@ -85,6 +84,9 @@ export const el: UIStrings = {
     addToToday: "Προσθήκη στο σήμερα",
     begin: "Ξεκίνα",
     completedToday: "Έγινε σήμερα",
+    groupActive: "Ενεργές",
+    groupReady: "Έτοιμες",
+    groupCompleted: "Ολοκληρωμένες",
   },
   dayComplete: {
     title: "Αυτά ήταν όλα για σήμερα.",

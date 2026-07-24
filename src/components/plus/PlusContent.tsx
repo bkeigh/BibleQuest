@@ -18,8 +18,10 @@ const FREE_INCLUDES = [
 
 const PLUS_FEATURES = [
   "Unlimited active quest windows",
-  "Generate a reviewed quest by focus, category, and time",
-  "Private, on-device recommendations with no journal data sent away",
+  "Unlimited daily verse refreshes",
+  "The full still and live wallpaper collection",
+  "Find a reviewed quest by focus, category, and time",
+  "Private, on-device recommendations that never read your journals",
   "Support continued free access for the whole community",
 ];
 
@@ -69,9 +71,10 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
           Go deeper, when you’re ready
         </h3>
         <p className="mt-2 text-[0.9375rem] leading-relaxed text-charcoal">
-          Plus adds room for more simultaneous practices and a private way to
-          find the right reviewed quest. It deepens the experience — it never
-          decides how close you are to God.
+          Plus adds more room for quests, more ways to revisit the daily verse,
+          the full wallpaper collection, and a private way to find the right
+          reviewed quest. It deepens the experience — it never decides how
+          close you are to God.
         </p>
         <ul className="mt-4 grid gap-2 sm:grid-cols-2">
           {PLUS_FEATURES.map((f) => (

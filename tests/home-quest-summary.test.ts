@@ -41,6 +41,19 @@ describe("Home quest summary", () => {
     ).toBe("1 active · 2 ready · 1 complete");
   });
 
+  it("keeps a hidden reservation visible beside real quest counts", () => {
+    expect(
+      homeQuestSummary({
+        activeCount: 1,
+        readyCount: 1,
+        completedCount: 0,
+        visibleCount: 2,
+        occupiedCount: 3,
+        hiddenReservationCount: 1,
+      }),
+    ).toBe("1 active · 1 ready · 1 slot reserved");
+  });
+
   it("uses a calmer all-complete summary", () => {
     expect(
       homeQuestSummary({
@@ -52,5 +65,18 @@ describe("Home quest summary", () => {
         hiddenReservationCount: 0,
       }),
     ).toBe("3 of 3 complete");
+  });
+
+  it("retains reserved slots in an all-complete summary", () => {
+    expect(
+      homeQuestSummary({
+        activeCount: 0,
+        readyCount: 0,
+        completedCount: 2,
+        visibleCount: 2,
+        occupiedCount: 3,
+        hiddenReservationCount: 1,
+      }),
+    ).toBe("2 of 2 complete · 1 slot reserved");
   });
 });

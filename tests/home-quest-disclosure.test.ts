@@ -6,7 +6,7 @@ import { HomeQuestDisclosure } from "@/components/home/HomeQuestDisclosure";
 /** Renders the disclosure without requiring a browser event loop. */
 function renderDisclosure(defaultOpen: boolean) {
   const props = {
-    title: "Today’s quests",
+    title: "Quests",
     summary: "1 active · 1 complete",
     announcement: "One of two complete",
     defaultOpen,
@@ -32,7 +32,7 @@ describe("HomeQuestDisclosure", () => {
     expect(html).toContain("1 active · 1 complete");
   });
 
-  it("keeps details available when the empty state starts open", () => {
+  it("keeps details available when the collection starts open", () => {
     const html = renderDisclosure(true);
 
     expect(html).toContain('aria-expanded="true"');

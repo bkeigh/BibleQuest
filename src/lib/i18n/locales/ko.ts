@@ -38,7 +38,6 @@ export const ko: UIStrings = {
   },
   home: {
     todaysVerse: "오늘의 말씀",
-    todaysQuests: "오늘의 실천",
     yourGrowth: "나의 성장",
     recently: "최근",
     quickPrayer: "짧은 기도",
@@ -85,6 +84,9 @@ export const ko: UIStrings = {
     addToToday: "오늘에 추가",
     begin: "시작하기",
     completedToday: "오늘 완료",
+    groupActive: "진행 중",
+    groupReady: "준비됨",
+    groupCompleted: "완료됨",
   },
   dayComplete: {
     title: "오늘 할 일을 모두 마쳤어요.",
