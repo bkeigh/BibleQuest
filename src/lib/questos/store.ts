@@ -1483,9 +1483,18 @@ export const useQuestOS = create<QuestOSState>()(
           const key = recentVerseKey(verse);
           const current = get().recentVerses;
 
-          // Revisiting the passage already at the front of history is a no-op;
-          // avoiding a full persisted-store rewrite keeps Bible entry smooth.
-          if (current[0] && recentVerseKey(current[0]) === key) return;
+          // Revisiting the exact front entry is a no-op. If an open preferred
+          // edition resolves after the WEB fallback, replace the wording so
+          // history matches what the person actually read.
+          if (
+            current[0] &&
+            recentVerseKey(current[0]) === key &&
+            current[0].bookName === verse.bookName &&
+            current[0].reference === verse.reference &&
+            current[0].text === verse.text
+          ) {
+            return;
+          }
 
           const now = new Date().toISOString();
           const next: RecentVerse = { ...verse, viewedAt: now };

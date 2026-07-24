@@ -260,4 +260,29 @@ describe("rolling quest lifecycle", () => {
     expect(recent[0]).toMatchObject({ reference: "John 1:10", text: "Updated exact text" });
     expect(recent.filter((verse) => verse.reference === "John 1:10")).toHaveLength(1);
   });
+
+  it("replaces the front history entry when the displayed edition resolves", () => {
+    const passage = {
+      bookSlug: "john",
+      bookName: "John",
+      chapter: 1,
+      verseStart: 1,
+      verseEnd: 1,
+      reference: "John 1:1",
+    };
+
+    useQuestOS.getState().recordRecentVerse({
+      ...passage,
+      text: "In the beginning was the Word.",
+    });
+    useQuestOS.getState().recordRecentVerse({
+      ...passage,
+      text: "In the beginning was the Word, and the Word was with God.",
+    });
+
+    expect(useQuestOS.getState().recentVerses).toHaveLength(1);
+    expect(useQuestOS.getState().recentVerses[0]?.text).toBe(
+      "In the beginning was the Word, and the Word was with God.",
+    );
+  });
 });

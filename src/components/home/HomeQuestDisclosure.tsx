@@ -53,7 +53,6 @@ export function HomeQuestDisclosure({
   return (
     <section
       id="active-quests"
-      aria-labelledby={triggerId}
       className="scroll-mt-6 outline-none"
     >
       {/* New links use #quests; the section ID preserves old saved links. */}

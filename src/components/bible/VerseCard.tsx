@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { DailyVerse } from "@/lib/questos/types";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
@@ -33,6 +33,7 @@ export function VerseCard({
   anotherVerseLoading = false,
   preview,
   showOpenInChapter = false,
+  onPresentedText,
 }: {
   verse: DailyVerse;
   /**
@@ -53,6 +54,8 @@ export function VerseCard({
   preview?: boolean;
   /** Give Bible surfaces a direct path from the daily passage into context. */
   showOpenInChapter?: boolean;
+  /** Records only wording that BibleQuest may safely persist in history. */
+  onPresentedText?: (text: string) => void;
 }) {
   const { toast } = useToast();
   const t = useStrings();
@@ -64,8 +67,22 @@ export function VerseCard({
   const mayPersistEffectiveText = isRedistributableBibleTranslation(
     resolved.effectiveTranslation,
   );
+  const persistableText =
+    !resolved.loading && mayPersistEffectiveText ? resolved.text : verse.text;
 
   const closeShareSheet = useCallback(() => setShareSheetOpen(false), []);
+
+  // History should match the edition on screen when that wording is safe to
+  // store; licensed editions retain the bundled WEB snapshot instead.
+  useEffect(() => {
+    if (preview || resolved.loading || !onPresentedText) return;
+    onPresentedText(persistableText);
+  }, [
+    onPresentedText,
+    persistableText,
+    preview,
+    resolved.loading,
+  ]);
 
   const verseSegment =
     verse.verseEnd > verse.verseStart
@@ -74,8 +91,7 @@ export function VerseCard({
   const shareTitle = `${verse.reference} — BibleQuest`;
   // Open editions can travel with their attribution. API.Bible content stays
   // transient, so licensed readings share the bundled WEB snapshot instead.
-  const sharedVerseText =
-    !resolved.loading && mayPersistEffectiveText ? resolved.text : verse.text;
+  const sharedVerseText = persistableText;
   const shareText = formatVerseShareText(sharedVerseText, verse.reference);
   const sharePath = `/verse/${verse.bookSlug}/${verse.chapter}/${verseSegment}${
     !resolved.loading &&

@@ -2,7 +2,7 @@
 
 /**
  * The daily landing screen. It composes the local-first QuestOS state into one
- * calm sequence: welcome and candle, today's quest choices, growth, and
+ * calm sequence: welcome and candle, quests, growth, and
  * private next steps. Scripture discovery stays one tap away without competing
  * with the quests that anchor the daily experience.
  */
