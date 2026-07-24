@@ -1,7 +1,7 @@
 # BibleQuest launch upgrades
 
-Status: implementation plan  
-Baseline: `173b1a95a6db8c6abb42d43ac62d0449cbcab50d`  
+Status: implementation plan
+Baseline: `173b1a95a6db8c6abb42d43ac62d0449cbcab50d`
 Prepared: July 24, 2026
 
 ## Guardrails
