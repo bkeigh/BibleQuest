@@ -78,6 +78,90 @@ the evidence.
 | Stripe 3DS | Use hosted Stripe Checkout in test mode with an official 3DS challenge test payment method; complete and cancel separate challenges. | Stripe owns the hosted challenge origin; success reconciles current Subscription state; cancellation grants nothing; BibleQuest CSP gains no Stripe subresource origin. | Billing owner |
 | One-time support | Enable only the test support latch; complete guest and signed-in support, cancel, expire, refund, dispute, resend, and abuse checks from the dedicated matrix. | Server amount/currency and exact hosted origin hold; signed current objects alone update bounded financial state; no account is created, no Plus access appears, and no payment/contact data enters evidence. | Billing owner |
 
+## Manual — exact Email and Google auth workflows
+
+Run this section only on an auth + sync enabled release candidate with two
+disposable accounts and inboxes. A guest-only launch records every active
+provider row `OUT OF SCOPE — APPROVED GUEST-ONLY` and completes the containment
+matrix instead. Record UTC time, immutable deployment SHA, browser/device,
+sanitized Supabase/provider event status, and pass/fail. Never save an email
+address, code, token, callback URL, cookie, user ID, or private content.
+
+### Email
+
+| Case | Action | Pass criteria |
+| --- | --- | --- |
+| New signup and verification | Request passwordless email for a never-used Gmail address. Test the numeric code inside the requesting installed PWA, then use a new message to test the browser link. | Custom sender and branded template appear; matching Supabase and SMTP events exist; each path creates one verified account and reaches only an approved same-origin destination. |
+| Returning login | Fully sign out, close the client, request a fresh message, sign in, then close/reopen again. | One existing account resumes, its owned test state restores, and no second identity or guest-owned state is silently attached. |
+| Single use and expiry | Reuse a consumed code/link; separately use an expired code/link and a link opened in the wrong browser context. | Each fails with bounded recovery copy; no session is created; raw provider text, token, and email never enter the destination URL, logs, analytics, or evidence. |
+| Resend and rate limits | Request again before 60 seconds, after 60 seconds, and repeatedly up to the approved Supabase/provider threshold. | UI cooldown works; server/provider throttling is calm and bounded; Google remains usable; no address-enumeration difference appears. |
+| Recovery/reset | Generate a Supabase `recovery` callback for the disposable account even though BibleQuest advertises passwordless sign-in, not a password-reset UI. | Callback is `private, no-store`, stays same-origin, and reaches only the reviewed recovery posture; malformed/expired recovery credentials create no session or account change. |
+| Email change | Generate and complete the reviewed Supabase `email_change` flow for the disposable account, then repeat with an expired/used credential. | Fresh confirmation preserves the same owner and private rows; old address no longer signs in after provider state settles; invalid credentials change nothing and expose no address/token. |
+| Logout/login | Sign out from settings, navigate/reload/back-forward, then sign in again. | Private UI, avatar URL, billing state, push controls, and sync client clear immediately; no stale account flashes; the same account restores only after verified login. |
+| Sender and spam posture | Deliver fresh messages to Gmail and iCloud; inspect Supabase and SMTP-provider delivery records plus Inbox/Spam placement. | Verified custom domain/sender, SPF/DKIM/DMARC posture, matching delivery events, acceptable placement, reply/support path, and no production use of Supabase’s test sender. |
+
+### Google
+
+| Case | Action | Pass criteria |
+| --- | --- | --- |
+| New signup | From a clean client, choose Google and approve with a never-used disposable Google account. | Consent identifies the reviewed app/domain; callback is canonical and `private, no-store`; exactly one BibleQuest account is created. |
+| Returning login | Sign out, fully close, then choose the same Google account again. | The same owner and test state restore; no duplicate account or guest-state attachment appears. |
+| Cancel and provider error | Cancel at account chooser/consent; separately exercise a safe test provider-error callback. | User returns to bounded recovery UI; no session/account is created and no raw Google error or identifier is exposed. |
+| Wrong account | At the chooser select disposable account B instead of A. | B opens as B with none of A’s identifiers, avatar, billing, push, prayer, reflection, Journey, or settings state. |
+| Redirect defense | Test approved internal `next` values plus external, protocol-relative, encoded, and malformed destinations. | Approved paths remain on the canonical origin; every hostile form is rejected without credential exchange or open redirect. |
+| Logout/login | Sign out, use reload/back-forward, then sign in with Google again. | Session UI and private caches clear on logout; returning login restores only the selected account. |
+| Email collision/linking | Use passwordless email and Google with the same verified disposable address, then repeat with distinct addresses. | Result matches the frozen Supabase identity-linking policy; there is no silent cross-owner merge, orphaned private data, or attacker-controlled linking. Evidence records only “same owner” or “separate owners,” never raw IDs. |
+
+Any unreviewed redirect, token leak, duplicate identity, cross-owner merge,
+address-enumeration behavior, stale private UI, or provider flow that cannot be
+matched to sanitized server logs keeps auth + sync disabled.
+
+## Manual — exact two-user private-data isolation
+
+Use two disposable verified users A and B, separate browser profiles, synthetic
+sentinel content, normal user tokens, and the immutable candidate. Run the
+checked-in pgTAP/RLS report first, then prove the deployed API boundary. Do not
+use the service-role key for negative tests.
+
+| Surface | Required A↔B attempts | Pass criteria |
+| --- | --- | --- |
+| Every user-owned table and view | For every private relation named by the RLS report, test owner create/read/update/delete, cross-owner filtered read, list/enumeration, guessed UUID/natural key, spoofed owner insert/upsert, update, and delete in both directions. | Owner CRUD follows the contract; cross-owner reads are empty and writes are denied or affect zero rows; no count, error, timing, or returned representation leaks another owner. |
+| Prayer, reflection, quest, Bible, Journey, and settings | Create distinct A/B sentinels, reload on second clients, edit/delete, reconnect from offline, and inspect all app list/detail/export surfaces. | Each account sees only its own records; deletion does not resurrect; export contains only the signed-in owner; local drafts never cross accounts. |
+| RPCs and account deletion | Exercise every authenticated RPC with own IDs, B’s guessed IDs, anonymous credentials, stale generation/revision, duplicate request UUIDs, and malformed bounded input; run Clear My Data and full account deletion separately. | `auth.uid()` remains authoritative; anonymous/cross-owner calls fail; retries are idempotent; purge removes only the target owner; B remains unchanged. |
+| Avatar API and Storage | Upload/get/replace/delete each owner’s avatar; try listing, reading, signing, uploading, overwriting, moving, and deleting the other owner’s guessed object key; repeat slow/interrupted uploads. | Bucket stays private; only the owner receives a short-lived URL; guessed keys reveal nothing; invalid/partial files never become current; replacement/deletion removes obsolete ownership safely. |
+| Push | Create preferences and subscriptions for A/B; attempt cross-owner list/update/delete, endpoint reuse, guessed subscription ID, test delivery, and scheduler access. | Browser roles see only their own bounded posture; endpoint ownership cannot be stolen; scheduler/service operations reject user tokens; logout/deletion removes or disables the correct subscriptions only. |
+| Billing and one-time support | Create distinct Stripe test state; try cross-owner status, refresh, Checkout, Portal, guessed app/Stripe identifiers, support rows, and return-query manipulation. | Server derives the owner; browser roles cannot enumerate financial rows; A never receives B’s Portal/entitlement; guest support creates no account; query strings grant nothing. |
+| Account switch and residual state | Use A, sign out, then use B in the same client; repeat after reload, back-forward, offline/reconnect, and service-worker update. | A’s avatar, private text, billing, push, caches, and sync status never flash or reappear for B. |
+
+Save only relation/surface names, operation category, HTTP/result category,
+UTC time, release SHA, browser/device, and pass/fail. Sanitize HAR/screenshots;
+never retain tokens, emails, raw IDs, object keys, private text, Stripe IDs,
+push endpoints/keys, or signed URLs. After evidence is accepted, delete both
+test users, purge their application rows and avatar objects, remove push
+subscriptions, close Stripe test objects where applicable, and record only
+sanitized zero-residual counts.
+
+## Manual — exact multi-device, offline, avatar, and push matrix
+
+Use an iPhone installed PWA, Android installed PWA, desktop Chromium, and
+desktop Safari against one immutable candidate. For worker update/rollback,
+use the approved same-origin non-production alias and record both artifact SHAs.
+
+| Case | Action | Pass criteria |
+| --- | --- | --- |
+| Install and relaunch | Add to Home Screen on iPhone Safari and Android Chrome; install/use desktop Chromium where offered; open normally in desktop Safari; close/relaunch each twice. | Correct icon/name/start URL, standalone posture on phones, safe-area layout, retained local/session posture, and no unexpected account or payment control. |
+| Avatar sync | Upload on one device, observe on the other three, replace on a second device, then delete on a third. | Current avatar converges everywhere after normal refresh signals; stale signed URLs fail safely; no old/account-switched avatar flash appears. |
+| Slow/interrupted upload | Throttle upload, disconnect mid-request, retry the same valid file, then try oversized, wrong-type, corrupt, and decompression-heavy files. | Calm bounded failure; no partial current avatar; retry succeeds once; server-decoded limits hold; temporary/obsolete objects do not accumulate. |
+| Offline edits and conflicts | While one device is offline, create/edit/delete prayer, reflection, quest, Bible, Journey, and settings state from both clients; reconnect in both orders. | Local work survives close/reopen; merge/CAS rules converge without duplication, resurrection, completion loss, silent overwrite, or retry loop. |
+| Service-worker update and rollback | Load the compatible old artifact, fully close, remap the controlled alias to candidate, relaunch twice, then rehearse the approved compatible rollback. | Worker becomes `biblequest-v21`; only allowlisted public shells/assets are cached; no auth/API/private response is cached; update and rollback do not strand the app. |
+| Push subscribe/unsubscribe | On each supported platform, grant permission only after the in-app action, subscribe, send a test reminder, change time/timezone, unsubscribe, and revoke browser permission. | One owner-bound subscription per endpoint; foreground/background behavior is honest; changes converge; unsubscribe/revocation stops delivery without affecting another device. Unsupported Safari/device posture is explicit, not reported as pass. |
+| Logout and deletion | With multiple active devices and push subscriptions, log out one device, then delete the disposable account from another; reopen all clients online and offline. | Logged-out client clears private UI/subscription posture; deletion purges/detaches reviewed data, prevents later push, and no offline client resurrects the account. |
+
+Record platform/OS/browser versions, UTC time, immutable SHA, worker version,
+network posture, sanitized provider/event category, and pass/fail. Never record
+private content, accounts, notification endpoints/keys, signed avatar URLs,
+payment/contact data, cookies, tokens, or raw identifiers.
+
 ## Manual — guest-only containment
 
 Run this matrix whenever the launch record selects guest-only. Use a clean
