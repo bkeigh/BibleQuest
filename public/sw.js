@@ -4,7 +4,7 @@
  * validated build assets. Prayers, reflections, and other user data continue
  * to live in the persisted Zustand store; this worker never handles that data.
  */
-const CACHE_VERSION = "biblequest-v15";
+const CACHE_VERSION = "biblequest-v21";
 const CACHE_OWNER_PREFIX = "biblequest-";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
@@ -75,6 +75,16 @@ const PRECACHE_PATHS = [
 ];
 
 const OFFLINE_PATH = "/offline";
+const PUSH_KINDS = new Set([
+  "daily_verse",
+  "daily_quest",
+  "prayer_reminder",
+  "weekly_recap",
+  "test",
+]);
+const PUSH_TITLE = "A gentle BibleQuest reminder";
+const PUSH_BODY = "A quiet moment is ready whenever you are.";
+const PUSH_TARGET = "/app";
 
 // Default-deny navigation policy. Dynamic entries below are limited to known,
 // public-content route families; account, billing, auth, and marketing routes
@@ -168,6 +178,25 @@ function isResponseCacheable(response) {
   if (response.headers.has("set-cookie")) return false;
 
   return true;
+}
+
+function pushKind(data) {
+  try {
+    const value = data?.json();
+    if (
+      !value ||
+      typeof value !== "object" ||
+      Array.isArray(value) ||
+      Object.keys(value).sort().join(",") !== "kind,version" ||
+      value.version !== 1 ||
+      !PUSH_KINDS.has(value.kind)
+    ) {
+      return null;
+    }
+    return value.kind;
+  } catch {
+    return null;
+  }
 }
 
 function absoluteUrl(pathname) {
@@ -305,6 +334,46 @@ self.addEventListener("message", (event) => {
   }
 });
 
+// Payloads carry only a bounded kind. Visible copy and navigation are fixed in
+// the worker so no prayer, journal, quest, or Scripture text can reach a lock
+// screen even if an upstream scheduler regresses.
+self.addEventListener("push", (event) => {
+  const kind = pushKind(event.data);
+  if (!kind) return;
+  event.waitUntil(
+    self.registration.showNotification(PUSH_TITLE, {
+      body: PUSH_BODY,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/favicon-48.png",
+      tag: `biblequest-reminder-${kind}`,
+      renotify: false,
+      silent: false,
+      data: { target: PUSH_TARGET },
+    })
+  );
+});
+
+// Notification clicks can focus or open only the fixed same-origin app shell.
+self.addEventListener("notificationclick", (event) => {
+  if (!event.notification?.tag?.startsWith("biblequest-reminder-")) return;
+  event.notification.close();
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then(async (clients) => {
+        for (const client of clients) {
+          const url = new URL(client.url);
+          if (url.origin !== self.location.origin) continue;
+          if (typeof client.navigate === "function") {
+            await client.navigate(PUSH_TARGET);
+          }
+          return client.focus();
+        }
+        return self.clients.openWindow(PUSH_TARGET);
+      })
+  );
+});
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -335,6 +404,10 @@ if (self.__BIBLEQUEST_SW_TESTING__) {
     CURRENT_CACHES,
     PRECACHE_PATHS,
     PIXEL_ASSET_PATHS,
+    PUSH_KINDS,
+    PUSH_TITLE,
+    PUSH_BODY,
+    PUSH_TARGET,
     OFFLINE_SAFE_NAVIGATION_PATHS,
     isForbiddenPath,
     isRequestCacheCandidate,
@@ -343,5 +416,6 @@ if (self.__BIBLEQUEST_SW_TESTING__) {
     isImmutableStaticRequest,
     isPixelAssetRequest,
     isResponseCacheable,
+    pushKind,
   });
 }

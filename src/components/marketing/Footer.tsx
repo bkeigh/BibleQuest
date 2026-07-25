@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { SUPPORT_EMAIL, SUPPORT_EMAIL_HREF } from "@/lib/brand";
 
 export function Footer() {
   return (
@@ -36,7 +37,7 @@ export function Footer() {
               <FooterLink href="/writing">Writing</FooterLink>
               <FooterLink href="/churches">Churches</FooterLink>
               <a
-                href="mailto:hello@biblequest.co"
+                href={SUPPORT_EMAIL_HREF}
                 className="text-ash transition-colors hover:text-accent"
               >
                 Contact
@@ -44,7 +45,7 @@ export function Footer() {
             </FooterCol>
             <FooterCol title="Legal">
               <FooterLink href="/privacy">Privacy</FooterLink>
-              <FooterLink href="/terms">Terms</FooterLink>
+              <FooterLink href="/terms">Terms of Use</FooterLink>
             </FooterCol>
           </div>
         </div>
@@ -53,10 +54,10 @@ export function Footer() {
           <p>
             © {new Date().getFullYear()} BibleQuest ·{" "}
             <a
-              href="mailto:hello@biblequest.co"
+              href={SUPPORT_EMAIL_HREF}
               className="transition-colors hover:text-accent"
             >
-              hello@biblequest.co
+              {SUPPORT_EMAIL}
             </a>
           </p>
           <p>WEB bundled offline · Online editions attributed in context.</p>

@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/.next-header-*/
+/artifacts/synthetic-health/
 
 # next.js
 /.next/
@@ -37,6 +39,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local Codex worktrees and generated wallpaper source renders
+/.codex-worktrees/
+/output/live-wallpapers/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.env*.local

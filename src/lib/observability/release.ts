@@ -1,5 +1,6 @@
 import observability from "../../../config/observability.json";
-import { parseRevenueCatConfiguration } from "@/lib/revenuecat/config";
+import { stripeBillingAvailability } from "@/lib/billing/config";
+import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 
 const SHA = /^[a-f0-9]{40}$/i;
 
@@ -19,7 +20,9 @@ export interface ReleaseHealth {
   schema_contract: string;
   content_contract: string;
   service_worker_version: string;
-  billing_mode: "coming-soon" | "sandbox" | "live" | "invalid";
+  billing_mode: "coming-soon" | "test" | "live" | "invalid";
+  billing_purchases_enabled: boolean;
+  billing_support_enabled: boolean;
 }
 
 type PublicEnvironment = Record<string, string | undefined>;
@@ -31,10 +34,15 @@ function safeSha(value: string | undefined): string | null {
 }
 
 /** Reports configuration shape without exposing a Supabase host or key. */
-function authPosture(env: PublicEnvironment): AuthPosture {
+function authPosture(
+  env: PublicEnvironment,
+  accountSyncContained: boolean,
+): AuthPosture {
   const hasUrl = Boolean(env.NEXT_PUBLIC_SUPABASE_URL?.trim());
   const hasKey = Boolean(env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim());
-  if (hasUrl && hasKey) return "configured";
+  if (hasUrl && hasKey) {
+    return accountSyncContained ? "guest-only" : "configured";
+  }
   if (!hasUrl && !hasKey) return "guest-only";
   return "invalid";
 }
@@ -48,23 +56,32 @@ function analyticsPosture(env: PublicEnvironment): AnalyticsPosture {
   return "configured";
 }
 
-/** Collapses the RevenueCat parser to the only billing states safe for health. */
-function billingMode(env: PublicEnvironment): ReleaseHealth["billing_mode"] {
-  const billing = parseRevenueCatConfiguration(
-    env.NEXT_PUBLIC_REVENUECAT_BILLING_MODE,
-    env.NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY,
-  );
-  return billing.status === "coming-soon" ||
-    billing.status === "sandbox" ||
-    billing.status === "live"
-    ? billing.status
-    : "invalid";
+/** Collapses full Stripe configuration to bounded mode and purchase posture. */
+function billingPosture(env: PublicEnvironment): {
+  mode: ReleaseHealth["billing_mode"];
+  purchasesEnabled: boolean;
+  supportEnabled: boolean;
+} {
+  const billing = stripeBillingAvailability(env);
+  return billing.status === "configured"
+    ? {
+        mode: billing.mode,
+        purchasesEnabled: billing.purchasesEnabled,
+        supportEnabled: billing.supportEnabled,
+      }
+    : {
+        mode: billing.status === "coming-soon" ? "coming-soon" : "invalid",
+        purchasesEnabled: false,
+        supportEnabled: false,
+      };
 }
 
 /** Builds a content-free release identity for external health evidence. */
 export function buildReleaseHealth(
   env: PublicEnvironment = process.env,
+  accountSyncContained = ACCOUNT_SYNC_CONTAINED,
 ): ReleaseHealth {
+  const billing = billingPosture(env);
   return {
     status: "ok",
     app: "biblequest",
@@ -74,11 +91,13 @@ export function buildReleaseHealth(
     canonical_origin: observability.canonicalOrigin,
     canonical_origin_matches:
       env.NEXT_PUBLIC_APP_URL?.trim() === observability.canonicalOrigin,
-    auth_posture: authPosture(env),
+    auth_posture: authPosture(env, accountSyncContained),
     analytics_posture: analyticsPosture(env),
     schema_contract: observability.schemaContract,
     content_contract: observability.contentContract,
     service_worker_version: observability.serviceWorkerVersion,
-    billing_mode: billingMode(env),
+    billing_mode: billing.mode,
+    billing_purchases_enabled: billing.purchasesEnabled,
+    billing_support_enabled: billing.supportEnabled,
   };
 }

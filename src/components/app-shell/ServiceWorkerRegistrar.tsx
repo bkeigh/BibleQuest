@@ -21,6 +21,8 @@ export function ServiceWorkerRegistrar() {
 
     let reported = false;
     let versionTimer: number | null = null;
+    let observedRegistration: ServiceWorkerRegistration | null = null;
+    let observedInstallingWorker: ServiceWorker | null = null;
     const reportOnce = (
       outcome: "success" | "failure",
       version?: string,
@@ -53,6 +55,38 @@ export function ServiceWorkerRegistrar() {
         reportOnce("failure");
       }
     };
+
+    // Challenge each newly controlling worker so an old active worker cannot
+    // turn a normal v14 -> v15 upgrade into a false registration failure.
+    const challengeWorker = (worker?: ServiceWorker | null) => {
+      worker?.postMessage({ type: "BIBLEQUEST_SW_VERSION_REQUEST" });
+    };
+    const onControllerChange = () => {
+      challengeWorker(navigator.serviceWorker.controller);
+    };
+    const onInstallingStateChange = () => {
+      if (observedInstallingWorker?.state === "activated") {
+        challengeWorker(
+          navigator.serviceWorker.controller ?? observedRegistration?.active,
+        );
+      }
+    };
+    const observeInstallingWorker = (registration: ServiceWorkerRegistration) => {
+      if (observedInstallingWorker) {
+        observedInstallingWorker.removeEventListener(
+          "statechange",
+          onInstallingStateChange,
+        );
+      }
+      observedInstallingWorker = registration.installing;
+      observedInstallingWorker?.addEventListener(
+        "statechange",
+        onInstallingStateChange,
+      );
+    };
+    const onUpdateFound = () => {
+      if (observedRegistration) observeInstallingWorker(observedRegistration);
+    };
     const onLoad = () => {
       versionTimer = window.setTimeout(
         () => reportOnce("failure"),
@@ -60,21 +94,35 @@ export function ServiceWorkerRegistrar() {
       );
       void navigator.serviceWorker
         .register("/sw.js")
-        .then(async () => {
-          const registration = await navigator.serviceWorker.ready;
-          registration.active?.postMessage({
-            type: "BIBLEQUEST_SW_VERSION_REQUEST",
-          });
+        .then(async (registration) => {
+          observedRegistration = registration;
+          registration.addEventListener("updatefound", onUpdateFound);
+          observeInstallingWorker(registration);
+          const readyRegistration = await navigator.serviceWorker.ready;
+          challengeWorker(readyRegistration.active);
         })
         .catch(() => reportOnce("failure"));
     };
     navigator.serviceWorker.addEventListener("message", onMessage);
+    navigator.serviceWorker.addEventListener(
+      "controllerchange",
+      onControllerChange,
+    );
     if (document.readyState === "complete") onLoad();
     else window.addEventListener("load", onLoad, { once: true });
     return () => {
       if (versionTimer) window.clearTimeout(versionTimer);
       window.removeEventListener("load", onLoad);
       navigator.serviceWorker.removeEventListener("message", onMessage);
+      navigator.serviceWorker.removeEventListener(
+        "controllerchange",
+        onControllerChange,
+      );
+      observedRegistration?.removeEventListener("updatefound", onUpdateFound);
+      observedInstallingWorker?.removeEventListener(
+        "statechange",
+        onInstallingStateChange,
+      );
     };
   }, []);
   return null;

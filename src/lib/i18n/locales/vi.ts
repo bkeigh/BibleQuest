@@ -38,7 +38,6 @@ export const vi: UIStrings = {
   },
   home: {
     todaysVerse: "Câu Kinh Thánh hôm nay",
-    todaysQuests: "Việc lành hôm nay",
     yourGrowth: "Bước tiến của bạn",
     recently: "Gần đây",
     quickPrayer: "Lời nguyện ngắn",
@@ -85,6 +84,9 @@ export const vi: UIStrings = {
     addToToday: "Thêm vào hôm nay",
     begin: "Bắt đầu",
     completedToday: "Đã xong hôm nay",
+    groupActive: "Đang làm",
+    groupReady: "Sẵn sàng",
+    groupCompleted: "Đã hoàn thành",
   },
   dayComplete: {
     title: "Hôm nay thế là trọn vẹn.",

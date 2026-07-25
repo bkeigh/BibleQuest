@@ -11,6 +11,7 @@ export function currentSnapshot(): QuestOSSnapshot {
       displayName: "Fixture Person",
       onboardingCompleted: true,
       createdAt: FIXED_NOW,
+      updatedAt: FIXED_NOW,
     },
     settings: {
       ...DEFAULT_SETTINGS,
@@ -18,6 +19,8 @@ export function currentSnapshot(): QuestOSSnapshot {
       notifications: { ...DEFAULT_SETTINGS.notifications },
       questDurationPreference: [...DEFAULT_SETTINGS.questDurationPreference],
       questCategoryPreference: [...DEFAULT_SETTINGS.questCategoryPreference],
+      updatedAt: FIXED_NOW,
+      notificationsUpdatedAt: FIXED_NOW,
     },
     assignments: {
       "2026-07-16": [

@@ -84,7 +84,7 @@ docker exec -i supabase_db_BibleQuest \
   < supabase/evidence/rls_policy_report.sql
 ```
 
-All 27 public tables must show `rowsecurity = true`; verify policy roles and
+All 28 public tables must show `rowsecurity = true`; verify policy roles and
 expressions in the same report. See [`../SECURITY.md`](../SECURITY.md).
 
 ## 3. Bible content
@@ -148,16 +148,17 @@ node scripts/build-icons.mjs   # rebuilds icon.svg, PWA icons, favicon.ico + OG 
 
 ## 7. Enable one-time Stripe support (optional)
 
-Create and review a Stripe Payment Link in the intended test or live Stripe
-environment, then set the complete link as a server-only variable:
+Apply migration `0026`, finish the direct Stripe test configuration from
+[`STRIPE_TEST_BILLING.md`](STRIPE_TEST_BILLING.md), and enable only the
+separate support latch in a local or Preview environment:
 
 ```bash
-STRIPE_DONATION_URL=https://buy.stripe.com/...
+BIBLEQUEST_STRIPE_SUPPORT_ENABLED=true
 ```
 
-Visitors enter through `/support`; `/api/support/checkout` validates the URL
-again before redirecting. Only exact HTTPS `buy.stripe.com` links with one clean
-path segment are accepted. Missing, whitespace-damaged, query-bearing, or
-non-Stripe values fail closed and show “Donations are temporarily unavailable.”
-Do not add `NEXT_PUBLIC_` to this variable, and do not place donor-identifying
-prefill data in the configured URL.
+Visitors enter through `/support`. The same-origin POST route validates a fixed
+USD amount, creates an idempotent Stripe-hosted Checkout Session server-side,
+and returns only an exact `https://checkout.stripe.com` URL. Guest support does
+not create an app account. Production remains disabled until the complete
+receipt, refund, webhook, rate-limit, legal, and device matrix in
+[`STRIPE_ONE_TIME_SUPPORT.md`](STRIPE_ONE_TIME_SUPPORT.md) passes.

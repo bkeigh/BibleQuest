@@ -38,7 +38,6 @@ export const ro: UIStrings = {
   },
   home: {
     todaysVerse: "Versetul zilei",
-    todaysQuests: "Misiunile de azi",
     yourGrowth: "Creșterea ta",
     recently: "De curând",
     quickPrayer: "Rugăciune scurtă",
@@ -85,6 +84,9 @@ export const ro: UIStrings = {
     addToToday: "Adaugă pentru azi",
     begin: "Începe",
     completedToday: "Încheiată azi",
+    groupActive: "Active",
+    groupReady: "Pregătite",
+    groupCompleted: "Încheiate",
   },
   dayComplete: {
     title: "Atât pentru astăzi.",

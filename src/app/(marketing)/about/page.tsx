@@ -3,12 +3,14 @@ import {
   Prose,
   ProseHeading,
 } from "@/components/marketing/MarketingPage";
+import { marketingMetadata } from "@/lib/metadata";
 
-export const metadata = {
+export const metadata = marketingMetadata({
   title: "About",
   description:
     "BibleQuest helps Christians grow closer to God through Scripture, prayer, reflection, and small daily acts of faith — without shame, pressure, or noise.",
-};
+  path: "/about",
+});
 
 export default function AboutPage() {
   return (

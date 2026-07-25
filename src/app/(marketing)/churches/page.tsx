@@ -4,12 +4,15 @@ import {
   ProseHeading,
 } from "@/components/marketing/MarketingPage";
 import { GentleLink } from "@/components/design-system/GentleButton";
+import { marketingMetadata } from "@/lib/metadata";
+import { SUPPORT_EMAIL, SUPPORT_EMAIL_HREF } from "@/lib/brand";
 
-export const metadata = {
+export const metadata = marketingMetadata({
   title: "For Churches",
   description:
     "BibleQuest helps faith become a daily rhythm through the week. Church and small-group tools are on the way.",
-};
+  path: "/churches",
+});
 
 export default function ChurchesPage() {
   return (
@@ -39,10 +42,10 @@ export default function ChurchesPage() {
         discipleship, we’d love your honest feedback on what would actually be
         useful for your community. Write to us at{" "}
         <a
-          href="mailto:hello@biblequest.co"
+          href={SUPPORT_EMAIL_HREF}
           className="text-accent underline underline-offset-4"
         >
-          hello@biblequest.co
+          {SUPPORT_EMAIL}
         </a>{" "}
         — we read everything.
       </Prose>

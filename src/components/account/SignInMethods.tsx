@@ -16,23 +16,46 @@ import {
 } from "@/lib/observability/client-signals";
 import { authCallbackPath } from "@/lib/auth/redirect";
 import {
+  emailOtpFailure,
   emailRequestFailure,
   oauthRequestFailure,
   type AuthRequestFailure,
 } from "@/lib/auth/errors";
+import {
+  ACCOUNT_SYNC_CONTAINED,
+  ACCOUNT_SYNC_CONTAINMENT_NOTICE,
+} from "@/lib/sync/containment";
+import { withDeadline } from "@/lib/async/deadline";
 
 type EmailStatus = "idle" | "sending" | "requested";
 
 // A quick client-side affordance. Supabase remains the source of truth.
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-/** Supabase's default per-address magic-link window is 60 seconds. */
+const EMAIL_OTP = /^\d{6,8}$/;
+/** Supabase's default per-address passwordless-email window is 60 seconds. */
 const RESEND_COOLDOWN_SECONDS = 60;
+const AUTH_REQUEST_DEADLINE_MS = 12_000;
+
+/** Only explicit enrollment may let Supabase create a new email identity. */
+export function shouldCreateAccount(intent: "create" | "signin"): boolean {
+  return intent === "create";
+}
+
+/** Keeps pasted email codes numeric and within Supabase's supported range. */
+export function normalizeEmailOtp(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 8);
+}
+
+/** Accepts current hosted and local Supabase email-code lengths. */
+export function isEmailOtpReady(value: string): boolean {
+  return EMAIL_OTP.test(value);
+}
 
 interface SignInMethodsProps {
   source: "account" | "onboarding";
   /** Changes account creation copy and prevents email signup in returning-user mode. */
   intent?: "create" | "signin";
-  /** Fired after Supabase accepts a magic-link request (not a delivery claim). */
+  /** Fired after Supabase accepts an email request (not a delivery claim). */
   onEmailSent?: () => void;
   /** Lets onboarding expose its local fallback after auth is unavailable. */
   onUnavailable?: () => void;
@@ -50,6 +73,8 @@ export function SignInMethods({
   const [email, setEmail] = useState("");
   const [requestedEmail, setRequestedEmail] = useState("");
   const [emailStatus, setEmailStatus] = useState<EmailStatus>("idle");
+  const [emailOtp, setEmailOtp] = useState("");
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resending, setResending] = useState(false);
   const [oauthPending, setOauthPending] = useState(false);
@@ -89,13 +114,17 @@ export function SignInMethods({
     }
 
     try {
-      const { error: requestError } = await createClient().auth.signInWithOtp({
-        email: address,
-        options: {
-          emailRedirectTo: callbackUrl(),
-          shouldCreateUser: intent === "create",
-        },
-      });
+      const { error: requestError } = await withDeadline(
+        createClient().auth.signInWithOtp({
+          email: address,
+          options: {
+            emailRedirectTo: callbackUrl(),
+            shouldCreateUser: shouldCreateAccount(intent),
+          },
+        }),
+        AUTH_REQUEST_DEADLINE_MS,
+        "Email sign-in request",
+      );
       if (requestError) {
         reportClientSignal({
           surface: "auth",
@@ -109,6 +138,7 @@ export function SignInMethods({
       }
 
       setRequestedEmail(address);
+      setEmailOtp("");
       setEmailStatus("requested");
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
       reportClientSignal({
@@ -132,15 +162,68 @@ export function SignInMethods({
     }
   }
 
+  /** Completes auth in the current storage context, including an installed PWA. */
+  async function verifyEmailCode() {
+    if (!isEmailOtpReady(emailOtp) || verifyingOtp) return;
+
+    setError(null);
+    setVerifyingOtp(true);
+    try {
+      const { error: verificationError } = await withDeadline(
+        createClient().auth.verifyOtp({
+          email: requestedEmail,
+          token: emailOtp,
+          type: "email",
+        }),
+        AUTH_REQUEST_DEADLINE_MS,
+        "Email-code verification",
+      );
+      if (verificationError) {
+        reportClientSignal({
+          surface: "auth",
+          stage: "verify_email",
+          outcome: "failure",
+          category: classifyOperationalError(verificationError, online()),
+        });
+        showFailure(emailOtpFailure(verificationError, online()));
+        return;
+      }
+
+      reportClientSignal({
+        surface: "auth",
+        stage: "verify_email",
+        outcome: "success",
+        category: "ok",
+      });
+      setEmailOtp("");
+      // Supabase emits SIGNED_IN in this same PWA context. The shared session
+      // hook verifies the user and advances the existing account flow.
+    } catch (verificationError) {
+      reportClientSignal({
+        surface: "auth",
+        stage: "verify_email",
+        outcome: "failure",
+        category: classifyOperationalError(verificationError, online()),
+      });
+      showFailure(emailOtpFailure(verificationError, online()));
+    } finally {
+      setVerifyingOtp(false);
+    }
+  }
+
   async function oauth(provider: "google") {
     setError(null);
     setOauthPending(true);
     track("sign_in_started", { method: "google", source });
     try {
-      const { error: requestError } = await createClient().auth.signInWithOAuth({
-        provider,
-        options: { redirectTo: callbackUrl() },
-      });
+      const { error: requestError } = await withDeadline(
+        createClient().auth.signInWithOAuth({
+          provider,
+          options: { redirectTo: callbackUrl() },
+        }),
+        AUTH_REQUEST_DEADLINE_MS,
+        "Google sign-in request",
+      );
       if (requestError) {
         reportClientSignal({
           surface: "auth",
@@ -164,6 +247,15 @@ export function SignInMethods({
     }
   }
 
+  // Defense in depth for any enrollment surface missed by a parent gate.
+  if (ACCOUNT_SYNC_CONTAINED) {
+    return (
+      <p role="status" className="text-small leading-relaxed text-ash">
+        {ACCOUNT_SYNC_CONTAINMENT_NOTICE}
+      </p>
+    );
+  }
+
   if (emailStatus === "requested") {
     return (
       <div>
@@ -176,13 +268,63 @@ export function SignInMethods({
             Check your email
           </p>
           <p className="mt-1 break-all text-center text-caption text-accent-ink">
-            We requested a sign-in link for {requestedEmail}.
+            We requested a secure sign-in email for {requestedEmail}.
           </p>
           <p className="mt-2 text-center text-caption leading-relaxed text-ash">
             Delivery can take a minute. Check Spam or Junk, and search for
-            “BibleQuest.” The link can only be used once.
+            “BibleQuest.” The code and link can only be used once.
           </p>
         </div>
+
+        <form
+          className="mt-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void verifyEmailCode();
+          }}
+        >
+          <label
+            htmlFor="signin-email-code"
+            className="mb-1.5 block text-caption text-ash"
+          >
+            Sign-in code
+          </label>
+          <input
+            id="signin-email-code"
+            type="text"
+            inputMode="numeric"
+            enterKeyHint="done"
+            autoComplete="one-time-code"
+            pattern="[0-9]*"
+            value={emailOtp}
+            onChange={(event) => {
+              setEmailOtp(normalizeEmailOtp(event.target.value));
+              setError(null);
+            }}
+            placeholder="Enter the code"
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? "signin-error" : "pwa-code-help"}
+            className="w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-center font-mono text-[1.25rem] tracking-[0.22em] text-graphite outline-none focus:border-accent/50"
+          />
+          <p
+            id="pwa-code-help"
+            className="mt-2 text-center text-caption leading-relaxed text-ash"
+          >
+            Using the Home Screen app? Stay here and enter the code instead of
+            opening the email link in Safari.
+          </p>
+          <GentleButton
+            type="submit"
+            variant="primary"
+            size="md"
+            fullWidth
+            className="mt-3"
+            disabled={!isEmailOtpReady(emailOtp) || verifyingOtp || resending}
+            aria-busy={verifyingOtp}
+          >
+            {verifyingOtp ? "Signing in…" : "Sign in with code"}
+          </GentleButton>
+        </form>
 
         {error && <FailureNotice failure={error} />}
 
@@ -192,20 +334,22 @@ export function SignInMethods({
             variant="ghost"
             size="sm"
             onClick={() => void requestLink(true)}
-            disabled={resendCooldown > 0 || resending}
+            disabled={resendCooldown > 0 || resending || verifyingOtp}
           >
             {resending
               ? "Requesting…"
               : resendCooldown > 0
-                ? `Request another (${resendCooldown}s)`
-                : "Request another link"}
+                ? `Request another email (${resendCooldown}s)`
+                : "Request another email"}
           </GentleButton>
           <GentleButton
             type="button"
             variant="ghost"
             size="sm"
+            disabled={verifyingOtp}
             onClick={() => {
               setEmailStatus("idle");
+              setEmailOtp("");
               setError(null);
             }}
           >
@@ -221,7 +365,7 @@ export function SignInMethods({
           size="md"
           fullWidth
           onClick={() => void oauth("google")}
-          disabled={oauthPending || resending}
+          disabled={oauthPending || resending || verifyingOtp}
           aria-busy={oauthPending}
         >
           {oauthPending ? "Opening Google…" : "Continue with Google instead"}
@@ -273,7 +417,7 @@ export function SignInMethods({
             ? "Requesting…"
             : intent === "create"
               ? "Create account with email"
-              : "Email me a sign-in link"}
+              : "Email me a sign-in code"}
         </GentleButton>
       </form>
 

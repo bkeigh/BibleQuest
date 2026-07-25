@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import { parseRevenueCatConfiguration } from "./src/lib/revenuecat/config";
 
 /**
  * Security headers (applied to every route via `headers()` below).
@@ -11,8 +10,7 @@ import { parseRevenueCatConfiguration } from "./src/lib/revenuecat/config";
  * client actually talks to (see the enumerated list in each directive):
  *   - Supabase auth + PostgREST sync → exact configured HTTPS origin
  *   - Plausible Events API       → configured HTTPS origin, when enabled
- *   - RevenueCat SDK/paywall origins → only in explicit sandbox/live mode
- *   - Stripe origins → only in explicit live mode
+ *   - Stripe Checkout/Portal → top-level hosted redirects, no CSP source needed
  *   - Tally newsletter widget + iframe → exact HTTPS origin
  *   - Fonts (Fraunces, Inter via next/font; Ithaca local) → self (all self-hosted)
  *   - Icons / OG image / next/image (local) → self
@@ -20,13 +18,6 @@ import { parseRevenueCatConfiguration } from "./src/lib/revenuecat/config";
  *   - Service worker (/sw.js) + web manifest → self
  */
 const isProduction = process.env.NODE_ENV === "production";
-const revenueCatAssetOrigin = "https://da08ctfrofx1b.cloudfront.net";
-const revenueCat = parseRevenueCatConfiguration(
-  process.env.NEXT_PUBLIC_REVENUECAT_BILLING_MODE,
-  process.env.NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY,
-);
-const revenueCatEnabled = revenueCat.configured;
-const liveBillingEnabled = revenueCat.status === "live";
 
 // Next.js App Router streams the RSC payload through inline <script> tags and
 // injects inline <style> (next/font, Tailwind, framer-motion) — both need
@@ -36,9 +27,6 @@ const scriptSrc = [
   "'self'",
   "'unsafe-inline'",
   "https://tally.so",
-  liveBillingEnabled ? "https://js.stripe.com" : "",
-  liveBillingEnabled ? "https://*.js.stripe.com" : "",
-  liveBillingEnabled ? "https://checkout.stripe.com" : "",
   !isProduction ? "'unsafe-eval'" : "",
 ]
   .filter(Boolean)
@@ -110,12 +98,6 @@ const connectSrc = [
   "'self'", // same-origin API routes, RSC/data fetches, analytics no-op
   supabaseOrigin, // exact configured Supabase Auth + PostgREST origin
   plausibleOrigin, // one direct Plausible Events API transport, if configured
-  revenueCatEnabled ? "https://api.revenuecat.com" : "",
-  revenueCatEnabled ? "https://e.revenue.cat" : "",
-  liveBillingEnabled ? "https://api.stripe.com" : "",
-  liveBillingEnabled ? "https://checkout.stripe.com" : "",
-  liveBillingEnabled ? "https://link.com" : "",
-  liveBillingEnabled ? "https://*.link.com" : "",
   !isProduction ? "ws://localhost:*" : "", // HMR socket in `next dev`
 ]
   .filter(Boolean)
@@ -125,19 +107,13 @@ const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src ${scriptSrc}`,
   "style-src 'self' 'unsafe-inline'", // next/font + Tailwind + framer-motion inline styles
-  `img-src 'self' data: blob:${
-    revenueCatEnabled ? ` ${revenueCatAssetOrigin}` : ""
-  }${liveBillingEnabled ? " https://*.stripe.com https://*.link.com" : ""}`,
-  `font-src 'self'${revenueCatEnabled ? ` ${revenueCatAssetOrigin}` : ""}`,
+  "img-src 'self' data: blob:",
+  "font-src 'self'",
   `connect-src ${connectSrc}`,
-  `frame-src 'self' https://tally.so${
-    liveBillingEnabled
-      ? " https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://link.com https://*.link.com"
-      : ""
-  }`,
+  "frame-src 'self' https://tally.so",
   "worker-src 'self' blob:", // service worker + any blob workers
   "manifest-src 'self'", // /manifest.webmanifest
-  `media-src 'self' blob:${revenueCatEnabled ? ` ${revenueCatAssetOrigin}` : ""}`,
+  "media-src 'self' blob:",
   "object-src 'none'", // no <object>/<embed>/<applet>
   "base-uri 'self'", // lock <base> to same origin
   "form-action 'self'", // forms may only submit to same origin
@@ -149,8 +125,8 @@ const contentSecurityPolicy = [
   .filter(Boolean)
   .join("; ");
 
-// Disable powerful features the app never uses; permit payment only for our
-// origin and Stripe (Apple/Google Pay via the RevenueCat Web Billing flow).
+// Disable powerful features the app never uses. Hosted Stripe pages run under
+// Stripe's own origin and never need Payment Request access on BibleQuest.
 const permissionsPolicy = [
   "accelerometer=()",
   // Silent, same-origin wallpaper loops may autoplay; audio remains absent.
@@ -166,9 +142,7 @@ const permissionsPolicy = [
   "microphone=()",
   "midi=()",
   "usb=()",
-  liveBillingEnabled
-    ? 'payment=(self "https://js.stripe.com")'
-    : "payment=()",
+  "payment=()",
 ].join(", ");
 
 const securityHeaders = [
@@ -197,6 +171,8 @@ const privateNoStoreHeader = {
 };
 
 const nextConfig: NextConfig = {
+  // Avoid exposing framework identity on every response.
+  poweredByHeader: false,
   // This repository can sit beneath unrelated lockfiles on a workstation.
   // Pin Turbopack to the actual app root so dev tracing and diagnostics do not
   // silently widen to a parent directory.
@@ -211,6 +187,13 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/app/bible/**": ["./src/data/bible/**"],
     "/verse/**": ["./src/data/bible/**"],
+    // Sharp is externalized by Next.js, so explicitly retain its Linux addon
+    // and libvips runtime in the avatar function bundle.
+    "/api/profile/avatar": [
+      "./node_modules/sharp/**/*",
+      "./node_modules/@img/sharp-linux-x64/**/*",
+      "./node_modules/@img/sharp-libvips-linux-x64/**/*",
+    ],
   },
   async headers() {
     return [

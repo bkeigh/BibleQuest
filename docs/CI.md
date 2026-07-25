@@ -52,6 +52,18 @@ freeze. After an approved production reconciliation, run
 `pnpm check:production-readiness`; it is a read-only compatibility probe, not
 proof of migration history, SMTP delivery, or cross-account isolation.
 
+The repository does include deterministic local acceptance files for the
+immutable Journey identity and daily-quest CAS contracts:
+
+```bash
+supabase test db --local supabase/tests/0014_journey_event_identity.sql
+supabase test db --local supabase/tests/0015_daily_quest_cas.sql
+```
+
+The migration contract test also pins the checked-in SHA-256 manifest. A hash
+mismatch, a new `0013`, or a change to immutable `0014` is a hard failure even
+when a column-level compatibility probe succeeds.
+
 The production probe intentionally stays out of pull-request CI: CI receives no
 production credentials, a transient provider incident must not block unrelated
 code review, and production state is a release gate rather than a source-code

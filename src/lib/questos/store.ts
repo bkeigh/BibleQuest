@@ -93,6 +93,34 @@ function normalizeAppearanceSettings(
   };
 }
 
+/** Compares base settings persisted to the account, not notifications or art. */
+function syncedBaseSettingsChanged(before: Settings, after: Settings): boolean {
+  return (
+    before.appearance.theme !== after.appearance.theme ||
+    before.appearance.reducedMotion !== after.appearance.reducedMotion ||
+    before.appearance.textSize !== after.appearance.textSize ||
+    before.questDurationPreference.join(",") !==
+      after.questDurationPreference.join(",") ||
+    before.questCategoryPreference.join(",") !==
+      after.questCategoryPreference.join(",") ||
+    before.language !== after.language ||
+    before.preferredBibleTranslation !== after.preferredBibleTranslation ||
+    before.analyticsConsent !== after.analyticsConsent
+  );
+}
+
+/** Compares the independently timestamped notification-preferences row. */
+function syncedNotificationsChanged(before: Settings, after: Settings): boolean {
+  return (
+    before.notifications.dailyVerse !== after.notifications.dailyVerse ||
+    before.notifications.dailyQuest !== after.notifications.dailyQuest ||
+    before.notifications.prayerReminders !==
+      after.notifications.prayerReminders ||
+    before.notifications.weeklyRecap !== after.notifications.weeklyRecap ||
+    before.notifications.preferredTime !== after.notifications.preferredTime
+  );
+}
+
 function id(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -168,7 +196,10 @@ interface QuestOSState {
   tombstones: SyncTombstones;
 
   // -- lifecycle
-  completeOnboarding: (profile: Omit<Profile, "onboardingCompleted" | "createdAt">, settings?: Partial<Settings>) => void;
+  completeOnboarding: (
+    profile: Omit<Profile, "onboardingCompleted" | "createdAt" | "updatedAt">,
+    settings?: Partial<Settings>,
+  ) => void;
   updateProfile: (patch: Partial<Profile>) => void;
   updateSettings: (patch: Partial<Settings>) => void;
   recordVisit: () => void;
@@ -717,10 +748,13 @@ export const useQuestOS = create<QuestOSState>()(
               ...profileData,
               onboardingCompleted: true,
               createdAt: now,
+              updatedAt: now,
             },
             settings: {
               ...settings,
               appearance: normalizeAppearanceSettings(settings.appearance),
+              updatedAt: now,
+              notificationsUpdatedAt: now,
             },
           });
           track("onboarding_completed");
@@ -729,15 +763,43 @@ export const useQuestOS = create<QuestOSState>()(
         updateProfile: (patch) => {
           const profile = get().profile;
           if (!profile) return;
-          set({ profile: { ...profile, ...patch } });
+          const syncedChange = Object.keys(patch).some(
+            (key) =>
+              key !== "avatarVersion" &&
+              key !== "avatarUpdatedAt" &&
+              key !== "updatedAt",
+          );
+          set({
+            profile: {
+              ...profile,
+              ...patch,
+              updatedAt: syncedChange
+                ? new Date().toISOString()
+                : profile.updatedAt,
+            },
+          });
         },
 
         updateSettings: (patch) => {
-          const settings = { ...get().settings, ...patch };
+          const previous = get().settings;
+          const now = new Date().toISOString();
+          const settings = { ...previous, ...patch };
+          const normalized = {
+            ...settings,
+            appearance: normalizeAppearanceSettings(settings.appearance),
+          };
           set({
             settings: {
-              ...settings,
-              appearance: normalizeAppearanceSettings(settings.appearance),
+              ...normalized,
+              updatedAt: syncedBaseSettingsChanged(previous, normalized)
+                ? now
+                : previous.updatedAt,
+              notificationsUpdatedAt: syncedNotificationsChanged(
+                previous,
+                normalized,
+              )
+                ? now
+                : previous.notificationsUpdatedAt,
             },
           });
           // Mirror consent to its own storage key so events fired before
@@ -1424,9 +1486,18 @@ export const useQuestOS = create<QuestOSState>()(
           const key = recentVerseKey(verse);
           const current = get().recentVerses;
 
-          // Revisiting the passage already at the front of history is a no-op;
-          // avoiding a full persisted-store rewrite keeps Bible entry smooth.
-          if (current[0] && recentVerseKey(current[0]) === key) return;
+          // Revisiting the exact front entry is a no-op. If an open preferred
+          // edition resolves after the WEB fallback, replace the wording so
+          // history matches what the person actually read.
+          if (
+            current[0] &&
+            recentVerseKey(current[0]) === key &&
+            current[0].bookName === verse.bookName &&
+            current[0].reference === verse.reference &&
+            current[0].text === verse.text
+          ) {
+            return;
+          }
 
           const now = new Date().toISOString();
           const next: RecentVerse = { ...verse, viewedAt: now };
@@ -1539,7 +1610,7 @@ export const useQuestOS = create<QuestOSState>()(
     {
       name: "biblequest:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 13,
+      version: 14,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
@@ -1743,6 +1814,21 @@ export const useQuestOS = create<QuestOSState>()(
             state.settings = DEFAULT_SETTINGS;
           }
         }
+        if (version < 14) {
+          // v14 makes account conflict clocks explicit. Conservative legacy
+          // fallbacks let an existing account copy win; the server separately
+          // permits an onboarded guest profile to claim a blank signup row.
+          const profile = state.profile as Profile | null | undefined;
+          if (profile && !profile.updatedAt) {
+            profile.updatedAt = profile.createdAt;
+          }
+          const settings = state.settings as Settings | undefined;
+          if (settings) {
+            const fallback = profile?.createdAt ?? "1970-01-01T00:00:00.000Z";
+            settings.updatedAt ??= fallback;
+            settings.notificationsUpdatedAt ??= settings.updatedAt;
+          }
+        }
         return state as unknown as QuestOSState;
       },
       onRehydrateStorage: () => (state, error) => {
@@ -1771,8 +1857,8 @@ export function selectStreak(s: QuestOSState): StreakState {
 }
 
 /**
- * The quest shelf. Stable reference — the stored map itself. Derive
- * ordering/sections with buildQuestFeed inside useMemo (never here).
+ * The quest shelf. Stable reference — the stored map itself. Derive Home
+ * grouping inside useMemo (never inside this selector).
  */
 export function selectMyQuests(s: QuestOSState): Record<string, MyQuest> {
   return s.myQuests;

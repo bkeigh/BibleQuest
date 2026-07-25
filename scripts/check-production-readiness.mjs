@@ -1,5 +1,5 @@
 /**
- * Read-only production compatibility probe.
+ * Non-mutating production compatibility probe.
  *
  * Uses the same publishable Supabase configuration as the browser. It never
  * needs a database password, service-role key, or Supabase access token, and it
@@ -14,8 +14,15 @@
 
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import {
+  DAILY_QUEST_SYNC_CONTRACT,
+  ACCOUNT_SYNC_CONTRACT,
+  isDailyQuestSyncContract,
+  isAccountSyncContract,
+} from "./lib/observability-evidence.mjs";
 
 const JSON_OUTPUT = process.argv.includes("--json");
+const CANONICAL_ORIGIN = "https://www.biblequest.co";
 const observations = [];
 let healthEvidence = null;
 let canonicalEvidence = false;
@@ -103,6 +110,35 @@ const REQUIRED_SCHEMA = [
   },
 ];
 
+// Each public RPC returns exactly one fixed identity plus an authorization
+// posture boolean; no user or financial row is read into this process.
+const POSTURE_CONTRACTS = [
+  {
+    rpc: "profile_avatar_contract",
+    contract: "biblequest_profile_avatar_v1",
+    migration: "0023",
+    label: "private profile avatar posture",
+  },
+  {
+    rpc: "push_reminder_contract",
+    contract: "biblequest_private_push_v1",
+    migration: "0024",
+    label: "private push reminder posture",
+  },
+  {
+    rpc: "stripe_billing_contract",
+    contract: "biblequest_stripe_test_billing_v1",
+    migration: "0025",
+    label: "direct Stripe billing posture",
+  },
+  {
+    rpc: "stripe_support_contract",
+    contract: "biblequest_stripe_one_time_support_v1",
+    migration: "0026",
+    label: "one-time Stripe support posture",
+  },
+];
+
 const supabaseUrlValue = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
 const appUrlValue =
@@ -177,16 +213,18 @@ function safeHealthBody(value) {
     candidate.contract !== "biblequest_observability_v1" ||
     !sha(candidate.release_sha) ||
     !sha(candidate.rollback_sha) ||
-    candidate.canonical_origin !== "https://www.biblequest.co" ||
+    candidate.canonical_origin !== CANONICAL_ORIGIN ||
     typeof candidate.canonical_origin_matches !== "boolean" ||
     !["configured", "guest-only", "invalid"].includes(candidate.auth_posture) ||
     !["configured", "disabled", "invalid"].includes(candidate.analytics_posture) ||
-    candidate.schema_contract !== "0015" ||
+    candidate.schema_contract !== "0026" ||
     candidate.content_contract !== "seed-manifest-v1" ||
     !/^biblequest-v\d{1,4}$/.test(candidate.service_worker_version) ||
-    !["coming-soon", "sandbox", "live", "invalid"].includes(
+    !["coming-soon", "test", "live", "invalid"].includes(
       candidate.billing_mode,
-    )
+    ) ||
+    typeof candidate.billing_purchases_enabled !== "boolean" ||
+    typeof candidate.billing_support_enabled !== "boolean"
   ) {
     return null;
   }
@@ -201,6 +239,8 @@ function safeHealthBody(value) {
     content_contract: candidate.content_contract,
     service_worker_version: candidate.service_worker_version,
     billing_mode: candidate.billing_mode,
+    billing_purchases_enabled: candidate.billing_purchases_enabled,
+    billing_support_enabled: candidate.billing_support_enabled,
   };
 }
 
@@ -287,8 +327,8 @@ async function checkCanonicalMetadata() {
     const ok =
       response.ok &&
       finalUrl.origin === appUrl.origin &&
-      normalizedOgUrl === appUrl.origin &&
-      normalizedCanonicalUrl === appUrl.origin;
+      normalizedOgUrl === CANONICAL_ORIGIN &&
+      normalizedCanonicalUrl === CANONICAL_ORIGIN;
     canonicalEvidence = ok;
     result(
       ok,
@@ -338,6 +378,204 @@ async function checkSchema() {
         migration: check.migration,
         ok: false,
       });
+    }
+  }
+
+  // The bounded contract checks the CAS RPC, trigger bindings, RLS, and exact
+  // grants server-side without returning catalog diagnostics or user rows.
+  try {
+    const response = await supabaseFetch(
+      "/rest/v1/rpc/daily_quest_sync_contract",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      },
+    );
+    const body = await jsonBody(response);
+    const ok = response.ok && isDailyQuestSyncContract(body);
+    schemaEvidence.push({
+      contract: DAILY_QUEST_SYNC_CONTRACT,
+      migration: "0015",
+      ok,
+    });
+    result(
+      ok,
+      "daily quest transactional sync posture",
+      response.ok
+        ? ok
+          ? "CAS RPC, triggers, RLS, and grants match 0015"
+          : "invalid bounded contract"
+        : safeProviderCode(body?.code, response.status),
+    );
+  } catch (error) {
+    schemaEvidence.push({
+      contract: DAILY_QUEST_SYNC_CONTRACT,
+      migration: "0015",
+      ok: false,
+    });
+    result(
+      false,
+      "daily quest transactional sync posture",
+      safeRequestFailure(error),
+    );
+  }
+
+  // The bounded 0019 contract proves the complete identity, generation,
+  // per-row revision/CAS, RPC, trigger, and direct-mutation boundary without
+  // attempting a user-data write.
+  try {
+    const response = await supabaseFetch(
+      "/rest/v1/rpc/account_sync_contract",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      },
+    );
+    const body = await jsonBody(response);
+    const ok = response.ok && isAccountSyncContract(body);
+    schemaEvidence.push({
+      contract: ACCOUNT_SYNC_CONTRACT,
+      migration: "0019",
+      ok,
+    });
+    result(
+      ok,
+      "account identity and generation boundary",
+      response.ok
+        ? ok
+          ? "identity, generation, revision/CAS, RPC, trigger, and grant boundary match 0019"
+          : "invalid bounded contract"
+        : safeProviderCode(body?.code, response.status),
+    );
+  } catch (error) {
+    schemaEvidence.push({
+      contract: ACCOUNT_SYNC_CONTRACT,
+      migration: "0019",
+      ok: false,
+    });
+    result(
+      false,
+      "account identity and generation boundary",
+      safeRequestFailure(error),
+    );
+  }
+
+  // The 0022 contract must prove deletion is generation-bound and resilient.
+  try {
+    const response = await supabaseFetch(
+      "/rest/v1/rpc/account_deletion_contract",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      },
+    );
+    const body = await jsonBody(response);
+    const ok =
+      response.ok &&
+      body?.contract === "generation_bound_account_deletion_v2" &&
+      body?.ready === true &&
+      Object.keys(body).length === 2;
+    schemaEvidence.push({
+      contract: "generation_bound_account_deletion_v2",
+      migration: "0022",
+      ok,
+    });
+    result(
+      ok,
+      "generation-bound account deletion",
+      response.ok
+        ? ok
+          ? "real-user deletion path matches 0022"
+          : "invalid bounded contract"
+        : safeProviderCode(body?.code, response.status),
+    );
+  } catch (error) {
+    schemaEvidence.push({
+      contract: "generation_bound_account_deletion_v2",
+      migration: "0022",
+      ok: false,
+    });
+    result(
+      false,
+      "generation-bound account deletion",
+      safeRequestFailure(error),
+    );
+  }
+
+  // An anonymous invocation must still reach the sealed RPC and be rejected.
+  // A missing function returns 404, so this prevents health metadata from
+  // claiming account deletion is ready when the migration is absent.
+  try {
+    const response = await supabaseFetch(
+      "/rest/v1/rpc/delete_own_account",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      },
+    );
+    const ok = response.status === 401;
+    schemaEvidence.push({
+      contract: "delete_own_account_authenticated_only",
+      migration: "0022",
+      ok,
+    });
+    result(
+      ok,
+      "self-service account deletion boundary",
+      ok ? "authenticated-only deletion RPC is present and sealed" : `HTTP ${response.status}`,
+    );
+  } catch (error) {
+    schemaEvidence.push({
+      contract: "delete_own_account_authenticated_only",
+      migration: "0022",
+      ok: false,
+    });
+    result(
+      false,
+      "self-service account deletion boundary",
+      safeRequestFailure(error),
+    );
+  }
+
+  // New launch capabilities expose only fixed two-field readiness contracts.
+  for (const check of POSTURE_CONTRACTS) {
+    try {
+      const response = await supabaseFetch(`/rest/v1/rpc/${check.rpc}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const body = await jsonBody(response);
+      const ok =
+        response.ok &&
+        body?.contract === check.contract &&
+        body?.ok === true &&
+        Object.keys(body).sort().join(",") === "contract,ok";
+      schemaEvidence.push({
+        contract: check.contract,
+        migration: check.migration,
+        ok,
+      });
+      result(
+        ok,
+        check.label,
+        response.ok
+          ? ok
+            ? `bounded contract matches ${check.migration}`
+            : "invalid bounded contract"
+          : safeProviderCode(body?.code, response.status),
+      );
+    } catch (error) {
+      schemaEvidence.push({
+        contract: check.contract,
+        migration: check.migration,
+        ok: false,
+      });
+      result(false, check.label, safeRequestFailure(error));
     }
   }
 }
@@ -494,7 +732,7 @@ async function checkAuthMethods() {
   }
 }
 
-if (!JSON_OUTPUT) console.log("BibleQuest production readiness (read-only)\n");
+if (!JSON_OUTPUT) console.log("BibleQuest production readiness (non-mutating)\n");
 
 if (failures.length === 0) {
   await checkHealth();
@@ -517,7 +755,8 @@ if (JSON_OUTPUT) {
       canonical_metadata: { ok: canonicalEvidence },
       schema_parity: {
         ok:
-          schemaEvidence.length === REQUIRED_SCHEMA.length &&
+          schemaEvidence.length ===
+            REQUIRED_SCHEMA.length + 4 + POSTURE_CONTRACTS.length &&
           schemaEvidence.every((check) => check.ok),
         checks: schemaEvidence,
       },

@@ -28,10 +28,33 @@ const CATEGORIES = [
   "unknown",
 ];
 const STAGES = {
-  auth: ["session", "request_email", "request_oauth", "callback"],
-  sync: ["initial", "push"],
+  auth: ["session", "request_email", "verify_email", "request_oauth", "callback"],
+  sync: ["initial", "push", "reconciliation"],
   service_worker: ["registration"],
 };
+
+export const DAILY_QUEST_SYNC_CONTRACT = "biblequest_daily_quest_sync_v1";
+export const ACCOUNT_SYNC_CONTRACT = "biblequest_account_sync_v4";
+
+/** Accepts only the two-field public CAS posture response. */
+export function isDailyQuestSyncContract(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return (
+    Object.keys(value).sort().join(",") === "contract,ok" &&
+    value.contract === DAILY_QUEST_SYNC_CONTRACT &&
+    value.ok === true
+  );
+}
+
+/** Accepts only the two-field live mutable-account boundary response. */
+export function isAccountSyncContract(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return (
+    Object.keys(value).sort().join(",") === "contract,ok" &&
+    value.contract === ACCOUNT_SYNC_CONTRACT &&
+    value.ok === true
+  );
+}
 
 /** Parses one exact structured log message and drops every other field. */
 export function parseClientSignalMessage(message) {
@@ -127,6 +150,22 @@ export function signalsFromJsonLines(input) {
   return signals;
 }
 
+/** Discards a provider result when its row cap could hide later signals. */
+export function boundedSignalCollection(input, rowLimit = Number.POSITIVE_INFINITY) {
+  if (typeof input !== "string") {
+    return { status: "unavailable", row_count: 0, signals: [] };
+  }
+  const rowCount = input.split(/\r?\n/).filter((line) => line.trim()).length;
+  if (Number.isFinite(rowLimit) && rowCount >= rowLimit) {
+    return { status: "truncated", row_count: rowCount, signals: [] };
+  }
+  return {
+    status: "complete",
+    row_count: rowCount,
+    signals: signalsFromJsonLines(input),
+  };
+}
+
 /** Produces stable key ordering for reviewable aggregate evidence. */
 function sortedCounts(counts) {
   return Object.fromEntries(
@@ -137,7 +176,7 @@ function sortedCounts(counts) {
 }
 
 /** Aggregates safe signals without retaining any source row or identifier. */
-export function aggregateClientSignals(signals, available = true) {
+export function aggregateClientSignals(signals, collectionStatus = "complete") {
   const buckets = Object.fromEntries(
     SURFACES.map((surface) => [
       surface,
@@ -181,7 +220,8 @@ export function aggregateClientSignals(signals, available = true) {
   }
   normalized.service_worker.versions = sortedCounts(versions);
   return {
-    available,
+    available: collectionStatus === "complete",
+    collection_status: collectionStatus,
     total: SURFACES.reduce(
       (sum, surface) => sum + normalized[surface].attempts,
       0,
@@ -229,9 +269,24 @@ function rateAlerts(surface, bucket) {
   return result;
 }
 
-/** Evaluates browser signal availability, rates, categories, and worker parity. */
-export function evaluateClientSignals(aggregate, phase) {
+/** Evaluates browser signal availability, required coverage, and failure posture. */
+export function evaluateClientSignals(
+  aggregate,
+  phase,
+  authPosture = "configured",
+) {
   const alerts = [];
+  if (aggregate.collection_status === "truncated") {
+    alerts.push(
+      alert(
+        "critical",
+        "browser_signals_truncated",
+        "[MONITORING OWNER]",
+        "narrow or paginate the sanitized log query and rerun this checkpoint",
+      ),
+    );
+    return alerts;
+  }
   if (!aggregate.available) {
     alerts.push(
       alert(
@@ -242,6 +297,54 @@ export function evaluateClientSignals(aggregate, phase) {
       ),
     );
     return alerts;
+  }
+
+  // Guest-only containment has no legitimate auth or sync synthetic activity.
+  const requiredSurfaces =
+    authPosture === "guest-only" ? ["service_worker"] : SURFACES;
+  const missingSurfaces = requiredSurfaces.filter(
+    (surface) => aggregate[surface].success === 0,
+  );
+  if (missingSurfaces.length) {
+    const action =
+      authPosture === "guest-only"
+        ? "run the active-worker synthetic before continuing"
+        : "run the auth, sync, and active-worker synthetic before continuing";
+    alerts.push(
+      alert(
+        "critical",
+        "browser_signal_coverage_missing",
+        "[MONITORING OWNER]",
+        action,
+      ),
+    );
+  }
+
+  // Any account activity contradicts the selected guest-only containment track.
+  if (
+    authPosture === "guest-only" &&
+    (aggregate.auth.attempts > 0 || aggregate.sync.attempts > 0)
+  ) {
+    alerts.push(
+      alert(
+        "critical",
+        "guest_only_account_activity_detected",
+        "[ACCOUNT POSTURE OWNER]",
+        "hold or roll back and investigate the auth or sync containment failure",
+      ),
+    );
+  }
+
+  // A failed worker canary is a launch hold even if a later attempt succeeds.
+  if (aggregate.service_worker.failure > 0) {
+    alerts.push(
+      alert(
+        "critical",
+        "service_worker_synthetic_failed",
+        "[PWA OWNER]",
+        "hold rollout and resolve the active-worker synthetic failure",
+      ),
+    );
   }
   alerts.push(...rateAlerts("auth", aggregate.auth));
   alerts.push(...rateAlerts("sync", aggregate.sync));
@@ -282,6 +385,34 @@ export function fixtureReadiness() {
   const schemaChecks = ["0010", "0010", "0011", "0011", "0014", "0015"].map(
     (migration, index) => ({ contract: `fixture_${index}`, migration, ok: true }),
   );
+  schemaChecks.push({
+    contract: DAILY_QUEST_SYNC_CONTRACT,
+    migration: "0015",
+    ok: true,
+  });
+  schemaChecks.push({
+    contract: ACCOUNT_SYNC_CONTRACT,
+    migration: "0019",
+    ok: true,
+  });
+  schemaChecks.push({
+    contract: "generation_bound_account_deletion_v2",
+    migration: "0022",
+    ok: true,
+  });
+  schemaChecks.push({
+    contract: "delete_own_account_authenticated_only",
+    migration: "0022",
+    ok: true,
+  });
+  for (const [contract, migration] of [
+    ["biblequest_profile_avatar_v1", "0023"],
+    ["biblequest_private_push_v1", "0024"],
+    ["biblequest_stripe_test_billing_v1", "0025"],
+    ["biblequest_stripe_one_time_support_v1", "0026"],
+  ]) {
+    schemaChecks.push({ contract, migration, ok: true });
+  }
   const contentChecks = [
     "quest_templates",
     "daily_verses",
@@ -300,12 +431,14 @@ export function fixtureReadiness() {
         rollback_sha: "b".repeat(40),
         canonical_origin: observability.canonicalOrigin,
         canonical_origin_matches: true,
-        auth_posture: "configured",
+        auth_posture: "guest-only",
         analytics_posture: "disabled",
         schema_contract: observability.schemaContract,
         content_contract: observability.contentContract,
         service_worker_version: observability.serviceWorkerVersion,
         billing_mode: "coming-soon",
+        billing_purchases_enabled: false,
+        billing_support_enabled: false,
       },
     },
     canonical_metadata: { ok: true },
@@ -317,7 +450,7 @@ export function fixtureReadiness() {
       google_enabled: true,
       phone_disabled: true,
     },
-    check_count: 18,
+    check_count: 25,
     failed_check_count: 0,
   };
 }
@@ -325,18 +458,6 @@ export function fixtureReadiness() {
 /** Returns safe fixture signals for the evidence command and CI. */
 export function fixtureSignals() {
   return [
-    ...Array.from({ length: 5 }, () => ({
-      surface: "auth",
-      stage: "session",
-      outcome: "success",
-      category: "ok",
-    })),
-    ...Array.from({ length: 5 }, () => ({
-      surface: "sync",
-      stage: "initial",
-      outcome: "success",
-      category: "ok",
-    })),
     {
       surface: "service_worker",
       stage: "registration",
@@ -348,12 +469,47 @@ export function fixtureSignals() {
 }
 
 /** Combines readiness and client aggregates into incident-safe launch evidence. */
-export function buildLaunchEvidence(readiness, aggregate, phase, source) {
-  const alerts = evaluateClientSignals(aggregate, phase);
+export function buildLaunchEvidence(
+  readiness,
+  aggregate,
+  phase,
+  source,
+  options = {},
+) {
+  const environment = options.environment === "preview" ? "preview" : "production";
+  const liveBillingVerified = options.liveBillingVerified === true;
   const release = readiness?.external_health?.release ?? null;
+  // Only the bounded health contract can relax coverage for contained launches.
+  const alerts = evaluateClientSignals(aggregate, phase, release?.auth_posture);
+  const schemaChecks = readiness?.schema_parity?.checks;
+  const dailyQuestSyncReady =
+    Array.isArray(schemaChecks) &&
+    schemaChecks.some(
+      (check) =>
+        check?.contract === DAILY_QUEST_SYNC_CONTRACT &&
+        check?.migration === "0015" &&
+        check?.ok === true,
+    );
+  const accountSyncReady =
+    Array.isArray(schemaChecks) &&
+    schemaChecks.some(
+      (check) =>
+        check?.contract === ACCOUNT_SYNC_CONTRACT &&
+        check?.migration === "0019" &&
+        check?.ok === true,
+    );
   const add = (condition, severity, code, owner, action) => {
     if (condition) alerts.push(alert(severity, code, owner, action));
   };
+  add(
+    readiness?.contract !== "biblequest_readiness_v1" ||
+      readiness?.ok !== true ||
+      readiness?.failed_check_count !== 0,
+    "critical",
+    "readiness_contract_failed",
+    "[DEPLOY OWNER]",
+    "rerun the complete readiness probe and resolve every failed check",
+  );
   add(
     readiness?.external_health?.ok !== true,
     "critical",
@@ -384,8 +540,11 @@ export function buildLaunchEvidence(readiness, aggregate, phase, source) {
     "hold rollout and reconcile deployment plus metadata origin",
   );
   add(
-    release?.auth_posture === "invalid" ||
-      readiness?.auth_providers?.settings_reachable !== true,
+    !["configured", "guest-only"].includes(release?.auth_posture) ||
+      readiness?.auth_providers?.settings_reachable !== true ||
+      readiness?.auth_providers?.email_enabled !== true ||
+      readiness?.auth_providers?.google_enabled !== true ||
+      readiness?.auth_providers?.phone_disabled !== true,
     "critical",
     "auth_posture_invalid",
     "[AUTH OWNER]",
@@ -395,11 +554,13 @@ export function buildLaunchEvidence(readiness, aggregate, phase, source) {
     release?.auth_posture === "guest-only",
     "warning",
     "auth_guest_only",
-    "[AUTH OWNER]",
+    "[ACCOUNT POSTURE OWNER]",
     "confirm the launch explicitly intends guest-only mode",
   );
   add(
-    readiness?.schema_parity?.ok !== true,
+    readiness?.schema_parity?.ok !== true ||
+      dailyQuestSyncReady !== true ||
+      accountSyncReady !== true,
     "critical",
     "schema_parity_failed",
     "[DATABASE OWNER]",
@@ -413,11 +574,34 @@ export function buildLaunchEvidence(readiness, aggregate, phase, source) {
     "stop content rollout and compare the frozen manifest by natural key",
   );
   add(
-    release?.billing_mode === "invalid" || release?.billing_mode === "sandbox",
+    release?.billing_mode === "invalid" || release?.billing_mode === "test",
     "critical",
     "billing_posture_unsafe",
     "[BILLING OWNER]",
     "keep production coming-soon or complete the approved live billing gate",
+  );
+  add(
+    release?.billing_mode === "live" && !liveBillingVerified,
+    "critical",
+    "live_billing_gate_missing",
+    "[BILLING OWNER]",
+    "attach the approved live-billing evidence before using the explicit gate",
+  );
+  add(
+    release?.billing_purchases_enabled === true &&
+      (release?.billing_mode !== "live" || !liveBillingVerified),
+    "critical",
+    "billing_purchase_gate_unsafe",
+    "[BILLING OWNER]",
+    "disable purchase UI until the exact live-billing gate is approved",
+  );
+  add(
+    release?.billing_support_enabled === true &&
+      (release?.billing_mode !== "live" || !liveBillingVerified),
+    "critical",
+    "billing_support_gate_unsafe",
+    "[BILLING OWNER]",
+    "disable one-time support until the exact live-billing gate is approved",
   );
   add(
     release?.service_worker_version !== observability.serviceWorkerVersion,
@@ -432,6 +616,7 @@ export function buildLaunchEvidence(readiness, aggregate, phase, source) {
   return {
     contract: observability.contract,
     phase,
+    environment,
     observed_at: new Date().toISOString(),
     source,
     thresholds: observability.thresholds,
@@ -457,6 +642,11 @@ export function buildLaunchEvidence(readiness, aggregate, phase, source) {
       observed: Object.keys(aggregate.service_worker.versions),
     },
     billing_mode: release?.billing_mode ?? "unknown",
+    billing_purchases_enabled:
+      release?.billing_purchases_enabled === true,
+    billing_support_enabled:
+      release?.billing_support_enabled === true,
+    live_billing_gate_verified: liveBillingVerified,
     rollback_target_sha: release?.rollback_sha ?? null,
     alerts,
     decision: critical ? "HOLD" : warning ? "REVIEW" : "CONTINUE",

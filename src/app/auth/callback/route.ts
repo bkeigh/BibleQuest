@@ -10,6 +10,7 @@ import {
   type AuthFailureReason,
 } from "@/lib/auth/errors";
 import { AUTH_COMPLETION_COOKIE } from "@/lib/auth/completion-signal";
+import { accountSyncAvailable } from "@/lib/sync/containment";
 
 /**
  * Email OTP types we accept on the token_hash path. An allow-list, not a cast:
@@ -45,7 +46,8 @@ function asEmailOtpType(value: string | null): EmailOtpType | null {
  *    Switch the Supabase email templates to `{{ .TokenHash }}` to route magic
  *    links here; until then this branch is simply never taken.
  *
- * Either way we end with a session cookie, then return the user to the app.
+ * When account sync is available, either flow ends with a session cookie and
+ * returns the user to the app. Guest-only containment rejects both first.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -57,7 +59,9 @@ export async function GET(request: Request) {
     url.searchParams.get("error_code") ?? url.searchParams.get("error");
   let failure: AuthFailureReason = "unknown";
 
-  if (!isSupabaseConfigured()) {
+  // Fail closed before exchanging any credential while guest-only containment
+  // is active, even when the deployment still carries valid Supabase config.
+  if (!accountSyncAvailable(isSupabaseConfigured())) {
     failure = "configuration";
   } else if (providerError) {
     failure = authFailureReason(null, providerError);

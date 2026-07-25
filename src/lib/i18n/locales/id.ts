@@ -38,7 +38,6 @@ export const id: UIStrings = {
   },
   home: {
     todaysVerse: "Ayat hari ini",
-    todaysQuests: "Misi hari ini",
     yourGrowth: "Pertumbuhanmu",
     recently: "Baru-baru ini",
     quickPrayer: "Doa singkat",
@@ -85,6 +84,9 @@ export const id: UIStrings = {
     addToToday: "Tambahkan ke hari ini",
     begin: "Mulai",
     completedToday: "Selesai hari ini",
+    groupActive: "Aktif",
+    groupReady: "Siap",
+    groupCompleted: "Selesai",
   },
   dayComplete: {
     title: "Semua selesai untuk hari ini.",

@@ -19,6 +19,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
 import { gentleEase } from "@/lib/motion";
 import { PixelIcon } from "./PixelIcon";
+import { IconClose } from "./icons";
 
 type ToastVariant = "default" | "success" | "celebrate";
 
@@ -47,6 +48,9 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 let counter = 0;
 
 const AUTO_DISMISS_MS = 5000;
+
+/** Keeps stacked confirmations from covering the app on rapid actions. */
+const MAX_VISIBLE_TOASTS = 3;
 
 const VARIANT_STYLES: Record<ToastVariant, string> = {
   default: "rounded-full border border-mist",
@@ -104,7 +108,7 @@ function ToastCard({
       {variant === "celebrate" && (
         <PixelIcon name="star" size={3} animate className="shrink-0" />
       )}
-      <span>{item.message}</span>
+      <span className="min-w-0 flex-1">{item.message}</span>
       {item.action && (
         <button
           type="button"
@@ -112,11 +116,19 @@ function ToastCard({
             item.action?.onClick();
             onDismiss();
           }}
-          className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center px-1 font-medium text-accent underline-offset-4 hover:underline"
+          className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-[var(--radius-button)] px-1 font-medium text-accent underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           {item.action.label}
         </button>
       )}
+      <button
+        type="button"
+        aria-label="Dismiss notification"
+        onClick={onDismiss}
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ash transition-colors hover:bg-linen hover:text-charcoal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        <IconClose size={16} />
+      </button>
     </motion.div>
   );
 }
@@ -130,7 +142,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const toast = useCallback((message: string, options?: ToastOptions) => {
     const id = ++counter;
-    setItems((prev) => [...prev, { id, message, ...options }]);
+    setItems((prev) => [
+      ...prev.slice(-(MAX_VISIBLE_TOASTS - 1)),
+      { id, message, ...options },
+    ]);
   }, []);
 
   return (

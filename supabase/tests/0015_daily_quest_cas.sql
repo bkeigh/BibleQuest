@@ -1,15 +1,126 @@
--- Exercise the migration 0015 CAS, RLS, idempotency, and rollback contract.
 begin;
 
+-- Linked CLI tests enter through a restricted login; use the database owner.
+set role postgres;
+grant usage on schema extensions to public;
 create extension if not exists pgtap with schema extensions;
+set local search_path = public, extensions;
 
-select plan(34);
+select plan(59);
 
 -- Create two disposable owners; the surrounding transaction removes them.
 insert into auth.users (id, raw_user_meta_data, created_at, updated_at)
 values
   ('10000000-0000-4000-8000-000000000001', '{}'::jsonb, now(), now()),
   ('20000000-0000-4000-8000-000000000002', '{}'::jsonb, now(), now());
+
+-- Exercise historical CAS assertions through a transaction-local adapter;
+-- 0018 separately proves this retired signature is absent in production.
+create function public.replace_user_daily_quests(
+  p_assigned_date date,
+  p_expected_revision bigint,
+  p_request_id uuid,
+  p_rows jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  uid uuid := auth.uid();
+  live_generation bigint;
+  response jsonb;
+begin
+  select generation into live_generation
+  from public.user_sync_state
+  where user_id = uid;
+  response := public.replace_user_daily_quests(
+    uid,
+    live_generation,
+    p_assigned_date,
+    p_expected_revision,
+    p_request_id,
+    p_rows
+  );
+  return response - 'generation';
+end;
+$function$;
+
+revoke execute on function public.replace_user_daily_quests(
+  date, bigint, uuid, jsonb
+) from public, anon;
+grant execute on function public.replace_user_daily_quests(
+  date, bigint, uuid, jsonb
+) to authenticated;
+
+-- Adapt the historical void purge only inside this rollback-only test.
+create function public.purge_user_data()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  uid uuid := auth.uid();
+  live_generation bigint;
+begin
+  select generation into live_generation
+  from public.user_sync_state
+  where user_id = uid;
+  perform public.purge_user_data(
+    uid,
+    live_generation,
+    extensions.gen_random_uuid()
+  );
+end;
+$function$;
+
+revoke execute on function public.purge_user_data() from public, anon;
+grant execute on function public.purge_user_data() to authenticated;
+
+-- Pin the authoritative 0014 Journey identity before exercising 0015.
+select has_column(
+  'public',
+  'journey_events',
+  'date_key',
+  '0014 date_key column exists'
+);
+select has_column(
+  'public',
+  'journey_events',
+  'source_id',
+  '0014 source_id column exists'
+);
+select is(
+  (select count(*)
+   from pg_catalog.pg_trigger
+   where tgrelid = 'public.journey_events'::regclass
+     and tgname = 'ensure_journey_event_date_key'
+     and not tgisinternal),
+  1::bigint,
+  '0014 legacy Journey trigger exists exactly once'
+);
+insert into public.journey_events (
+  id,
+  user_id,
+  event_type,
+  title,
+  occurred_at
+) values (
+  '14000000-0000-4000-8000-000000000014',
+  '10000000-0000-4000-8000-000000000001',
+  'test',
+  'migration identity fixture',
+  '2026-07-19T23:30:00-04:00'
+);
+select is(
+  (select date_key
+   from public.journey_events
+   where id = '14000000-0000-4000-8000-000000000014'),
+  '2026-07-20'::date,
+  '0014 cached-client fallback derives the deterministic UTC day'
+);
 
 -- Inject a post-delete insertion failure to prove statement rollback.
 create function public.test_fail_daily_quest_insert()
@@ -98,12 +209,63 @@ select ok(
   'legacy revision trigger cannot be called as an RPC'
 );
 select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.preserve_daily_quest_completion_for_legacy_write()',
+    'EXECUTE'
+  ),
+  'legacy completion trigger cannot be called as an RPC'
+);
+select ok(
   (select prosecdef and proconfig = array['search_path=""']::text[]
    from pg_catalog.pg_proc
    where oid =
      'public.replace_user_daily_quests(date,bigint,uuid,jsonb)'::regprocedure),
   'CAS RPC is security definer with an empty search path'
 );
+
+-- The anonymous readiness RPC exposes only a live, content-free contract bit.
+select ok(
+  to_regprocedure('public.daily_quest_sync_contract()') is not null,
+  'daily-quest readiness contract exists'
+);
+select ok(
+  (select prosecdef and proconfig = array['search_path=""']::text[]
+   from pg_catalog.pg_proc
+   where oid = 'public.daily_quest_sync_contract()'::regprocedure),
+  'readiness contract is security definer with an empty search path'
+);
+select ok(
+  has_function_privilege(
+    'anon', 'public.daily_quest_sync_contract()', 'EXECUTE'
+  ),
+  'anonymous readiness may execute the content-free contract'
+);
+select ok(
+  has_function_privilege(
+    'authenticated', 'public.daily_quest_sync_contract()', 'EXECUTE'
+  ),
+  'authenticated readiness may execute the content-free contract'
+);
+set local role anon;
+select is(
+  public.daily_quest_sync_contract()->>'contract',
+  'biblequest_daily_quest_sync_v1',
+  'readiness contract returns the fixed CAS identity'
+);
+select is(
+  public.daily_quest_sync_contract()->>'ok',
+  'true',
+  'readiness contract derives a passing live safety posture'
+);
+select is(
+  (select count(*)
+   from jsonb_object_keys(public.daily_quest_sync_contract())),
+  2::bigint,
+  'readiness contract returns no diagnostic or row fields'
+);
+reset role;
+set role postgres;
 
 -- Act as the first owner for all same-account CAS scenarios.
 set local role authenticated;
@@ -198,6 +360,25 @@ select is(
    where assigned_date = '2026-07-20'),
   2::bigint,
   'merged conflict retry retains both device picks'
+);
+
+-- Replay an older request after an intervening device write.
+select is(
+  public.replace_user_daily_quests(
+    '2026-07-20',
+    0,
+    'a0000000-0000-4000-8000-000000000001',
+    '[{"quest_slug":"cas-a","status":"assigned","rerolls":0,"picked_at":"2026-07-20T12:00:00Z","expires_at":"2026-07-21T12:00:00Z"}]'::jsonb
+  )->>'duplicate',
+  'true',
+  'bounded request history deduplicates across an intervening write'
+);
+select is(
+  (select revision
+   from public.user_daily_quest_days
+   where assigned_date = '2026-07-20'),
+  2::bigint,
+  'interleaved duplicate does not advance revision'
 );
 
 -- Force a failure after deletion and prove rows plus revision roll back.
@@ -298,6 +479,61 @@ select is(
 
 -- Old cached clients retain direct owner writes and make them CAS-visible.
 select set_config('biblequest.daily_quest_rpc', 'off', true);
+delete from public.user_daily_quests
+where assigned_date = '2026-07-23';
+select is(
+  (select count(*)
+   from public.user_daily_quests
+   where assigned_date = '2026-07-23'
+     and status = 'completed'),
+  1::bigint,
+  'cached legacy delete cannot remove completed history'
+);
+insert into public.user_daily_quests (
+  user_id,
+  quest_slug,
+  assigned_date,
+  status,
+  rerolls,
+  completed_at,
+  picked_at,
+  expires_at
+) values
+  (
+    '10000000-0000-4000-8000-000000000001',
+    'completed',
+    '2026-07-23',
+    'completed',
+    0,
+    '2026-07-23T12:10:00Z',
+    '2026-07-23T12:00:00Z',
+    '2026-07-24T12:00:00Z'
+  ),
+  (
+    '10000000-0000-4000-8000-000000000001',
+    'legacy-peer',
+    '2026-07-23',
+    'assigned',
+    0,
+    null,
+    '2026-07-23T12:00:00Z',
+    '2026-07-24T12:00:00Z'
+  );
+select is(
+  (select string_agg(quest_slug || ':' || status, ',' order by quest_slug)
+   from public.user_daily_quests
+   where assigned_date = '2026-07-23'),
+  'completed:completed,legacy-peer:assigned',
+  'cached legacy insert skips the duplicate completion and keeps new picks'
+);
+select is(
+  (select revision
+   from public.user_daily_quest_days
+   where assigned_date = '2026-07-23'),
+  3::bigint,
+  'only the real legacy row change advances the revision'
+);
+
 insert into public.user_daily_quests (
   user_id,
   quest_slug,
@@ -344,6 +580,13 @@ select is(
   'second owner cannot select first owner revisions'
 );
 select is(
+  (select count(*)
+   from public.user_daily_quests
+   where assigned_date < '2026-07-25'),
+  0::bigint,
+  'second owner cannot select first owner assignments'
+);
+select is(
   public.replace_user_daily_quests(
     '2026-07-25',
     0,
@@ -366,8 +609,21 @@ select throws_ok(
     '2026-07-26T12:00:00Z'
   )$$,
   '42501',
-  'new row violates row-level security policy for table "user_daily_quests"',
+  'account sync: authenticated user changed',
   'direct cross-owner insert is denied'
+);
+select is_empty(
+  $$update public.user_daily_quests
+    set status = 'started'
+    where user_id = '10000000-0000-4000-8000-000000000001'
+    returning 1$$,
+  'second owner cannot update first owner assignments'
+);
+select is_empty(
+  $$delete from public.user_daily_quests
+    where user_id = '10000000-0000-4000-8000-000000000001'
+    returning 1$$,
+  'second owner cannot delete first owner assignments'
 );
 
 -- Clear My Data removes the first owner's empty-day metadata but not owner B.
@@ -376,8 +632,52 @@ select set_config(
   '10000000-0000-4000-8000-000000000001',
   true
 );
+select is(
+  (select count(*)
+   from public.user_daily_quest_days
+   where assigned_date = '2026-07-25'),
+  0::bigint,
+  'first owner cannot select second owner revisions'
+);
+select is(
+  (select count(*)
+   from public.user_daily_quests
+   where assigned_date = '2026-07-25'),
+  0::bigint,
+  'first owner cannot select second owner assignments'
+);
+select throws_ok(
+  $$insert into public.user_daily_quests (
+    user_id, quest_slug, assigned_date, status, rerolls, picked_at, expires_at
+  ) values (
+    '20000000-0000-4000-8000-000000000002',
+    'cross-owner-reverse',
+    '2026-07-25',
+    'assigned',
+    0,
+    '2026-07-25T12:00:00Z',
+    '2026-07-26T12:00:00Z'
+  )$$,
+  '42501',
+  'account sync: authenticated user changed',
+  'first owner direct cross-owner insert is denied'
+);
+select is_empty(
+  $$update public.user_daily_quests
+    set status = 'started'
+    where user_id = '20000000-0000-4000-8000-000000000002'
+    returning 1$$,
+  'first owner cannot update second owner assignments'
+);
+select is_empty(
+  $$delete from public.user_daily_quests
+    where user_id = '20000000-0000-4000-8000-000000000002'
+    returning 1$$,
+  'first owner cannot delete second owner assignments'
+);
 select public.purge_user_data();
 reset role;
+set role postgres;
 select is(
   (select count(*)
    from public.user_daily_quest_days

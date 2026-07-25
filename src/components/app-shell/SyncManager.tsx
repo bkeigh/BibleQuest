@@ -6,11 +6,9 @@ import { createClient } from "@/lib/supabase/client";
 import { startSync, stopSync } from "@/lib/sync/engine";
 import {
   localDataBelongsToOtherUser,
-  markInitialSyncPending,
-  setLastSyncedUserId,
 } from "@/lib/sync/last-user";
-import { useQuestOS } from "@/lib/questos/store";
-import { clearAllDeviceLocalJournalDrafts } from "@/lib/questos/journal-drafts";
+import { prepareLocalJourneyHandoff } from "@/lib/sync/handoff";
+import { clearAvatar } from "@/lib/utils/avatar";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton } from "@/components/design-system/GentleButton";
 
@@ -57,16 +55,12 @@ export function SyncManager() {
 
   if (!handoff) return null;
 
-  const resolve = (startFresh: boolean) => {
+  const resolve = async (startFresh: boolean) => {
     if (!userId) return;
     // The engine never started (startSync refuses while the marker
     // mismatches), so clearing here can't race a push.
-    if (startFresh) {
-      useQuestOS.getState().clearAllData();
-      clearAllDeviceLocalJournalDrafts();
-    }
-    markInitialSyncPending(userId);
-    setLastSyncedUserId(userId);
+    if (startFresh) await clearAvatar();
+    prepareLocalJourneyHandoff(userId, startFresh);
     startSync(userId);
     rerender();
   };
@@ -102,7 +96,7 @@ export function SyncManager() {
             fullWidth
             autoFocus
             className="mt-5"
-            onClick={() => resolve(true)}
+            onClick={() => void resolve(true)}
           >
             Start fresh with my account
           </GentleButton>
@@ -115,7 +109,7 @@ export function SyncManager() {
             size="md"
             fullWidth
             className="mt-4"
-            onClick={() => resolve(false)}
+            onClick={() => void resolve(false)}
           >
             This is my journey — keep it
           </GentleButton>

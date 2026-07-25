@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   accountRestorePhase,
+  hasRecoverableLocalJourney,
   hasSafeLocalJourney,
 } from "@/lib/sync/access";
 
@@ -114,6 +115,17 @@ describe("safe local journey detection", () => {
     ).toBe(true);
   });
 
+  it("quarantines a journey while a hardened initial restore is pending", () => {
+    expect(
+      hasSafeLocalJourney({
+        localOnboardingCompleted: true,
+        lastSyncedUserId: "account-a",
+        userId: "account-a",
+        initialSyncPending: true,
+      }),
+    ).toBe(false);
+  });
+
   it("never opens a journey stamped to a different account", () => {
     expect(
       hasSafeLocalJourney({
@@ -130,6 +142,31 @@ describe("safe local journey detection", () => {
         localOnboardingCompleted: false,
         lastSyncedUserId: null,
         userId: "account-a",
+      }),
+    ).toBe(false);
+  });
+
+  it("allows an unowned guest journey only as explicit failure recovery", () => {
+    expect(
+      hasRecoverableLocalJourney({
+        localOnboardingCompleted: true,
+        lastSyncedUserId: null,
+        userId: "account-a",
+      }),
+    ).toBe(true);
+    expect(
+      hasRecoverableLocalJourney({
+        localOnboardingCompleted: true,
+        lastSyncedUserId: "account-b",
+        userId: "account-a",
+      }),
+    ).toBe(false);
+    expect(
+      hasRecoverableLocalJourney({
+        localOnboardingCompleted: true,
+        lastSyncedUserId: "account-a",
+        userId: "account-a",
+        resetRequired: true,
       }),
     ).toBe(false);
   });

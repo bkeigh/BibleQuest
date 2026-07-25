@@ -12,6 +12,8 @@
  */
 import {
   PRAYER_CATEGORIES,
+  QUEST_CATEGORIES,
+  QUEST_DURATIONS,
   QUEST_STEP_KEYS,
   REFLECTION_MOODS,
   type AccountNudgeContext,
@@ -39,8 +41,16 @@ function isObj(v: unknown): v is Record<string, unknown> {
 const str = (v: unknown): v is string => typeof v === "string";
 const num = (v: unknown): v is number => typeof v === "number";
 const PRAYER_CATEGORY_SET = new Set<string>(PRAYER_CATEGORIES);
+const QUEST_CATEGORY_SET = new Set<unknown>(QUEST_CATEGORIES);
+const QUEST_DURATION_SET = new Set<unknown>(QUEST_DURATIONS);
 const QUEST_STEP_SET = new Set<string>(QUEST_STEP_KEYS);
 const REFLECTION_MOOD_SET = new Set<string>(REFLECTION_MOODS);
+const DAILY_RHYTHM_SET = new Set([
+  "morning",
+  "afternoon",
+  "evening",
+  "flexible",
+]);
 const MILESTONE_KEY_SET = new Set(seedMilestones.map(({ key }) => key));
 const MY_QUEST_STATUSES = new Set([
   "saved",
@@ -62,6 +72,11 @@ const ACCOUNT_NUDGE_CONTEXTS = new Set<AccountNudgeContext>([
   "first_reflection",
   "milestone_reached",
 ]);
+export const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
+const MAX_IMPORT_COLLECTION_ITEMS = 20_000;
+const MAX_IMPORT_KEYED_RECORDS = 5_000;
+const IMPORT_TOO_LARGE_ERROR =
+  "That journey is too large to restore safely.";
 
 // Element guards — assert the fields the app dereferences without a guard.
 const isPrayer = (o: unknown) =>
@@ -87,7 +102,7 @@ const isRecentVerse = (o: unknown) =>
   str(o.text) &&
   str(o.viewedAt);
 const isEarnedMilestone = (o: unknown) => isObj(o) && str(o.key) && str(o.achievedAt);
-const isProfile = (o: unknown) =>
+const isProfile = (o: unknown): o is Record<string, unknown> =>
   isObj(o) && str(o.displayName) && typeof o.onboardingCompleted === "boolean" && str(o.createdAt);
 const isReadingPosition = (o: unknown) =>
   isObj(o) && str(o.bookSlug) && str(o.bookName) && num(o.chapter);
@@ -172,6 +187,12 @@ function cleanPendingMilestones(values: unknown[]): string[] {
  * content-free error on failure.
  */
 export function parseSnapshot(rawText: string): ParseResult {
+  // File input checks bytes before reading; this second bound protects every
+  // direct caller without allocating another encoded copy of private text.
+  if (rawText.length > MAX_IMPORT_FILE_BYTES) {
+    return { ok: false, error: IMPORT_TOO_LARGE_ERROR };
+  }
+
   let json: unknown;
   try {
     json = JSON.parse(rawText);
@@ -188,6 +209,33 @@ export function parseSnapshot(rawText: string): ParseResult {
 
   const src = json;
   const out: Record<string, unknown> = {};
+
+  // Reject excessive collections instead of silently truncating a backup.
+  for (const key of [...Object.keys(ARRAY_GUARDS), "pendingMilestones"]) {
+    const value = src[key];
+    if (Array.isArray(value) && value.length > MAX_IMPORT_COLLECTION_ITEMS) {
+      return { ok: false, error: IMPORT_TOO_LARGE_ERROR };
+    }
+  }
+  for (const key of ["assignments", "myQuests"]) {
+    const value = src[key];
+    if (
+      isObj(value) &&
+      Object.keys(value).length > MAX_IMPORT_KEYED_RECORDS
+    ) {
+      return { ok: false, error: IMPORT_TOO_LARGE_ERROR };
+    }
+  }
+  if (
+    isObj(src.assignments) &&
+    Object.values(src.assignments).some(
+      (value) =>
+        Array.isArray(value) &&
+        value.length > MAX_IMPORT_COLLECTION_ITEMS,
+    )
+  ) {
+    return { ok: false, error: IMPORT_TOO_LARGE_ERROR };
+  }
 
   // Object arrays: keep only well-formed elements.
   for (const [key, guard] of Object.entries(ARRAY_GUARDS)) {
@@ -282,11 +330,55 @@ export function parseSnapshot(rawText: string): ParseResult {
         s.preferredBibleTranslation,
       );
     }
+
+    // Keep only notification fields the settings UI can safely dereference.
+    if ("notifications" in s && !isObj(s.notifications)) {
+      delete s.notifications;
+    } else if (isObj(s.notifications)) {
+      const notifications = { ...s.notifications };
+      for (const key of [
+        "dailyVerse",
+        "dailyQuest",
+        "prayerReminders",
+        "weeklyRecap",
+      ]) {
+        if (typeof notifications[key] !== "boolean") delete notifications[key];
+      }
+      if (
+        typeof notifications.preferredTime !== "string" ||
+        !DAILY_RHYTHM_SET.has(notifications.preferredTime)
+      ) {
+        delete notifications.preferredTime;
+      }
+      s.notifications = notifications;
+    }
+
+    // Preference arrays must stay arrays because scoring and sync call array APIs.
+    if ("questDurationPreference" in s) {
+      s.questDurationPreference = Array.isArray(s.questDurationPreference)
+        ? s.questDurationPreference.filter((value) =>
+            QUEST_DURATION_SET.has(value),
+          )
+        : [];
+    }
+    if ("questCategoryPreference" in s) {
+      s.questCategoryPreference = Array.isArray(s.questCategoryPreference)
+        ? s.questCategoryPreference.filter((value) =>
+            QUEST_CATEGORY_SET.has(value),
+          )
+        : [];
+    }
     delete s.analyticsConsent;
     out.settings = s;
   }
   // Nullable objects: keep only when well-formed, else drop to the default (null).
-  if (isProfile(src.profile)) out.profile = src.profile;
+  if (isProfile(src.profile)) {
+    // Portable backups never import device cache or remote media pointers.
+    const profile = { ...src.profile };
+    delete profile.avatarVersion;
+    delete profile.avatarUpdatedAt;
+    out.profile = profile;
+  }
   if (isStreak(src.streak)) out.streak = src.streak;
   if (isReadingPosition(src.readingPosition)) out.readingPosition = src.readingPosition;
   if (isAccountNudge(src.accountNudge)) out.accountNudge = src.accountNudge;

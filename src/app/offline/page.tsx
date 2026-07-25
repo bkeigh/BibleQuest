@@ -1,8 +1,9 @@
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { GentleLink } from "@/components/design-system/GentleButton";
 import { errors } from "@/lib/questos/copy";
+import { privateRouteMetadata } from "@/lib/metadata";
 
-export const metadata = { title: "Offline" };
+export const metadata = privateRouteMetadata("Offline", "/offline");
 
 export default function OfflinePage() {
   return (

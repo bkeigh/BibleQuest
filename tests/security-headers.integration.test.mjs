@@ -11,7 +11,6 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const nextBin = fileURLToPath(
   new URL("../node_modules/next/dist/bin/next", import.meta.url),
 );
-const revenueCatAssetOrigin = "https://da08ctfrofx1b.cloudfront.net";
 const approvedFrameAncestors = [
   "'self'",
   "https://winterhill.studio",
@@ -40,6 +39,8 @@ function assertIncludes(directives, name, expected) {
 }
 
 function assertSharedSecurityContract(response, production) {
+  assert.equal(response.headers.get("x-powered-by"), null);
+
   const rawCsp = response.headers.get("content-security-policy");
   assert.ok(rawCsp, "response must include Content-Security-Policy");
   const csp = parseCsp(rawCsp);
@@ -50,37 +51,17 @@ function assertSharedSecurityContract(response, production) {
 
   assertIncludes(csp, "script-src", [
     "https://tally.so",
-    "https://js.stripe.com",
-    "https://*.js.stripe.com",
-    "https://checkout.stripe.com",
   ]);
   assertIncludes(csp, "connect-src", [
     "https://header-fixture.supabase.co",
-    "https://api.revenuecat.com",
-    "https://e.revenue.cat",
-    "https://api.stripe.com",
-    "https://checkout.stripe.com",
-    "https://link.com",
-    "https://*.link.com",
   ]);
-  assertIncludes(csp, "frame-src", [
-    "https://tally.so",
-    "https://js.stripe.com",
-    "https://*.js.stripe.com",
-    "https://hooks.stripe.com",
-    "https://checkout.stripe.com",
-    "https://link.com",
-    "https://*.link.com",
-  ]);
-  assertIncludes(csp, "img-src", [
-    revenueCatAssetOrigin,
-    "https://*.stripe.com",
-    "https://*.link.com",
-  ]);
-  assertIncludes(csp, "font-src", [revenueCatAssetOrigin]);
-  assertIncludes(csp, "media-src", [revenueCatAssetOrigin]);
+  assertIncludes(csp, "frame-src", ["https://tally.so"]);
+  assert.deepEqual(csp.get("img-src"), ["'self'", "data:", "blob:"]);
+  assert.deepEqual(csp.get("font-src"), ["'self'"]);
+  assert.deepEqual(csp.get("media-src"), ["'self'", "blob:"]);
 
   assert.equal(rawCsp.includes("https://api.rc-backup.com"), false);
+  assert.equal(/revenuecat|stripe|link\.com/i.test(rawCsp), false);
   assert.equal(rawCsp.includes("https://*.supabase.co"), false);
   assert.equal(rawCsp.includes("wss://*.supabase.co"), false);
   assert.equal(
@@ -153,8 +134,6 @@ async function withNextServer(command, callback) {
         BIBLEQUEST_HEADER_TEST_DIST_DIR:
           command === "dev" ? isolatedDevDistDir : "",
         NEXT_PUBLIC_SUPABASE_URL: "https://header-fixture.supabase.co",
-        NEXT_PUBLIC_REVENUECAT_BILLING_MODE: "live",
-        NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY: "rcb_headerfixture",
       },
       stdio: ["ignore", "pipe", "pipe"],
     },
@@ -164,7 +143,7 @@ async function withNextServer(command, callback) {
 
   try {
     const response = await waitForResponse(child, `http://127.0.0.1:${port}/`, logs);
-    await callback(response);
+    await callback(response, logs);
   } finally {
     await stop(child);
     if (command === "dev") {
@@ -195,8 +174,12 @@ test(
   "a development Next.js response keeps HSTS out and unsafe-eval scoped to dev",
   { timeout: 120_000 },
   async () => {
-    await withNextServer("dev", (response) => {
-      assert.ok(response.status >= 200 && response.status < 400);
+    await withNextServer("dev", async (response, logs) => {
+      const body = await response.text();
+      assert.ok(
+        response.status >= 200 && response.status < 400,
+        `development server returned ${response.status}\n${body}\n${logs.join("")}`,
+      );
       assertSharedSecurityContract(response, false);
     });
   },

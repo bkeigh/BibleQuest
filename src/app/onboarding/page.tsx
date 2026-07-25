@@ -2,8 +2,9 @@ import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
 import { SyncManager } from "@/components/app-shell/SyncManager";
 import { OnboardingAccountRestoreGate } from "@/components/onboarding/OnboardingGate";
 import { parseAuthFailureReason } from "@/lib/auth/errors";
+import { privateRouteMetadata } from "@/lib/metadata";
 
-export const metadata = { title: "Welcome" };
+export const metadata = privateRouteMetadata("Welcome", "/onboarding");
 
 export default async function OnboardingPage({
   searchParams,

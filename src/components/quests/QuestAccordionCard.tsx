@@ -37,7 +37,7 @@ import { formatDuration, CATEGORY_LABEL } from "./QuestSlip";
 import { useStrings, fmt, type UIStrings } from "@/lib/i18n";
 import { track } from "@/lib/analytics/events";
 import { cn } from "@/lib/utils/cn";
-import { usePlus } from "@/lib/revenuecat/usePlus";
+import { usePlus } from "@/lib/billing/usePlus";
 
 /** The generic movement labels used when a quest has no required checklist. */
 function stepLabels(t: UIStrings): Record<QuestStepKey, string> {

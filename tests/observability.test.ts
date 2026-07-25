@@ -26,6 +26,7 @@ const PRIVATE_MARKERS = [
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 class TestStorage implements Storage {
@@ -52,6 +53,19 @@ class TestStorage implements Storage {
 
 describe("privacy-safe observability contract", () => {
   it("reconstructs only the exact bounded client signal", () => {
+    expect(
+      sanitizeClientSignal({
+        surface: "auth",
+        stage: "verify_email",
+        outcome: "success",
+        category: "ok",
+      }),
+    ).toEqual({
+      surface: "auth",
+      stage: "verify_email",
+      outcome: "success",
+      category: "ok",
+    });
     expect(
       sanitizeClientSignal({
         surface: "sync",
@@ -190,6 +204,63 @@ describe("privacy-safe observability contract", () => {
     expect(info).not.toHaveBeenCalled();
   });
 
+  it("rejects a canonical-origin claim sent to a different deployment", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const response = await POST(
+      new Request("https://candidate.example.test/api/observability/client", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "https://www.biblequest.co",
+          "Sec-Fetch-Site": "same-origin",
+        },
+        body: JSON.stringify({
+          surface: "auth",
+          stage: "session",
+          outcome: "success",
+          category: "ok",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(info).not.toHaveBeenCalled();
+  });
+
+  it("bounds same-origin ingestion without logging the client bucket", async () => {
+    vi.stubEnv("VERCEL", "1");
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const clientBucket = crypto.randomUUID();
+    const request = () =>
+      POST(
+        new Request("https://www.biblequest.co/api/observability/client", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: "https://www.biblequest.co",
+            "Sec-Fetch-Site": "same-origin",
+            "X-Forwarded-For": clientBucket,
+          },
+          body: JSON.stringify({
+            surface: "sync",
+            stage: "push",
+            outcome: "success",
+            category: "ok",
+          }),
+        }),
+      );
+
+    for (let index = 0; index < 60; index += 1) {
+      expect((await request()).status).toBe(202);
+    }
+    const limited = await request();
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toBe("60");
+    expect(JSON.stringify(await limited.json())).not.toContain(clientBucket);
+    expect(info).toHaveBeenCalledTimes(60);
+    expect(info.mock.calls.flat().join(" ")).not.toContain(clientBucket);
+  });
+
   it("queues only enums offline and flushes without credentials after reconnect", async () => {
     const storage = new TestStorage();
     const browserWindow = Object.assign(new EventTarget(), {
@@ -224,26 +295,55 @@ describe("privacy-safe observability contract", () => {
   });
 
   it("exposes bounded release posture and redacts malformed environment values", () => {
-    const health = buildReleaseHealth({
+    const configuredEnvironment = {
       VERCEL_GIT_COMMIT_SHA: "a".repeat(40),
       BIBLEQUEST_ROLLBACK_SHA: "b".repeat(40),
       NEXT_PUBLIC_APP_URL: observability.canonicalOrigin,
-      NEXT_PUBLIC_REVENUECAT_BILLING_MODE: "coming-soon",
+      STRIPE_BILLING_MODE: "coming-soon",
       NEXT_PUBLIC_SUPABASE_URL: "https://project.supabase.co",
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "publishable-fixture",
       NEXT_PUBLIC_ANALYTICS_ENABLED: "true",
       NEXT_PUBLIC_PLAUSIBLE_DOMAIN: "www.biblequest.co",
-    });
+    };
+    const health = buildReleaseHealth(configuredEnvironment, false);
     expect(health).toMatchObject({
       release_sha: "a".repeat(40),
       rollback_sha: "b".repeat(40),
       canonical_origin_matches: true,
       auth_posture: "configured",
       analytics_posture: "configured",
-      schema_contract: "0015",
-      service_worker_version: "biblequest-v15",
+      schema_contract: "0026",
+      service_worker_version: "biblequest-v21",
       billing_mode: "coming-soon",
+      billing_purchases_enabled: false,
+      billing_support_enabled: false,
     });
+
+    // The public contract must report the effective guest-only latch even
+    // when provider credentials remain available to the deployment.
+    expect(buildReleaseHealth(configuredEnvironment).auth_posture).toBe(
+      "guest-only",
+    );
+
+    const testBilling = buildReleaseHealth({
+      NEXT_PUBLIC_APP_URL: observability.canonicalOrigin,
+      STRIPE_BILLING_MODE: "test",
+      STRIPE_SECRET_KEY: `sk_test_${"a".repeat(24)}`,
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: `pk_test_${"b".repeat(24)}`,
+      STRIPE_WEBHOOK_SECRET: `whsec_${"c".repeat(24)}`,
+      STRIPE_PLUS_MONTHLY_PRICE_ID: "price_TestMonthly123",
+      STRIPE_PLUS_ANNUAL_PRICE_ID: "price_TestAnnual123",
+      BIBLEQUEST_STRIPE_PURCHASES_ENABLED: "true",
+      BIBLEQUEST_STRIPE_SUPPORT_ENABLED: "true",
+    });
+    expect(testBilling).toMatchObject({
+      billing_mode: "test",
+      billing_purchases_enabled: true,
+      billing_support_enabled: true,
+    });
+    expect(JSON.stringify(testBilling)).not.toMatch(
+      /sk_test_|pk_test_|whsec_|price_/,
+    );
 
     const hostile = buildReleaseHealth({
       VERCEL_GIT_COMMIT_SHA: PRIVATE_MARKERS[7],
@@ -252,7 +352,7 @@ describe("privacy-safe observability contract", () => {
       NEXT_PUBLIC_SUPABASE_URL: PRIVATE_MARKERS[8],
       NEXT_PUBLIC_ANALYTICS_ENABLED: "true",
       NEXT_PUBLIC_PLAUSIBLE_DOMAIN: PRIVATE_MARKERS[4],
-      NEXT_PUBLIC_REVENUECAT_BILLING_MODE: PRIVATE_MARKERS[5],
+      STRIPE_BILLING_MODE: PRIVATE_MARKERS[5],
     });
     const serialized = JSON.stringify(hostile);
     expect(hostile.release_sha).toBeNull();

@@ -1,27 +1,19 @@
 import { NextResponse } from "next/server";
-import observability from "../../../../../config/observability.json";
+import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
 import { safeClientSignalLog } from "@/lib/observability/client-signals";
 
 const MAX_BODY_BYTES = 512;
+const SIGNAL_RATE_POLICIES = [
+  { limit: 60, windowMs: 60_000 },
+  { limit: 300, windowMs: 15 * 60_000 },
+] as const;
 
-/** Accepts only canonical or local same-origin browser posts. */
-function allowedOrigin(request: Request): boolean {
+/** Requires the browser-supplied origin to match the endpoint being called. */
+function hasExactOrigin(request: Request): boolean {
   const origin = request.headers.get("origin");
   if (!origin) return false;
-  if (origin === observability.canonicalOrigin) return true;
-  if (
-    process.env.VERCEL_URL &&
-    origin === `https://${process.env.VERCEL_URL}`
-  ) {
-    return true;
-  }
   try {
-    const url = new URL(origin);
-    return (
-      process.env.NODE_ENV !== "production" &&
-      url.protocol === "http:" &&
-      (url.hostname === "localhost" || url.hostname === "127.0.0.1")
-    );
+    return new URL(origin).origin === new URL(request.url).origin;
   } catch {
     return false;
   }
@@ -29,12 +21,20 @@ function allowedOrigin(request: Request): boolean {
 
 /** Records a reconstructed content-free browser health signal. */
 export async function POST(request: Request) {
+  const blocked = guardProviderRequest(
+    request,
+    "observability-client",
+    SIGNAL_RATE_POLICIES,
+  );
+  if (blocked) return blocked;
+
   const contentType = request.headers.get("content-type")?.split(";", 1)[0];
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (
-    !allowedOrigin(request) ||
+    !hasExactOrigin(request) ||
     contentType !== "application/json" ||
     !Number.isFinite(contentLength) ||
+    contentLength < 0 ||
     contentLength > MAX_BODY_BYTES
   ) {
     return NextResponse.json({ accepted: false }, { status: 400 });

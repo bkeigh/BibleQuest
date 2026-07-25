@@ -1,6 +1,6 @@
 "use client";
 
-import { usePlus } from "@/lib/revenuecat/usePlus";
+import { usePlus } from "@/lib/billing/usePlus";
 import { PlusInvitationLink } from "./PlusInvitationLink";
 
 interface ExplorePlusLinkProps {

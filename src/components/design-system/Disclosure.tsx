@@ -109,8 +109,9 @@ export function Disclosure({
         aria-controls={contentId}
         onClick={handleToggle}
         className={cn(
-          "flex w-full items-center gap-3 text-left font-medium text-graphite",
+          "flex min-h-11 w-full items-center gap-3 text-left font-medium text-graphite",
           "rounded-[var(--radius-button)]",
+          "transition-colors hover:bg-paper/55 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:bg-linen/70",
           styles.trigger
         )}
       >
@@ -127,6 +128,7 @@ export function Disclosure({
         id={contentId}
         role="region"
         aria-labelledby={triggerId}
+        aria-hidden={!open}
         className={cn(
           "grid transition-[grid-template-rows] duration-300 [transition-timing-function:var(--ease-gentle)]",
           open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"

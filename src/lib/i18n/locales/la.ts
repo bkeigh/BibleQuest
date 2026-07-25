@@ -38,7 +38,6 @@ export const la: UIStrings = {
   },
   home: {
     todaysVerse: "Versiculus hodiernus",
-    todaysQuests: "Munera hodierna",
     yourGrowth: "Profectus tuus",
     recently: "Nuper",
     quickPrayer: "Oratio brevis",
@@ -85,6 +84,9 @@ export const la: UIStrings = {
     addToToday: "In hodiernum adde",
     begin: "Incipe",
     completedToday: "Hodie perfectum",
+    groupActive: "Activa",
+    groupReady: "Parata",
+    groupCompleted: "Perfecta",
   },
   dayComplete: {
     title: "Omnia hodierna peracta sunt.",

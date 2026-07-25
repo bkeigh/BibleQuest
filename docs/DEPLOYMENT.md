@@ -91,15 +91,21 @@ needed — just don't remove that config.
 - [ ] Bible chapter renders real WEB text.
 - [ ] A public `/verse/{book}/{chapter}/{verse}` link renders without onboarding,
       has canonical/social metadata, and its “Open chapter” CTA targets the verse.
-- [ ] `/support` clearly reports whether one-time support is available. If
-      `STRIPE_DONATION_URL` is intentionally configured, verify the same-origin
-      checkout route redirects only to the reviewed live Stripe Payment Link;
-      repeat with the variable absent and confirm it fails closed.
+- [ ] `/support` clearly reports whether one-time support is available. With
+      its separate gate enabled in an approved test deployment, verify the
+      same-origin POST route returns only the exact Stripe-hosted Checkout URL;
+      repeat with the gate disabled and confirm it fails closed.
+- [ ] Vercel Firewall applies a deployment-wide bound to
+      `/api/support/checkout`; the in-process 5/10-minute and 20/day bounds are
+      defense in depth.
 - [ ] Add to Home Screen on an iPhone; confirm it opens standalone.
 - [ ] Offline: load the app, go offline, confirm the offline fallback appears.
 - [ ] `/api/health` passes the bounded release contract in
       [`OBSERVABILITY.md`](OBSERVABILITY.md), including deployed/rollback SHA,
       canonical, auth, schema/content, worker, and billing posture.
+- [ ] Vercel Firewall applies a deployment-wide bound to
+      `/api/observability/client`; the in-process 60/minute and 300/15-minute
+      limits are defense in depth and never make public signals authenticated.
 - [ ] Privacy and Terms pages load.
 - [ ] Save deployed document and `/sw.js` header evidence; confirm HSTS/CSP are
       not changed by Vercel project-level header rules.
@@ -114,17 +120,26 @@ needed — just don't remove that config.
 - [ ] Rehearse the complete Supabase migration/RLS runbook on staging, review
       the production dry run, and obtain explicit approval before the database
       push (if enabling sync).
-- [ ] Complete [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md): apply
-      migrations through `0015` (including the authoritative `0014` Journey
-      identity change) with the reviewed seed applied separately,
+- [ ] Complete [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md): apply its
+      account boundary through `0022`, then the launch capability migrations
+      through `0026`
+      with the reviewed seed applied separately,
       configure custom SMTP, and pass production readiness, daily-quest CAS,
       cached-client, and two-user isolation checks.
+- [ ] Require the anonymous `daily_quest_sync_contract` readiness response to
+      contain exactly the fixed contract identity and `ok: true`; treat extra
+      keys, content, or `ok: false` as a sync launch blocker.
 - [ ] Configure privacy-first analytics if desired. Use Vercel logs and an
       external uptime check through the content-free operational contract in
       [`OBSERVABILITY.md`](OBSERVABILITY.md) until a separately privacy-reviewed
       error provider exists.
-- [ ] Keep RevenueCat in `coming-soon` unless every sandbox-to-production gate
-      in [`REVENUECAT.md`](REVENUECAT.md) has evidence and explicit approval.
+- [ ] Keep direct Stripe Billing in `coming-soon` with purchases disabled unless
+      every test-to-live gate in
+      [`STRIPE_TEST_BILLING.md`](STRIPE_TEST_BILLING.md) has evidence and
+      explicit approval.
+- [ ] Keep one-time support disabled unless every test-to-live gate in
+      [`STRIPE_ONE_TIME_SUPPORT.md`](STRIPE_ONE_TIME_SUPPORT.md) has evidence
+      and explicit approval.
 - [ ] Keep the Free Use Bible API catalogue constrained to the reviewed
       public-domain allow-list in `src/lib/bible/translations.ts`. A provider
       catalogue entry is not, by itself, approval to expose that edition.

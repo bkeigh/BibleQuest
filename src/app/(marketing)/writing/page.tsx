@@ -1,12 +1,14 @@
 import { MarketingPage, Prose } from "@/components/marketing/MarketingPage";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { marketingMetadata } from "@/lib/metadata";
 
-export const metadata = {
+export const metadata = marketingMetadata({
   title: "Writing",
   description:
     "Essays on faith, rhythm, and building a spiritual app that refuses shame. Coming soon.",
-};
+  path: "/writing",
+});
 
 const PLANNED = [
   "Why faith should not feel like homework",

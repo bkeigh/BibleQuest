@@ -22,9 +22,9 @@ describe("launch content catalog", () => {
       "utf8",
     );
 
-    const accountSurface = home.indexOf("Profile, preferences &amp; accessibility");
+    const accountSurface = home.indexOf("Personal welcome");
     const verseEntry = home.indexOf("<TodaysVerseLink />");
-    const questSection = home.indexOf('id="active-quests"');
+    const questSection = home.indexOf("<HomeQuestDisclosure");
     expect(accountSurface).toBeGreaterThan(-1);
     expect(verseEntry).toBeGreaterThan(accountSurface);
     expect(questSection).toBeGreaterThan(verseEntry);
@@ -40,6 +40,100 @@ describe("launch content catalog", () => {
     );
     expect(focusRule).toContain("display: none");
     expect(focusRule).not.toContain("transform:");
+  });
+
+  it("keeps one default-open Home quest collection with nested status drawers", () => {
+    const home = readFileSync(
+      path.join(process.cwd(), "src/components/home/HomeScreen.tsx"),
+      "utf8",
+    );
+
+    // Counts stay in one outer summary while every status owns a compact drawer.
+    expect(home).toContain("<HomeQuestDisclosure");
+    expect(home).toContain("title={t.nav.quests}");
+    expect(home).toContain("summary={questSummary}");
+    expect(home).toContain("defaultOpen");
+    expect(home).toContain("label={t.quests.groupActive}");
+    expect(home).toContain("label={t.quests.groupReady}");
+    expect(home).toContain("label={t.quests.groupCompleted}");
+    expect(home).toContain("buildHomeQuestGroups");
+    expect(home).not.toContain("<QuestFeed");
+    expect(home).not.toContain("Swipe sideways to review every open quest.");
+    expect(home).not.toContain("useCompactQuestRail");
+  });
+
+  it("uses a larger tree-only Home growth preview", () => {
+    const home = readFileSync(
+      path.join(process.cwd(), "src/components/home/HomeScreen.tsx"),
+      "utf8",
+    );
+
+    expect(home).toContain("size={96}");
+    expect(home).toContain("treeOnly");
+    expect(home).not.toContain("size={76}");
+  });
+
+  it("keeps Bible verse taps semantic and history aligned with the shown edition", () => {
+    const reader = readFileSync(
+      path.join(process.cwd(), "src/components/bible/ChapterReader.tsx"),
+      "utf8",
+    );
+    const bibleIndex = readFileSync(
+      path.join(process.cwd(), "src/components/bible/BibleIndex.tsx"),
+      "utf8",
+    );
+    const questDetail = readFileSync(
+      path.join(process.cwd(), "src/components/quests/QuestDetail.tsx"),
+      "utf8",
+    );
+
+    expect(reader).toContain("<button");
+    expect(reader).not.toContain('role="button"');
+    expect(reader).toContain("persistableVerseText(i)");
+    expect(bibleIndex).toContain("onPresentedText={recordPresentedVerse}");
+    expect(questDetail).toContain("Back to Quests");
+    expect(questDetail).not.toContain("Back to active quests");
+  });
+
+  it("keeps onboarding quest language aligned with the consolidated Home section", () => {
+    const onboarding = readFileSync(
+      path.join(process.cwd(), "src/components/onboarding/OnboardingFlow.tsx"),
+      "utf8",
+    );
+
+    expect(onboarding).toContain("your quests");
+    expect(onboarding).toContain("unlimited quest windows");
+    expect(onboarding).not.toContain("active quests");
+  });
+
+  it("uses the approved social preview tagline", () => {
+    const iconBuilder = readFileSync(
+      path.join(process.cwd(), "scripts/build-icons.mjs"),
+      "utf8",
+    );
+
+    expect(iconBuilder).toContain("A daily guide to living in faith");
+    expect(iconBuilder).not.toContain("A daily guide to living your faith");
+  });
+
+  it("keeps Plus copy aligned with shipped benefits and Stripe-authored pricing", () => {
+    const plusContent = readFileSync(
+      path.join(process.cwd(), "src/components/plus/PlusContent.tsx"),
+      "utf8",
+    );
+    const plusCta = readFileSync(
+      path.join(process.cwd(), "src/components/plus/PlusCta.tsx"),
+      "utf8",
+    );
+
+    expect(plusContent).toContain("Unlimited active quest windows");
+    expect(plusContent).toContain("Unlimited daily verse refreshes");
+    expect(plusContent).toContain("The full still and live wallpaper collection");
+    expect(plusContent).toContain("never read your journals");
+    expect(plusCta).toContain("formatBillingAmount(plan)");
+    expect(plusCta).toContain("renews automatically each billing period");
+    expect(plusCta).toMatch(/Checkout\s+shows the final total/);
+    expect(`${plusContent}\n${plusCta}`).not.toMatch(/\$8\.99|29¢|AI Study/i);
   });
 
   it("ships exactly 150 unique, reviewed free quests with useful depth", () => {

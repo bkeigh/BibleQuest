@@ -17,6 +17,7 @@ import { reflectionPrompts } from "@/data/seed/reflection-prompts";
 import { hashString, toDateKey } from "@/lib/utils/dates";
 import { useDeviceLocalJournalDraft } from "@/lib/questos/journal-drafts";
 import type { ReflectionMood } from "@/lib/questos/types";
+import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 
 type ReflectionDraft = {
   body: string;
@@ -291,7 +292,9 @@ function ReflectionComposerInner() {
 
       <div className="mt-7 flex items-center justify-between gap-3">
         <p className="max-w-xs text-[0.75rem] leading-relaxed text-ash">
-          Saved entries sync to your BibleQuest account when you are signed in.
+          {ACCOUNT_SYNC_CONTAINED
+            ? "Saved on this device. Account sync is temporarily unavailable."
+            : "Saved entries sync to your BibleQuest account when you are signed in."}
         </p>
         {(restored || value.body.trim()) && (
           <button

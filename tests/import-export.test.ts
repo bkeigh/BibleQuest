@@ -1,12 +1,37 @@
 import { describe, expect, it } from "vitest";
 import { seedMilestones } from "@/data/seed/milestones";
-import { parseSnapshot } from "@/lib/questos/import-schema";
+import {
+  MAX_IMPORT_FILE_BYTES,
+  parseSnapshot,
+} from "@/lib/questos/import-schema";
 import { createExportSnapshot } from "@/lib/questos/snapshot";
 import { currentSnapshot } from "./fixtures";
 
 describe("journey import and export", () => {
+  it("rejects oversized files and collections before restore", () => {
+    const oversizedFile = parseSnapshot(
+      " ".repeat(MAX_IMPORT_FILE_BYTES + 1),
+    );
+    expect(oversizedFile).toEqual({
+      ok: false,
+      error: "That journey is too large to restore safely.",
+    });
+
+    const oversizedCollection = parseSnapshot(
+      JSON.stringify({
+        prayers: Array.from({ length: 20_001 }, () => null),
+      }),
+    );
+    expect(oversizedCollection).toEqual({
+      ok: false,
+      error: "That journey is too large to restore safely.",
+    });
+  });
+
   it("round-trips the current snapshot including My Quests lifecycle and steps", () => {
-    const exported = createExportSnapshot(currentSnapshot());
+    const source = currentSnapshot();
+    source.profile!.avatarUpdatedAt = "2026-07-24T12:00:00.000Z";
+    const exported = createExportSnapshot(source);
     const result = parseSnapshot(JSON.stringify(exported));
 
     expect(result.ok).toBe(true);
@@ -18,6 +43,7 @@ describe("journey import and export", () => {
     ]);
     expect(result.data.myQuests?.["fixture-walk"]?.timesCompleted).toBe(2);
     expect(result.data.accountNudge?.shownContexts).toEqual(["onboarding"]);
+    expect(exported.profile?.avatarUpdatedAt).toBeUndefined();
     const { analyticsConsent, ...settingsWithoutConsent } = exported.settings;
     expect(analyticsConsent).toBe(false);
     expect(result.data).toEqual({
@@ -97,6 +123,24 @@ describe("journey import and export", () => {
     expect(malformed.data.settings?.appearance).not.toHaveProperty(
       "glassOpacity",
     );
+  });
+
+  it("drops malformed nested settings before they can crash restore", () => {
+    const result = parseSnapshot(
+      JSON.stringify({
+        settings: {
+          notifications: null,
+          questDurationPreference: "all-day",
+          questCategoryPreference: { category: "prayer" },
+        },
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.settings).not.toHaveProperty("notifications");
+    expect(result.data.settings?.questDurationPreference).toEqual([]);
+    expect(result.data.settings?.questCategoryPreference).toEqual([]);
   });
 
   it("drops malformed records and returns content-free errors", () => {

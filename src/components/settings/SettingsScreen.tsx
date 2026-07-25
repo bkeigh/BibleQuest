@@ -15,16 +15,37 @@ import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosure";
+import { SearchClearButton } from "@/components/design-system/SearchClearButton";
 import { Avatar } from "@/components/profile/Avatar";
 import { applyAppearance } from "@/lib/theme";
-import { saveAvatar, clearAvatar } from "@/lib/utils/avatar";
-import { parseSnapshot } from "@/lib/questos/import-schema";
+import {
+  clearAvatar,
+  clearLegacyAvatar,
+  profileAvatarMarker,
+  saveAvatar,
+  storeRemoteAvatar,
+} from "@/lib/utils/avatar";
+import {
+  deleteRemoteAvatar,
+  uploadRemoteAvatar,
+} from "@/lib/avatar/client";
+import { validateAvatarFile } from "@/lib/avatar/validation";
+import {
+  MAX_IMPORT_FILE_BYTES,
+  parseSnapshot,
+} from "@/lib/questos/import-schema";
 import { createExportSnapshot } from "@/lib/questos/snapshot";
 import { clearAllDeviceLocalJournalDrafts } from "@/lib/questos/journal-drafts";
 import { clearLastSyncedUserId } from "@/lib/sync/last-user";
+import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 import { useSession } from "@/lib/supabase/useSession";
 import { createClient } from "@/lib/supabase/client";
+import { deleteOwnAccountWithAvatar } from "@/lib/auth/account-deletion";
 import { track } from "@/lib/analytics/events";
+import { stopSync } from "@/lib/sync/engine";
+import { clearStoredAccountSyncGenerations } from "@/lib/sync/generation";
+import { clearStoredDailyQuestSyncContext } from "@/lib/sync/daily-quests";
+import { clearStoredMutableRevisionContext } from "@/lib/sync/mutable-revisions";
 import type { QuestOSSnapshot } from "@/lib/questos/types";
 import { useStrings, LANGUAGES, languageMeta, fmt } from "@/lib/i18n";
 import { IconCheck, IconChevronRight } from "@/components/design-system/icons";
@@ -39,13 +60,15 @@ import {
 import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
 import { WallpaperPicker } from "@/components/settings/WallpaperPicker";
 import { ExplorePlusLink } from "@/components/plus/ExplorePlusLink";
-import { DonationLink } from "@/components/plus/DonationLink";
+import { SupportLink } from "@/components/plus/SupportLink";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 import {
   MAX_GLASS_OPACITY,
   MIN_GLASS_OPACITY,
   normalizeGlassOpacity,
 } from "@/lib/glass-opacity";
+import { SUPPORT_EMAIL, SUPPORT_EMAIL_HREF } from "@/lib/brand";
+import { ReminderSettings } from "@/components/settings/ReminderSettings";
 
 function Row({
   label,
@@ -643,14 +666,22 @@ function BibleTranslationPicker({
           <label htmlFor="translation-search" className="text-caption text-ash">
             {copy.searchLabel}
           </label>
-          <input
-            id="translation-search"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={copy.searchPlaceholder}
-            className="mt-1.5 w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-[0.9375rem] text-graphite outline-none focus:border-accent/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          />
+          <div className="relative mt-1.5">
+            <input
+              id="translation-search"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={copy.searchPlaceholder}
+              className="w-full rounded-[var(--radius-button)] border border-mist bg-linen py-2.5 pl-3.5 pr-12 text-[0.9375rem] text-graphite outline-none focus:border-accent/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            />
+            <SearchClearButton
+              inputId="translation-search"
+              visible={query.length > 0}
+              onClear={() => setQuery("")}
+              label="Clear Bible translation search"
+            />
+          </div>
           <div className="mt-3 max-h-80 space-y-4 overflow-y-auto pr-1">
             {onlineLanguages.map(([language, editions]) => (
               <div key={language}>
@@ -698,13 +729,20 @@ function SettingsInner() {
   const store = useQuestOS;
 
   const [confirmClear, setConfirmClear] = useState(false);
+  const [clearingData, setClearingData] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [pendingImport, setPendingImport] =
     useState<Partial<QuestOSSnapshot> | null>(null);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const photoUploadControllerRef = useRef<AbortController | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
 
@@ -718,6 +756,14 @@ function SettingsInner() {
   const language = settings.language ?? "en";
   const bibleTranslation =
     settings.preferredBibleTranslation ?? DEFAULT_BIBLE_TRANSLATION_KEY;
+
+  // Cancel an obsolete upload when Settings unmounts or a newer pick starts.
+  useEffect(
+    () => () => {
+      photoUploadControllerRef.current?.abort();
+    },
+    [],
+  );
 
   function setAppearance(patch: Partial<typeof appearance>) {
     const next = { ...appearance, ...patch };
@@ -749,21 +795,71 @@ function SettingsInner() {
   async function onPhotoPicked(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = ""; // reset so re-picking the same file still fires onChange
-    if (!file) return;
-    const ok = await saveAvatar(file);
-    if (ok) {
-      // The photo lives in IndexedDB; the store only carries this marker so
-      // Avatar knows to refetch (and it syncs/exports as a harmless string).
-      updateProfile({ avatarUpdatedAt: new Date().toISOString() });
-      toast(t.settings.photoSaved, { variant: "success" });
-    } else {
+    if (!file || photoBusy) return;
+    setPhotoBusy(true);
+    if (sessionLoading || !(await validateAvatarFile(file))) {
       toast(t.settings.photoError);
+      setPhotoBusy(false);
+      return;
+    }
+
+    photoUploadControllerRef.current?.abort();
+    const controller = new AbortController();
+    photoUploadControllerRef.current = controller;
+    const previousMarker = profileAvatarMarker(profile);
+    try {
+      if (user) {
+        const remote = await uploadRemoteAvatar(file, controller.signal);
+        if (!(await storeRemoteAvatar(remote.blob, remote.version))) {
+          throw new Error("avatar cache unavailable");
+        }
+        updateProfile({
+          avatarVersion: remote.version,
+          avatarUpdatedAt: remote.updatedAt,
+        });
+        await clearLegacyAvatar();
+        if (previousMarker && previousMarker !== remote.version) {
+          await clearAvatar(previousMarker);
+        }
+      } else {
+        const nextMarker = new Date().toISOString();
+        if (!(await saveAvatar(file, nextMarker))) {
+          throw new Error("avatar cache unavailable");
+        }
+        updateProfile({
+          avatarVersion: null,
+          avatarUpdatedAt: nextMarker,
+        });
+        if (previousMarker && previousMarker !== nextMarker) {
+          await clearAvatar(previousMarker);
+        }
+      }
+      toast(t.settings.photoSaved, { variant: "success" });
+    } catch {
+      if (controller.signal.aborted) return;
+      toast(t.settings.photoError);
+    } finally {
+      if (photoUploadControllerRef.current === controller) {
+        photoUploadControllerRef.current = null;
+      }
+      setPhotoBusy(false);
     }
   }
 
   async function removePhoto() {
-    await clearAvatar();
-    updateProfile({ avatarUpdatedAt: null });
+    if (photoBusy) return;
+    setPhotoBusy(true);
+    const currentMarker = profileAvatarMarker(profile);
+    try {
+      if (user) await deleteRemoteAvatar();
+      if (currentMarker) await clearAvatar(currentMarker);
+      await clearLegacyAvatar();
+      updateProfile({ avatarVersion: null, avatarUpdatedAt: null });
+    } catch {
+      toast(t.settings.photoError);
+    } finally {
+      setPhotoBusy(false);
+    }
   }
 
   function exportData() {
@@ -785,6 +881,10 @@ function SettingsInner() {
     const file = e.target.files?.[0];
     e.target.value = ""; // reset so re-picking the same file still fires onChange
     if (!file) return;
+    if (file.size > MAX_IMPORT_FILE_BYTES) {
+      setImportError("That journey is too large to restore safely.");
+      return;
+    }
     let text: string;
     try {
       text = await file.text();
@@ -808,10 +908,68 @@ function SettingsInner() {
     );
     // A restore whose profile carries no photo marker must not resurrect a
     // stale on-device photo blob for the incoming profile.
-    if (!pendingImport.profile?.avatarUpdatedAt) void clearAvatar();
+    if (
+      !pendingImport.profile?.avatarVersion &&
+      !pendingImport.profile?.avatarUpdatedAt
+    ) {
+      void clearAvatar();
+    }
     setPendingImport(null);
     applyAppearance(store.getState().settings.appearance);
     toast("Restored.", { variant: "success" });
+  }
+
+  // Server deletion must succeed before any irreplaceable device data is removed.
+  async function deleteAccount() {
+    if (
+      !user ||
+      ACCOUNT_SYNC_CONTAINED ||
+      deleteConfirmation !== "DELETE" ||
+      deletingAccount
+    ) {
+      return;
+    }
+    setDeletingAccount(true);
+    setDeleteAccountError(false);
+
+    try {
+      await deleteOwnAccountWithAvatar();
+    } catch {
+      setDeletingAccount(false);
+      setDeleteAccountError(true);
+      return;
+    }
+
+    // Stop every subscriber before removing the deleted account's local copy.
+    stopSync();
+    clearAllData();
+    clearAllDeviceLocalJournalDrafts();
+    clearLastSyncedUserId();
+    clearStoredAccountSyncGenerations();
+    clearStoredDailyQuestSyncContext();
+    clearStoredMutableRevisionContext();
+    await clearAvatar();
+    toast("Your account and saved journey were deleted.", {
+      variant: "success",
+    });
+    router.replace("/onboarding");
+  }
+
+  /** Removes account media before clearing every local and synced journey. */
+  async function clearJourneyData() {
+    if (clearingData) return;
+    setClearingData(true);
+    try {
+      if (user) await deleteRemoteAvatar(true);
+      clearAllData(user ? { purgeAccount: user.id } : undefined);
+      clearAllDeviceLocalJournalDrafts();
+      await clearAvatar();
+      clearLastSyncedUserId();
+      router.replace("/onboarding");
+    } catch {
+      toast("Your data could not be cleared. Nothing on this device was removed.");
+      setClearingData(false);
+    }
   }
 
   return (
@@ -823,7 +981,7 @@ function SettingsInner() {
           <div className="flex items-center gap-4 max-[360px]:flex-col max-[360px]:items-stretch sm:gap-5">
             <Avatar
               name={profile?.displayName}
-              marker={profile?.avatarUpdatedAt}
+              marker={profileAvatarMarker(profile)}
               size="lg"
               className="ring-1 ring-paper/70 shadow-[0_8px_24px_rgb(18_33_27_/_0.12)] max-[360px]:self-center"
             />
@@ -896,7 +1054,7 @@ function SettingsInner() {
                     <input
                       ref={photoInputRef}
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp"
                       className="sr-only"
                       // Proxy-triggered by the visible button; without this
                       // the sr-only input is an invisible tab stop.
@@ -908,15 +1066,17 @@ function SettingsInner() {
                       variant="outline"
                       size="sm"
                       className="min-h-11"
+                      disabled={sessionLoading || photoBusy}
                       onClick={() => photoInputRef.current?.click()}
                     >
-                      {t.settings.changePhoto}
+                      {photoBusy ? "Saving…" : t.settings.changePhoto}
                     </GentleButton>
-                    {profile?.avatarUpdatedAt && (
+                    {profileAvatarMarker(profile) && (
                       <GentleButton
                         variant="text"
                         size="sm"
                         className="min-h-11"
+                        disabled={photoBusy}
                         onClick={removePhoto}
                       >
                         {t.settings.removePhoto}
@@ -935,13 +1095,21 @@ function SettingsInner() {
             href="/app/account"
             className="flex items-center justify-between px-4 py-3.5 text-charcoal hover:bg-linen"
           >
-            <span className="text-[0.9375rem]">Sync across devices</span>
+            <span className="text-[0.9375rem]">
+              {ACCOUNT_SYNC_CONTAINED ? "Account sync" : "Sync across devices"}
+            </span>
             <span className="flex items-center gap-1 text-[0.8125rem] text-ash">
-              {sessionLoading ? "Checking…" : user ? "Signed in" : "Set up sync"}
+              {ACCOUNT_SYNC_CONTAINED
+                ? "Temporarily unavailable"
+                : sessionLoading
+                  ? "Checking…"
+                  : user
+                    ? "Signed in"
+                    : "Set up sync"}
               <IconChevronRight size={15} />
             </span>
           </Link>
-          {user && (
+          {!ACCOUNT_SYNC_CONTAINED && user && (
             <div className="border-t border-mist/70 px-4 py-3">
               <GentleButton
                 variant="outline"
@@ -959,7 +1127,7 @@ function SettingsInner() {
         <SectionTitle>Plus</SectionTitle>
         <div className="space-y-3">
           <ExplorePlusLink description="Discover the full wallpaper collection and extra ways to deepen your daily practice." />
-          <DonationLink />
+          <SupportLink />
         </div>
 
         {/* Always visible — text size and bold text are comfort settings
@@ -1075,7 +1243,14 @@ function SettingsInner() {
 
           <Disclosure
             variant="card"
-            label={t.settings.language}
+            label={
+              <span className="inline-flex items-center gap-2">
+                {t.settings.language}
+                <span className="rounded-full bg-accent-surface px-2 py-0.5 text-[0.6875rem] font-medium uppercase tracking-[0.06em] text-accent">
+                  Beta
+                </span>
+              </span>
+            }
             summary={<span className="text-[0.8125rem] text-ash">{languageMeta(language).endonym}</span>}
           >
             <p className="pb-1 text-[0.875rem] leading-relaxed text-ash">
@@ -1088,11 +1263,7 @@ function SettingsInner() {
           </Disclosure>
 
           <Disclosure variant="card" label={t.settings.reminders}>
-            <p className="text-[0.875rem] leading-relaxed text-ash">
-              Reminders are coming soon. When they arrive, they’ll be
-              invitations — never pressure, never streak warnings. You’ll choose
-              exactly what and when.
-            </p>
+            <ReminderSettings />
           </Disclosure>
 
           <Disclosure variant="card" label="Privacy & data">
@@ -1190,13 +1361,22 @@ function SettingsInner() {
               </li>
               <li>
                 <Link href="/terms" className="block py-3 text-charcoal hover:text-accent">
-                  Terms of Service
+                  Terms of Use
                 </Link>
               </li>
               <li>
                 <Link href="/privacy" className="block py-3 text-charcoal hover:text-accent">
                   Privacy Policy
                 </Link>
+              </li>
+              <li>
+                <a
+                  href={SUPPORT_EMAIL_HREF}
+                  className="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-1 py-3 text-charcoal hover:text-accent"
+                >
+                  <span>Email support</span>
+                  <span className="text-caption text-ash">{SUPPORT_EMAIL}</span>
+                </a>
               </li>
             </ul>
           </Disclosure>
@@ -1230,24 +1410,10 @@ function SettingsInner() {
                 <GentleButton
                   variant="danger"
                   size="sm"
-                  onClick={() => {
-                    // Signed in, the purge marker condemns the account copy
-                    // too; the sync engine deletes it on the next push or
-                    // initial sync, even if that happens after a reload.
-                    clearAllData(user ? { purgeAccount: user.id } : undefined);
-                    clearAllDeviceLocalJournalDrafts();
-                    // "Everything on this device" includes the profile photo,
-                    // which lives beside the store in IndexedDB.
-                    void clearAvatar();
-                    // The device no longer holds anyone's journey — drop the
-                    // sync-ownership marker so the next sign-in isn't asked
-                    // about data that no longer exists. (If still signed in,
-                    // the next successful push re-stamps it.)
-                    clearLastSyncedUserId();
-                    router.replace("/onboarding");
-                  }}
+                  disabled={clearingData}
+                  onClick={() => void clearJourneyData()}
                 >
-                  Yes, clear everything
+                  {clearingData ? "Clearing…" : "Yes, clear everything"}
                 </GentleButton>
                 <GentleButton
                   variant="ghost"
@@ -1260,6 +1426,93 @@ function SettingsInner() {
             </>
           )}
         </PaperCard>
+
+        {!ACCOUNT_SYNC_CONTAINED && user && (
+          <>
+            {/* Keeps irreversible account deletion at the very bottom of Settings. */}
+            <SectionTitle>Delete account</SectionTitle>
+            <PaperCard variant="paper" padding="md">
+              {!confirmDeleteAccount ? (
+                <>
+                  <p className="text-[0.875rem] leading-relaxed text-ash">
+                    Permanently close your login and delete its synced journey.
+                    This device’s journey will also be cleared.
+                  </p>
+                  <GentleButton
+                    variant="danger"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => {
+                      setDeleteAccountError(false);
+                      setConfirmDeleteAccount(true);
+                    }}
+                  >
+                    Delete account
+                  </GentleButton>
+                </>
+              ) : (
+                <>
+                  <p className="text-[0.9375rem] leading-relaxed text-charcoal">
+                    This permanently deletes your account, prayers,
+                    reflections, progress, and this device’s journey. It can’t
+                    be undone.
+                  </p>
+                  <label
+                    htmlFor="delete-account-confirmation"
+                    className="mt-3 block text-caption text-ash"
+                  >
+                    Type DELETE to confirm
+                  </label>
+                  <input
+                    id="delete-account-confirmation"
+                    value={deleteConfirmation}
+                    onChange={(event) => {
+                      setDeleteConfirmation(event.target.value);
+                      setDeleteAccountError(false);
+                    }}
+                    autoComplete="off"
+                    spellCheck={false}
+                    disabled={deletingAccount}
+                    className="mt-1.5 w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-body text-graphite outline-none focus:border-accent/50"
+                  />
+                  {deleteAccountError && (
+                    <p role="alert" className="mt-2 text-caption text-rose-700">
+                      We couldn’t delete your account. Nothing on this device
+                      was removed. Check your connection and try again.
+                    </p>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-2.5">
+                    <GentleButton
+                      variant="danger"
+                      size="sm"
+                      disabled={
+                        deleteConfirmation !== "DELETE" || deletingAccount
+                      }
+                      aria-busy={deletingAccount}
+                      onClick={() => void deleteAccount()}
+                    >
+                      {deletingAccount
+                        ? "Deleting account…"
+                        : "Permanently delete account"}
+                    </GentleButton>
+                    <GentleButton
+                      variant="ghost"
+                      size="sm"
+                      disabled={deletingAccount}
+                      onClick={() => {
+                        setConfirmDeleteAccount(false);
+                        setDeleteConfirmation("");
+                        setDeleteAccountError(false);
+                      }}
+                    >
+                      Keep my account
+                    </GentleButton>
+                  </div>
+                </>
+              )}
+            </PaperCard>
+          </>
+        )}
       </PageContainer>
     </>
   );

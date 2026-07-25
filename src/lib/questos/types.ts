@@ -515,12 +515,14 @@ export interface Profile {
   calling?: Calling;
   onboardingCompleted: boolean;
   createdAt: string;
+  /** Last change to account-synced profile fields; legacy snapshots may omit it. */
+  updatedAt?: string;
   /**
-   * Set when a profile photo exists in the on-device media store (IndexedDB —
-   * see src/lib/utils/avatar.ts). The image itself deliberately stays OUT of
-   * this persisted blob: localStorage re-serializes the whole store on every
-   * write, and the sync engine must never ship the photo to the account.
+   * Opaque server version for an account avatar. Image bytes stay in private
+   * Storage plus the version-keyed IndexedDB cache, never in this JSON store.
    */
+  avatarVersion?: string | null;
+  /** Pre-account-sync local marker retained only for legacy avatar migration. */
   avatarUpdatedAt?: string | null;
 }
 
@@ -587,6 +589,10 @@ export interface Settings {
    * Counts taps and screens only — never prayer, reflection, or note text.
    */
   analyticsConsent: boolean;
+  /** Last change to account-synced base settings; device-only art preserves it. */
+  updatedAt?: string;
+  /** Last change to notification preferences, which live in a separate row. */
+  notificationsUpdatedAt?: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {

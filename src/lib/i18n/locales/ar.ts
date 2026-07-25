@@ -38,7 +38,6 @@ export const ar: UIStrings = {
   },
   home: {
     todaysVerse: "آية اليوم",
-    todaysQuests: "مهام اليوم",
     yourGrowth: "نموّك",
     recently: "مؤخرًا",
     quickPrayer: "صلاة قصيرة",
@@ -85,6 +84,9 @@ export const ar: UIStrings = {
     addToToday: "أضِف إلى اليوم",
     begin: "ابدأ",
     completedToday: "أُنجزت اليوم",
+    groupActive: "نشطة",
+    groupReady: "جاهزة",
+    groupCompleted: "مكتملة",
   },
   dayComplete: {
     title: "هذا كل شيء لليوم.",

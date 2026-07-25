@@ -1,10 +1,23 @@
 packages:
   - .
+# Installs the Linux x64 Sharp runtime beside the local platform so Vercel can
+# package both the native addon and its matching libvips shared library.
+supportedArchitectures:
+  os:
+    - current
+    - linux
+  cpu:
+    - current
+    - x64
+  libc:
+    - current
+    - glibc
 allowBuilds:
   sharp: true
   unrs-resolver: true
 verifyDepsBeforeRun: false
 overrides:
-  postcss: 8.5.16
+  # Pin the patched source-map path validation release.
+  postcss: 8.5.18
   # Keep Next's optional image runtime on the audited libvips build.
-  sharp: 0.35.3
+  next>sharp: 0.35.3

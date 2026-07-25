@@ -38,7 +38,6 @@ export const pl: UIStrings = {
   },
   home: {
     todaysVerse: "Werset na dziś",
-    todaysQuests: "Zadania na dziś",
     yourGrowth: "Twój wzrost",
     recently: "Ostatnio",
     quickPrayer: "Krótka modlitwa",
@@ -85,6 +84,9 @@ export const pl: UIStrings = {
     addToToday: "Dodaj na dziś",
     begin: "Rozpocznij",
     completedToday: "Ukończone dziś",
+    groupActive: "Aktywne",
+    groupReady: "Gotowe",
+    groupCompleted: "Ukończone",
   },
   dayComplete: {
     title: "To wszystko na dzisiaj.",

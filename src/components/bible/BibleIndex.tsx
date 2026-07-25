@@ -5,7 +5,7 @@
  * the daily verse, reading history, saved Scripture, and all 66 books close
  * without allowing navigation controls to compete with the text itself.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   selectVerseRefreshCount,
@@ -26,6 +26,7 @@ import { PaperCard } from "@/components/design-system/PaperCard";
 import { VerseCard } from "@/components/bible/VerseCard";
 import { VerseRefreshLimitDialog } from "@/components/bible/VerseRefreshLimitDialog";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { SearchClearButton } from "@/components/design-system/SearchClearButton";
 import {
   IconBookmark,
   IconChevronRight,
@@ -37,7 +38,7 @@ import {
   translationMetadata,
   translationPreferenceLabel,
 } from "@/lib/bible/translations";
-import { usePlus } from "@/lib/revenuecat/usePlus";
+import { usePlus } from "@/lib/billing/usePlus";
 import { useSession } from "@/lib/supabase/useSession";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 
@@ -84,7 +85,6 @@ function BibleIndexInner() {
   const verseRefreshCount = useQuestOS(selectVerseRefreshCount);
   const refreshVerse = useQuestOS((state) => state.refreshVerse);
   const dayKey = useCurrentDayKey();
-  const recordedVerseRef = useRef<string | null>(null);
   const [query, setQuery] = useState("");
   const [refreshLimitOpen, setRefreshLimitOpen] = useState(false);
   const [testament, setTestament] = useState<Testament>(() =>
@@ -123,14 +123,10 @@ function BibleIndexInner() {
     [],
   );
 
-  // Only a page that actually presents the verse should add it to reading
-  // history. Defer the persisted write so it cannot contend with first paint.
-  useEffect(() => {
-    const passageKey = `${verse.bookSlug}:${verse.chapter}:${verse.verseStart}-${verse.verseEnd}`;
-    if (recordedVerseRef.current === passageKey) return;
-
-    const record = () => {
-      recordedVerseRef.current = passageKey;
+  // VerseCard resolves the preferred edition first, then sends back only text
+  // that BibleQuest may safely keep in recent-reading history.
+  const recordPresentedVerse = useCallback(
+    (text: string) => {
       recordRecentVerse({
         bookSlug: verse.bookSlug,
         bookName: verseBookName,
@@ -138,17 +134,11 @@ function BibleIndexInner() {
         verseStart: verse.verseStart,
         verseEnd: verse.verseEnd,
         reference: verse.reference,
-        text: verse.text,
+        text,
       });
-    };
-
-    if ("requestIdleCallback" in window) {
-      const idle = window.requestIdleCallback(record, { timeout: 1_000 });
-      return () => window.cancelIdleCallback(idle);
-    }
-    const timer = globalThis.setTimeout(record, 250);
-    return () => globalThis.clearTimeout(timer);
-  }, [recordRecentVerse, verse, verseBookName]);
+    },
+    [recordRecentVerse, verse, verseBookName],
+  );
 
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const visibleBooks = useMemo(() => {
@@ -208,6 +198,7 @@ function BibleIndexInner() {
             onAnotherVerse={handleAnotherVerse}
             anotherVerseLoading={plus.loading}
             showOpenInChapter
+            onPresentedText={recordPresentedVerse}
           />
         </section>
 
@@ -347,21 +338,30 @@ function BibleIndexInner() {
             </p>
           </div>
 
-          <label className="relative mt-3 block">
-            <span className="sr-only">Search Bible books</span>
+          <div className="relative mt-3">
+            <label htmlFor="bible-book-search" className="sr-only">
+              Search Bible books
+            </label>
             <IconSearch
               size={18}
               className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ash"
             />
             <input
+              id="bible-book-search"
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search Genesis, John, Psalms…"
               autoComplete="off"
-              className="min-h-12 w-full rounded-[var(--radius-card)] border border-mist bg-paper pl-11 pr-4 text-small text-graphite outline-none paper-shadow transition-colors placeholder:text-fog focus:border-accent/50"
+              className="min-h-12 w-full rounded-[var(--radius-card)] border border-mist bg-paper pl-11 pr-12 text-small text-graphite outline-none paper-shadow transition-colors placeholder:text-fog focus:border-accent/50"
             />
-          </label>
+            <SearchClearButton
+              inputId="bible-book-search"
+              visible={query.length > 0}
+              onClear={() => setQuery("")}
+              label="Clear Bible book search"
+            />
+          </div>
 
           {!normalizedQuery && (
             <div

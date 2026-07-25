@@ -17,6 +17,8 @@ interface SafeLocalJourneyInput {
   localOnboardingCompleted: boolean;
   lastSyncedUserId: string | null;
   userId: string | null;
+  initialSyncPending?: boolean;
+  resetRequired?: boolean;
 }
 
 /**
@@ -28,11 +30,31 @@ export function hasSafeLocalJourney({
   localOnboardingCompleted,
   lastSyncedUserId,
   userId,
+  initialSyncPending = false,
 }: SafeLocalJourneyInput): boolean {
   return Boolean(
     localOnboardingCompleted &&
       userId &&
-      lastSyncedUserId === userId,
+      lastSyncedUserId === userId &&
+      !initialSyncPending,
+  );
+}
+
+/**
+ * An unowned guest journey may be opened after a failed first restore, but a
+ * journey stamped to another account may never cross that privacy boundary.
+ */
+export function hasRecoverableLocalJourney({
+  localOnboardingCompleted,
+  lastSyncedUserId,
+  userId,
+  resetRequired = false,
+}: SafeLocalJourneyInput): boolean {
+  return Boolean(
+    localOnboardingCompleted &&
+      userId &&
+      !resetRequired &&
+      (!lastSyncedUserId || lastSyncedUserId === userId),
   );
 }
 

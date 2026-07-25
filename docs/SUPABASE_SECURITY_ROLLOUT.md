@@ -4,9 +4,10 @@ This runbook covers the forward-only reconciliation migration
 `0008_reassert_rls_and_purge.sql` and the rolling quest/recent-verse migration
 `0010_rolling_quest_windows_and_recent_verses.sql`, through the current Bible
 preference/bookmark migration `0011_bible_translation_preference.sql`, the KJV
-default migration `0012_kjv_bible_translation_default.sql`, the authoritative
-Journey identity migration `0014_journey_event_identity.sql`, and transactional
-daily-quest migration `0015_transactional_daily_quest_sync.sql`. It is
+default migration `0012_kjv_bible_translation_default.sql`, immutable Journey
+identity `0014_journey_event_identity.sql`, and transactional daily-quest
+migration `0015_transactional_daily_quest_sync.sql`, followed by the reviewed
+account-sync and deletion boundary `0016` through `0022`. It is
 deliberately local/staging-first. Do not run any linked or remote command until
 the project reference and exact command have been reviewed and explicitly
 approved.
@@ -31,13 +32,10 @@ The repository timeline is:
 | 2026-07-17 | launch content/lifecycle pass | Adds `0010_rolling_quest_windows_and_recent_verses.sql`: rolling 24-hour quest timestamps, owner-only recent verses, an idempotent daily-passage key, and a complete purge definition. |
 | 2026-07-18 | Bible edition sync pass | Adds `0011_bible_translation_preference.sql`: account-backed Bible preference, bookmark translation key, and translation-aware bookmark uniqueness. |
 | 2026-07-20 | KJV default pass | Adds `0012_kjv_bible_translation_default.sql`: new account settings default to the app's keyless KJV edition; existing choices are unchanged. |
-| 2026-07-21 | Journey identity pass | Adds authoritative `0014_journey_event_identity.sql`: durable Journey source-local dates and source IDs with a cached-client UTC fallback. |
-| 2026-07-21 | Daily-quest CAS pass | Adds forward-only `0015_transactional_daily_quest_sync.sql`: owner-RLS day revisions, authenticated atomic replacement, duplicate-request protection, completed-state preservation, legacy-client revision tracking, and complete purge coverage. |
-
-Version `0013` is intentionally unused in the reconciled source manifest. Do
-not insert or rename a migration below authoritative `0014`; the CAS change
-must remain `0015` even if an earlier local-only database recorded a draft
-`0013`.
+| 2026-07-21 | Journey identity release | Adds immutable `0014_journey_event_identity.sql` with SHA-256 `9497b745c5efc0c3f6c4c82e43e57c4fd9b34e8cfae12e6193226d564da50789`. |
+| 2026-07-21 | Daily-quest CAS pass | Re-versions the reviewed but untracked local `0013` work as `0015_transactional_daily_quest_sync.sql`: owner-RLS day revisions, authenticated atomic replacement, bounded duplicate-request protection, completed-state preservation, legacy-client revision tracking, and complete purge coverage. `0013` remains absent because no immutable linked history proved insertion below `0014` safe. |
+| 2026-07-23 | Account boundary hardening | Adds `0016`–`0019`: mutable-row guards, an enforced account boundary, identity/generation binding, and server-ordered revisions. |
+| 2026-07-23 | Resilient self-service deletion | Adds `0020`–`0022`: authenticated self-service deletion, generation-bound deletion, and resilient cleanup. |
 
 If a database recorded an old `0002`, `0003`, or `0004` before the renames,
 the later filenames do not change those recorded versions. Conversely, a
@@ -56,7 +54,7 @@ history rows.
 | Server-owned | `subscriptions` | Authenticated owner `SELECT` only. Inserts, updates, and deletes require trusted service-role/webhook code. |
 | Internal | None in `public`. Supabase-managed schemas are outside this migration. |
 
-RLS is enabled on all 28 tables. Private prayers, reflections, recent Scripture
+RLS is enabled on all 29 tables. Private prayers, reflections, recent Scripture
 history, notes, and
 journey data have no anonymous policy and every authenticated policy includes
 an `auth.uid()` owner condition.
@@ -95,9 +93,16 @@ Expected migration order:
 0012_kjv_bible_translation_default.sql
 0014_journey_event_identity.sql
 0015_transactional_daily_quest_sync.sql
+0016_mutable_account_sync_guards.sql
+0017_enforce_mutable_account_sync_boundary.sql
+0018_bind_account_sync_identity_and_generation.sql
+0019_server_ordered_account_sync_revisions.sql
+0020_self_service_account_deletion.sql
+0021_generation_bound_account_deletion.sql
+0022_resilient_account_deletion.sql
 ```
 
-Evidence must show 28 existing tables with `rowsecurity = true`, only the
+Evidence must show 29 existing tables with `rowsecurity = true`, only the
 documented policy names, no `anon` role on user/server-owned policies, and
 `purge_user_data` as `security_definer = true`, `search_path=""`, anonymous
 execute false, authenticated execute true. Table grants must also match the
@@ -112,9 +117,11 @@ unique index.
 It must also show that `user_daily_quest_days` exposes only
 `assigned_date`/`revision` to authenticated clients, its owner-only SELECT
 policy is active, `replace_user_daily_quests` is authenticated-only SECURITY
-DEFINER with `search_path=""`, and the non-callable legacy trigger function is
-installed. The 34 database tests must pass without selecting application rows
-into evidence.
+DEFINER with `search_path=""`, and both non-callable legacy trigger functions
+are installed. The anonymous `daily_quest_sync_contract` readiness RPC must
+return only its fixed contract identity and `ok: true`. The 15 Journey identity
+and 59 CAS/contract database tests must pass, including the pinned `0014`
+migration, without selecting application rows into evidence.
 
 ## Two-user negative tests
 
@@ -166,9 +173,9 @@ supabase migration list --linked
 
 Before the real push, save the `migration list` and dry-run output. The dry run
 must propose only the intended pending migration(s), including `0008` when it
-is not already present, and end in the current highest version (`0015`). If it
-tries to replay renamed `0002`-`0006`, stop: do not use `--include-all` and do
-not repair history as a shortcut. After the push, run
+is not already present, contain no `0013`, and end in the current highest
+version (`0015`). If it tries to replay renamed `0002`-`0006`, stop: do not use
+`--include-all` and do not repair history. After the push, run
 `supabase/evidence/rls_policy_report.sql` in the staging SQL editor, then execute
 the full two-user and anonymous plans. Exercise account sync and Clear My Data
 from the staging app as an end-to-end check.
@@ -205,28 +212,20 @@ supabase migration list --linked
 `0008` changes policies and a function, `0010` backfills quest timestamps and
 deduplicates daily content before adding its unique key, and `0011` is additive
 apart from replacing bookmark uniqueness with a translation-aware index.
-`0012` changes only the default for new settings rows. `0014` additively
-preserves Journey date/source identity. `0015` is additive except for replacing
-`purge_user_data`; it backfills opaque revisions from
-existing assignment days and installs the authenticated CAS/legacy trigger.
-The
+`0012` changes only the default for new settings rows. `0014` adds the accepted
+Journey identity. `0015` is additive except for replacing `purge_user_data`; it
+backfills opaque revisions from existing assignment days and installs the
+authenticated CAS/legacy triggers. The
 seed upserts reviewed public content. Rollback is forward-only:
 
 1. If the migration fails, its transaction rolls back; capture the error and do not alter history.
 2. If verification reveals a policy regression, stop application rollout and create a new, higher-numbered idempotent migration restoring the last known-safe policy/function definitions. Do not delete or edit `0008` after it has been applied.
 3. If an unrelated data issue is discovered, stop writes and use the reviewed Supabase backup/PITR procedure; policy DDL itself does not require row restoration.
 
-### When migration repair is appropriate
+### Migration repair is not authorized
 
-`supabase migration repair <version> --status applied|reverted` changes only
-`supabase_migrations.schema_migrations`; it does not execute, undo, or verify
-the SQL. Use it only when all of the following are true:
-
-- `supabase migration list --linked` proves a specific history mismatch;
-- catalog/schema evidence independently proves the SQL is already present (for `applied`) or absent (for `reverted`);
-- the exact version, status, project reference, before/after migration lists, and recovery plan have been reviewed; and
-- explicit approval has been given for that exact repair command.
-
-Repair is not a way to deploy `0008`, fix a failed policy, or make ambiguous
-renumbered migrations disappear. When schema state is uncertain, stop and
-reconcile evidence before modifying history.
+Do not run `supabase migration repair` for this release. A history mismatch,
+unexpected `0013`, replay of renamed `0002`-`0006`, or any disagreement with
+the immutable `0014` identity is a hard stop. Preserve every applied migration
+and correct a verified schema defect only with a separately reviewed, higher
+forward migration after the authoritative histories are reconciled.

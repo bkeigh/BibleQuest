@@ -9,10 +9,12 @@ import { retrySync } from "@/lib/sync/engine";
 import { useSyncStatus } from "@/lib/sync/status";
 import {
   getLastSyncedUserId,
+  initialSyncIsPending,
   localDataBelongsToOtherUser,
 } from "@/lib/sync/last-user";
 import {
   accountRestorePhase,
+  hasRecoverableLocalJourney,
   hasSafeLocalJourney,
 } from "@/lib/sync/access";
 import {
@@ -26,6 +28,7 @@ import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PixelMascot } from "@/components/design-system/PixelMascot";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton } from "@/components/design-system/GentleButton";
+import { accountSyncResetRequired } from "@/lib/sync/generation";
 
 /**
  * Sends first-time visitors to onboarding before the app opens. Renders a
@@ -116,7 +119,15 @@ function LoadingVeil() {
   );
 }
 
-function RestoreError({ userId }: { userId: string }) {
+function RestoreError({
+  userId,
+  canContinueLocally,
+  onContinueLocally,
+}: {
+  userId: string;
+  canContinueLocally: boolean;
+  onContinueLocally: () => void;
+}) {
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
   const [online, setOnline] = useState(
@@ -169,6 +180,17 @@ function RestoreError({ userId }: { userId: string }) {
           >
             Retry
           </GentleButton>
+          {canContinueLocally && (
+            <GentleButton
+              variant="outline"
+              size="md"
+              fullWidth
+              className="mt-2"
+              onClick={onContinueLocally}
+            >
+              Continue with this device
+            </GentleButton>
+          )}
           <GentleButton
             variant="ghost"
             size="sm"
@@ -190,6 +212,59 @@ function RestoreError({ userId }: { userId: string }) {
   );
 }
 
+/** Keeps retry visible without taking an already-safe local journey away. */
+function LocalRestoreNotice({
+  userId,
+  children,
+}: {
+  userId: string;
+  children: React.ReactNode;
+}) {
+  const sync = useSyncStatus();
+  const [online, setOnline] = useState(
+    () => typeof navigator === "undefined" || navigator.onLine !== false,
+  );
+
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine !== false);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+
+  return (
+    <>
+      {children}
+      <div className="pointer-events-none fixed inset-x-0 bottom-20 z-40 px-4">
+        <div
+          role="status"
+          className="pointer-events-auto mx-auto flex max-w-md items-center gap-3 rounded-[var(--radius-card)] border border-mist bg-paper/95 px-4 py-3 shadow-[0_8px_28px_rgb(31_48_40_/_0.16)] backdrop-blur"
+        >
+          <p className="min-w-0 flex-1 text-caption leading-relaxed text-charcoal">
+            {sync.state === "syncing"
+              ? "Checking your saved account journey…"
+              : online
+                ? "This device is available. Account sync will keep retrying."
+                : "This device is available offline. Sync resumes when you reconnect."}
+          </p>
+          {sync.state !== "syncing" && (
+            <GentleButton
+              variant="ghost"
+              size="sm"
+              onClick={() => void retrySync(userId)}
+            >
+              Retry
+            </GentleButton>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 /**
  * Blocks both /app and /onboarding until an authenticated account's initial
  * pull has completed. This is what lets a fresh browser recover the remote
@@ -198,10 +273,19 @@ function RestoreError({ userId }: { userId: string }) {
 function AccountRestoreBoundary({ children }: { children: React.ReactNode }) {
   const { user, loading, configured } = useSession();
   const sync = useSyncStatus();
+  const [localRecoveryUserId, setLocalRecoveryUserId] = useState<string | null>(
+    null,
+  );
   const localOnboardingCompleted = useQuestOS(
     (state) => state.profile?.onboardingCompleted ?? false,
   );
   const userId = user?.id ?? null;
+  const initialSyncPending = Boolean(
+    userId && initialSyncIsPending(userId),
+  );
+  const resetRequired = Boolean(
+    userId && accountSyncResetRequired(userId),
+  );
   const handoffPending = Boolean(
     configured && userId && localDataBelongsToOtherUser(userId)
   );
@@ -209,6 +293,13 @@ function AccountRestoreBoundary({ children }: { children: React.ReactNode }) {
     localOnboardingCompleted,
     lastSyncedUserId: getLastSyncedUserId(),
     userId,
+    initialSyncPending,
+  });
+  const recoverableLocalJourney = hasRecoverableLocalJourney({
+    localOnboardingCompleted,
+    lastSyncedUserId: getLastSyncedUserId(),
+    userId,
+    resetRequired,
   });
   const phase = accountRestorePhase({
     configured,
@@ -221,9 +312,26 @@ function AccountRestoreBoundary({ children }: { children: React.ReactNode }) {
     safeLocalJourney,
   });
 
+  // Once chosen, a safe device-local journey stays open through later retries.
+  if (
+    userId &&
+    localRecoveryUserId === userId &&
+    recoverableLocalJourney &&
+    !handoffPending
+  ) {
+    return (
+      <LocalRestoreNotice userId={userId}>{children}</LocalRestoreNotice>
+    );
+  }
   if (phase === "loading") return <LoadingVeil />;
   if (phase === "initial-sync-error" && userId) {
-    return <RestoreError userId={userId} />;
+    return (
+      <RestoreError
+        userId={userId}
+        canContinueLocally={recoverableLocalJourney}
+        onContinueLocally={() => setLocalRecoveryUserId(userId)}
+      />
+    );
   }
   return <>{children}</>;
 }

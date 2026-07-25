@@ -1,0 +1,59 @@
+name: Daily synthetic health
+
+on:
+  schedule:
+    # Offset from the top of the hour to reduce scheduler congestion.
+    - cron: "23 11 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: daily-synthetic-health
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    name: Read-only production monitor
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BIBLEQUEST_MONITOR_SUPABASE_URL: ${{ secrets.BIBLEQUEST_MONITOR_SUPABASE_URL }}
+      BIBLEQUEST_MONITOR_SUPABASE_ANON_KEY: ${{ secrets.BIBLEQUEST_MONITOR_SUPABASE_ANON_KEY }}
+      BIBLEQUEST_MONITOR_EXPECTED_SHA: ${{ vars.BIBLEQUEST_MONITOR_EXPECTED_SHA }}
+      BIBLEQUEST_MONITOR_EXPECTED_AUTH_POSTURE: configured
+      BIBLEQUEST_MONITOR_EXPECTED_BILLING_MODE: coming-soon
+      BIBLEQUEST_MONITOR_VERCEL_PROJECT_ID: ${{ secrets.BIBLEQUEST_MONITOR_VERCEL_PROJECT_ID }}
+      BIBLEQUEST_MONITOR_VERCEL_TEAM_ID: ${{ secrets.BIBLEQUEST_MONITOR_VERCEL_TEAM_ID }}
+      BIBLEQUEST_MONITOR_VERCEL_TOKEN: ${{ secrets.BIBLEQUEST_MONITOR_VERCEL_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Run bounded synthetic checks
+        id: synthetic
+        continue-on-error: true
+        run: node scripts/run-synthetic-health.mjs
+      - name: Archive sanitized report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-health-${{ github.run_id }}
+          path: artifacts/synthetic-health/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Deduplicate failure or recovery issue
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/sync-synthetic-health-issue.mjs
+      - name: Preserve failing workflow status
+        if: steps.synthetic.outcome != 'success'
+        run: exit 1

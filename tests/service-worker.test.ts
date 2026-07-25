@@ -16,6 +16,10 @@ type WorkerPolicy = {
   RUNTIME_CACHE: string;
   PRECACHE_PATHS: string[];
   PIXEL_ASSET_PATHS: string[];
+  PUSH_TITLE: string;
+  PUSH_BODY: string;
+  PUSH_TARGET: string;
+  pushKind: (data: { json: () => unknown } | null) => string | null;
   isRequestCacheCandidate: (request: Request) => boolean;
   isOfflineSafeNavigationRequest: (request: Request) => boolean;
   isImmutableStaticRequest: (request: Request) => boolean;
@@ -25,6 +29,10 @@ type WorkerPolicy = {
 
 type WorkerEvent = {
   data?: unknown;
+  notification?: {
+    tag?: string;
+    close: () => void;
+  };
   request?: Request;
   source?: { postMessage: (message: unknown) => void };
   respondWith?: (value: Promise<Response> | Response) => void;
@@ -113,13 +121,38 @@ function loadWorker(
 ) {
   const listeners = new Map<string, WorkerListener>();
   const cacheStorage = new MemoryCacheStorage();
-  const state = { claimed: false, skipped: false };
+  const state = {
+    claimed: false,
+    skipped: false,
+    notifications: [] as Array<{ title: string; options: Record<string, unknown> }>,
+    opened: [] as string[],
+    windowClients: [] as Array<{
+      url: string;
+      navigate?: (path: string) => Promise<unknown>;
+      focus: () => Promise<unknown>;
+    }>,
+  };
   const worker = {
     __BIBLEQUEST_SW_TESTING__: true as true | WorkerPolicy,
     location: new URL(`${ORIGIN}/sw.js`),
+    registration: {
+      async showNotification(
+        title: string,
+        options: Record<string, unknown>,
+      ) {
+        state.notifications.push({ title, options });
+      },
+    },
     clients: {
       async claim() {
         state.claimed = true;
+      },
+      async matchAll() {
+        return state.windowClients;
+      },
+      async openWindow(pathname: string) {
+        state.opened.push(pathname);
+        return null;
       },
     },
     async skipWaiting() {
@@ -431,8 +464,78 @@ describe("service-worker fetch behavior", () => {
   });
 });
 
+describe("service-worker push privacy", () => {
+  it("shows fixed neutral copy for only the bounded payload shape", async () => {
+    const harness = loadWorker();
+    const event = lifecycleEvent();
+    harness.listeners.get("push")!({
+      data: {
+        json: () => ({ version: 1, kind: "prayer_reminder" }),
+      },
+      waitUntil: event.waitUntil,
+    });
+    await event.done();
+
+    expect(harness.state.notifications).toEqual([
+      {
+        title: harness.policy.PUSH_TITLE,
+        options: expect.objectContaining({
+          body: harness.policy.PUSH_BODY,
+          tag: "biblequest-reminder-prayer_reminder",
+          data: { target: harness.policy.PUSH_TARGET },
+        }),
+      },
+    ]);
+    expect(JSON.stringify(harness.state.notifications)).not.toMatch(
+      /journal|prayer text|scripture text|quest detail/i,
+    );
+  });
+
+  it("ignores malformed, extra-field, and private-content payloads", () => {
+    const harness = loadWorker();
+    for (const value of [
+      null,
+      { version: 1, kind: "unknown" },
+      { version: 1, kind: "daily_verse", body: "private" },
+      { version: 2, kind: "daily_verse" },
+    ]) {
+      harness.listeners.get("push")!({
+        data: { json: () => value },
+        waitUntil() {},
+      });
+    }
+    expect(harness.state.notifications).toHaveLength(0);
+  });
+
+  it("opens or focuses only the fixed same-origin app target", async () => {
+    const harness = loadWorker();
+    const close = vi.fn();
+    const focus = vi.fn().mockResolvedValue(undefined);
+    const navigate = vi.fn().mockResolvedValue(undefined);
+    harness.state.windowClients.push({
+      url: `${ORIGIN}/app/prayer?private=ignored`,
+      focus,
+      navigate,
+    });
+    const event = lifecycleEvent();
+    harness.listeners.get("notificationclick")!({
+      notification: {
+        tag: "biblequest-reminder-daily_verse",
+        close,
+      },
+      waitUntil: event.waitUntil,
+    });
+    await event.done();
+
+    expect(close).toHaveBeenCalledOnce();
+    expect(navigate).toHaveBeenCalledWith("/app");
+    expect(focus).toHaveBeenCalledOnce();
+    expect(harness.state.opened).toEqual([]);
+  });
+});
+
 describe("service-worker lifecycle and upgrades", () => {
-  it("installs the v15 shell and production sprite catalogue, omitting uncacheable responses", async () => {
+  it("installs the current shell and production sprite catalogue, omitting uncacheable responses", async () => {
     const harness = loadWorker(async (fetchRequest) => {
       if (fetchRequest.url.endsWith("/onboarding")) {
         return makeResponse("private", {
@@ -471,10 +574,12 @@ describe("service-worker lifecycle and upgrades", () => {
     });
   });
 
-  it("deletes only obsolete BibleQuest caches during v15 activation", async () => {
+  it("deletes old and incompatible BibleQuest caches during activation", async () => {
     const harness = loadWorker();
     await harness.caches.open("biblequest-v6-shell");
     await harness.caches.open("biblequest-v6-runtime");
+    await harness.caches.open("biblequest-v14-shell");
+    await harness.caches.open("biblequest-v14-runtime");
     await harness.caches.open(harness.policy.SHELL_CACHE);
     await harness.caches.open(harness.policy.RUNTIME_CACHE);
     await harness.caches.open("another-app-runtime");
@@ -484,13 +589,15 @@ describe("service-worker lifecycle and upgrades", () => {
     await event.done();
 
     expect(harness.caches.deleted.sort()).toEqual([
+      "biblequest-v14-runtime",
+      "biblequest-v14-shell",
       "biblequest-v6-runtime",
       "biblequest-v6-shell",
     ]);
     expect((await harness.caches.keys()).sort()).toEqual([
       "another-app-runtime",
-      "biblequest-v15-runtime",
-      "biblequest-v15-shell",
+      `${observability.serviceWorkerVersion}-runtime`,
+      `${observability.serviceWorkerVersion}-shell`,
     ]);
     expect(harness.state.claimed).toBe(true);
   });

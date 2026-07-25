@@ -1,5 +1,4 @@
--- Forward-only transactional daily-quest sync after authoritative migration 0014.
--- Provides revision-guarded replacement for multi-device sync.
+-- Transactional, revision-guarded daily-quest replacement for multi-device sync.
 -- Legacy table writes remain available during rollout and advance the revision.
 
 begin;
@@ -8,8 +7,8 @@ create table if not exists public.user_daily_quest_days (
   user_id uuid not null references auth.users(id) on delete cascade,
   assigned_date date not null,
   revision bigint not null default 0 check (revision >= 0),
-  last_request_id uuid,
-  last_request_hash text,
+  request_history jsonb not null default '[]'::jsonb
+    check (jsonb_typeof(request_history) = 'array'),
   updated_at timestamptz not null default now(),
   primary key (user_id, assigned_date)
 );
@@ -40,6 +39,54 @@ grant select (assigned_date, revision)
   on public.user_daily_quest_days to authenticated;
 grant all privileges on table public.user_daily_quest_days to service_role;
 
+-- Cached clients replace a day with direct DELETE + INSERT requests. Keep a
+-- completed row in place and silently skip its duplicate re-insert so that
+-- legacy retries remain compatible without exposing cross-owner existence.
+create or replace function public.preserve_daily_quest_completion_for_legacy_write()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  uid uuid := auth.uid();
+begin
+  if current_setting('biblequest.daily_quest_rpc', true) = 'on'
+     or current_setting('biblequest.daily_quest_purge', true) = 'on'
+     or uid is null then
+    return case when tg_op = 'DELETE' then old else new end;
+  end if;
+
+  if tg_op in ('DELETE', 'UPDATE')
+     and old.user_id = uid
+     and old.status = 'completed' then
+    return null;
+  end if;
+
+  if tg_op = 'INSERT' and new.user_id = uid and exists (
+    select 1
+    from public.user_daily_quests as existing
+    where existing.user_id = new.user_id
+      and existing.assigned_date = new.assigned_date
+      and existing.quest_slug = new.quest_slug
+      and existing.status = 'completed'
+  ) then
+    return null;
+  end if;
+
+  return case when tg_op = 'DELETE' then old else new end;
+end;
+$function$;
+
+drop trigger if exists preserve_daily_quest_completion_for_legacy_write
+  on public.user_daily_quests;
+create trigger preserve_daily_quest_completion_for_legacy_write
+  before insert or update or delete on public.user_daily_quests
+  for each row execute function public.preserve_daily_quest_completion_for_legacy_write();
+
+revoke execute on function public.preserve_daily_quest_completion_for_legacy_write()
+  from public, anon, authenticated;
+
 -- Old cached clients still write the original table directly. Advancing the
 -- opaque day revision makes those writes visible to compare-and-swap clients.
 create or replace function public.bump_daily_quest_revision_for_legacy_write()
@@ -54,7 +101,8 @@ declare
   new_uid uuid;
   new_day date;
 begin
-  if current_setting('biblequest.daily_quest_rpc', true) = 'on' then
+  if current_setting('biblequest.daily_quest_rpc', true) = 'on'
+     or current_setting('biblequest.daily_quest_purge', true) = 'on' then
     return case when tg_op = 'DELETE' then old else new end;
   end if;
 
@@ -74,8 +122,6 @@ begin
     )
     on conflict (user_id, assigned_date) do update
       set revision = public.user_daily_quest_days.revision + 1,
-          last_request_id = null,
-          last_request_hash = null,
           updated_at = now();
   end if;
 
@@ -96,8 +142,6 @@ begin
       )
       on conflict (user_id, assigned_date) do update
         set revision = public.user_daily_quest_days.revision + 1,
-            last_request_id = null,
-            last_request_hash = null,
             updated_at = now();
     end if;
   end if;
@@ -132,9 +176,9 @@ as $function$
 declare
   uid uuid := auth.uid();
   current_revision bigint;
-  previous_request_id uuid;
   previous_request_hash text;
   request_hash text;
+  request_history jsonb;
   canonical_rows jsonb;
 begin
   if uid is null then
@@ -232,8 +276,8 @@ begin
   )
   on conflict (user_id, assigned_date) do nothing;
 
-  select revision, last_request_id, last_request_hash
-  into current_revision, previous_request_id, previous_request_hash
+  select revision, user_daily_quest_days.request_history
+  into current_revision, request_history
   from public.user_daily_quest_days
   where user_id = uid
     and assigned_date = p_assigned_date
@@ -258,7 +302,13 @@ begin
   where quest.user_id = uid
     and quest.assigned_date = p_assigned_date;
 
-  if previous_request_id = p_request_id then
+  select history.value->>'hash'
+  into previous_request_hash
+  from jsonb_array_elements(request_history) as history(value)
+  where history.value->>'id' = p_request_id::text
+  limit 1;
+
+  if previous_request_hash is not null then
     if previous_request_hash is distinct from request_hash then
       raise exception 'replace_user_daily_quests: request id reused'
         using errcode = '22023';
@@ -323,8 +373,18 @@ begin
 
   update public.user_daily_quest_days
   set revision = current_revision + 1,
-      last_request_id = p_request_id,
-      last_request_hash = request_hash,
+      request_history = (
+        select coalesce(
+          jsonb_agg(history.value order by history.position),
+          '[]'::jsonb
+        )
+        from jsonb_array_elements(
+          jsonb_build_array(
+            jsonb_build_object('id', p_request_id, 'hash', request_hash)
+          ) || public.user_daily_quest_days.request_history
+        ) with ordinality as history(value, position)
+        where history.position <= 32
+      ),
       updated_at = now()
   where user_id = uid
     and assigned_date = p_assigned_date;
@@ -376,6 +436,8 @@ begin
     raise exception 'purge_user_data: not authenticated';
   end if;
 
+  perform set_config('biblequest.daily_quest_purge', 'on', true);
+
   delete from public.user_recent_verses       where user_id = uid;
   delete from public.user_quests              where user_id = uid;
   delete from public.user_daily_quests        where user_id = uid;
@@ -398,5 +460,147 @@ $function$;
 revoke execute on function public.purge_user_data() from public;
 revoke execute on function public.purge_user_data() from anon;
 grant execute on function public.purge_user_data() to authenticated;
+
+-- Expose one content-free readiness bit that is derived from the live CAS,
+-- RLS, grant, and cached-client trigger posture instead of a version label.
+create or replace function public.daily_quest_sync_contract()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+with revision_table as (
+  select relation.oid, relation.relrowsecurity
+  from pg_catalog.pg_class as relation
+  join pg_catalog.pg_namespace as namespace
+    on namespace.oid = relation.relnamespace
+  where namespace.nspname = 'public'
+    and relation.relname = 'user_daily_quest_days'
+    and relation.relkind = 'r'
+),
+cas_function as (
+  select procedure.oid, procedure.prosecdef, procedure.proconfig
+  from pg_catalog.pg_proc as procedure
+  where procedure.oid = pg_catalog.to_regprocedure(
+    'public.replace_user_daily_quests(date,bigint,uuid,jsonb)'
+  )
+),
+trigger_functions as (
+  select count(*) = 2 as hardened
+  from pg_catalog.pg_proc as procedure
+  where procedure.oid in (
+      pg_catalog.to_regprocedure(
+        'public.bump_daily_quest_revision_for_legacy_write()'
+      ),
+      pg_catalog.to_regprocedure(
+        'public.preserve_daily_quest_completion_for_legacy_write()'
+      )
+    )
+    and procedure.prosecdef
+    and procedure.proconfig = array['search_path=""']::text[]
+    and not pg_catalog.has_function_privilege(
+      'anon', procedure.oid, 'EXECUTE'
+    )
+    and not pg_catalog.has_function_privilege(
+      'authenticated', procedure.oid, 'EXECUTE'
+    )
+),
+legacy_triggers as (
+  select count(*) = 2 as enabled
+  from pg_catalog.pg_trigger as trigger
+  join pg_catalog.pg_proc as procedure
+    on procedure.oid = trigger.tgfoid
+  where trigger.tgrelid = pg_catalog.to_regclass(
+      'public.user_daily_quests'
+    )
+    and not trigger.tgisinternal
+    and trigger.tgenabled <> 'D'
+    and (
+      (
+        trigger.tgname = 'bump_daily_quest_revision_for_legacy_write'
+        and procedure.proname = 'bump_daily_quest_revision_for_legacy_write'
+      )
+      or (
+        trigger.tgname = 'preserve_daily_quest_completion_for_legacy_write'
+        and procedure.proname = 'preserve_daily_quest_completion_for_legacy_write'
+      )
+    )
+)
+select pg_catalog.jsonb_build_object(
+  'contract', 'biblequest_daily_quest_sync_v1',
+  'ok',
+    coalesce(
+      (
+        select revision_table.relrowsecurity
+          and pg_catalog.has_column_privilege(
+            'authenticated', revision_table.oid, 'assigned_date', 'SELECT'
+          )
+          and pg_catalog.has_column_privilege(
+            'authenticated', revision_table.oid, 'revision', 'SELECT'
+          )
+          and not pg_catalog.has_column_privilege(
+            'authenticated', revision_table.oid, 'user_id', 'SELECT'
+          )
+          and not pg_catalog.has_column_privilege(
+            'authenticated', revision_table.oid, 'request_history', 'SELECT'
+          )
+          and not pg_catalog.has_table_privilege(
+            'authenticated', revision_table.oid, 'INSERT'
+          )
+          and not pg_catalog.has_table_privilege(
+            'authenticated', revision_table.oid, 'UPDATE'
+          )
+          and not pg_catalog.has_table_privilege(
+            'authenticated', revision_table.oid, 'DELETE'
+          )
+          and not pg_catalog.has_table_privilege(
+            'anon', revision_table.oid, 'SELECT'
+          )
+          and not pg_catalog.has_table_privilege(
+            'anon', revision_table.oid, 'INSERT'
+          )
+          and not pg_catalog.has_table_privilege(
+            'anon', revision_table.oid, 'UPDATE'
+          )
+          and not pg_catalog.has_table_privilege(
+            'anon', revision_table.oid, 'DELETE'
+          )
+          and exists (
+            select 1
+            from pg_catalog.pg_policies as policy
+            where policy.schemaname = 'public'
+              and policy.tablename = 'user_daily_quest_days'
+              and policy.cmd = 'SELECT'
+              and policy.roles = array['authenticated']::name[]
+              and policy.qual = '(auth.uid() = user_id)'
+          )
+        from revision_table
+      ),
+      false
+    )
+    and coalesce(
+      (
+        select cas_function.prosecdef
+          and cas_function.proconfig = array['search_path=""']::text[]
+          and pg_catalog.has_function_privilege(
+            'authenticated', cas_function.oid, 'EXECUTE'
+          )
+          and not pg_catalog.has_function_privilege(
+            'anon', cas_function.oid, 'EXECUTE'
+          )
+        from cas_function
+      ),
+      false
+    )
+    and coalesce((select hardened from trigger_functions), false)
+    and coalesce((select enabled from legacy_triggers), false)
+);
+$function$;
+
+revoke execute on function public.daily_quest_sync_contract()
+  from public, anon, authenticated;
+grant execute on function public.daily_quest_sync_contract()
+  to anon, authenticated;
 
 commit;
