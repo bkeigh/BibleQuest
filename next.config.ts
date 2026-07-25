@@ -187,15 +187,9 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/app/bible/**": ["./src/data/bible/**"],
     "/verse/**": ["./src/data/bible/**"],
-    // Retains Sharp's Linux runtime files without tracing pnpm symlink folders.
+    // Sharp's trace omits only its Linux shared library on pnpm/Vercel.
     "/api/profile/avatar": [
-      "./node_modules/@img/sharp-linux-x64/index.cjs",
-      "./node_modules/@img/sharp-linux-x64/lib/*.node",
-      "./node_modules/@img/sharp-linux-x64/package.json",
-      "./node_modules/@img/sharp-libvips-linux-x64/lib/index.js",
-      "./node_modules/@img/sharp-libvips-linux-x64/lib/*.so.*",
-      "./node_modules/@img/sharp-libvips-linux-x64/package.json",
-      "./node_modules/@img/sharp-libvips-linux-x64/versions.json",
+      "./node_modules/.pnpm/@img+sharp-libvips-linux-x64@*/node_modules/@img/sharp-libvips-linux-x64/lib/*.so.*",
     ],
   },
   async headers() {
