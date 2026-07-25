@@ -92,7 +92,7 @@ business reason, and both allowed- and denied-origin browser tests.
 | `frame-ancestors` | `https://winterhill.studio`, `https://www.winterhill.studio` | Intentional Winterhill project preview; no other site may embed BibleQuest. |
 | `connect-src` | The exact validated `NEXT_PUBLIC_SUPABASE_URL` origin | Supabase Auth and PostgREST calls from `src/lib/supabase/*` and `src/lib/sync/engine.ts`; the source is absent when no URL is configured. No Realtime subscription exists, so no wildcard or `wss:` origin is allowed. |
 | `connect-src` | The validated HTTPS `NEXT_PUBLIC_PLAUSIBLE_HOST` origin | Consent-gated event POSTs in `src/lib/analytics/events.ts`; absent when analytics/domain/host validation is not enabled. Default is `https://plausible.io`. |
-| `script-src`, `frame-src` | `https://tally.so` | Temporary pre-launch waitlist widget and its dynamically sized form iframe on the public homepage; remove both sources with `WaitlistGate` at launch. |
+| `script-src`, `frame-src` | `https://tally.so` | BibleQuest newsletter widget and its dynamically sized form iframe on the public homepage. |
 | Top-level navigation | `https://checkout.stripe.com`, `https://billing.stripe.com` | Server-created hosted Checkout and Customer Portal redirects are validated to these exact origins. They are navigations, not BibleQuest subresources, so they add no CSP source. |
 | `Permissions-Policy: payment` | none | BibleQuest embeds no payment element. Hosted Stripe pages run under Stripe’s own origin. |
 

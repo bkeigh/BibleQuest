@@ -71,7 +71,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
       {
         title: "Service providers",
         body:
-          "We use service providers only for defined tasks: Supabase for authentication and protected account storage; Vercel for hosting and operational delivery; Plausible for optional analytics; Stripe for optional subscriptions and one-time support payments; Tally for the temporary waitlist; and reviewed Bible providers for requested online editions. Stripe receives the payment and contact details needed to run Checkout, subscriptions, receipts, refunds, and disputes; BibleQuest does not receive full card numbers. Providers process information under their own terms and privacy notices. Bible requests do not include your prayers, reflections, name, or BibleQuest account ID.",
+          "We use service providers only for defined tasks: Supabase for authentication and protected account storage; Vercel for hosting and operational delivery; Plausible for optional analytics; Stripe for optional subscriptions and one-time support payments; Tally for the BibleQuest newsletter; and reviewed Bible providers for requested online editions. Stripe receives the payment and contact details needed to run Checkout, subscriptions, receipts, refunds, and disputes; BibleQuest does not receive full card numbers. Providers process information under their own terms and privacy notices. Bible requests do not include your prayers, reflections, name, or BibleQuest account ID.",
       },
       {
         title: "Online Bible editions",

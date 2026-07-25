@@ -48,6 +48,7 @@ import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { seedQuests, questBySlug } from "@/data/seed/quests";
 import { usePlus } from "@/lib/billing/usePlus";
 import { ExplorePlusLink } from "@/components/plus/ExplorePlusLink";
+import { NewsletterLink } from "@/components/newsletter/NewsletterLink";
 import { homeQuestSummary } from "@/lib/questos/home-quest-summary";
 import { buildHomeQuestGroups } from "@/lib/questos/home-quest-groups";
 import { profileAvatarMarker } from "@/lib/utils/avatar";
@@ -421,6 +422,8 @@ function HomeInner() {
             className="mt-1"
             description="See every live wallpaper and the complete Plus experience."
           />
+
+          <NewsletterLink />
 
         </div>
       </PageContainer>

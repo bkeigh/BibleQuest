@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Keep repository-local Codex worktrees outside the root lint scope.
+    ".codex-worktrees/**",
   ]),
 ]);
 

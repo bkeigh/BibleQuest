@@ -4,7 +4,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef } from "react";
-import { IconCheck } from "@/components/design-system/icons";
+import {
+  IconArrowLeft,
+  IconArrowRight,
+  IconCheck,
+} from "@/components/design-system/icons";
 import { useToast } from "@/components/design-system/Toast";
 import { usePlus } from "@/lib/billing/usePlus";
 import {
@@ -31,6 +35,7 @@ export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
   const { isPlus, loading } = usePlus();
   const shouldReduceMotion = useShouldReduceMotion();
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const choices = ["none", ...WALLPAPER_CATALOG.map(({ id }) => id)] as const;
   const requestedWallpaper = value === "none" ? undefined : getWallpaperById(value);
   const savedChoiceLocked = Boolean(
@@ -51,6 +56,16 @@ export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
         label: "Explore Plus",
         onClick: () => router.push("/app/plus"),
       },
+    });
+  }
+
+  // Gives mouse users an explicit way to page through the horizontal gallery.
+  function scrollWallpapers(direction: -1 | 1) {
+    const gallery = scrollRef.current;
+    if (!gallery) return;
+    gallery.scrollBy({
+      left: direction * Math.max(320, gallery.clientWidth * 0.8),
+      behavior: shouldReduceMotion ? "auto" : "smooth",
     });
   }
 
@@ -86,14 +101,35 @@ export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
   return (
     <fieldset className="min-w-0 max-w-full pb-4 pt-5">
       <legend className="sr-only">Wallpaper</legend>
-      <p aria-hidden="true" className="text-[0.9375rem] text-charcoal">
-        Wallpaper
-      </p>
+      <div className="flex items-center justify-between gap-4">
+        <p aria-hidden="true" className="text-[0.9375rem] text-charcoal">
+          Wallpaper
+        </p>
+        <div className="hidden shrink-0 items-center gap-2 sm:flex">
+          <button
+            type="button"
+            aria-label="Show previous wallpapers"
+            onClick={() => scrollWallpapers(-1)}
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-mist text-accent transition-colors hover:bg-linen focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <IconArrowLeft size={18} />
+          </button>
+          <button
+            type="button"
+            aria-label="Show next wallpapers"
+            onClick={() => scrollWallpapers(1)}
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-mist text-accent transition-colors hover:bg-linen focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <IconArrowRight size={18} />
+          </button>
+        </div>
+      </div>
       <p className="mt-1.5 text-caption leading-relaxed text-ash">
         Five scenes are included with Free. Plus unlocks the complete collection.
       </p>
 
       <div
+        ref={scrollRef}
         role="radiogroup"
         aria-label="Choose a wallpaper"
         className="-mx-4 mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"

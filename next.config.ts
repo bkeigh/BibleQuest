@@ -11,7 +11,7 @@ import type { NextConfig } from "next";
  *   - Supabase auth + PostgREST sync → exact configured HTTPS origin
  *   - Plausible Events API       → configured HTTPS origin, when enabled
  *   - Stripe Checkout/Portal → top-level hosted redirects, no CSP source needed
- *   - Tally waitlist widget + iframe → exact HTTPS origin during pre-launch
+ *   - Tally newsletter widget + iframe → exact HTTPS origin
  *   - Fonts (Fraunces, Inter via next/font; Ithaca local) → self (all self-hosted)
  *   - Icons / OG image / next/image (local) → self
  *   - Avatars (URL.createObjectURL) → blob:; noise SVG background → data:

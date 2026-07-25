@@ -13,6 +13,8 @@ import { QuestDemo, PrayerDemo } from "@/components/marketing/Demos";
 import { MarketingGrowthLoop } from "@/components/marketing/MarketingGrowthLoop";
 import { HeroBackdrop } from "@/components/marketing/HeroBackdrop";
 import { VerseDemo } from "@/components/marketing/VerseDemo";
+import { NewsletterSignup } from "@/components/newsletter/NewsletterSignup";
+import { PlusInvitationLink } from "@/components/plus/PlusInvitationLink";
 import { getDailyVerse } from "@/lib/questos/verse-engine";
 import { questBySlug, seedQuests } from "@/data/seed/quests";
 import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
@@ -408,9 +410,13 @@ export default function LandingPage() {
               free — and always will be. Plus adds depth for those who want it
               and helps keep BibleQuest alive.
             </p>
-            <GentleLink variant="outline" href="/pricing" className="mt-6">
-              See what’s free and what’s Plus
-            </GentleLink>
+            {/* Match the in-app Explore Plus card while keeping the pricing route. */}
+            <PlusInvitationLink
+              href="/pricing"
+              title="See what’s free and what’s Plus"
+              description="Compare the complete free experience with everything included in Plus."
+              className="mt-6"
+            />
           </PaperCard>
         </Reveal>
       </EditorialSection>
@@ -439,6 +445,15 @@ export default function LandingPage() {
             ))}
           </DisclosureGroup>
         </div>
+      </EditorialSection>
+
+      {/* Keeps newsletter signup available without blocking app access. */}
+      <EditorialSection
+        id="newsletter"
+        className="scroll-mt-20 bg-linen"
+        spacing="compact"
+      >
+        <NewsletterSignup />
       </EditorialSection>
 
       {/* Final CTA */}

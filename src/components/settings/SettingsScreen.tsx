@@ -39,7 +39,9 @@ import { clearAllDeviceLocalJournalDrafts } from "@/lib/questos/journal-drafts";
 import { clearLastSyncedUserId } from "@/lib/sync/last-user";
 import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 import { useSession } from "@/lib/supabase/useSession";
+import { createClient } from "@/lib/supabase/client";
 import { deleteOwnAccountWithAvatar } from "@/lib/auth/account-deletion";
+import { track } from "@/lib/analytics/events";
 import { stopSync } from "@/lib/sync/engine";
 import { clearStoredAccountSyncGenerations } from "@/lib/sync/generation";
 import { clearStoredDailyQuestSyncContext } from "@/lib/sync/daily-quests";
@@ -728,6 +730,7 @@ function SettingsInner() {
 
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearingData, setClearingData] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -773,6 +776,20 @@ function SettingsInner() {
     if (!trimmed) return;
     updateProfile({ displayName: trimmed });
     setEditingName(false);
+  }
+
+  // Logs out without removing the journey that remains stored on this device.
+  async function logOut() {
+    setSigningOut(true);
+    const { error } = await createClient().auth.signOut();
+    if (error) {
+      setSigningOut(false);
+      toast("Couldn’t log out just now. Check your connection and retry.");
+      return;
+    }
+    track("sign_out");
+    toast("Logged out. Your journey stays on this device.");
+    router.refresh();
   }
 
   async function onPhotoPicked(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1093,88 +1110,25 @@ function SettingsInner() {
             </span>
           </Link>
           {!ACCOUNT_SYNC_CONTAINED && user && (
-            <div className="border-t border-mist/70 px-4 py-4">
-              {!confirmDeleteAccount ? (
-                <>
-                  <p className="text-[0.875rem] leading-relaxed text-ash">
-                    Permanently close your login and delete its synced journey.
-                    This device’s journey will also be cleared.
-                  </p>
-                  <GentleButton
-                    variant="danger"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => {
-                      setDeleteAccountError(false);
-                      setConfirmDeleteAccount(true);
-                    }}
-                  >
-                    Delete account
-                  </GentleButton>
-                </>
-              ) : (
-                <>
-                  <p className="text-[0.9375rem] leading-relaxed text-charcoal">
-                    This permanently deletes your account, prayers,
-                    reflections, progress, and this device’s journey. It can’t
-                    be undone.
-                  </p>
-                  <label
-                    htmlFor="delete-account-confirmation"
-                    className="mt-3 block text-caption text-ash"
-                  >
-                    Type DELETE to confirm
-                  </label>
-                  <input
-                    id="delete-account-confirmation"
-                    value={deleteConfirmation}
-                    onChange={(event) => {
-                      setDeleteConfirmation(event.target.value);
-                      setDeleteAccountError(false);
-                    }}
-                    autoComplete="off"
-                    spellCheck={false}
-                    disabled={deletingAccount}
-                    className="mt-1.5 w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-body text-graphite outline-none focus:border-accent/50"
-                  />
-                  {deleteAccountError && (
-                    <p role="alert" className="mt-2 text-caption text-rose-700">
-                      We couldn’t delete your account. Nothing on this device
-                      was removed. Check your connection and try again.
-                    </p>
-                  )}
-                  <div className="mt-3 flex flex-wrap gap-2.5">
-                    <GentleButton
-                      variant="danger"
-                      size="sm"
-                      disabled={
-                        deleteConfirmation !== "DELETE" || deletingAccount
-                      }
-                      aria-busy={deletingAccount}
-                      onClick={() => void deleteAccount()}
-                    >
-                      {deletingAccount
-                        ? "Deleting account…"
-                        : "Permanently delete account"}
-                    </GentleButton>
-                    <GentleButton
-                      variant="ghost"
-                      size="sm"
-                      disabled={deletingAccount}
-                      onClick={() => {
-                        setConfirmDeleteAccount(false);
-                        setDeleteConfirmation("");
-                        setDeleteAccountError(false);
-                      }}
-                    >
-                      Keep my account
-                    </GentleButton>
-                  </div>
-                </>
-              )}
+            <div className="border-t border-mist/70 px-4 py-3">
+              <GentleButton
+                variant="outline"
+                size="sm"
+                fullWidth
+                disabled={signingOut}
+                onClick={() => void logOut()}
+              >
+                {signingOut ? "Logging out…" : "Log out"}
+              </GentleButton>
             </div>
           )}
         </PaperCard>
+
+        <SectionTitle>Plus</SectionTitle>
+        <div className="space-y-3">
+          <ExplorePlusLink description="Discover the full wallpaper collection and extra ways to deepen your daily practice." />
+          <SupportLink />
+        </div>
 
         {/* Always visible — text size and bold text are comfort settings
             people shouldn't have to hunt for behind a disclosure. */}
@@ -1428,12 +1382,6 @@ function SettingsInner() {
           </Disclosure>
         </DisclosureGroup>
 
-        <SectionTitle>Plus</SectionTitle>
-        <div className="space-y-3">
-          <ExplorePlusLink description="Discover the full wallpaper collection and extra ways to deepen your daily practice." />
-          <SupportLink />
-        </div>
-
         {/* Danger zone — plain, calm, confirmed */}
         <SectionTitle>Start over</SectionTitle>
         <PaperCard variant="paper" padding="md">
@@ -1478,6 +1426,93 @@ function SettingsInner() {
             </>
           )}
         </PaperCard>
+
+        {!ACCOUNT_SYNC_CONTAINED && user && (
+          <>
+            {/* Keeps irreversible account deletion at the very bottom of Settings. */}
+            <SectionTitle>Delete account</SectionTitle>
+            <PaperCard variant="paper" padding="md">
+              {!confirmDeleteAccount ? (
+                <>
+                  <p className="text-[0.875rem] leading-relaxed text-ash">
+                    Permanently close your login and delete its synced journey.
+                    This device’s journey will also be cleared.
+                  </p>
+                  <GentleButton
+                    variant="danger"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => {
+                      setDeleteAccountError(false);
+                      setConfirmDeleteAccount(true);
+                    }}
+                  >
+                    Delete account
+                  </GentleButton>
+                </>
+              ) : (
+                <>
+                  <p className="text-[0.9375rem] leading-relaxed text-charcoal">
+                    This permanently deletes your account, prayers,
+                    reflections, progress, and this device’s journey. It can’t
+                    be undone.
+                  </p>
+                  <label
+                    htmlFor="delete-account-confirmation"
+                    className="mt-3 block text-caption text-ash"
+                  >
+                    Type DELETE to confirm
+                  </label>
+                  <input
+                    id="delete-account-confirmation"
+                    value={deleteConfirmation}
+                    onChange={(event) => {
+                      setDeleteConfirmation(event.target.value);
+                      setDeleteAccountError(false);
+                    }}
+                    autoComplete="off"
+                    spellCheck={false}
+                    disabled={deletingAccount}
+                    className="mt-1.5 w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-body text-graphite outline-none focus:border-accent/50"
+                  />
+                  {deleteAccountError && (
+                    <p role="alert" className="mt-2 text-caption text-rose-700">
+                      We couldn’t delete your account. Nothing on this device
+                      was removed. Check your connection and try again.
+                    </p>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-2.5">
+                    <GentleButton
+                      variant="danger"
+                      size="sm"
+                      disabled={
+                        deleteConfirmation !== "DELETE" || deletingAccount
+                      }
+                      aria-busy={deletingAccount}
+                      onClick={() => void deleteAccount()}
+                    >
+                      {deletingAccount
+                        ? "Deleting account…"
+                        : "Permanently delete account"}
+                    </GentleButton>
+                    <GentleButton
+                      variant="ghost"
+                      size="sm"
+                      disabled={deletingAccount}
+                      onClick={() => {
+                        setConfirmDeleteAccount(false);
+                        setDeleteConfirmation("");
+                        setDeleteAccountError(false);
+                      }}
+                    >
+                      Keep my account
+                    </GentleButton>
+                  </div>
+                </>
+              )}
+            </PaperCard>
+          </>
+        )}
       </PageContainer>
     </>
   );

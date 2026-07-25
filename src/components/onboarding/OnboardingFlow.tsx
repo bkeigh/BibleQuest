@@ -58,6 +58,12 @@ const TOTAL_STEPS = PLUS_STEP + 1;
 
 const STEP_HEADING_ID = "onboarding-step-heading";
 
+// Uses animated companions only in onboarding while preserving static mascots elsewhere.
+const ONBOARDING_MASCOT_ANIMATIONS: Partial<Record<PixelMascotName, string>> = {
+  lamb: "/pixel/mascot-lamb-walk.gif",
+  campfire: "/pixel/mascot-campfire-burn.gif",
+};
+
 // Uses retained stills only, giving the guide a taste of app artwork without video cost.
 const STEP_BACKGROUNDS: Partial<Record<number, string>> = {
   [WELCOME_STEP]: "/wallpapers/01-let-there-be-light/poster.webp",
@@ -391,7 +397,11 @@ function StepMascot({
 }) {
   return (
     <motion.div variants={riseIn} initial="hidden" animate="visible" className="mb-4">
-      <PixelMascot name={name} size={size} />
+      <PixelMascot
+        name={name}
+        src={ONBOARDING_MASCOT_ANIMATIONS[name]}
+        size={size}
+      />
     </motion.div>
   );
 }
