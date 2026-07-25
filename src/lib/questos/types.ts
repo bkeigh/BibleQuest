@@ -518,11 +518,11 @@ export interface Profile {
   /** Last change to account-synced profile fields; legacy snapshots may omit it. */
   updatedAt?: string;
   /**
-   * Set when a profile photo exists in the on-device media store (IndexedDB —
-   * see src/lib/utils/avatar.ts). The image itself deliberately stays OUT of
-   * this persisted blob: localStorage re-serializes the whole store on every
-   * write, and the sync engine must never ship the photo to the account.
+   * Opaque server version for an account avatar. Image bytes stay in private
+   * Storage plus the version-keyed IndexedDB cache, never in this JSON store.
    */
+  avatarVersion?: string | null;
+  /** Pre-account-sync local marker retained only for legacy avatar migration. */
   avatarUpdatedAt?: string | null;
 }
 

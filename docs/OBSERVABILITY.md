@@ -22,9 +22,10 @@ as a containment breach.
 - `configured`, `guest-only`, or `invalid` effective auth posture without a
   host or key; the containment latch reports `guest-only` even when dormant
   provider credentials remain configured;
-- schema/content contract labels (`0022` and `seed-manifest-v1`);
+- schema/content contract labels (`0026` and `seed-manifest-v1`);
 - the checked-in service-worker version;
-- `coming-soon`, `sandbox`, `live`, or `invalid` billing posture without a key.
+- `coming-soon`, `test`, `live`, or `invalid` direct Stripe posture without a
+  key, plus a boolean purchase-UI gate.
 
 `BIBLEQUEST_ROLLBACK_SHA` is a server-only deployment variable. Set it only to
 the reviewed, database-compatible rollback commit after the rollback authority
@@ -135,7 +136,8 @@ Prerequisites:
 6. `live` billing returns `HOLD` unless the billing owner has approved and
    attached the complete provider/legal smoke evidence and the operator adds
    `--live-billing-verified` to that exact invocation. `coming-soon` needs no
-   override; `sandbox` is never production-safe.
+   override; `test` is never production-safe. A purchase gate outside an
+   explicitly verified live posture is also a hard hold.
 
 `HOLD` is a hard stop. `REVIEW` requires the named account posture owner and
 rollback authority to record a decision before continuing. A guest-only

@@ -13,6 +13,7 @@
 # testing
 /coverage
 /.next-header-*/
+/artifacts/synthetic-health/
 
 # next.js
 /.next/

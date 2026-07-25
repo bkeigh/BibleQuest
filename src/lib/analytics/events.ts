@@ -32,6 +32,7 @@ type AccountContext =
 type SignInMethod = "magic_link" | "google";
 type SignInSource = "account" | "onboarding";
 type SyncStatus = "initial" | "push";
+type BillingInterval = "monthly" | "annual";
 
 /** Compile-time event/property allowlist. No arbitrary strings are accepted. */
 export interface AnalyticsEventProps {
@@ -69,6 +70,10 @@ export interface AnalyticsEventProps {
   pwa_install_prompt_viewed: undefined;
   pwa_install_accepted: undefined;
   pwa_install_dismissed: undefined;
+  plus_checkout_opened: { interval: BillingInterval };
+  plus_billing_portal_opened: undefined;
+  plus_billing_refreshed: undefined;
+  support_checkout_opened: undefined;
 }
 
 export type AnalyticsEvent = keyof AnalyticsEventProps;
@@ -169,6 +174,14 @@ const EVENT_RULES = {
   pwa_install_prompt_viewed: noProps,
   pwa_install_accepted: noProps,
   pwa_install_dismissed: noProps,
+  plus_checkout_opened: {
+    props: {
+      interval: { kind: "enum", values: ["monthly", "annual"] },
+    },
+  },
+  plus_billing_portal_opened: noProps,
+  plus_billing_refreshed: noProps,
+  support_checkout_opened: noProps,
 } as const satisfies Record<AnalyticsEvent, EventRule>;
 
 const QUEUE_KEY = "biblequest:analytics-queue";

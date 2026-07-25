@@ -5,6 +5,7 @@ import "./globals.css";
 import { ServiceWorkerRegistrar } from "@/components/app-shell/ServiceWorkerRegistrar";
 import { JournalDraftJanitor } from "@/components/journal/JournalDraftJanitor";
 import { APPEARANCE_BOOTSTRAP_SCRIPT } from "@/lib/appearance-bootstrap";
+import { deploymentLabel } from "@/lib/deployment-label";
 
 const fraunces = Fraunces({
   variable: "--font-fraunces",
@@ -101,6 +102,11 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Makes isolated sync staging visibly impossible to mistake for Production.
+  const stagingLabel = deploymentLabel(
+    process.env.BIBLEQUEST_DEPLOYMENT_LABEL
+  );
+
   return (
     <html
       lang="en"
@@ -115,6 +121,14 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-parchment text-charcoal">
+        {stagingLabel ? (
+          <div
+            role="status"
+            className="sticky top-0 z-[100] border-b border-gold-700 bg-dusk px-3 py-2 text-center font-pixel text-xs tracking-[0.12em] text-gold-100"
+          >
+            {stagingLabel}
+          </div>
+        ) : null}
         {children}
         <JournalDraftJanitor />
         <ServiceWorkerRegistrar />

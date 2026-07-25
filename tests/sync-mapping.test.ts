@@ -4,6 +4,8 @@ import {
   prayerToRow,
   recentVerseToRow,
   reflectionToRow,
+  profileToRow,
+  rowToProfile,
   rowToAssignment,
   rowToPrayer,
   rowToRecentVerse,
@@ -69,5 +71,33 @@ describe("rolling quest and recent-verse sync mapping", () => {
     expect(rowToReflection(reflectionToRow("user-a", reflection))).toEqual(
       reflection,
     );
+  });
+
+  it("reads remote avatar metadata but never writes it through generic sync", () => {
+    const profile = {
+      displayName: "Fixture",
+      onboardingCompleted: true,
+      createdAt: "2026-07-24T12:00:00.000Z",
+      updatedAt: "2026-07-24T12:00:00.000Z",
+      avatarVersion: "00000000-0000-4000-8000-000000000001",
+      avatarUpdatedAt: "2026-07-24T12:05:00.000Z",
+    };
+    const row = profileToRow("user-a", profile);
+
+    expect(row).not.toHaveProperty("avatar_path");
+    expect(row).not.toHaveProperty("avatar_version");
+    expect(row).not.toHaveProperty("avatar_updated_at");
+    expect(
+      rowToProfile({
+        ...row,
+        avatar_path:
+          "user-a/avatar-00000000-0000-4000-8000-000000000001.webp",
+        avatar_version: "00000000-0000-4000-8000-000000000001",
+        avatar_updated_at: "2026-07-24T12:05:00.000Z",
+      }),
+    ).toMatchObject({
+      avatarVersion: "00000000-0000-4000-8000-000000000001",
+      avatarUpdatedAt: "2026-07-24T12:05:00.000Z",
+    });
   });
 });

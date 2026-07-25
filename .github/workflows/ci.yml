@@ -95,30 +95,27 @@ jobs:
             supabase_url: ""
             supabase_key: ""
             account_sync_enabled: "false"
-            billing_mode: coming-soon
-            billing_key: ""
           # Browser-safe fixtures exercise the configured-auth bundle without
           # contacting Supabase or requiring repository secrets.
           - mode: configured-auth-contained
             supabase_url: https://header-fixture.supabase.co
             supabase_key: header-fixture-anon-key
             account_sync_enabled: "false"
-            billing_mode: live
-            billing_key: rcb_headerfixture
           # Compile the release posture too; fake browser-safe values never
           # contact Supabase during the build.
           - mode: configured-auth-enabled
             supabase_url: https://header-fixture.supabase.co
             supabase_key: header-fixture-anon-key
             account_sync_enabled: "true"
-            billing_mode: coming-soon
-            billing_key: ""
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ matrix.supabase_url }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ matrix.supabase_key }}
       NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED: ${{ matrix.account_sync_enabled }}
-      NEXT_PUBLIC_REVENUECAT_BILLING_MODE: ${{ matrix.billing_mode }}
-      NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY: ${{ matrix.billing_key }}
+      # Every CI bundle exercises the safe production default. Direct Stripe
+      # test/live configuration belongs only in encrypted environments.
+      STRIPE_BILLING_MODE: coming-soon
+      BIBLEQUEST_STRIPE_PURCHASES_ENABLED: "false"
+      BIBLEQUEST_STRIPE_SUPPORT_ENABLED: "false"
     steps:
       - name: Check out repository
         uses: actions/checkout@v6

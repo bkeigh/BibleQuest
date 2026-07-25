@@ -163,6 +163,26 @@ const PUSH_DEBOUNCE_MS = 2_500;
 const RETRY_MS = 30_000;
 export const INITIAL_SYNC_DEADLINE_MS = 15_000;
 
+/** Ignores media-only metadata that has its own authenticated RPC boundary. */
+export function syncedProfileChanged(
+  current: QuestOSSnapshot["profile"],
+  previous: QuestOSSnapshot["profile"],
+): boolean {
+  if (current === previous) return false;
+  if (!current || !previous) return current !== previous;
+  return (
+    current.displayName !== previous.displayName ||
+    current.primaryGoal !== previous.primaryGoal ||
+    current.tradition !== previous.tradition ||
+    current.dailyRhythm !== previous.dailyRhythm ||
+    current.questStyle !== previous.questStyle ||
+    current.calling !== previous.calling ||
+    current.onboardingCompleted !== previous.onboardingCompleted ||
+    current.createdAt !== previous.createdAt ||
+    current.updatedAt !== previous.updatedAt
+  );
+}
+
 function mentionsSchemaIdentifier(message: string, identifier: string) {
   const escaped = identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(
@@ -321,7 +341,11 @@ export async function startSync(userId: string, retryingFailure = false) {
     if (applyingRemote) return;
     let changed = false;
     for (const field of SYNCED_FIELDS) {
-      if (state[field] !== prev[field]) {
+      const fieldChanged =
+        field === "profile"
+          ? syncedProfileChanged(state.profile, prev.profile)
+          : state[field] !== prev[field];
+      if (fieldChanged) {
         dirty.add(field);
         changed = true;
       }
@@ -1538,14 +1562,16 @@ function unionById<T extends { id: string }>(
   return [...byId.values()];
 }
 
-/** Reattaches the on-device avatar marker after account rows are decoded. */
+/** Lets migrated server avatar state win while preserving pre-0023 behavior. */
 function preserveDeviceAvatarMarker(
   accountProfile: QuestOSSnapshot["profile"],
   deviceProfile: QuestOSSnapshot["profile"],
 ): QuestOSSnapshot["profile"] {
-  if (!accountProfile || !deviceProfile?.avatarUpdatedAt) {
+  if (!accountProfile) {
     return accountProfile;
   }
+  if (accountProfile.avatarVersion !== undefined) return accountProfile;
+  if (!deviceProfile?.avatarUpdatedAt) return accountProfile;
   return {
     ...accountProfile,
     avatarUpdatedAt: deviceProfile.avatarUpdatedAt,

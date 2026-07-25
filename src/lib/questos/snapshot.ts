@@ -10,7 +10,11 @@ export function createExportSnapshot(source: QuestOSSnapshot): QuestOSSnapshot {
   // Omitting it prevents a restore on another device from claiming a missing
   // or unrelated local photo.
   const profile = source.profile
-    ? { ...source.profile, avatarUpdatedAt: undefined }
+    ? {
+        ...source.profile,
+        avatarVersion: undefined,
+        avatarUpdatedAt: undefined,
+      }
     : null;
 
   return {

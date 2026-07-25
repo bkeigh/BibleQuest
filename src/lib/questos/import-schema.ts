@@ -102,7 +102,7 @@ const isRecentVerse = (o: unknown) =>
   str(o.text) &&
   str(o.viewedAt);
 const isEarnedMilestone = (o: unknown) => isObj(o) && str(o.key) && str(o.achievedAt);
-const isProfile = (o: unknown) =>
+const isProfile = (o: unknown): o is Record<string, unknown> =>
   isObj(o) && str(o.displayName) && typeof o.onboardingCompleted === "boolean" && str(o.createdAt);
 const isReadingPosition = (o: unknown) =>
   isObj(o) && str(o.bookSlug) && str(o.bookName) && num(o.chapter);
@@ -372,7 +372,13 @@ export function parseSnapshot(rawText: string): ParseResult {
     out.settings = s;
   }
   // Nullable objects: keep only when well-formed, else drop to the default (null).
-  if (isProfile(src.profile)) out.profile = src.profile;
+  if (isProfile(src.profile)) {
+    // Portable backups never import device cache or remote media pointers.
+    const profile = { ...src.profile };
+    delete profile.avatarVersion;
+    delete profile.avatarUpdatedAt;
+    out.profile = profile;
+  }
   if (isStreak(src.streak)) out.streak = src.streak;
   if (isReadingPosition(src.readingPosition)) out.readingPosition = src.readingPosition;
   if (isAccountNudge(src.accountNudge)) out.accountNudge = src.accountNudge;

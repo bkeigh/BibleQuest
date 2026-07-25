@@ -54,7 +54,7 @@ import { gentleEase, celebrationScale, pixelSparkle } from "@/lib/motion";
 import { cleanVerseText } from "@/lib/utils/scripture";
 import { hashString } from "@/lib/utils/dates";
 import { track } from "@/lib/analytics/events";
-import { usePlus } from "@/lib/revenuecat/usePlus";
+import { usePlus } from "@/lib/billing/usePlus";
 
 type Phase = "detail" | "reflect" | "done";
 

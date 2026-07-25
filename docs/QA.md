@@ -8,7 +8,7 @@ sign-off in that runbook; an unchecked item is not a pass.
 
 ```bash
 pnpm test                # all Vitest risk tests; noninteractive and exits
-pnpm test:headers        # representative live-billing build + next start/dev header tests
+pnpm test:headers        # production build + next start/dev header tests
 pnpm test:headers:built  # rerun after that representative production build
 pnpm test:service-worker # cache policy, lifecycle, and offline fallback
 pnpm test:observability  # privacy allowlist, redaction, queue, and thresholds
@@ -19,8 +19,7 @@ pnpm exec tsc --noEmit   # strict TypeScript — 0 errors
 pnpm build               # production build succeeds
 pnpm audit --prod        # production dependency audit
 git diff --check         # no whitespace errors
-supabase test db --local supabase/tests/0014_journey_event_identity.sql
-supabase test db --local supabase/tests/0015_daily_quest_cas.sql
+supabase test db --local # all account, avatar, push, billing, and support pgTAP
 ```
 
 The automated suite targets launch-critical behavior rather than UI snapshots:
@@ -42,16 +41,19 @@ The automated suite targets launch-critical behavior rather than UI snapshots:
   deterministically rejects private fields, safely queues offline categories,
   aggregates Vercel-shaped rows without identifiers/URLs, and applies the
   checked-in launch thresholds.
-- RevenueCat tests cover entitlement mapping, deny-by-default activation,
-  current-offering/paywall readiness, cancellation/failure containment,
-  anonymous persistence, guest → account identification, sign-out isolation,
-  account switching, and repeated configuration.
+- Direct Stripe tests cover deny-by-default/mode configuration, server-selected
+  Prices, current-object entitlement projection, Checkout/Portal origins,
+  signed replay-safe webhook boundaries, failure categories, account
+  isolation, and legally retained deletion posture.
+- One-time support tests cover server-bounded amounts, guest/account separation,
+  idempotent Checkout creation, exact hosted origins, current-object
+  completion/refund/dispute projection, sealed records, and pressure-free copy.
 - The service worker default-denies sensitive/query-bearing navigations,
   validates responses before caching, and removes only BibleQuest-owned stale
   caches.
 - Live production and development responses preserve the exact Winterhill
   ancestor list, omit conflicting `X-Frame-Options`, scope HSTS/`unsafe-eval`
-  correctly, and retain the evidenced RevenueCat/Stripe CSP origins.
+  correctly, and keep hosted Stripe navigation out of the document CSP.
 
 Tests use deterministic time, UUID, and storage replacements and restore
 modified globals after every case. Fixtures are deliberately fake and tests
@@ -72,8 +74,93 @@ the evidence.
 | Supabase sign-in and sync (enabled track) | On a clean browser profile, sign in through each enabled method, create one non-sensitive test record, reload, and confirm the same account receives the synced record. | Auth calls reach only the configured Supabase project over HTTPS; the session survives; sync completes; no CSP errors or cross-account data appears. Guest-only records this active behavior `OUT OF SCOPE — APPROVED GUEST-ONLY`, not `PASS`. | Supabase owner |
 | Email sign-in + callback (enabled track) | Request an email for Gmail and iCloud addresses that are not Supabase organization members. Confirm the UI says the email was requested (not delivered), shows the target address, holds resend for 60 seconds, and keeps Google available. In a fresh installed PWA, enter the code without opening the email link; separately open a fresh link in a browser and observe `/auth/callback` through the first-quest hand-off. | Both messages have matching Supabase and SMTP-provider delivery events; the PWA code creates and retains its session inside standalone mode after a full close/reopen; callback stays on the BibleQuest origin, is `private, no-store`, and expired/used/browser-mismatch credentials show a bounded recovery reason with no raw token or provider text. Guest-only records provider delivery/round trips out of scope and runs the containment matrix below. | Supabase owner |
 | PWA | Fresh-install from the immutable candidate URL. Separately, use the approved controlled non-production alias to load compatible old and candidate staging-built artifacts that both use the confirmed staging Supabase pair and safe billing posture; abort on Production values. Remap the same origin for update/rollback rehearsal. Inspect `/sw.js`, Cache Storage, online/offline/reconnect, and record both deployment IDs plus alias changes. | Fresh install/launch works; only documented shell/build assets are cached; forbidden/private routes are absent; same-origin worker update, streaming navigation, and compatible rollback remain functional without Production backend traffic. | Repository owner |
-| RevenueCat sandbox paywall | Use the Test Store public key and a published sandbox paywall; open Plus, exercise paywall/package fallback, close/reopen, and complete a simulated purchase. | Offerings, branding image/font/media, entitlement refresh, and management action work without CSP errors; no Stripe request occurs for Test Store. | Billing owner |
-| Stripe 3DS | Use RevenueCat Web Billing in Stripe test mode with an official 3DS challenge test payment method; complete and cancel separate challenges while watching frames and requests. | Stripe.js loads from its allowed JS origin, API calls use `api.stripe.com`, 3DS renders through allowed Stripe/hooks frames, success updates entitlement, cancel returns safely, and no CSP source was broadened ad hoc. | Billing owner |
+| Direct Stripe Checkout | Use the test-only purchase gate and both configured recurring Prices; complete monthly/annual Checkout and cancel a separate session. | Displayed amounts come from Stripe; the server selects the Price; cancel grants nothing; success grants only after the signed webhook/current-object projection. | Billing owner |
+| Stripe 3DS | Use hosted Stripe Checkout in test mode with an official 3DS challenge test payment method; complete and cancel separate challenges. | Stripe owns the hosted challenge origin; success reconciles current Subscription state; cancellation grants nothing; BibleQuest CSP gains no Stripe subresource origin. | Billing owner |
+| One-time support | Enable only the test support latch; complete guest and signed-in support, cancel, expire, refund, dispute, resend, and abuse checks from the dedicated matrix. | Server amount/currency and exact hosted origin hold; signed current objects alone update bounded financial state; no account is created, no Plus access appears, and no payment/contact data enters evidence. | Billing owner |
+
+## Manual — exact Email and Google auth workflows
+
+Run this section only on an auth + sync enabled release candidate with two
+disposable accounts and inboxes. A guest-only launch records every active
+provider row `OUT OF SCOPE — APPROVED GUEST-ONLY` and completes the containment
+matrix instead. Record UTC time, immutable deployment SHA, browser/device,
+sanitized Supabase/provider event status, and pass/fail. Never save an email
+address, code, token, callback URL, cookie, user ID, or private content.
+
+### Email
+
+| Case | Action | Pass criteria |
+| --- | --- | --- |
+| New signup and verification | Request passwordless email for a never-used Gmail address. Test the numeric code inside the requesting installed PWA, then use a new message to test the browser link. | Custom sender and branded template appear; matching Supabase and SMTP events exist; each path creates one verified account and reaches only an approved same-origin destination. |
+| Returning login | Fully sign out, close the client, request a fresh message, sign in, then close/reopen again. | One existing account resumes, its owned test state restores, and no second identity or guest-owned state is silently attached. |
+| Single use and expiry | Reuse a consumed code/link; separately use an expired code/link and a link opened in the wrong browser context. | Each fails with bounded recovery copy; no session is created; raw provider text, token, and email never enter the destination URL, logs, analytics, or evidence. |
+| Resend and rate limits | Request again before 60 seconds, after 60 seconds, and repeatedly up to the approved Supabase/provider threshold. | UI cooldown works; server/provider throttling is calm and bounded; Google remains usable; no address-enumeration difference appears. |
+| Recovery/reset | Generate a Supabase `recovery` callback for the disposable account even though BibleQuest advertises passwordless sign-in, not a password-reset UI. | Callback is `private, no-store`, stays same-origin, and reaches only the reviewed recovery posture; malformed/expired recovery credentials create no session or account change. |
+| Email change | Generate and complete the reviewed Supabase `email_change` flow for the disposable account, then repeat with an expired/used credential. | Fresh confirmation preserves the same owner and private rows; old address no longer signs in after provider state settles; invalid credentials change nothing and expose no address/token. |
+| Logout/login | Sign out from settings, navigate/reload/back-forward, then sign in again. | Private UI, avatar URL, billing state, push controls, and sync client clear immediately; no stale account flashes; the same account restores only after verified login. |
+| Sender and spam posture | Deliver fresh messages to Gmail and iCloud; inspect Supabase and SMTP-provider delivery records plus Inbox/Spam placement. | Verified custom domain/sender, SPF/DKIM/DMARC posture, matching delivery events, acceptable placement, reply/support path, and no production use of Supabase’s test sender. |
+
+### Google
+
+| Case | Action | Pass criteria |
+| --- | --- | --- |
+| New signup | From a clean client, choose Google and approve with a never-used disposable Google account. | Consent identifies the reviewed app/domain; callback is canonical and `private, no-store`; exactly one BibleQuest account is created. |
+| Returning login | Sign out, fully close, then choose the same Google account again. | The same owner and test state restore; no duplicate account or guest-state attachment appears. |
+| Cancel and provider error | Cancel at account chooser/consent; separately exercise a safe test provider-error callback. | User returns to bounded recovery UI; no session/account is created and no raw Google error or identifier is exposed. |
+| Wrong account | At the chooser select disposable account B instead of A. | B opens as B with none of A’s identifiers, avatar, billing, push, prayer, reflection, Journey, or settings state. |
+| Redirect defense | Test approved internal `next` values plus external, protocol-relative, encoded, and malformed destinations. | Approved paths remain on the canonical origin; every hostile form is rejected without credential exchange or open redirect. |
+| Logout/login | Sign out, use reload/back-forward, then sign in with Google again. | Session UI and private caches clear on logout; returning login restores only the selected account. |
+| Email collision/linking | Use passwordless email and Google with the same verified disposable address, then repeat with distinct addresses. | Result matches the frozen Supabase identity-linking policy; there is no silent cross-owner merge, orphaned private data, or attacker-controlled linking. Evidence records only “same owner” or “separate owners,” never raw IDs. |
+
+Any unreviewed redirect, token leak, duplicate identity, cross-owner merge,
+address-enumeration behavior, stale private UI, or provider flow that cannot be
+matched to sanitized server logs keeps auth + sync disabled.
+
+## Manual — exact two-user private-data isolation
+
+Use two disposable verified users A and B, separate browser profiles, synthetic
+sentinel content, normal user tokens, and the immutable candidate. Run the
+checked-in pgTAP/RLS report first, then prove the deployed API boundary. Do not
+use the service-role key for negative tests.
+
+| Surface | Required A↔B attempts | Pass criteria |
+| --- | --- | --- |
+| Every user-owned table and view | For every private relation named by the RLS report, test owner create/read/update/delete, cross-owner filtered read, list/enumeration, guessed UUID/natural key, spoofed owner insert/upsert, update, and delete in both directions. | Owner CRUD follows the contract; cross-owner reads are empty and writes are denied or affect zero rows; no count, error, timing, or returned representation leaks another owner. |
+| Prayer, reflection, quest, Bible, Journey, and settings | Create distinct A/B sentinels, reload on second clients, edit/delete, reconnect from offline, and inspect all app list/detail/export surfaces. | Each account sees only its own records; deletion does not resurrect; export contains only the signed-in owner; local drafts never cross accounts. |
+| RPCs and account deletion | Exercise every authenticated RPC with own IDs, B’s guessed IDs, anonymous credentials, stale generation/revision, duplicate request UUIDs, and malformed bounded input; run Clear My Data and full account deletion separately. | `auth.uid()` remains authoritative; anonymous/cross-owner calls fail; retries are idempotent; purge removes only the target owner; B remains unchanged. |
+| Avatar API and Storage | Upload/get/replace/delete each owner’s avatar; try listing, reading, signing, uploading, overwriting, moving, and deleting the other owner’s guessed object key; repeat slow/interrupted uploads. | Bucket stays private; only the owner receives a short-lived URL; guessed keys reveal nothing; invalid/partial files never become current; replacement/deletion removes obsolete ownership safely. |
+| Push | Create preferences and subscriptions for A/B; attempt cross-owner list/update/delete, endpoint reuse, guessed subscription ID, test delivery, and scheduler access. | Browser roles see only their own bounded posture; endpoint ownership cannot be stolen; scheduler/service operations reject user tokens; logout/deletion removes or disables the correct subscriptions only. |
+| Billing and one-time support | Create distinct Stripe test state; try cross-owner status, refresh, Checkout, Portal, guessed app/Stripe identifiers, support rows, and return-query manipulation. | Server derives the owner; browser roles cannot enumerate financial rows; A never receives B’s Portal/entitlement; guest support creates no account; query strings grant nothing. |
+| Account switch and residual state | Use A, sign out, then use B in the same client; repeat after reload, back-forward, offline/reconnect, and service-worker update. | A’s avatar, private text, billing, push, caches, and sync status never flash or reappear for B. |
+
+Save only relation/surface names, operation category, HTTP/result category,
+UTC time, release SHA, browser/device, and pass/fail. Sanitize HAR/screenshots;
+never retain tokens, emails, raw IDs, object keys, private text, Stripe IDs,
+push endpoints/keys, or signed URLs. After evidence is accepted, delete both
+test users, purge their application rows and avatar objects, remove push
+subscriptions, close Stripe test objects where applicable, and record only
+sanitized zero-residual counts.
+
+## Manual — exact multi-device, offline, avatar, and push matrix
+
+Use an iPhone installed PWA, Android installed PWA, desktop Chromium, and
+desktop Safari against one immutable candidate. For worker update/rollback,
+use the approved same-origin non-production alias and record both artifact SHAs.
+
+| Case | Action | Pass criteria |
+| --- | --- | --- |
+| Install and relaunch | Add to Home Screen on iPhone Safari and Android Chrome; install/use desktop Chromium where offered; open normally in desktop Safari; close/relaunch each twice. | Correct icon/name/start URL, standalone posture on phones, safe-area layout, retained local/session posture, and no unexpected account or payment control. |
+| Avatar sync | Upload on one device, observe on the other three, replace on a second device, then delete on a third. | Current avatar converges everywhere after normal refresh signals; stale signed URLs fail safely; no old/account-switched avatar flash appears. |
+| Slow/interrupted upload | Throttle upload, disconnect mid-request, retry the same valid file, then try oversized, wrong-type, corrupt, and decompression-heavy files. | Calm bounded failure; no partial current avatar; retry succeeds once; server-decoded limits hold; temporary/obsolete objects do not accumulate. |
+| Offline edits and conflicts | While one device is offline, create/edit/delete prayer, reflection, quest, Bible, Journey, and settings state from both clients; reconnect in both orders. | Local work survives close/reopen; merge/CAS rules converge without duplication, resurrection, completion loss, silent overwrite, or retry loop. |
+| Service-worker update and rollback | Load the compatible old artifact, fully close, remap the controlled alias to candidate, relaunch twice, then rehearse the approved compatible rollback. | Worker becomes `biblequest-v21`; only allowlisted public shells/assets are cached; no auth/API/private response is cached; update and rollback do not strand the app. |
+| Push subscribe/unsubscribe | On each supported platform, grant permission only after the in-app action, subscribe, send a test reminder, change time/timezone, unsubscribe, and revoke browser permission. | One owner-bound subscription per endpoint; foreground/background behavior is honest; changes converge; unsubscribe/revocation stops delivery without affecting another device. Unsupported Safari/device posture is explicit, not reported as pass. |
+| Logout and deletion | With multiple active devices and push subscriptions, log out one device, then delete the disposable account from another; reopen all clients online and offline. | Logged-out client clears private UI/subscription posture; deletion purges/detaches reviewed data, prevents later push, and no offline client resurrects the account. |
+
+Record platform/OS/browser versions, UTC time, immutable SHA, worker version,
+network posture, sanitized provider/event category, and pass/fail. Never record
+private content, accounts, notification endpoints/keys, signed avatar URLs,
+payment/contact data, cookies, tokens, or raw identifiers.
 
 ## Manual — guest-only containment
 
@@ -190,34 +277,52 @@ remains separate from signed journey-restore and CAS evidence.
       export downloads JSON; clear-data returns to onboarding.
 - [ ] Plus: free promise shown first; nothing spiritual is gated.
 
-## Manual — RevenueCat (sandbox only)
+## Manual — direct Stripe (test only)
 
-Keep Vercel production in `coming-soon`. Use only an ignored local Test Store
-public key and `NEXT_PUBLIC_REVENUECAT_BILLING_MODE=sandbox`; never print the
-key or connect/create/change live billing state. Complete the detailed
-dashboard gates in [`REVENUECAT.md`](REVENUECAT.md) first.
+Keep Vercel Production `coming-soon` with purchases disabled. Use only ignored
+local or encrypted preview test credentials; never print them or create/change
+live billing state. Complete the full evidence matrix in
+[`STRIPE_TEST_BILLING.md`](STRIPE_TEST_BILLING.md).
 
-- [ ] Coming-soon/no-key: pricing and `/app/plus` render calm coming-soon copy,
-      no RevenueCat request, and no purchase control.
-- [ ] Invalid/mismatched mode and key: no SDK call and no purchase control.
-- [ ] Missing current offering, empty current offering, or unpublished paywall:
-      no direct package buttons and no purchase control.
-- [ ] Complete Test Store current offering + published paywall: exactly one
-      paywall CTA is shown; displayed products/prices come from RevenueCat.
-- [ ] Simulated cancellation: neutral “no changes” copy, no entitlement, retry
-      remains available.
-- [ ] Simulated failure: generic error only, no raw SDK/customer/purchase data,
-      no entitlement, retry remains available.
-- [ ] Simulated success: Plus activates immediately, then remains active after
-      close, reload, focus return, `pageshow`, visibility return, and reconnect.
-- [ ] Guest success → sign in: Plus follows the account. Sign out: the fresh
-      guest is free. Account A → B: A's Plus never appears or flashes for B.
-- [ ] Active Plus with a management URL opens it in a new isolated tab and
-      refreshes on return. With no URL, access remains active and an explicit
-      refresh action replaces the disabled management control.
-- [ ] Analytics/network inspection contains no App User ID, anonymous ID,
-      CustomerInfo identifier, transaction/purchase identifier, operation
-      session ID, management URL, or redemption data.
+- [ ] Coming-soon/no-key: pricing and `/app/plus` show calm coming-soon copy and
+      no purchase control.
+- [ ] Invalid, incomplete, mismatched-mode, or duplicate-Price configuration
+      fails closed and health reports `invalid` without exposing a value.
+- [ ] Test mode with purchase gate off shows no checkout control.
+- [ ] Monthly and annual controls display Stripe-authored amounts for the same
+      Product/currency and open only exact hosted Checkout.
+- [ ] Checkout cancellation and return query manipulation grant nothing.
+- [ ] Success, 3DS, initial failure, renewal failure/recovery, cancel-at-period,
+      Portal, refund, and dispute states match the server projection.
+- [ ] Duplicate and out-of-order webhook delivery cannot replay an entitlement.
+- [ ] Reload, focus, `pageshow`, visibility return, reconnect, and explicit
+      refresh restore current server state.
+- [ ] Sign out and Account A → B never show A’s status or management control.
+- [ ] Analytics/network/evidence contains no Customer, Subscription, Price,
+      Session, invoice, payment method, card, email, or webhook payload data.
+
+## Manual — one-time support (test only)
+
+Keep the Production support latch off. Use only test credentials and complete
+the full matrix in
+[`STRIPE_ONE_TIME_SUPPORT.md`](STRIPE_ONE_TIME_SUPPORT.md).
+
+- [ ] Support-disabled and invalid billing postures show no payment control.
+- [ ] Presets/custom amount bounds, immutable request UUID, same-origin/body
+      guards, per-instance throttles, and Vercel Firewall all fail closed.
+- [ ] Guest Checkout creates no app account; signed-in Checkout remains
+      separate from Plus; both return only an exact hosted Stripe URL.
+- [ ] Cancel/return query manipulation never claims payment.
+- [ ] Signed current Session events cover success, async failure, and expiry;
+      duplicate/out-of-order delivery remains replay-safe.
+- [ ] Current Charge/Dispute state covers partial/full refund and
+      created/updated/won/lost dispute posture.
+- [ ] Account deletion detaches the user ID while preserving the bounded
+      financial record; browser roles cannot read or mutate any support row.
+- [ ] Stripe receipt/refund email, support inbox, pressure-free copy, desktop
+      browsers, and physical mobile Safari all pass.
+- [ ] Logs, analytics, network summaries, screenshots, and saved evidence
+      contain no contact/payment IDs, Checkout URLs, or raw webhook payloads.
 
 ## Manual — PWA & platform
 
@@ -292,7 +397,7 @@ change. Never move the production domain for a rehearsal.
 - [ ] Run a production build, open the app, and in DevTools → Application →
       Service Workers confirm `/sw.js` controls the page at scope `/`.
 - [ ] In Application → Cache Storage, confirm only the current
-      `biblequest-v20-shell` and `biblequest-v20-runtime` caches are BibleQuest
+      `biblequest-v21-shell` and `biblequest-v21-runtime` caches are BibleQuest
       owned; unrelated-origin cache names are not touched by activation.
 - [ ] Inspect every shell entry: only `/offline`, `/app`, `/onboarding`,
       `/manifest.webmanifest`, and the exact `/pixel/` catalogue from `sw.js`
@@ -362,5 +467,7 @@ change. Never move the production domain for a rehearsal.
   email, Gmail/iCloud, callback, transactional/cached-client, and both-direction
   two-user checks in [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md). A
   prior guest-only launch is not evidence for any of those active behaviors.
-- Notification delivery and external AI generation are not implemented. Plus
-  stays coming-soon unless its complete provider and release gates pass.
+- Private Web Push is implemented but remains deny-by-default until its
+  migration, encryption, scheduler, isolation, device, and live rollout gates
+  pass. External AI generation is not implemented. Plus and one-time support
+  stay disabled unless their complete provider and release gates pass.

@@ -116,7 +116,7 @@ describe("launch content catalog", () => {
     expect(iconBuilder).not.toContain("A daily guide to living your faith");
   });
 
-  it("keeps Plus copy aligned with shipped benefits and undecided pricing", () => {
+  it("keeps Plus copy aligned with shipped benefits and Stripe-authored pricing", () => {
     const plusContent = readFileSync(
       path.join(process.cwd(), "src/components/plus/PlusContent.tsx"),
       "utf8",
@@ -130,7 +130,9 @@ describe("launch content catalog", () => {
     expect(plusContent).toContain("Unlimited daily verse refreshes");
     expect(plusContent).toContain("The full still and live wallpaper collection");
     expect(plusContent).toContain("never read your journals");
-    expect(plusCta).toContain("The exact price and trial terms will");
+    expect(plusCta).toContain("formatBillingAmount(plan)");
+    expect(plusCta).toContain("renews automatically each billing period");
+    expect(plusCta).toMatch(/Checkout\s+shows the final total/);
     expect(`${plusContent}\n${plusCta}`).not.toMatch(/\$8\.99|29¢|AI Study/i);
   });
 

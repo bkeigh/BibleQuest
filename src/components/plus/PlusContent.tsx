@@ -2,7 +2,6 @@ import { PaperCard } from "@/components/design-system/PaperCard";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { IconCheck, IconSparkle } from "@/components/design-system/icons";
 import { PlusCta } from "@/components/plus/PlusCta";
-import { getRevenueCatAvailability } from "@/lib/revenuecat/client";
 import { GentleLink } from "@/components/design-system/GentleButton";
 import { Disclosure } from "@/components/design-system/Disclosure";
 
@@ -30,8 +29,6 @@ const PLUS_FEATURES = [
  * Plus page. The free promise stays close without pushing Plus below the fold.
  */
 export function PlusContent({ compact = false }: { compact?: boolean }) {
-  const revenueCat = getRevenueCatAvailability();
-
   return (
     <div className={compact ? "space-y-5" : "space-y-6"}>
       {/* Keep the full free promise available without hiding the Plus offer. */}
@@ -64,7 +61,6 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
           </span>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-gold-500/45 bg-gold-500/15 px-3 py-1 text-[0.75rem] text-gilt">
             <IconSparkle size={14} /> BibleQuest Plus
-            {revenueCat.configured ? "" : " — coming soon"}
           </span>
         </div>
         <h3 className="mt-3 font-display text-[1.5rem] text-graphite">
@@ -83,17 +79,13 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
             </li>
           ))}
         </ul>
-        <p className="mt-4 text-[0.8125rem] leading-relaxed text-charcoal">
-          <span className="text-gilt">Our pledge:</span> 5% of BibleQuest’s
-          proceeds goes to churches and nonprofits.
-        </p>
         <PlusCta />
       </PaperCard>
 
-      {/* Patron */}
+      {/* One-time support stays separate from recurring Plus membership. */}
       <PaperCard variant="paper" padding="lg">
         <p className="text-[0.75rem] uppercase tracking-[0.16em] text-accent">
-          Patron
+          One-time support
         </p>
         <h3 className="mt-1.5 font-display text-[1.375rem] text-graphite">
           Support the mission
@@ -103,10 +95,11 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
           One-time supporters get our gratitude — no spiritual perks, ever.
         </p>
         <GentleLink variant="gold" size="sm" href="/support" className="mt-4 min-h-11">
-          Make a one-time donation
+          Support BibleQuest once
         </GentleLink>
         <p className="mt-2 text-[0.75rem] leading-relaxed text-ash">
-          Stripe checkout is shown only when it is safely configured.
+          One-time support is separate from Plus and is not tax-deductible.
+          Stripe Checkout appears only when separately approved and enabled.
         </p>
       </PaperCard>
     </div>

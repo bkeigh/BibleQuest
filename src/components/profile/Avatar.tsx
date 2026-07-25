@@ -4,12 +4,14 @@
  * Avatar — the user's photo, or a warm initial-letter fallback.
  * Private-feeling by design: this is "my space", not a public profile.
  *
- * The photo lives in IndexedDB (src/lib/utils/avatar.ts); the store only
- * carries `profile.avatarUpdatedAt` as a cache-busting change marker, which
- * callers pass as `marker` so the hook refetches after an upload.
+ * The photo lives in a version-keyed IndexedDB cache. The store carries only
+ * an opaque marker, never image bytes or a short-lived signed URL.
  */
 import { useEffect, useState } from "react";
-import { loadAvatar } from "@/lib/utils/avatar";
+import {
+  AVATAR_CHANGED_EVENT,
+  loadAvatar,
+} from "@/lib/utils/avatar";
 import { cn } from "@/lib/utils/cn";
 
 /** Object URL for the stored photo, refreshed whenever `marker` changes. */
@@ -19,13 +21,26 @@ export function useAvatarUrl(marker: string | null | undefined): string | null {
     if (!marker) return;
     let objectUrl: string | null = null;
     let cancelled = false;
-    loadAvatar().then((blob) => {
-      if (cancelled || !blob) return;
-      objectUrl = URL.createObjectURL(blob);
-      setUrl(objectUrl);
-    });
+    let sequence = 0;
+    const load = () => {
+      const currentSequence = ++sequence;
+      void loadAvatar(marker).then((blob) => {
+        if (cancelled || currentSequence !== sequence) return;
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        objectUrl = blob ? URL.createObjectURL(blob) : null;
+        setUrl(objectUrl);
+      });
+    };
+    const onAvatarChanged = (event: Event) => {
+      const changed = (event as CustomEvent<unknown>).detail;
+      if (changed === marker || changed === null) load();
+    };
+    load();
+    window.addEventListener(AVATAR_CHANGED_EVENT, onAvatarChanged);
     return () => {
       cancelled = true;
+      sequence += 1;
+      window.removeEventListener(AVATAR_CHANGED_EVENT, onAvatarChanged);
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [marker]);
@@ -49,7 +64,7 @@ export function Avatar({
 }: {
   /** Display name — its first letter is the fallback face. */
   name?: string | null;
-  /** profile.avatarUpdatedAt (null/undefined = no photo). */
+  /** Opaque account version or legacy local marker. */
   marker?: string | null;
   size?: keyof typeof SIZES;
   className?: string;

@@ -40,7 +40,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
   privacy: {
     eyebrow: "Privacy",
     title: "Privacy Policy",
-    effectiveDate: "July 23, 2026",
+    effectiveDate: "July 24, 2026",
     intro:
       "BibleQuest is a product of Winterhill Studio. This policy explains what we collect, why we use it, and the choices you have.",
     sections: [
@@ -56,7 +56,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
       },
       {
         title: "Information created when you use BibleQuest",
-        body: `Without an account, app data is stored in your browser on your device. ${ACCOUNT_STORAGE_COPY} We may also receive limited technical information needed to authenticate you, prevent abuse, deliver requested passages, complete a purchase or donation, and keep the service reliable. ${ACCOUNT_SECURITY_COPY}`,
+        body: `Without an account, app data is stored in your browser on your device. ${ACCOUNT_STORAGE_COPY} We may also receive limited technical information needed to authenticate you, prevent abuse, deliver requested passages, complete a purchase or one-time support payment, and keep the service reliable. ${ACCOUNT_SECURITY_COPY}`,
       },
       {
         title: "How we use information",
@@ -71,7 +71,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
       {
         title: "Service providers",
         body:
-          "We use service providers only for defined tasks: Supabase for authentication and protected account storage; Vercel for hosting and operational delivery; Plausible for optional analytics; RevenueCat and Stripe for optional purchases or donations; Tally for the temporary waitlist; and reviewed Bible providers for requested online editions. Providers process information under their own terms and privacy notices. Bible requests do not include your prayers, reflections, name, or BibleQuest account ID.",
+          "We use service providers only for defined tasks: Supabase for authentication and protected account storage; Vercel for hosting and operational delivery; Plausible for optional analytics; Stripe for optional subscriptions and one-time support payments; Tally for the temporary waitlist; and reviewed Bible providers for requested online editions. Stripe receives the payment and contact details needed to run Checkout, subscriptions, receipts, refunds, and disputes; BibleQuest does not receive full card numbers. Providers process information under their own terms and privacy notices. Bible requests do not include your prayers, reflections, name, or BibleQuest account ID.",
       },
       {
         title: "Online Bible editions",
@@ -81,7 +81,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
       {
         title: "How long information is kept",
         body:
-          "Device-only data remains until you clear it, remove the app’s browser storage, or lose access to that device. Account and support records remain while needed to provide the service, resolve a request, protect against abuse, or meet legal duties. When deletion is completed, information is removed from active systems; limited copies may remain temporarily in access-restricted backups until they roll off through the provider’s normal backup cycle.",
+          "Device-only data remains until you clear it, remove the app’s browser storage, or lose access to that device. Account and support records remain while needed to provide the service, resolve a request, protect against abuse, or meet legal duties. Payment, invoice, refund, and dispute records may remain after account deletion when needed for accounting, fraud prevention, legal retention, or resolving a transaction; BibleQuest detaches unnecessary application ownership where practical. When other deletion is completed, limited copies may remain temporarily in access-restricted backups until they roll off through the provider’s normal backup cycle.",
       },
       {
         title: "Your choices and rights",
@@ -133,7 +133,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
   terms: {
     eyebrow: "Terms",
     title: "Terms of Use",
-    effectiveDate: "July 23, 2026",
+    effectiveDate: "July 24, 2026",
     intro:
       "These Terms of Use are an agreement between you and Winterhill Studio for your use of BibleQuest.",
     sections: [
@@ -178,9 +178,9 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
           "BibleQuest bundles the public-domain World English Bible and identifies other editions, sources, licenses, and fallbacks in context. Third-party Bible, authentication, payment, and form services have their own terms. A link or integration does not mean BibleQuest controls or endorses everything on that service.",
       },
       {
-        title: "Plus, purchases, and donations",
+        title: "Plus subscriptions and one-time support",
         body:
-          "The core BibleQuest experience is free. If Plus or another paid feature becomes available, the purchase screen will show the price, billing period, renewal terms, and cancellation method before you pay. Payment providers may handle billing and refunds under their terms and applicable law. Donations are voluntary, do not purchase spiritual standing, and do not create a Plus membership.",
+          "The core BibleQuest experience is free. If Plus becomes available, Checkout shows the price and billing period before confirmation. A monthly or annual Plus subscription renews automatically at the then-disclosed price each period until canceled. You may cancel through the Stripe billing portal; cancellation normally stops the next renewal and access continues through the already-paid period unless Stripe states otherwise. Except where applicable law requires a refund, subscription charges are not automatically refundable; contact support promptly and we will review a request based on the transaction and applicable law. A one-time “Support BibleQuest” payment is separate, voluntary, non-recurring, not tax-deductible, provides no Plus or spiritual benefit, and is subject to the same legally required rights and stated refund path.",
       },
       {
         title: "Availability and changes",
