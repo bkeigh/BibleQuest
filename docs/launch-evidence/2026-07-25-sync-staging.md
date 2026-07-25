@@ -33,10 +33,12 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
 - Google is enabled with the existing BibleQuest OAuth client.
 - Google OAuth allows the staging callback
   `https://yjwlunqssyztxkedstjb.supabase.co/auth/v1/callback`.
-- Custom SMTP remains the only provider blocker. Required settings are
-  `hello@auth.biblequest.co`, sender `BibleQuest`, host `smtp.resend.com`, port
-  `465`, username `resend`, and a fresh Resend sending-only API key as the
-  password.
+- Custom SMTP is enabled with `hello@auth.biblequest.co`, sender
+  `BibleQuest`, host `smtp.resend.com`, port `465`, minimum interval `1`, and
+  username `resend`.
+- The SMTP password is a fresh Resend sending-only key restricted to
+  `auth.biblequest.co`; it was transferred directly between provider
+  dashboards and was not logged or committed.
 
 ## Stripe sandbox
 
@@ -82,8 +84,11 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
   surfaces.
 - Google OAuth used the staging Supabase callback and returned to the stable
   Preview `/onboarding` route with a signed-in session.
+- A Gmail sign-in code was accepted by Resend, reported `delivered`, arrived in
+  Gmail with the reviewed sender/subject, and created a signed-in session.
 - One non-sensitive onboarding quest remained present after a full reload,
-  providing a basic signed-in sync persistence check.
+  Google sign-in, and email-code sign-in, providing a basic signed-in sync
+  persistence check.
 - Settings showed `Signed in`, the avatar control, and the ready
   `Enable gentle reminders` control with no console errors.
 - Monthly, annual, and lifetime controls each opened Stripe-hosted Sandbox
@@ -95,7 +100,6 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
 
 ## Remaining gates
 
-- Configure staging custom SMTP with a fresh Resend sending-only key.
-- Complete real Gmail and iCloud email-code/link delivery.
+- Complete iCloud email-code/link delivery with a disposable test address.
 - Complete avatar upload/replace/delete after browser file upload is enabled.
 - Complete the second-account isolation, physical-device push, and PWA matrix.
