@@ -19,6 +19,7 @@ with expected (table_name, classification) as (
     ('profiles', 'user-owned'),
     ('user_settings', 'user-owned'),
     ('user_daily_quests', 'user-owned'),
+    ('user_daily_quest_days', 'user-owned'),
     ('user_quests', 'user-owned'),
     ('quest_completions', 'user-owned'),
     ('prayers', 'user-owned'),
@@ -81,8 +82,8 @@ where tables.schemaname = 'public'
 group by tables.tablename
 order by tables.tablename;
 
--- 4. purge_user_data must be SECURITY DEFINER, have an empty fixed
--- search_path, and be executable by authenticated only (not anon/public).
+-- 4. Security-definer account functions must have an empty fixed search_path
+-- and the exact intended API-role execution posture.
 select
   procedure.proname as function_name,
   procedure.prosecdef as security_definer,
@@ -97,8 +98,12 @@ from pg_catalog.pg_proc as procedure
 join pg_catalog.pg_namespace as namespace
   on namespace.oid = procedure.pronamespace
 where namespace.nspname = 'public'
-  and procedure.proname = 'purge_user_data'
-  and pg_catalog.pg_get_function_identity_arguments(procedure.oid) = '';
+  and procedure.proname in (
+    'purge_user_data',
+    'replace_user_daily_quests',
+    'bump_daily_quest_revision_for_legacy_write'
+  )
+order by procedure.proname;
 
 -- 5. Effective table grants for API roles. Expected: anon SELECT on public
 -- content only; authenticated least-privilege access matching its policies;
@@ -113,16 +118,24 @@ where table_schema = 'public'
 group by grantee, table_name
 order by table_name, grantee;
 
--- 6. Same-passage recent-verse updates must be guarded by the non-callable
--- trigger that preserves the entire row with the newest viewed_at timestamp.
+-- 6. Internal triggers preserve newest recent verses and expose old-client
+-- daily-quest writes to CAS revisions. Definitions contain no application rows.
 select
   trigger.tgname as trigger_name,
   trigger.tgenabled as enabled,
   pg_catalog.pg_get_triggerdef(trigger.oid, true) as definition
 from pg_catalog.pg_trigger as trigger
-where trigger.tgrelid = 'public.user_recent_verses'::regclass
+join pg_catalog.pg_class as table_class
+  on table_class.oid = trigger.tgrelid
+join pg_catalog.pg_namespace as table_namespace
+  on table_namespace.oid = table_class.relnamespace
+where table_namespace.nspname = 'public'
+  and table_class.relname in (
+    'user_recent_verses',
+    'user_daily_quests'
+  )
   and not trigger.tgisinternal
-order by trigger.tgname;
+order by table_class.relname, trigger.tgname;
 
 select
   procedure.proname as function_name,
@@ -138,5 +151,22 @@ from pg_catalog.pg_proc as procedure
 join pg_catalog.pg_namespace as namespace
   on namespace.oid = procedure.pronamespace
 where namespace.nspname = 'public'
-  and procedure.proname = 'keep_newest_recent_verse'
-  and pg_catalog.pg_get_function_identity_arguments(procedure.oid) = '';
+  and procedure.proname in (
+    'keep_newest_recent_verse',
+    'bump_daily_quest_revision_for_legacy_write'
+  )
+  and pg_catalog.pg_get_function_identity_arguments(procedure.oid) = ''
+order by procedure.proname;
+
+-- 7. The revision table intentionally exposes only the day and opaque
+-- revision to authenticated clients; the raw owner column remains hidden.
+select
+  grantee,
+  table_name,
+  column_name,
+  privilege_type
+from information_schema.column_privileges
+where table_schema = 'public'
+  and table_name = 'user_daily_quest_days'
+  and grantee in ('anon', 'authenticated', 'service_role')
+order by grantee, column_name, privilege_type;

@@ -80,6 +80,8 @@ jobs:
         run: pnpm exec tsc --noEmit
       - name: Run noninteractive tests
         run: pnpm test
+      - name: Verify sanitized launch evidence command
+        run: pnpm test:launch-evidence
 
   production-build:
     name: Production build

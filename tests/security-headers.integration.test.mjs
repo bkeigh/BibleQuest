@@ -18,6 +18,7 @@ const approvedFrameAncestors = [
   "https://www.winterhill.studio",
 ];
 const isolatedDevDistDir = ".next-header-test";
+const incrementalTypeCache = "tsconfig.tsbuildinfo";
 
 function parseCsp(value) {
   const directives = new Map();
@@ -167,7 +168,10 @@ async function withNextServer(command, callback) {
   } finally {
     await stop(child);
     if (command === "dev") {
+      // The isolated Next dev run records ephemeral generated types in the
+      // shared incremental cache; remove both so a later build starts cleanly.
       rmSync(join(root, isolatedDevDistDir), { recursive: true, force: true });
+      rmSync(join(root, incrementalTypeCache), { force: true });
     }
   }
 }

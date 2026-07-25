@@ -10,6 +10,10 @@ import type { User } from "@supabase/supabase-js";
 import { createClient, isSupabaseConfigured } from "./client";
 import { track } from "@/lib/analytics/events";
 import {
+  classifyOperationalError,
+  reportClientSignal,
+} from "@/lib/observability/client-signals";
+import {
   authEventCompletesSignIn,
   consumeAuthCompletionSignal,
 } from "@/lib/auth/completion-signal";
@@ -44,7 +48,15 @@ interface SessionState {
 function trackCompletedSignIn(userId: string) {
   if (signInTracked) return;
   signInTracked = true;
-  if (firstTabToTrack(userId)) track("sign_in_completed");
+  if (firstTabToTrack(userId)) {
+    track("sign_in_completed");
+    reportClientSignal({
+      surface: "auth",
+      stage: "session",
+      outcome: "success",
+      category: "ok",
+    });
+  }
 }
 
 /**
@@ -61,14 +73,35 @@ export function useSession(): SessionState {
     const supabase = createClient();
     let active = true;
 
-    supabase.auth.getUser().then(({ data }) => {
-      if (!active) return;
-      if (data.user && consumeAuthCompletionSignal()) {
-        trackCompletedSignIn(data.user.id);
-      }
-      setUser(data.user ?? null);
-      setLoading(false);
-    });
+    void supabase.auth
+      .getUser()
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          reportClientSignal({
+            surface: "auth",
+            stage: "session",
+            outcome: "failure",
+            category: classifyOperationalError(error),
+          });
+        }
+        if (data.user && consumeAuthCompletionSignal()) {
+          trackCompletedSignIn(data.user.id);
+        }
+        setUser(data.user ?? null);
+        setLoading(false);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        reportClientSignal({
+          surface: "auth",
+          stage: "session",
+          outcome: "failure",
+          category: classifyOperationalError(error),
+        });
+        setUser(null);
+        setLoading(false);
+      });
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       // Server callback round trips restore as INITIAL_SESSION, while in-page

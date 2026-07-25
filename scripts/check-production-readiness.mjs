@@ -15,6 +15,19 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
+const JSON_OUTPUT = process.argv.includes("--json");
+const observations = [];
+let healthEvidence = null;
+let canonicalEvidence = false;
+const schemaEvidence = [];
+const contentEvidence = [];
+const authEvidence = {
+  settings_reachable: false,
+  email_enabled: false,
+  google_enabled: false,
+  phone_disabled: false,
+};
+
 const seedManifest = JSON.parse(
   readFileSync(
     new URL("../supabase/seed-manifest.json", import.meta.url),
@@ -78,6 +91,16 @@ const REQUIRED_SCHEMA = [
     select: "translation_key",
     migration: "0011",
   },
+  {
+    table: "journey_events",
+    select: "date_key,source_id",
+    migration: "0014",
+  },
+  {
+    table: "user_daily_quest_days",
+    select: "assigned_date,revision",
+    migration: "0015",
+  },
 ];
 
 const supabaseUrlValue = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
@@ -120,8 +143,65 @@ if (!publishableKey) {
 
 function result(ok, label, detail) {
   const line = `${ok ? "PASS" : "FAIL"}  ${label}${detail ? ` — ${detail}` : ""}`;
-  console.log(line);
+  observations.push({ ok, label });
+  if (!JSON_OUTPUT) console.log(line);
   if (!ok) failures.push(`${label}${detail ? `: ${detail}` : ""}`);
+}
+
+/** Maps request failures to fixed evidence categories without echoing URLs. */
+function safeRequestFailure(error) {
+  if (error && typeof error === "object") {
+    const name = typeof error.name === "string" ? error.name : "";
+    if (name === "TimeoutError" || name === "AbortError") return "timeout";
+  }
+  return "request failed";
+}
+
+/** Accepts only short provider codes that cannot carry free-form content. */
+function safeProviderCode(value, status) {
+  return typeof value === "string" && /^[A-Z0-9_]{1,16}$/i.test(value)
+    ? value
+    : `HTTP ${status}`;
+}
+
+/** Reconstructs the bounded public health contract for evidence output. */
+function safeHealthBody(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const candidate = value;
+  const sha = (item) =>
+    item === null ||
+    (typeof item === "string" && /^[a-f0-9]{40}$/i.test(item));
+  if (
+    candidate.status !== "ok" ||
+    candidate.app !== "biblequest" ||
+    candidate.contract !== "biblequest_observability_v1" ||
+    !sha(candidate.release_sha) ||
+    !sha(candidate.rollback_sha) ||
+    candidate.canonical_origin !== "https://www.biblequest.co" ||
+    typeof candidate.canonical_origin_matches !== "boolean" ||
+    !["configured", "guest-only", "invalid"].includes(candidate.auth_posture) ||
+    !["configured", "disabled", "invalid"].includes(candidate.analytics_posture) ||
+    candidate.schema_contract !== "0015" ||
+    candidate.content_contract !== "seed-manifest-v1" ||
+    !/^biblequest-v\d{1,4}$/.test(candidate.service_worker_version) ||
+    !["coming-soon", "sandbox", "live", "invalid"].includes(
+      candidate.billing_mode,
+    )
+  ) {
+    return null;
+  }
+  return {
+    release_sha: candidate.release_sha,
+    rollback_sha: candidate.rollback_sha,
+    canonical_origin: candidate.canonical_origin,
+    canonical_origin_matches: candidate.canonical_origin_matches,
+    auth_posture: candidate.auth_posture,
+    analytics_posture: candidate.analytics_posture,
+    schema_contract: candidate.schema_contract,
+    content_contract: candidate.content_contract,
+    service_worker_version: candidate.service_worker_version,
+    billing_mode: candidate.billing_mode,
+  };
 }
 
 async function jsonBody(response) {
@@ -171,16 +251,17 @@ async function checkHealth() {
     });
     const body = await jsonBody(response);
     const finalUrl = new URL(response.url);
+    const safeBody = safeHealthBody(body);
+    const ok =
+      response.ok && finalUrl.origin === appUrl.origin && safeBody !== null;
+    healthEvidence = ok ? safeBody : null;
     result(
-      response.ok &&
-        finalUrl.origin === appUrl.origin &&
-        body?.status === "ok" &&
-        body?.app === "biblequest",
+      ok,
       "deployed health endpoint",
-      response.ok ? `${response.status} ${body?.status ?? "invalid body"}` : `HTTP ${response.status}`,
+      response.ok ? `${response.status} ${safeBody ? "valid contract" : "invalid body"}` : `HTTP ${response.status}`,
     );
   } catch (error) {
-    result(false, "deployed health endpoint", error instanceof Error ? error.message : "request failed");
+    result(false, "deployed health endpoint", safeRequestFailure(error));
   }
 }
 
@@ -208,6 +289,7 @@ async function checkCanonicalMetadata() {
       finalUrl.origin === appUrl.origin &&
       normalizedOgUrl === appUrl.origin &&
       normalizedCanonicalUrl === appUrl.origin;
+    canonicalEvidence = ok;
     result(
       ok,
       "canonical production metadata",
@@ -219,7 +301,7 @@ async function checkCanonicalMetadata() {
     result(
       false,
       "canonical production metadata",
-      error instanceof Error ? error.message : "request failed",
+      safeRequestFailure(error),
     );
   }
 }
@@ -236,16 +318,26 @@ async function checkSchema() {
       // is resolved. PostgreSQL 42501 therefore proves the named relation and
       // selected columns exist without weakening RLS or reading a user row.
       const present = response.ok || code === "42501";
+      schemaEvidence.push({
+        contract: `${check.table}.${check.select}`,
+        migration: check.migration,
+        ok: present,
+      });
       const detail = present
         ? `selected ${check.migration} schema contract resolves`
-        : `${code ?? `HTTP ${response.status}`} (requires migration ${check.migration})`;
+        : `${safeProviderCode(code, response.status)} (requires migration ${check.migration})`;
       result(present, `${check.table}.${check.select}`, detail);
     } catch (error) {
       result(
         false,
         `${check.table}.${check.select}`,
-        error instanceof Error ? error.message : "request failed",
+        safeRequestFailure(error),
       );
+      schemaEvidence.push({
+        contract: `${check.table}.${check.select}`,
+        migration: check.migration,
+        ok: false,
+      });
     }
   }
 }
@@ -315,14 +407,16 @@ async function checkContent() {
             duplicates ? `${duplicates} duplicate keys` : null,
             blankScripture ? `${blankScripture} blank Scripture snapshots` : null,
           ].filter(Boolean).join("; ")
-        : `${body?.code ?? `HTTP ${response.status}`}`;
+        : safeProviderCode(body?.code, response.status);
+      contentEvidence.push({ table: check.table, ok });
       result(ok, check.label, detail);
     } catch (error) {
       result(
         false,
         check.label,
-        error instanceof Error ? error.message : "request failed",
+        safeRequestFailure(error),
       );
+      contentEvidence.push({ table: check.table, ok: false });
     }
   }
 
@@ -347,14 +441,21 @@ async function checkContent() {
     result(
       response.ok && count === 0,
       "active approved premium quests",
-      response.ok ? `${count ?? "unknown"}/0` : `${body?.code ?? `HTTP ${response.status}`}`,
+      response.ok
+        ? `${count ?? "unknown"}/0`
+        : safeProviderCode(body?.code, response.status),
     );
+    contentEvidence.push({
+      table: "premium_quest_posture",
+      ok: response.ok && count === 0,
+    });
   } catch (error) {
     result(
       false,
       "active approved premium quests",
-      error instanceof Error ? error.message : "request failed",
+      safeRequestFailure(error),
     );
+    contentEvidence.push({ table: "premium_quest_posture", ok: false });
   }
 }
 
@@ -368,6 +469,10 @@ async function checkAuthMethods() {
     }
 
     const providers = body.external ?? {};
+    authEvidence.settings_reachable = true;
+    authEvidence.email_enabled = providers.email === true;
+    authEvidence.google_enabled = providers.google === true;
+    authEvidence.phone_disabled = providers.phone !== true;
     result(
       providers.email === true,
       "email provider enabled (delivery manual)",
@@ -384,12 +489,12 @@ async function checkAuthMethods() {
     result(
       false,
       "auth provider configuration",
-      error instanceof Error ? error.message : "request failed",
+      safeRequestFailure(error),
     );
   }
 }
 
-console.log("BibleQuest production readiness (read-only)\n");
+if (!JSON_OUTPUT) console.log("BibleQuest production readiness (read-only)\n");
 
 if (failures.length === 0) {
   await checkHealth();
@@ -398,16 +503,45 @@ if (failures.length === 0) {
   await checkContent();
   await checkAuthMethods();
 } else {
-  for (const failure of failures) console.log(`FAIL  configuration — ${failure}`);
+  if (!JSON_OUTPUT) {
+    for (const failure of failures) console.log(`FAIL  configuration — ${failure}`);
+  }
 }
 
-console.log(
-  "\nManual gates not covered: migration history, backup/restore, SMTP delivery, signed two-user RLS isolation, account purge, offline reconnect, and device QA.",
-);
-
-if (failures.length > 0) {
-  console.log(`\nProduction readiness failed (${failures.length} check${failures.length === 1 ? "" : "s"}).`);
-  process.exitCode = 1;
+if (JSON_OUTPUT) {
+  console.log(
+    JSON.stringify({
+      contract: "biblequest_readiness_v1",
+      ok: failures.length === 0,
+      external_health: { ok: healthEvidence !== null, release: healthEvidence },
+      canonical_metadata: { ok: canonicalEvidence },
+      schema_parity: {
+        ok:
+          schemaEvidence.length === REQUIRED_SCHEMA.length &&
+          schemaEvidence.every((check) => check.ok),
+        checks: schemaEvidence,
+      },
+      content_parity: {
+        ok:
+          contentEvidence.length === EXPECTED_CONTENT.length + 1 &&
+          contentEvidence.every((check) => check.ok),
+        checks: contentEvidence,
+      },
+      auth_providers: authEvidence,
+      check_count: observations.length,
+      failed_check_count: observations.filter((item) => !item.ok).length,
+    }),
+  );
 } else {
-  console.log("\nProduction compatibility checks passed.");
+  console.log(
+    "\nManual gates not covered: migration history, backup/restore, SMTP delivery, signed two-user RLS isolation, account purge, offline reconnect, and device QA.",
+  );
+
+  if (failures.length > 0) {
+    console.log(`\nProduction readiness failed (${failures.length} check${failures.length === 1 ? "" : "s"}).`);
+  } else {
+    console.log("\nProduction compatibility checks passed.");
+  }
 }
+
+if (failures.length > 0) process.exitCode = 1;

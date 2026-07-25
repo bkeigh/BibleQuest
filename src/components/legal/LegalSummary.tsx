@@ -38,9 +38,9 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
           "BibleQuest sends allowlisted event names and small bounded values directly to Plausible. URLs are reduced to safe route shapes and requests send no referrer. Turning analytics off clears pending events. Browser Do Not Track and Global Privacy Control are respected.",
       },
       {
-        title: "If you join the waitlist",
+        title: "If you join the newsletter",
         body:
-          "The name and email address you choose to submit go directly to Tally, which hosts the temporary pre-launch form. The form does not ask for prayers, reflections, or other spiritual journal content.",
+          "The name and email address you choose to submit go directly to Tally, which hosts the BibleQuest newsletter form. The form does not ask for prayers, reflections, or other spiritual journal content.",
       },
       {
         title: "Online Bible editions",

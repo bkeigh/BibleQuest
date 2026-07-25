@@ -1,10 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { IconArrowRight } from "@/components/design-system/icons";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
-import { cn } from "@/lib/utils/cn";
 import { usePlus } from "@/lib/revenuecat/usePlus";
+import { PlusInvitationLink } from "./PlusInvitationLink";
 
 interface ExplorePlusLinkProps {
   className?: string;
@@ -21,29 +18,11 @@ export function ExplorePlusLink({
   const { isPlus } = usePlus();
 
   return (
-    <Link
+    <PlusInvitationLink
+      title={isPlus ? "Plus is active" : "Explore Plus"}
+      description={isPlus ? memberDescription : description}
       href="/app/plus"
-      className={cn(
-        "group relative isolate flex min-h-[4.75rem] items-center gap-3 overflow-hidden rounded-[var(--radius-card)] border border-gold-700/45 bg-[linear-gradient(135deg,var(--color-gold-300),var(--color-gold-500))] px-4 py-3 text-[#2c2618] paper-shadow-lg transition-all duration-300 [transition-timing-function:var(--ease-gentle)] hover:-translate-y-0.5 hover:brightness-[1.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0",
-        className,
-      )}
-    >
-      <span
-        aria-hidden="true"
-        className="ambient absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/25 blur-2xl [animation:var(--animate-twinkle)]"
-      />
-      <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-white/20 ring-1 ring-[#2c2618]/15">
-        <PixelIcon name="crown" size={4} />
-      </span>
-      <span className="relative min-w-0 flex-1">
-        <span className="block font-display text-[1.125rem] leading-tight">
-          {isPlus ? "Plus is active" : "Explore Plus"}
-        </span>
-        <span className="mt-1 block text-caption leading-snug text-[#2c2618]/75">
-          {isPlus ? memberDescription : description}
-        </span>
-      </span>
-      <IconArrowRight className="relative shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
-    </Link>
+      className={className}
+    />
   );
 }

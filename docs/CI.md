@@ -14,7 +14,7 @@ guest mode with analytics, payments, and Supabase integrations disabled.
 | Check | Commands | Policy |
 | --- | --- | --- |
 | `Quality` | `pnpm lint`, `pnpm check:seed`, `git diff --check` over the event changes and working tree | Blocks lint, stale generated Console content, and whitespace errors. |
-| `Types and tests` | `pnpm exec tsc --noEmit`, `pnpm test` | Blocks type errors and test failures. Tests run noninteractively. |
+| `Types and tests` | `pnpm exec tsc --noEmit`, `pnpm test`, `pnpm test:launch-evidence` | Blocks type/test failures and verifies the sanitized evidence command plus alert thresholds with fixtures. Tests run noninteractively. |
 | `Production build` | `pnpm build` | Blocks a guest-mode production build failure; times out after 20 minutes. |
 | `Dependency risk` | `pnpm audit --prod`, then `pnpm audit --prod --audit-level high` | Reports every production advisory. High and critical advisories block CI; moderate advisories stay visible for triage without blocking. |
 

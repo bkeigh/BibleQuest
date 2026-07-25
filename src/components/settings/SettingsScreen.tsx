@@ -23,6 +23,8 @@ import { createExportSnapshot } from "@/lib/questos/snapshot";
 import { clearAllDeviceLocalJournalDrafts } from "@/lib/questos/journal-drafts";
 import { clearLastSyncedUserId } from "@/lib/sync/last-user";
 import { useSession } from "@/lib/supabase/useSession";
+import { createClient } from "@/lib/supabase/client";
+import { track } from "@/lib/analytics/events";
 import type { QuestOSSnapshot } from "@/lib/questos/types";
 import { useStrings, LANGUAGES, languageMeta, fmt } from "@/lib/i18n";
 import { IconCheck, IconChevronRight } from "@/components/design-system/icons";
@@ -696,6 +698,7 @@ function SettingsInner() {
   const store = useQuestOS;
 
   const [confirmClear, setConfirmClear] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [pendingImport, setPendingImport] =
@@ -727,6 +730,20 @@ function SettingsInner() {
     if (!trimmed) return;
     updateProfile({ displayName: trimmed });
     setEditingName(false);
+  }
+
+  // Logs out without removing the journey that remains stored on this device.
+  async function logOut() {
+    setSigningOut(true);
+    const { error } = await createClient().auth.signOut();
+    if (error) {
+      setSigningOut(false);
+      toast("Couldn’t log out just now. Check your connection and retry.");
+      return;
+    }
+    track("sign_out");
+    toast("Logged out. Your journey stays on this device.");
+    router.refresh();
   }
 
   async function onPhotoPicked(e: React.ChangeEvent<HTMLInputElement>) {
@@ -924,7 +941,26 @@ function SettingsInner() {
               <IconChevronRight size={15} />
             </span>
           </Link>
+          {user && (
+            <div className="border-t border-mist/70 px-4 py-3">
+              <GentleButton
+                variant="outline"
+                size="sm"
+                fullWidth
+                disabled={signingOut}
+                onClick={() => void logOut()}
+              >
+                {signingOut ? "Logging out…" : "Log out"}
+              </GentleButton>
+            </div>
+          )}
         </PaperCard>
+
+        <SectionTitle>Plus</SectionTitle>
+        <div className="space-y-3">
+          <ExplorePlusLink description="Discover the full wallpaper collection and extra ways to deepen your daily practice." />
+          <DonationLink />
+        </div>
 
         {/* Always visible — text size and bold text are comfort settings
             people shouldn't have to hunt for behind a disclosure. */}
@@ -1165,12 +1201,6 @@ function SettingsInner() {
             </ul>
           </Disclosure>
         </DisclosureGroup>
-
-        <SectionTitle>Plus</SectionTitle>
-        <div className="space-y-3">
-          <ExplorePlusLink description="Discover the full wallpaper collection and extra ways to deepen your daily practice." />
-          <DonationLink />
-        </div>
 
         {/* Danger zone — plain, calm, confirmed */}
         <SectionTitle>Start over</SectionTitle>

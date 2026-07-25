@@ -13,7 +13,7 @@ import { parseRevenueCatConfiguration } from "./src/lib/revenuecat/config";
  *   - Plausible Events API       → configured HTTPS origin, when enabled
  *   - RevenueCat SDK/paywall origins → only in explicit sandbox/live mode
  *   - Stripe origins → only in explicit live mode
- *   - Tally waitlist widget + iframe → exact HTTPS origin during pre-launch
+ *   - Tally newsletter widget + iframe → exact HTTPS origin
  *   - Fonts (Fraunces, Inter via next/font; Ithaca local) → self (all self-hosted)
  *   - Icons / OG image / next/image (local) → self
  *   - Avatars (URL.createObjectURL) → blob:; noise SVG background → data:

@@ -208,6 +208,57 @@ two-user negative test, Clear My Data, and offline/reconnect sync on staging.
 If any migration fails, stop. Do not edit an already-applied migration or reset
 production. Correct a verified defect with a new higher-numbered migration.
 
+### Transactional daily-quest rollout (`0015`)
+
+`0015_transactional_daily_quest_sync.sql` is a separate forward-only schema
+change after the authoritative `0014_journey_event_identity.sql`. It adds an owner-RLS revision table, an
+authenticated compare-and-swap RPC, a legacy-write revision trigger, and an
+updated `purge_user_data`. It does not seed content or read prayer, reflection,
+bookmark, recent-verse, or profile rows.
+
+Roll out the compatible web bundle first. Before `0015` exists, that bundle
+falls back only when PostgREST reports the exact revision table or RPC missing;
+all policy, permission, and malformed-response errors still stop sync. After
+`0015`, old cached bundles may continue their owner-RLS direct writes, and the
+trigger makes each affected day visible to new clients as a revision change.
+The recorded rollback deployment must retain that direct-write compatibility.
+
+Required local and staging evidence:
+
+```bash
+supabase db reset
+supabase test db --local supabase/tests/0014_journey_event_identity.sql
+supabase test db --local supabase/tests/0015_daily_quest_cas.sql
+supabase db lint --local --schema public --level warning --fail-on warning
+docker exec -i supabase_db_BibleQuest \
+  psql -U postgres -d postgres -v ON_ERROR_STOP=1 -P pager=off \
+  < supabase/evidence/rls_policy_report.sql
+```
+
+On staging, require the same migration-history safeguards as above, then prove:
+
+1. Two devices starting from the same revision produce one bounded conflict;
+   the merged retry retains both unfinished picks and every completed pick.
+2. A stale revision and an injected post-delete failure leave canonical rows
+   and the revision unchanged.
+3. Replaying the same request UUID after a lost response does not duplicate a
+   row or advance the revision twice.
+4. An empty day removes unfinished picks, never removes completed history, and
+   `purge_user_data` removes the empty-day revision metadata.
+5. Accounts A and B cannot read each other’s revision or assignment rows or
+   perform either-direction CRUD; anonymous execution is denied.
+6. A fully closed/reopened cached PWA on the previous bundle can still pick and
+   unpick, and a fully closed/reopened current PWA detects that legacy change.
+
+Production remains a hard no-go until the compatibility SHA is live, SMTP and
+the signed restore bridge have been retested, a current backup/PITR point and
+isolated restore rehearsal are accepted, staging passes the matrix above, and
+the production dry run proposes exactly the independently reviewed pending
+set. Stop on any project, history, schema, backup, restore, RLS, conflict,
+resurrection, or data-loss disagreement. Applying `0015` is a production write
+and requires a fresh explicit approval; never combine it with the canonical
+content seed, `--include-all`, reset, or migration repair.
+
 ## Founder action 4 — reconcile the content mirror
 
 The runtime app currently reads reviewed content bundled in the repository;
@@ -312,13 +363,12 @@ migration-history evidence, or signed two-user tests.
 7. Retest the original iPhone path from Mail into Safari/PWA. The restore screen
    must not recur, and no private text may appear in logs or screenshots.
 
-The compatibility release removes the immediate restore blocker, but daily
-assignment replacement is still a delete-then-insert client operation. A
-network interruption is recoverable through retry, yet simultaneous edits from
-two devices remain last-writer-wins and are not a public-launch guarantee. Keep
-account sync in a controlled beta until that write becomes one transactional
-server operation with conflict/revision protection; include concurrent-device
-quest-pick/unpick cases in its acceptance test.
+The current source replaces daily assignments through the transactional `0015`
+RPC with an opaque per-day revision and idempotent request UUID. That source
+change is not production evidence. Keep account sync in a controlled beta until
+the compatibility release is deployed, staging and production both show
+`0015` in migration history, the CAS/RLS evidence passes, and the complete
+concurrent-device pick/unpick/completion/cached-client matrix is accepted.
 
 Only then mark account sync **green** in the launch Console. SMTP delivery,
 schema compatibility, and cross-account isolation are three separate gates;

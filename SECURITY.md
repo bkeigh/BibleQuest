@@ -94,7 +94,7 @@ business reason, and both allowed- and denied-origin browser tests.
 | `connect-src` | The validated HTTPS `NEXT_PUBLIC_PLAUSIBLE_HOST` origin | Consent-gated event POSTs in `src/lib/analytics/events.ts`; absent when analytics/domain/host validation is not enabled. Default is `https://plausible.io`. |
 | `connect-src` | `https://api.revenuecat.com` | Installed `@revenuecat/purchases-js` endpoint for offerings, customer info, and checkout. |
 | `connect-src` | `https://e.revenue.cat` | Installed RevenueCat SDK/paywall event endpoint. |
-| `script-src`, `frame-src` | `https://tally.so` | Temporary pre-launch waitlist widget and its dynamically sized form iframe on the public homepage; remove both sources with `WaitlistGate` at launch. |
+| `script-src`, `frame-src` | `https://tally.so` | Newsletter widget and its dynamically sized form iframe on the public homepage. |
 | `script-src`, `frame-src` | `https://js.stripe.com`, `https://*.js.stripe.com` | Stripe.js and Stripe child frames loaded by RevenueCat Web Billing. |
 | `connect-src` | `https://api.stripe.com` | Stripe.js API transport during RevenueCat checkout. |
 | `frame-src` | `https://hooks.stripe.com` | Stripe redirect and 3DS frames. |

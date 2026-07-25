@@ -111,6 +111,18 @@ Important safeguards:
 - Prayer and reflection rows are protected by Supabase RLS.
 - A failed initial pull never falls through to a blind push.
 - Account purge and restore operations rebuild the remote copy deliberately.
+- `daily-quests.ts` replaces each changed assignment day through the
+  authenticated `replace_user_daily_quests` RPC. The client observes an opaque
+  per-day revision before pulling rows, reuses a request UUID after network
+  failure, and merges a bounded stale-revision response before retrying.
+- Migration `0015_transactional_daily_quest_sync.sql` owns the row lock,
+  compare-and-swap, atomic delete/insert, completed-row preservation, and
+  revision advance. It derives ownership from `auth.uid()`; no service role or
+  caller-supplied owner reaches browser code.
+- Cached pre-`0015` bundles keep their owner-RLS direct writes during rollout.
+  A database trigger advances the opaque revision for those legacy writes, and
+  the new bundle falls back to its prior path only for exact missing-table/RPC
+  errors. Permission, policy, and malformed-response errors fail closed.
 
 `mapping.ts` is the only translation layer between QuestOS objects and database
 rows. Keep conversions symmetric and update both directions together.
@@ -183,7 +195,8 @@ When the worker policy changes, increment `CACHE_VERSION` and update
 | `/app/plus` | Plus status, purchase, and customer-management entry points. |
 | `/app/settings` | Preferences, language, accessibility, consent, export/import, and reset. |
 | `/offline` | Honest fallback when a safe cached route is unavailable. |
-| `/api/health` | Minimal deployment health response. |
+| `/api/health` | Bounded deployment/release posture with no secrets or identifiers. |
+| `/api/observability/client` | Same-origin, enum-only browser auth/sync/worker signal ingestion. |
 | `/auth/callback` | Supabase auth completion with redirect validation. |
 
 ## Change recipes

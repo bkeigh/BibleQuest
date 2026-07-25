@@ -3,7 +3,10 @@
 This runbook covers the forward-only reconciliation migration
 `0008_reassert_rls_and_purge.sql` and the rolling quest/recent-verse migration
 `0010_rolling_quest_windows_and_recent_verses.sql`, through the current Bible
-preference/bookmark migration `0011_bible_translation_preference.sql`. It is
+preference/bookmark migration `0011_bible_translation_preference.sql`, the KJV
+default migration `0012_kjv_bible_translation_default.sql`, the authoritative
+Journey identity migration `0014_journey_event_identity.sql`, and transactional
+daily-quest migration `0015_transactional_daily_quest_sync.sql`. It is
 deliberately local/staging-first. Do not run any linked or remote command until
 the project reference and exact command have been reviewed and explicitly
 approved.
@@ -27,6 +30,14 @@ The repository timeline is:
 | 2026-07-16 | later local change | Adds `0009_analytics_consent_opt_in.sql` after the RLS reconciliation. |
 | 2026-07-17 | launch content/lifecycle pass | Adds `0010_rolling_quest_windows_and_recent_verses.sql`: rolling 24-hour quest timestamps, owner-only recent verses, an idempotent daily-passage key, and a complete purge definition. |
 | 2026-07-18 | Bible edition sync pass | Adds `0011_bible_translation_preference.sql`: account-backed Bible preference, bookmark translation key, and translation-aware bookmark uniqueness. |
+| 2026-07-20 | KJV default pass | Adds `0012_kjv_bible_translation_default.sql`: new account settings default to the app's keyless KJV edition; existing choices are unchanged. |
+| 2026-07-21 | Journey identity pass | Adds authoritative `0014_journey_event_identity.sql`: durable Journey source-local dates and source IDs with a cached-client UTC fallback. |
+| 2026-07-21 | Daily-quest CAS pass | Adds forward-only `0015_transactional_daily_quest_sync.sql`: owner-RLS day revisions, authenticated atomic replacement, duplicate-request protection, completed-state preservation, legacy-client revision tracking, and complete purge coverage. |
+
+Version `0013` is intentionally unused in the reconciled source manifest. Do
+not insert or rename a migration below authoritative `0014`; the CAS change
+must remain `0015` even if an earlier local-only database recorded a draft
+`0013`.
 
 If a database recorded an old `0002`, `0003`, or `0004` before the renames,
 the later filenames do not change those recorded versions. Conversely, a
@@ -41,11 +52,11 @@ history rows.
 | Classification | Tables | Intended access |
 | --- | --- | --- |
 | Public content | `faith_providers`, `bible_translations`, `bible_books`, `bible_chapters`, `bible_verses`, `daily_verses`, `quest_templates`, `prayer_prompts`, `reflection_prompts`, `milestones`, `feature_flags` | Anonymous and authenticated `SELECT` only. Reads are limited to active/approved content; disabled feature flags are hidden. No client writes. Prompt tables contain generic seed prompts, not a user's prayer or reflection text. |
-| User-owned | `profiles`, `user_settings`, `user_daily_quests`, `user_quests`, `quest_completions`, `prayers`, `reflections`, `verse_bookmarks`, `user_recent_verses`, `reading_progress`, `chapters_read`, `journey_events`, `growth_events`, `user_milestones`, `notification_preferences` | Authenticated owner only. Most tables allow all owner operations; profiles have no client delete, and journey/growth events have no client update. |
+| User-owned | `profiles`, `user_settings`, `user_daily_quests`, `user_daily_quest_days`, `user_quests`, `quest_completions`, `prayers`, `reflections`, `verse_bookmarks`, `user_recent_verses`, `reading_progress`, `chapters_read`, `journey_events`, `growth_events`, `user_milestones`, `notification_preferences` | Authenticated owner only. Most tables allow all owner operations; profiles have no client delete, journey/growth events have no client update, and `user_daily_quest_days` exposes only `assigned_date`/`revision` SELECT while its authenticated RPC owns writes. |
 | Server-owned | `subscriptions` | Authenticated owner `SELECT` only. Inserts, updates, and deletes require trusted service-role/webhook code. |
 | Internal | None in `public`. Supabase-managed schemas are outside this migration. |
 
-RLS is enabled on all 27 tables. Private prayers, reflections, recent Scripture
+RLS is enabled on all 28 tables. Private prayers, reflections, recent Scripture
 history, notes, and
 journey data have no anonymous policy and every authenticated policy includes
 an `auth.uid()` owner condition.
@@ -59,10 +70,12 @@ commands target the local stack only; do not add `--linked` or `--db-url`.
 supabase start
 supabase db reset
 supabase migration list --local
+supabase test db --local supabase/tests/0014_journey_event_identity.sql
+supabase test db --local supabase/tests/0015_daily_quest_cas.sql
 docker exec -i supabase_db_BibleQuest \
   psql -U postgres -d postgres -v ON_ERROR_STOP=1 -P pager=off \
   < supabase/evidence/rls_policy_report.sql
-supabase db lint --local
+supabase db lint --local --schema public --level warning --fail-on warning
 ```
 
 Expected migration order:
@@ -79,9 +92,12 @@ Expected migration order:
 0009_analytics_consent_opt_in.sql
 0010_rolling_quest_windows_and_recent_verses.sql
 0011_bible_translation_preference.sql
+0012_kjv_bible_translation_default.sql
+0014_journey_event_identity.sql
+0015_transactional_daily_quest_sync.sql
 ```
 
-Evidence must show 27 existing tables with `rowsecurity = true`, only the
+Evidence must show 28 existing tables with `rowsecurity = true`, only the
 documented policy names, no `anon` role on user/server-owned policies, and
 `purge_user_data` as `security_definer = true`, `search_path=""`, anonymous
 execute false, authenticated execute true. Table grants must also match the
@@ -93,6 +109,12 @@ Verify that `user_settings.preferred_bible_translation` and
 `verse_bookmarks.translation_key` exist, and that
 `verse_bookmarks_passage_translation_key` is the active translation-aware
 unique index.
+It must also show that `user_daily_quest_days` exposes only
+`assigned_date`/`revision` to authenticated clients, its owner-only SELECT
+policy is active, `replace_user_daily_quests` is authenticated-only SECURITY
+DEFINER with `search_path=""`, and the non-callable legacy trigger function is
+installed. The 34 database tests must pass without selecting application rows
+into evidence.
 
 ## Two-user negative tests
 
@@ -112,8 +134,11 @@ fixtures using the matching owner's session. Then test:
 6. Repeat the cross-owner checks as B against A to catch asymmetric fixtures or tokens.
 7. For `subscriptions`, both users can select only their own row; all client insert/update/delete attempts fail. Create subscription fixtures only with a trusted staging admin/service-role path.
 8. Put unique sentinel text in A and B prayer/reflection bodies. Confirm neither account can retrieve the other's sentinel in any response, error, log, or evidence output.
-9. Call `purge_user_data()` as A. Confirm all 15 A-owned tables are empty for A, B's rows remain, A's auth account remains, and A's server-owned subscription row remains.
+9. Call `purge_user_data()` as A. Confirm all 16 A-owned tables are empty for A, B's rows remain, A's auth account remains, and A's server-owned subscription row remains.
 10. For one A-owned recent passage, write a newer `viewed_at` and exact text from device B, then replay an older upsert for the same passage from device A. Confirm the whole newer row survives; a genuinely later upsert must still replace it.
+11. Pull A's daily-quest revision and rows on two devices, apply different picks from the same revision, and confirm the stale call returns canonical rows without mutation. Merge/retry and confirm both picks remain.
+12. Replay one daily-quest request UUID and confirm its revision advances once. Unpick an unfinished row and confirm it stays deleted; replay an empty/stale day against a completed row and confirm completion survives.
+13. As A and B, verify `user_daily_quest_days` hides the other owner and disallows direct revision writes. Confirm the RPC ignores caller ownership because no owner argument exists, anonymous execution fails, and Clear My Data removes the owner's revision metadata only.
 
 ## Anonymous-access tests
 
@@ -141,7 +166,7 @@ supabase migration list --linked
 
 Before the real push, save the `migration list` and dry-run output. The dry run
 must propose only the intended pending migration(s), including `0008` when it
-is not already present, and end in the current highest version (`0011`). If it
+is not already present, and end in the current highest version (`0015`). If it
 tries to replay renamed `0002`-`0006`, stop: do not use `--include-all` and do
 not repair history as a shortcut. After the push, run
 `supabase/evidence/rls_policy_report.sql` in the staging SQL editor, then execute
@@ -179,7 +204,12 @@ supabase migration list --linked
 
 `0008` changes policies and a function, `0010` backfills quest timestamps and
 deduplicates daily content before adding its unique key, and `0011` is additive
-apart from replacing bookmark uniqueness with a translation-aware index. The
+apart from replacing bookmark uniqueness with a translation-aware index.
+`0012` changes only the default for new settings rows. `0014` additively
+preserves Journey date/source identity. `0015` is additive except for replacing
+`purge_user_data`; it backfills opaque revisions from
+existing assignment days and installs the authenticated CAS/legacy trigger.
+The
 seed upserts reviewed public content. Rollback is forward-only:
 
 1. If the migration fails, its transaction rolls back; capture the error and do not alter history.

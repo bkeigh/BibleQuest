@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import observability from "../config/observability.json";
 
 const ORIGIN = "https://biblequest.test";
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -23,7 +24,9 @@ type WorkerPolicy = {
 };
 
 type WorkerEvent = {
+  data?: unknown;
   request?: Request;
+  source?: { postMessage: (message: unknown) => void };
   respondWith?: (value: Promise<Response> | Response) => void;
   waitUntil: (value: Promise<unknown>) => void;
 };
@@ -429,7 +432,7 @@ describe("service-worker fetch behavior", () => {
 });
 
 describe("service-worker lifecycle and upgrades", () => {
-  it("installs the v14 shell and production sprite catalogue, omitting uncacheable responses", async () => {
+  it("installs the v15 shell and production sprite catalogue, omitting uncacheable responses", async () => {
     const harness = loadWorker(async (fetchRequest) => {
       if (fetchRequest.url.endsWith("/onboarding")) {
         return makeResponse("private", {
@@ -443,7 +446,9 @@ describe("service-worker lifecycle and upgrades", () => {
     await event.done();
 
     const shell = await harness.caches.open(harness.policy.SHELL_CACHE);
-    expect(harness.policy.CACHE_VERSION).toBe("biblequest-v14");
+    expect(harness.policy.CACHE_VERSION).toBe(
+      observability.serviceWorkerVersion,
+    );
     expect(shell.entries.size).toBe(harness.policy.PRECACHE_PATHS.length - 1);
     expect(await shell.match(`${ORIGIN}/onboarding`)).toBeUndefined();
     expect(
@@ -452,7 +457,21 @@ describe("service-worker lifecycle and upgrades", () => {
     expect(harness.state.skipped).toBe(true);
   });
 
-  it("deletes only obsolete BibleQuest caches during v14 activation", async () => {
+  it("answers the bounded active-worker version challenge", () => {
+    const harness = loadWorker();
+    const postMessage = vi.fn();
+    harness.listeners.get("message")!({
+      data: { type: "BIBLEQUEST_SW_VERSION_REQUEST" },
+      source: { postMessage },
+      waitUntil() {},
+    });
+    expect(postMessage).toHaveBeenCalledWith({
+      type: "BIBLEQUEST_SW_VERSION_RESPONSE",
+      version: observability.serviceWorkerVersion,
+    });
+  });
+
+  it("deletes only obsolete BibleQuest caches during v15 activation", async () => {
     const harness = loadWorker();
     await harness.caches.open("biblequest-v6-shell");
     await harness.caches.open("biblequest-v6-runtime");
@@ -470,8 +489,8 @@ describe("service-worker lifecycle and upgrades", () => {
     ]);
     expect((await harness.caches.keys()).sort()).toEqual([
       "another-app-runtime",
-      "biblequest-v14-runtime",
-      "biblequest-v14-shell",
+      "biblequest-v15-runtime",
+      "biblequest-v15-shell",
     ]);
     expect(harness.state.claimed).toBe(true);
   });
