@@ -63,9 +63,39 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
 - Linked staging pgTAP: 5 files, 137 tests, PASS.
 - Migration `0027` SHA-256 matches `supabase/migrations/manifest.sha256`.
 
+## Deployed Preview verification
+
+- Vercel Preview deployment reached `READY`; the stable branch alias resolves
+  to the branch head and no Production target or domain is attached.
+- `/api/health` returned HTTP 200 with auth `configured`, schema contract
+  `0027`, Stripe mode `test`, purchases enabled, and support disabled.
+- The canonical-origin mismatch is expected on the isolated Preview origin.
+- `/api/billing/plans` returned only the reviewed monthly, annual, and lifetime
+  USD amounts: 899, 8999, and 14499 cents.
+- Signed-out billing, push, and avatar account routes remained sealed.
+- Vercel recorded no error/fatal runtime logs during the browser rehearsal.
+  The observed avatar 404s are the expected no-avatar response.
+
+## Browser rehearsal
+
+- The staging warning label was visible on marketing, onboarding, and app
+  surfaces.
+- Google OAuth used the staging Supabase callback and returned to the stable
+  Preview `/onboarding` route with a signed-in session.
+- One non-sensitive onboarding quest remained present after a full reload,
+  providing a basic signed-in sync persistence check.
+- Settings showed `Signed in`, the avatar control, and the ready
+  `Enable gentle reminders` control with no console errors.
+- Monthly, annual, and lifetime controls each opened Stripe-hosted Sandbox
+  Checkout with the reviewed $8.99, $89.99, and $144.99 amounts.
+- One-time support showed no payment control and sent nothing to Stripe.
+- A real avatar upload was not completed because the Chrome extension does not
+  currently have file-URL access. The upload contract and linked database
+  security tests passed; browser upload/replace/delete remains a manual gate.
+
 ## Remaining gates
 
 - Configure staging custom SMTP with a fresh Resend sending-only key.
-- Deploy this branch with the new environment and code state.
-- Run Google, email, account-sync, avatar, push, and all three Stripe Checkout
-  browser flows against the immutable Preview deployment.
+- Complete real Gmail and iCloud email-code/link delivery.
+- Complete avatar upload/replace/delete after browser file upload is enabled.
+- Complete the second-account isolation, physical-device push, and PWA matrix.
