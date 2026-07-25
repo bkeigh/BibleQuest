@@ -1,5 +1,17 @@
 packages:
   - .
+# Installs the Linux x64 Sharp runtime beside the local platform so Vercel can
+# package both the native addon and its matching libvips shared library.
+supportedArchitectures:
+  os:
+    - current
+    - linux
+  cpu:
+    - current
+    - x64
+  libc:
+    - current
+    - glibc
 allowBuilds:
   sharp: true
   unrs-resolver: true

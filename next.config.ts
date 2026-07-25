@@ -187,6 +187,13 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/app/bible/**": ["./src/data/bible/**"],
     "/verse/**": ["./src/data/bible/**"],
+    // Sharp is externalized by Next.js, so explicitly retain its Linux addon
+    // and libvips runtime in the avatar function bundle.
+    "/api/profile/avatar": [
+      "./node_modules/sharp/**/*",
+      "./node_modules/@img/sharp-linux-x64/**/*",
+      "./node_modules/@img/sharp-libvips-linux-x64/**/*",
+    ],
   },
   async headers() {
     return [

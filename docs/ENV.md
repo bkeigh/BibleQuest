@@ -7,6 +7,7 @@ template in [`../.env.example`](../.env.example).
 | --- | --- | --- |
 | `NEXT_PUBLIC_APP_URL` | Recommended | Canonical URL for metadata / OG. |
 | `BIBLEQUEST_ROLLBACK_SHA` | Launch gate | **Server-only.** Exact approved 40-character rollback commit reported by health; never a branch, URL, or deployment ID. |
+| `BIBLEQUEST_DEPLOYMENT_LABEL` | Staging safety | **Server-only.** Renders a warning only when the value is exactly `SYNC-ENABLED STAGING — NEVER PROMOTE`; leave unset in Production. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Optional | Enables account sync. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Optional | Publishable client key (safe in browser). |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server feature gate | **Server-only.** Used by sealed push scheduler/test/subscription routes and future billing projection routes. Never use a `NEXT_PUBLIC_*` name. |
