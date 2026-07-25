@@ -58,5 +58,20 @@ describe("marketing hero wallpaper", () => {
     expect(backdrop).toContain("prefers-reduced-motion: no-preference");
     expect(backdrop).toContain("connection?.saveData !== true");
     expect(backdrop).toContain('wideScreen.matches');
+    // Keep the still fully opaque and free from a translucent parchment wash.
+    expect(backdrop).toContain("opacity-100 sm:object-center");
+    expect(backdrop).not.toContain("rgba(255,253,247");
+  });
+
+  it("uses the compass sprite for the hero walkthrough action", () => {
+    const landingPage = readFileSync(
+      path.join(process.cwd(), "src/app/(marketing)/page.tsx"),
+      "utf8",
+    );
+
+    // Keep the walkthrough action visually distinct from a tombstone silhouette.
+    expect(landingPage).toMatch(
+      /icon="compass"\s+title="See how it works"/,
+    );
   });
 });
