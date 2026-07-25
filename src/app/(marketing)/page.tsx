@@ -104,7 +104,7 @@ function HeroAction({
   primary = false,
 }: {
   href: string;
-  icon: "open-book" | "path";
+  icon: "open-book" | "compass";
   title: string;
   detail: string;
   primary?: boolean;
@@ -240,7 +240,7 @@ export default function LandingPage() {
                 />
                 <HeroAction
                   href="/#how"
-                  icon="path"
+                  icon="compass"
                   title="See how it works"
                   detail="Walk through the app"
                 />
