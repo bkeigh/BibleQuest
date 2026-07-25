@@ -98,7 +98,7 @@ describe("launch legal documents", () => {
       expect.arrayContaining([
         "Who may use BibleQuest",
         "Your content",
-        "Plus subscriptions and one-time support",
+        "Plus purchases and one-time support",
         "Disclaimers and responsibility",
         "Contact",
       ]),

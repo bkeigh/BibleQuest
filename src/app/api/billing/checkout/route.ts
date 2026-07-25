@@ -81,7 +81,9 @@ export async function POST(request: Request) {
     if ((count ?? 0) > 0) return privateError("manage_existing", 409);
 
     const stripe = createStripe(configuration);
-    const interval = (body as { interval: "monthly" | "annual" }).interval;
+    const interval = (
+      body as { interval: "monthly" | "annual" | "lifetime" }
+    ).interval;
     const plans = await retrieveBillingPlans(stripe, configuration);
     const customer = await customerForUser(
       admin,
@@ -89,26 +91,33 @@ export async function POST(request: Request) {
       context.user,
       configuration,
     );
+    const lifetime = interval === "lifetime";
+    const checkoutMetadata = {
+      purpose: "biblequest_plus",
+      biblequest_user_id: context.user.id,
+      billing_interval: interval,
+    };
     const session = await stripe.checkout.sessions.create(
       {
-        mode: "subscription",
+        mode: lifetime ? "payment" : "subscription",
         customer,
         client_reference_id: context.user.id,
         line_items: [{ price: plans[interval].priceId, quantity: 1 }],
         success_url: `${configuration.appOrigin}/app/plus?checkout=returned`,
         cancel_url: `${configuration.appOrigin}/app/plus?checkout=cancelled`,
-        metadata: {
-          purpose: "biblequest_plus",
-          biblequest_user_id: context.user.id,
-          billing_interval: interval,
-        },
-        subscription_data: {
-          metadata: {
-            purpose: "biblequest_plus",
-            biblequest_user_id: context.user.id,
-            billing_interval: interval,
-          },
-        },
+        metadata: checkoutMetadata,
+        ...(lifetime
+          ? {
+              payment_intent_data: {
+                description: "BibleQuest Plus lifetime access",
+                metadata: checkoutMetadata,
+              },
+            }
+          : {
+              subscription_data: {
+                metadata: checkoutMetadata,
+              },
+            }),
       },
       {
         idempotencyKey: `biblequest-checkout-${context.user.id}-${interval}-${claim.claimToken}`,

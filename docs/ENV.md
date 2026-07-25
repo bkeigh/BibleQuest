@@ -43,6 +43,7 @@ template in [`../.env.example`](../.env.example).
 | `STRIPE_WEBHOOK_SECRET` | Billing secret | **Server-only.** Signing secret for the exact Checkout/Billing webhook endpoint. |
 | `STRIPE_PLUS_MONTHLY_PRICE_ID` | Billing gate | Server-allowlisted active recurring monthly Price for the Plus product. |
 | `STRIPE_PLUS_ANNUAL_PRICE_ID` | Billing gate | Server-allowlisted active recurring annual Price for the same Plus product and currency. |
+| `STRIPE_PLUS_LIFETIME_PRICE_ID` | Billing gate | Server-allowlisted active one-time lifetime Price for the same Plus product and currency. |
 | `API_BIBLE_API_KEY` | Optional | **Server-only.** Enables the licensed API.Bible adapter. Not needed for reviewed Free Use Bible API editions. |
 | `API_BIBLE_COMMERCIALLY_LICENSED_BIBLE_IDS` | Optional | Comma-separated API.Bible IDs explicitly licensed for BibleQuest's commercial use. Catalogue visibility alone is not permission. |
 

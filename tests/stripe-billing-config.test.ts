@@ -8,6 +8,7 @@ const TEST_ENVIRONMENT = {
   STRIPE_WEBHOOK_SECRET: `whsec_${"c".repeat(24)}`,
   STRIPE_PLUS_MONTHLY_PRICE_ID: "price_TestMonthly123",
   STRIPE_PLUS_ANNUAL_PRICE_ID: "price_TestAnnual123",
+  STRIPE_PLUS_LIFETIME_PRICE_ID: "price_TestLifetime123",
   NEXT_PUBLIC_APP_URL: "https://preview.biblequest.test",
 };
 
@@ -51,6 +52,11 @@ describe("deny-by-default direct Stripe configuration", () => {
       {
         ...TEST_ENVIRONMENT,
         STRIPE_PLUS_ANNUAL_PRICE_ID:
+          TEST_ENVIRONMENT.STRIPE_PLUS_MONTHLY_PRICE_ID,
+      },
+      {
+        ...TEST_ENVIRONMENT,
+        STRIPE_PLUS_LIFETIME_PRICE_ID:
           TEST_ENVIRONMENT.STRIPE_PLUS_MONTHLY_PRICE_ID,
       },
       {

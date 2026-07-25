@@ -34,6 +34,7 @@ const EXPECTED_MIGRATIONS = [
   "0025_stripe_test_billing.sql",
   "0026_stripe_one_time_support.sql",
   "0027_console_insights_and_audit.sql",
+  "0028_stripe_lifetime_plus.sql",
 ];
 
 /** Hash a migration exactly as the release manifest does. */

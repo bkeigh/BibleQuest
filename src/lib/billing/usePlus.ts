@@ -342,7 +342,7 @@ function usePlusCoordinator(): PlusState {
     canPurchase:
       Boolean(session.user) &&
       visible.purchasesEnabled &&
-      visible.plans.length === 2 &&
+      visible.plans.length === 3 &&
       !visible.isPlus,
     plans: visible.plans,
     interval: visible.interval,

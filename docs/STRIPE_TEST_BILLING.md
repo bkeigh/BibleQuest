@@ -25,21 +25,24 @@ The full configuration fails closed unless:
 - mode is exactly `test` or separately approved `live`;
 - secret and publishable keys match that mode;
 - the webhook secret, monthly Price, annual Price, and app origin are valid;
-- both Prices are active, recurring, one month/one year, same product/currency;
-- monthly and annual Price IDs differ; and
+- monthly and annual Prices are active, recurring, one month/one year;
+- the lifetime Price is active and one-time;
+- all three Prices share one Product and currency and have distinct IDs; and
 - the separate purchase gate is exactly `true`.
 
 ## Stripe test setup
 
 1. Select a Stripe sandbox/test environment. Do not toggle to live mode.
 2. Create one **BibleQuest Plus** Product.
-3. Create one monthly recurring Price and one annual recurring Price on that
-   Product, using the same currency. Record only their IDs in `.env.local`.
+3. Create one monthly recurring Price, one annual recurring Price, and one
+   one-time lifetime Price on that Product, using the same currency. Record
+   only their IDs in `.env.local`.
 4. Configure Customer Portal so customers can update payment methods, view
    invoices, and cancel at period end. Review its business information and
    cancellation copy.
-5. Apply migration `0025_stripe_test_billing.sql` to a local or approved staging
-   database, then run its pgTAP test.
+5. Apply migrations `0025_stripe_test_billing.sql` and
+   `0028_stripe_lifetime_plus.sql` to a local or approved staging database,
+   then run their pgTAP tests.
 6. Set test-mode environment values from `.env.example`. Keep
    `STRIPE_LIVE_BILLING_APPROVED=false`.
 7. Start BibleQuest and forward signed events:
@@ -72,6 +75,8 @@ IDs, Subscription IDs, Session IDs, invoice IDs, or secrets—for:
 | --- | --- |
 | Monthly success | Hosted Checkout returns; Plus remains free until the verified projection becomes `active` or `trialing`; displayed Price matches Stripe. |
 | Annual success | Same behavior with annual interval and Stripe-authored amount. |
+| Lifetime success | One-time Checkout returns; current PaymentIntent and Charge grant lifetime Plus with no renewal or period end. |
+| Lifetime refund/dispute | Full refund or open/lost dispute removes lifetime access; a won dispute restores it only from current Stripe state. |
 | Checkout cancel | Return copy says canceled; no entitlement is inferred. |
 | 3DS success/cancel | Challenge succeeds or cancels accurately; no redirect-only entitlement. |
 | Initial payment failure | State is `incomplete`/free with Portal and support guidance. |

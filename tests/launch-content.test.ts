@@ -131,8 +131,11 @@ describe("launch content catalog", () => {
     expect(plusContent).toContain("The full still and live wallpaper collection");
     expect(plusContent).toContain("never read your journals");
     expect(plusCta).toContain("formatBillingAmount(plan)");
-    expect(plusCta).toContain("renews automatically each billing period");
-    expect(plusCta).toMatch(/Checkout\s+shows the final total/);
+    expect(plusCta).toContain(
+      "Monthly and annual Plus renew automatically until canceled",
+    );
+    expect(plusCta).toMatch(/Lifetime\s+Plus is one payment with no renewal/);
+    expect(plusCta).toContain("Checkout shows the");
     expect(`${plusContent}\n${plusCta}`).not.toMatch(/\$8\.99|29¢|AI Study/i);
   });
 

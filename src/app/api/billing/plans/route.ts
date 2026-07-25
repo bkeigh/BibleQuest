@@ -53,6 +53,11 @@ export async function GET() {
             unitAmount: catalog.annual.unitAmount,
             currency: catalog.annual.currency,
           },
+          {
+            interval: "lifetime",
+            unitAmount: catalog.lifetime.unitAmount,
+            currency: catalog.lifetime.currency,
+          },
         ],
       },
       { headers: { "Cache-Control": "public, max-age=300" } },

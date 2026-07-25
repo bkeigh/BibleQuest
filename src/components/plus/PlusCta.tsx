@@ -118,26 +118,30 @@ export function PlusCta() {
       <div className="mt-5 space-y-3">
         <p className="text-[0.8125rem] leading-relaxed text-charcoal">
           You’re a Plus member.{" "}
-          {plus.cancelAtPeriodEnd && periodEnd
-            ? `Access remains active through ${periodEnd}; renewal is canceled.`
-            : periodEnd
-              ? `Your current period runs through ${periodEnd}.`
-              : "Stripe confirms your membership is active."}
+          {plus.interval === "lifetime"
+            ? "Stripe confirms your lifetime access."
+            : plus.cancelAtPeriodEnd && periodEnd
+              ? `Access remains active through ${periodEnd}; renewal is canceled.`
+              : periodEnd
+                ? `Your current period runs through ${periodEnd}.`
+                : "Stripe confirms your membership is active."}
         </p>
         {plus.mode === "test" && (
           <p className="text-[0.75rem] text-gilt">
             Stripe test mode — no real payment is accepted.
           </p>
         )}
-        <GentleButton
-          variant="text"
-          size="sm"
-          onClick={() => void portal()}
-          disabled={!plus.hasCustomer || busy !== null}
-        >
-          Manage renewal, payment method, or invoices
-          {busy === "portal" ? " …" : ""}
-        </GentleButton>
+        {plus.interval !== "lifetime" && (
+          <GentleButton
+            variant="text"
+            size="sm"
+            onClick={() => void portal()}
+            disabled={!plus.hasCustomer || busy !== null}
+          >
+            Manage renewal, payment method, or invoices
+            {busy === "portal" ? " …" : ""}
+          </GentleButton>
+        )}
         {actionError && (
           <p className="text-[0.8125rem] text-rose-700">{actionError}</p>
         )}
@@ -174,7 +178,7 @@ export function PlusCta() {
     );
   }
 
-  if (!plus.canPurchase || plus.plans.length !== 2) {
+  if (!plus.canPurchase || plus.plans.length !== 3) {
     return (
       <p className="mt-5 text-[0.8125rem] text-ash">
         Membership purchase is unavailable. The free app stays complete while
@@ -201,7 +205,7 @@ export function PlusCta() {
           Stripe test mode — these controls cannot make a real charge.
         </p>
       )}
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2 sm:grid-cols-3">
         {plus.plans.map((plan) => (
           <GentleButton
             key={plan.interval}
@@ -210,18 +214,27 @@ export function PlusCta() {
             disabled={busy !== null}
             onClick={() => void checkout(plan.interval)}
           >
-            {plan.interval === "monthly" ? "Monthly" : "Annual"} —{" "}
+            {plan.interval === "monthly"
+              ? "Monthly"
+              : plan.interval === "annual"
+                ? "Annual"
+                : "Lifetime"}{" "}
+            —{" "}
             {formatBillingAmount(plan)}
-            {plan.interval === "monthly" ? "/month" : "/year"}
+            {plan.interval === "monthly"
+              ? "/month"
+              : plan.interval === "annual"
+                ? "/year"
+                : " once"}
             {busy === plan.interval ? " …" : ""}
           </GentleButton>
         ))}
       </div>
       <p className="text-[0.75rem] leading-relaxed text-ash">
-        Plus renews automatically each billing period until canceled. Cancel in
-        the Stripe portal; access continues through the paid period. Checkout
-        shows the final total before confirmation. Refund requests are reviewed
-        under the{" "}
+        Monthly and annual Plus renew automatically until canceled. Lifetime
+        Plus is one payment with no renewal. Cancel subscriptions in the Stripe
+        portal; access continues through the paid period. Checkout shows the
+        final total before confirmation. Refund requests are reviewed under the{" "}
         <Link href="/terms" className="text-accent underline">
           Terms
         </Link>

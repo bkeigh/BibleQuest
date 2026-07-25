@@ -40,7 +40,10 @@ describe("direct Stripe API boundary", () => {
     expect(checkout).not.toMatch(/body[^;\n]*price/i);
     expect(plans).toContain("configuration.priceIds.monthly");
     expect(plans).toContain("configuration.priceIds.annual");
+    expect(plans).toContain("configuration.priceIds.lifetime");
     expect(plans).toContain("monthly.productId !== annual.productId");
+    expect(checkout).toContain('interval === "lifetime"');
+    expect(checkout).toContain('mode: lifetime ? "payment" : "subscription"');
   });
 
   it("verifies raw signatures before claiming a replay-safe event", () => {

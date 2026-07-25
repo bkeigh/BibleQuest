@@ -131,10 +131,12 @@ billing authority and Supabase holds only the server-projected membership
 state. Production remains `coming-soon` with purchase UI disabled.
 
 1. In a Stripe sandbox/test environment, create one **BibleQuest Plus** Product
-   and active monthly and annual recurring Prices using the same currency.
+   with active monthly and annual recurring Prices plus one active one-time
+   lifetime Price, all using the same currency.
 2. Configure Customer Portal cancellation, payment-method, and invoice options.
-3. Apply migration `0025`, run its pgTAP evidence, and configure only test
-   values in ignored `.env.local` or an encrypted preview environment.
+3. Apply migrations `0025` and `0028`, run their pgTAP evidence, and configure
+   only test values in ignored `.env.local` or an encrypted preview
+   environment.
 4. Use the Stripe CLI to forward signed events to
    `/api/billing/webhook`; store its signing secret only in that environment.
 5. Complete Checkout, 3DS, payment-failure, renewal, cancellation, Portal,

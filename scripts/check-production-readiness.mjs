@@ -127,7 +127,7 @@ const POSTURE_CONTRACTS = [
   },
   {
     rpc: "stripe_billing_contract",
-    contract: "biblequest_stripe_test_billing_v1",
+    contract: "biblequest_stripe_test_billing_v2",
     migration: "0025",
     label: "direct Stripe billing posture",
   },

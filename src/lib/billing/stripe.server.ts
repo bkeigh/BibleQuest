@@ -29,7 +29,7 @@ function productId(
   return typeof product === "string" ? product : product.id;
 }
 
-/** Retrieves and proves both recurring Price IDs before showing purchase UI. */
+/** Retrieves and proves every server-allowlisted Price before showing purchase UI. */
 export async function retrieveBillingPlans(
   stripe: Stripe,
   configuration: StripeBillingConfiguration,
@@ -39,21 +39,29 @@ export async function retrieveBillingPlans(
     BillingPlan & { priceId: string; productId: string }
   >
 > {
-  const [monthlyPrice, annualPrice] = await Promise.all([
+  const [monthlyPrice, annualPrice, lifetimePrice] = await Promise.all([
     stripe.prices.retrieve(configuration.priceIds.monthly),
     stripe.prices.retrieve(configuration.priceIds.annual),
+    stripe.prices.retrieve(configuration.priceIds.lifetime),
   ]);
 
   const parse = (
     price: Stripe.Price,
     interval: BillingInterval,
   ): BillingPlan & { priceId: string; productId: string } => {
-    const expectedInterval = interval === "monthly" ? "month" : "year";
+    const expectedInterval =
+      interval === "monthly"
+        ? "month"
+        : interval === "annual"
+          ? "year"
+          : null;
     if (
       !price.active ||
-      price.type !== "recurring" ||
-      price.recurring?.interval !== expectedInterval ||
-      price.recurring.interval_count !== 1 ||
+      (expectedInterval === null
+        ? price.type !== "one_time" || price.recurring !== null
+        : price.type !== "recurring" ||
+          price.recurring?.interval !== expectedInterval ||
+          price.recurring.interval_count !== 1) ||
       !Number.isSafeInteger(price.unit_amount) ||
       (price.unit_amount ?? 0) <= 0 ||
       !/^[a-z]{3}$/.test(price.currency) ||
@@ -72,11 +80,14 @@ export async function retrieveBillingPlans(
 
   const monthly = parse(monthlyPrice, "monthly");
   const annual = parse(annualPrice, "annual");
+  const lifetime = parse(lifetimePrice, "lifetime");
   if (
     monthly.currency !== annual.currency ||
-    monthly.productId !== annual.productId
+    monthly.currency !== lifetime.currency ||
+    monthly.productId !== annual.productId ||
+    monthly.productId !== lifetime.productId
   ) {
     throw new Error("Stripe billing plan unavailable.");
   }
-  return { monthly, annual };
+  return { monthly, annual, lifetime };
 }
