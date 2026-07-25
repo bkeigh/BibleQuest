@@ -3,17 +3,14 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 describe("Sharp deployment packaging", () => {
-  // The route trace must retain Sharp's Linux addon and shared libvips files.
-  it("includes the complete Linux runtime in the avatar function", async () => {
+  // The avatar function includes only the shared library missing from tracing.
+  it("adds the Linux libvips shared library without package directories", async () => {
     const { default: nextConfig } = await import("../next.config");
-    const includes = nextConfig.outputFileTracingIncludes?.[
-      "/api/profile/avatar"
-    ] as string[] | undefined;
 
-    expect(includes).toEqual([
-      "./node_modules/sharp/**/*",
-      "./node_modules/@img/sharp-linux-x64/**/*",
-      "./node_modules/@img/sharp-libvips-linux-x64/**/*",
+    expect(
+      nextConfig.outputFileTracingIncludes?.["/api/profile/avatar"]
+    ).toEqual([
+      "./node_modules/.pnpm/@img+sharp-libvips-linux-x64@*/node_modules/@img/sharp-libvips-linux-x64/lib/*.so.*",
     ]);
   });
 
