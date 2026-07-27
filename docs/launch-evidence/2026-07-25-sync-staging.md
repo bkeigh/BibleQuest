@@ -254,7 +254,7 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
 - Post-merge CI passed. The read-only production monitor then passed all 10/10
   checks at `2026-07-27T20:13:20Z` and automatically closed the deduplicated
   failure issue.
-- The latest ready `main` deployment is
+- The ready app-code deployment promoted to the console is
   `bible-quest-749v4zjxq-winterhill.vercel.app`.
   `console.biblequest.co` now reports the exact `9b2f206a...` release, returns
   its sign-in page without a configuration warning, and Vercel reported no
