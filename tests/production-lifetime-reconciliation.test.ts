@@ -50,7 +50,10 @@ describe("production lifetime migration reconciliation", () => {
   });
 
   it("fails closed on unexpected history, backup, SQL, or apply posture", () => {
-    expect(SCRIPT).toContain("assertHistory(remoteHistory(prepared.workdir)");
+    expect(SCRIPT).toContain("historyState(remoteHistory(prepared.workdir)");
+    expect(SCRIPT).toContain(
+      "Production migration history differs from the reviewed history",
+    );
     expect(SCRIPT).toContain("Latest physical production backup is stale");
     expect(SCRIPT).toContain("Reviewed 0028 source checksum changed");
     expect(SCRIPT).toContain(
@@ -58,6 +61,16 @@ describe("production lifetime migration reconciliation", () => {
     );
     expect(SCRIPT).not.toContain("migration repair");
     expect(SCRIPT).not.toContain("--include-all");
+  });
+
+  it("allows exact post-apply verification but refuses a second apply", () => {
+    expect(SCRIPT).toContain('return "applied"');
+    expect(SCRIPT).toContain(
+      "Reviewed production packet is already applied",
+    );
+    expect(SCRIPT).toContain(
+      'initialHistoryState === "applied" || mode === "apply"',
+    );
   });
 
   it("requires the complete pre-0028 production boundary and zero rows", () => {

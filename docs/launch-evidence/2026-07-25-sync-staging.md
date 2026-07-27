@@ -186,6 +186,26 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
   it creates a separately billed Supabase project and requires explicit cost
   approval.
 
+## Hosted physical restore drill — July 27, 2026
+
+- The owner explicitly approved the paid restore drill. Supabase displayed an
+  additional monthly estimate of $10.18 for the mirrored micro compute and
+  restore disk before creation.
+- The newest production physical backup,
+  `2026-07-27T07:59:04.823Z`, restored into a separately billed, isolated
+  project in the production region. The source production project remained
+  healthy and available throughout.
+- The restored project reached `ACTIVE_HEALTHY`. Aggregate checks returned
+  exactly 150 quest templates, 180 daily passages, 38 milestones, 32 prayer
+  prompts, 32 reflection prompts, 12 profiles, and 12 Auth users.
+- The restored billing contract was
+  `biblequest_stripe_test_billing_v1`; subscriptions, Stripe customers, and
+  Stripe webhook events were all zero. No email address, private writing,
+  payment identifier, or row content was read into evidence.
+- After the recovery proof passed, the exact disposable restore project was
+  permanently deleted and the organization inventory confirmed it was absent,
+  stopping its additional compute and disk meter.
+
 ## Same-origin rollback rehearsal — July 27, 2026
 
 - The isolated `biblequest-rollback-drill.vercel.app` alias first targeted
@@ -235,6 +255,27 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
 - Production application remains open and requires the separately reviewed
   confirmation command in `SUPABASE_SECURITY_ROLLOUT.md`.
 
+## Production lifetime reconciliation — July 27, 2026
+
+- After the hosted restore drill passed and the owner explicitly approved the
+  production rollout, the guarded command applied only
+  `20260727193000_reconcile_launch_contracts_and_lifetime_plus.sql`.
+- The command pinned production ref `iacnjqnssovaaojswjoh`, the reviewed
+  physical backup, the immutable legacy history, zero subscriptions, the
+  pre-`0028` contract boundary, and source SHA-256
+  `18b016d3307ccc76fe578e1f805a21ed2e414de1031fa779f023ccb376a99817`.
+- The post-apply history contains the reviewed packet exactly once. A new
+  read-only verification path recognizes only the exact legacy or exact
+  post-apply history and refuses a second apply.
+- Production readiness passed every database, RLS contract, account-deletion,
+  avatar, push, Stripe billing v2, one-time support, provider, and canonical
+  content check. Its sole remaining failure was the intentionally frozen
+  customer deployment still reporting schema `0026`; that closes only after
+  the verified application release is promoted.
+- The Vercel Production account-sync latch was changed to `true` after the
+  database verification. Vercel confirmed that a new deployment is required,
+  so the frozen customer artifact remained unchanged at this point.
+
 ## Console deployment and production monitor recovery — July 27, 2026
 
 - Production history reconciliation merged through PR `#33`; `main` CI passed
@@ -266,11 +307,12 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
 
 ## Remaining gates
 
-- Apply and verify the reviewed production lifetime packet after named
-  database-owner approval and the hosted-restore decision.
-- Complete iCloud email-code/link delivery with a disposable test address.
+- Confirm delivery of the staging sign-in message already sent to the
+  disposable iCloud QA address.
 - Complete the visual avatar file-picker pass after browser file access is
   enabled; the deployed route lifecycle itself now passes.
 - Complete the physical-device push and PWA matrix.
-- Complete a separately approved hosted physical-backup restore and the
-  physical-device worker update/rollback observation.
+- Merge, deploy, and promote the account-sync-enabled schema-`0028` customer
+  candidate, update exact release pins, then repeat synthetic, runtime-log,
+  auth, billing, and rollback checks.
+- Complete the physical-device worker update/rollback observation.
