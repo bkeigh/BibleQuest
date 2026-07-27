@@ -305,6 +305,44 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
   Its manifest, worker, static assets, app bootstrap, public content, provider
   posture, and release-health contract passed the synthetic monitor.
 
+## Plus nameplate and customer production promotion — July 27, 2026
+
+- PR `#38` added the active-Plus Home nameplate, using only the server-projected
+  subscription entitlement. Active Plus renders a gold gradient bookplate,
+  gold name, accessible `BibleQuest Plus` marker, and restrained ornaments;
+  the free state is unchanged.
+- The nameplate passed focused coverage plus desktop and `390x844` visual QA.
+  The complete pre-merge gate passed 84 Vitest files / 573 tests, ESLint,
+  TypeScript, seed parity, and the production build.
+- PR `#38` merged at
+  `addf6ed84c3d48c7332ca9b4cd56bfb224a69b42`; every main CI job passed.
+- Vercel deployment `dpl_5HScQ8ZjxaTvFYzhv7WHfg9iByTE`
+  (`bible-quest-5vbzx29o3-winterhill.vercel.app`) rebuilt that exact commit
+  after the Production account-sync and rollback metadata were reconciled.
+  Its protected health contract and onboarding UI passed before promotion.
+- The verified artifact was promoted to `www.biblequest.co`,
+  `console.biblequest.co`, and the production Vercel aliases. All three health
+  endpoints report release `addf6ed84c3d48c7332ca9b4cd56bfb224a69b42`,
+  rollback `cb0d857361cbd32a876580cf428903209456611f`, canonical origin match,
+  auth `configured`, schema `0028`, content `seed-manifest-v1`, worker
+  `biblequest-v21`, and billing `coming-soon` with both purchase controls off.
+- The post-promotion production-readiness probe passed the deployed health and
+  canonical metadata, all public schema/RLS contracts through `0028`, account
+  deletion, avatar, push, Stripe v2/support, providers, and exact content
+  counts.
+- GitHub monitor pins now match the release and schema. Manual run
+  `30310967775` passed 10/10 after promotion, and the Vercel provider reported
+  no runtime error clusters in the surrounding 30 minutes.
+- The authenticated live console rendered aggregate Today and Insights views
+  plus the append-only Audit view. It exposed counts and bounded operational
+  posture only; no prayer, reflection, journal, user, or webhook body entered
+  console evidence.
+- Stripe production billing remains locked in `coming-soon`. Staging test-mode
+  checkout opened the reviewed monthly, annual, and lifetime Sandbox prices.
+  The final simulated subscription submission and broader renewal,
+  failure/3DS, refund, dispute, portal, and webhook-order matrix remain
+  separate test gates; no real charge was attempted.
+
 ## Remaining gates
 
 - Confirm delivery of the staging sign-in message already sent to the
@@ -312,7 +350,6 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
 - Complete the visual avatar file-picker pass after browser file access is
   enabled; the deployed route lifecycle itself now passes.
 - Complete the physical-device push and PWA matrix.
-- Merge, deploy, and promote the account-sync-enabled schema-`0028` customer
-  candidate, update exact release pins, then repeat synthetic, runtime-log,
-  auth, billing, and rollback checks.
 - Complete the physical-device worker update/rollback observation.
+- Complete the full Stripe Sandbox lifecycle matrix before any separately
+  approved live-billing rollout.
