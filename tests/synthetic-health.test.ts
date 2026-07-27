@@ -149,6 +149,35 @@ describe("daily synthetic health", () => {
     );
   });
 
+  it("pins deployed contracts independently from the checkout on main", async () => {
+    const routes = healthyRoutes();
+    routes.set(
+      `${CANONICAL}/api/health`,
+      response(
+        health({
+          schema_contract: "0026",
+          content_contract: "deployed-seed-v1",
+          service_worker_version: "biblequest-v20",
+        }),
+      ),
+    );
+    const report = await runSyntheticHealth({
+      env: {
+        ...environment(),
+        BIBLEQUEST_MONITOR_EXPECTED_SCHEMA_CONTRACT: "0026",
+        BIBLEQUEST_MONITOR_EXPECTED_CONTENT_CONTRACT: "deployed-seed-v1",
+        BIBLEQUEST_MONITOR_EXPECTED_SERVICE_WORKER_VERSION: "biblequest-v20",
+      },
+      fetchImpl: fixtureFetch(routes),
+      retries: 0,
+    });
+
+    expect(report.ok).toBe(true);
+    expect(report.checks).toContainEqual(
+      expect.objectContaining({ id: "release_health", ok: true }),
+    );
+  });
+
   it("accepts an equivalent root canonical and HEAD representation length", async () => {
     const routes = healthyRoutes();
     routes.set(

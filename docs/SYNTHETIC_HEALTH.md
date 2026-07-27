@@ -26,8 +26,18 @@ Add these GitHub Actions secrets:
 - `BIBLEQUEST_MONITOR_SUPABASE_ANON_KEY`
 
 Set the repository variable `BIBLEQUEST_MONITOR_EXPECTED_SHA` to the exact
-approved production commit after deployment. The workflow pins expected auth
-to `configured` and billing to `coming-soon`; change those only in a reviewed
+approved production commit after deployment. Also pin the deployed release
+contracts with repository variables:
+
+- `BIBLEQUEST_MONITOR_EXPECTED_SCHEMA_CONTRACT`
+- `BIBLEQUEST_MONITOR_EXPECTED_CONTENT_CONTRACT`
+- `BIBLEQUEST_MONITOR_EXPECTED_SERVICE_WORKER_VERSION`
+
+These values deliberately follow the live customer deployment, not the newer
+checkout on `main`. Update them in the same promotion checkpoint as the
+expected SHA. When absent, the monitor falls back to the checkout's
+`config/observability.json` values. The workflow pins expected auth to
+`configured` and billing to `coming-soon`; change those only in a reviewed
 release that intentionally changes posture.
 
 Optional Vercel inspection requires all three secrets:
