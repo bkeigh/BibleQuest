@@ -52,6 +52,7 @@ import { NewsletterLink } from "@/components/newsletter/NewsletterLink";
 import { homeQuestSummary } from "@/lib/questos/home-quest-summary";
 import { buildHomeQuestGroups } from "@/lib/questos/home-quest-groups";
 import { profileAvatarMarker } from "@/lib/utils/avatar";
+import { cn } from "@/lib/utils/cn";
 
 function HomeInner() {
   const profile = useQuestOS((s) => s.profile);
@@ -200,8 +201,32 @@ function HomeInner() {
             candle, echoing a bookplate rather than a dashboard header. */}
         <header
           data-paper-variant="paper"
-          className="app-glass-surface sacred-frame mt-4 mb-4 bg-paper/90 px-5 py-4 max-[360px]:px-4 sm:mt-5 sm:px-6 sm:py-5"
+          data-plus-nameplate={isPlus ? "active" : "free"}
+          className={cn(
+            "app-glass-surface sacred-frame relative mt-4 mb-4 overflow-hidden bg-paper/90 px-5 py-4 max-[360px]:px-4 sm:mt-5 sm:px-6 sm:py-5",
+            isPlus &&
+              "border-[#b88528]/70 bg-[linear-gradient(135deg,rgba(255,248,218,0.94),rgba(246,225,159,0.9)_48%,rgba(255,249,224,0.94))] shadow-[0_12px_34px_rgba(126,85,24,0.2)] ring-1 ring-[#e2bd62]/65",
+          )}
         >
+          {/* Active Plus members receive a restrained gold bookplate flourish. */}
+          {isPlus && (
+            <>
+              <span
+                aria-hidden="true"
+                className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#c99635]/80 to-transparent"
+              />
+              <span
+                aria-hidden="true"
+                className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-[#fff4bd]/60 blur-2xl"
+              />
+              <span
+                aria-hidden="true"
+                className="absolute right-3 bottom-2 font-display text-2xl text-[#a66f18]/20"
+              >
+                ✦
+              </span>
+            </>
+          )}
           <div className="relative z-10 flex min-w-0 items-center gap-3 max-[360px]:gap-2">
             <Link
               href="/app/settings"
@@ -222,10 +247,26 @@ function HomeInner() {
               </span>
             </Link>
             <div className="min-w-0 flex-1">
+              {isPlus && (
+                <p
+                  aria-label="BibleQuest Plus member"
+                  className="mb-1 flex items-center gap-1.5 text-[0.625rem] font-semibold uppercase tracking-[0.2em] text-[#8a5a12]"
+                >
+                  <span aria-hidden="true">✦</span>
+                  BibleQuest Plus
+                  <span aria-hidden="true">✦</span>
+                </p>
+              )}
               <p className="font-display text-[1rem] leading-tight text-accent max-[360px]:text-[0.875rem]">
                 {name ? `${hello},` : season.label}
               </p>
-              <h1 className="mt-1 truncate font-display text-[1.375rem] leading-tight text-graphite max-[360px]:text-[1.0625rem] min-[430px]:text-[1.5rem] sm:text-editorial">
+              <h1
+                className={cn(
+                  "mt-1 truncate font-display text-[1.375rem] leading-tight text-graphite max-[360px]:text-[1.0625rem] min-[430px]:text-[1.5rem] sm:text-editorial",
+                  isPlus &&
+                    "bg-gradient-to-r from-[#7d5013] via-[#bb8124] to-[#7d5013] bg-clip-text text-transparent drop-shadow-[0_1px_0_rgba(255,255,255,0.75)]",
+                )}
+              >
                 {name || `${hello}.`}
               </h1>
               {name && (

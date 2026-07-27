@@ -73,6 +73,21 @@ describe("launch content catalog", () => {
     expect(home).not.toContain("size={76}");
   });
 
+  it("reserves the gold Home nameplate for active Plus members", () => {
+    const home = readFileSync(
+      path.join(process.cwd(), "src/components/home/HomeScreen.tsx"),
+      "utf8",
+    );
+
+    // The sealed Plus projection controls both the visual state and its label.
+    expect(home).toContain('data-plus-nameplate={isPlus ? "active" : "free"}');
+    expect(home).toContain('aria-label="BibleQuest Plus member"');
+    expect(home).toContain("BibleQuest Plus");
+    expect(home).toContain("border-[#b88528]/70");
+    expect(home).toContain("from-[#7d5013]");
+    expect(home).not.toContain("subscription.status");
+  });
+
   it("keeps Bible verse taps semantic and history aligned with the shown edition", () => {
     const reader = readFileSync(
       path.join(process.cwd(), "src/components/bible/ChapterReader.tsx"),

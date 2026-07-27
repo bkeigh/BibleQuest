@@ -107,14 +107,17 @@ function remoteHistory(workdir) {
     .map((migration) => String(migration.remote));
 }
 
-/** Requires the frozen legacy history, optionally followed by this packet. */
-function assertHistory(actual, allowPacket) {
-  const expected = allowPacket
-    ? [...LEGACY_HISTORY.map(([version]) => version), PACKET_VERSION]
-    : LEGACY_HISTORY.map(([version]) => version);
-  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-    fail("Production migration history differs from the reviewed legacy list");
+/** Classifies only the reviewed pre-apply or exact post-apply history. */
+function historyState(actual) {
+  const legacy = LEGACY_HISTORY.map(([version]) => version);
+  if (JSON.stringify(actual) === JSON.stringify(legacy)) return "legacy";
+  if (
+    JSON.stringify(actual) ===
+    JSON.stringify([...legacy, PACKET_VERSION])
+  ) {
+    return "applied";
   }
+  fail("Production migration history differs from the reviewed history");
 }
 
 /** Requires one recent, completed physical backup before any real push. */
@@ -291,13 +294,21 @@ let prepared;
 try {
   prepared = await prepareWorkdir();
   linkProduction(prepared.workdir);
-  assertHistory(remoteHistory(prepared.workdir), false);
+  const initialHistoryState = historyState(remoteHistory(prepared.workdir));
   const backupAt = latestBackup();
-  const proposed = dryRun(prepared.workdir);
+  let proposed = [];
 
-  if (mode === "apply") {
+  if (initialHistoryState === "legacy") {
+    proposed = dryRun(prepared.workdir);
+  } else if (mode === "apply") {
+    fail("Reviewed production packet is already applied");
+  }
+
+  if (mode === "apply" && initialHistoryState === "legacy") {
     applyPacket(prepared.workdir);
-    assertHistory(remoteHistory(prepared.workdir), true);
+    if (historyState(remoteHistory(prepared.workdir)) !== "applied") {
+      fail("Reviewed production packet was not recorded");
+    }
   }
 
   console.log(
@@ -309,7 +320,7 @@ try {
       source_sha256: prepared.sourceSha,
       backup_at: backupAt,
       proposed,
-      applied: mode === "apply",
+      applied: initialHistoryState === "applied" || mode === "apply",
     }),
   );
 } finally {
