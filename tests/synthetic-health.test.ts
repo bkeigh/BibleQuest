@@ -149,6 +149,31 @@ describe("daily synthetic health", () => {
     );
   });
 
+  it("accepts an equivalent root canonical and HEAD representation length", async () => {
+    const routes = healthyRoutes();
+    routes.set(
+      `${CANONICAL}/`,
+      response(html().replace(`${CANONICAL}/`, CANONICAL)),
+    );
+    const report = await runSyntheticHealth({
+      env: environment(),
+      fetchImpl: fixtureFetch(routes, {
+        [`${CANONICAL}${STATIC_ASSET}`]: (init) => {
+          expect(init.method).toBe("HEAD");
+          return response("", 200, { "content-length": "1048576" });
+        },
+      }),
+      retries: 0,
+    });
+
+    expect(report.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "public_home", ok: true }),
+        expect.objectContaining({ id: "static_assets", ok: true }),
+      ]),
+    );
+  });
+
   it("fails simulated bad schema and canonical metadata", async () => {
     const routes = healthyRoutes();
     routes.set(

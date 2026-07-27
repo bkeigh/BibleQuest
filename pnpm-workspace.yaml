@@ -21,3 +21,6 @@ overrides:
   postcss: 8.5.18
   # Keep Next's optional image runtime on the audited libvips build.
   next>sharp: 0.35.3
+minimumReleaseAgeExclude:
+  # Allow the fresh upstream patches that address brace-expansion advisories.
+  - brace-expansion@1.1.16 || 5.0.8

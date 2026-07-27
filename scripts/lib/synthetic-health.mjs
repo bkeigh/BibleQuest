@@ -153,7 +153,11 @@ async function inspectResponse(
       init,
       options,
     );
-    const body = await boundedText(response, maximumBytes);
+    // HEAD exposes representation metadata without a response body to inspect.
+    const body =
+      init.method?.toUpperCase() === "HEAD"
+        ? ""
+        : await boundedText(response, maximumBytes);
     const verdict = inspect(response, body);
     const withinLatency =
       !options.maximumLatencyMs || elapsedMs <= options.maximumLatencyMs;
@@ -177,11 +181,23 @@ function safeJson(text) {
   }
 }
 
+/** Accepts only the canonical origin's exact root URL. */
 function exactCanonical(html, canonicalOrigin) {
   const match = html.match(
     /<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["'][^>]*>/i,
   );
-  return match?.[1] === `${canonicalOrigin}/`;
+  if (!match?.[1]) return false;
+  try {
+    const canonical = new URL(match[1]);
+    return (
+      canonical.origin === canonicalOrigin &&
+      canonical.pathname === "/" &&
+      !canonical.search &&
+      !canonical.hash
+    );
+  } catch {
+    return false;
+  }
 }
 
 function staticAssetPaths(html, canonicalOrigin) {
