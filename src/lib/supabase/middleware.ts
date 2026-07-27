@@ -11,8 +11,19 @@ import { accountSyncAvailable } from "@/lib/sync/containment";
  * Follows the @supabase/ssr guidance: do not run logic between createServerClient
  * and getUser(), and always return the response object it produces.
  */
-export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({ request });
+export async function updateSession(request: NextRequest, rewriteUrl?: URL) {
+  const responseForRequest = () => {
+    const forwardedHeaders = new Headers(request.headers);
+    // The proxy owns this marker so a caller cannot spoof clean console URLs.
+    if (rewriteUrl) forwardedHeaders.set("x-biblequest-console-host", "1");
+    else forwardedHeaders.delete("x-biblequest-console-host");
+
+    const requestInit = { request: { headers: forwardedHeaders } };
+    return rewriteUrl
+      ? NextResponse.rewrite(rewriteUrl, requestInit)
+      : NextResponse.next(requestInit);
+  };
+  let response = responseForRequest();
 
   // Contained builds must not create a server client or refresh a session,
   // even if Supabase environment variables remain available for later rollout.
@@ -30,7 +41,7 @@ export async function updateSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
-          response = NextResponse.next({ request });
+          response = responseForRequest();
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );

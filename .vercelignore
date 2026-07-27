@@ -1,12 +1,9 @@
-# Source artwork and QA renders are not used by the Next.js runtime.
+# Keep local launch evidence and generated campaign output out of deployments.
+launch-evidence-*.local.md
 output/
 
-# Local worktrees, build products, and test caches must not enter deployments.
+# Exclude local-only workspace artifacts already ignored by Git.
 .codex-worktrees/
-.next/
-.next-*/
-coverage/
-.turbo/
-*.tsbuildinfo
-*.log
-.DS_Store
+.next-header-*/
+artifacts/synthetic-health/
+scripts/normalize-live-wallpaper.sh

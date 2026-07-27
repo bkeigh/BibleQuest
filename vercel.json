@@ -2,5 +2,107 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "buildCommand": "pnpm build",
-  "installCommand": "pnpm install --frozen-lockfile"
+  "installCommand": "pnpm install --frozen-lockfile",
+  "rewrites": [
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "console.biblequest.co"
+        }
+      ],
+      "destination": "/console"
+    },
+    {
+      "source": "/sign-in",
+      "has": [
+        {
+          "type": "host",
+          "value": "console.biblequest.co"
+        }
+      ],
+      "destination": "/console/sign-in"
+    },
+    {
+      "source": "/releases",
+      "has": [
+        {
+          "type": "host",
+          "value": "console.biblequest.co"
+        }
+      ],
+      "destination": "/console/releases"
+    },
+    {
+      "source": "/insights",
+      "has": [
+        {
+          "type": "host",
+          "value": "console.biblequest.co"
+        }
+      ],
+      "destination": "/console/insights"
+    },
+    {
+      "source": "/content",
+      "has": [
+        {
+          "type": "host",
+          "value": "console.biblequest.co"
+        }
+      ],
+      "destination": "/console/content"
+    },
+    {
+      "source": "/content/:slug",
+      "has": [
+        {
+          "type": "host",
+          "value": "console.biblequest.co"
+        }
+      ],
+      "destination": "/console/content/:slug"
+    },
+    {
+      "source": "/accounts",
+      "has": [
+        {
+          "type": "host",
+          "value": "console.biblequest.co"
+        }
+      ],
+      "destination": "/console/accounts"
+    },
+    {
+      "source": "/billing",
+      "has": [
+        {
+          "type": "host",
+          "value": "console.biblequest.co"
+        }
+      ],
+      "destination": "/console/billing"
+    },
+    {
+      "source": "/flags",
+      "has": [
+        {
+          "type": "host",
+          "value": "console.biblequest.co"
+        }
+      ],
+      "destination": "/console/flags"
+    },
+    {
+      "source": "/audit",
+      "has": [
+        {
+          "type": "host",
+          "value": "console.biblequest.co"
+        }
+      ],
+      "destination": "/console/audit"
+    }
+  ]
 }

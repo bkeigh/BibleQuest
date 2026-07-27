@@ -226,6 +226,11 @@ const nextConfig: NextConfig = {
         headers: [privateNoStoreHeader],
       },
       {
+        // Operator views may contain account and billing diagnostics.
+        source: "/console/:path*",
+        headers: [privateNoStoreHeader],
+      },
+      {
         source: "/api/:path*",
         headers: [privateNoStoreHeader],
       },
