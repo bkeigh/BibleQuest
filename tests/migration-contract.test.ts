@@ -55,6 +55,26 @@ describe("release migration contracts", () => {
     expect(migrations).not.toContain("0013_transactional_daily_quest_sync.sql");
   });
 
+  it("keeps lifetime Plus compatible with the superseded staging migration", () => {
+    const lifetime = readFileSync(
+      join(
+        MIGRATIONS_DIR,
+        "0028_stripe_lifetime_plus.sql",
+      ),
+      "utf8",
+    );
+
+    expect(lifetime).toContain(
+      "drop constraint if exists subscriptions_lifetime_amount_check",
+    );
+    expect(lifetime).toContain(
+      "drop constraint if exists subscriptions_checkout_session_key",
+    );
+    expect(lifetime).toContain(
+      "drop index if exists public.subscriptions_payment_intent_idx",
+    );
+  });
+
   it("matches the checked-in SHA-256 migration manifest", () => {
     const manifest = readFileSync(
       join(MIGRATIONS_DIR, "manifest.sha256"),

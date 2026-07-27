@@ -13,6 +13,19 @@ alter table public.subscriptions
   drop constraint if exists subscriptions_interval_check;
 alter table public.subscriptions
   drop constraint if exists subscriptions_stripe_shape_check;
+alter table public.subscriptions
+  drop constraint if exists subscriptions_lifetime_amount_check;
+alter table public.subscriptions
+  drop constraint if exists subscriptions_lifetime_session_check;
+alter table public.subscriptions
+  drop constraint if exists subscriptions_lifetime_intent_check;
+alter table public.subscriptions
+  drop constraint if exists subscriptions_lifetime_outcome_check;
+alter table public.subscriptions
+  drop constraint if exists subscriptions_lifetime_dispute_check;
+alter table public.subscriptions
+  drop constraint if exists subscriptions_checkout_session_key;
+drop index if exists public.subscriptions_payment_intent_idx;
 
 alter table public.subscriptions
   add constraint subscriptions_interval_check check (

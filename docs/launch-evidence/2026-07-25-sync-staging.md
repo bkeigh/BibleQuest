@@ -80,6 +80,9 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
 - Local pgTAP passed 14 files / 389 tests.
 - All 39 public tables had RLS enabled; every public posture contract returned
   its fixed identity and passing state.
+- The Supabase Preview upgrade exposed legacy lifetime-constraint names from
+  the former `0027`; migration `0028` now replaces those exact constraints
+  safely, and a repeat-application plus pgTAP rehearsal passed locally.
 - Live billing remained unapproved and purchase/support latches remained off
   in the contained build.
 
