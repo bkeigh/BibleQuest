@@ -121,7 +121,8 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
 - One-time support showed no payment control and sent nothing to Stripe.
 - A real avatar upload was not completed because the Chrome extension does not
   currently have file-URL access. The upload contract and linked database
-  security tests passed; browser upload/replace/delete remains a manual gate.
+  security tests passed; the browser file-picker visual check remained open at
+  this point in the rehearsal.
 
 ## Rebuilt staging and signed isolation — July 27, 2026
 
@@ -146,6 +147,25 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
   and completed signup in the same Preview context.
 - Google account selection completed the full OAuth callback and restored the
   same signed-in account and journey.
+
+## Delivery and deployed avatar lifecycle — July 27, 2026
+
+- Staging custom SMTP delivered a fresh confirmation code to the second
+  operator mailbox through Proton at `2026-07-27T19:56:34Z`.
+- The synthetic account existed only for that delivery check. It was deleted
+  through the staging admin boundary immediately afterward, its absence was
+  verified, and the temporary API-key and cleanup files were moved to Trash.
+- A separate disposable confirmed staging account exercised the deployed
+  Preview avatar route through a normal RLS-bound session.
+- The lifecycle proved initial `404`, PNG upload and normalized private WebP
+  read, replacement with a changed version, deletion of the obsolete object,
+  explicit all-owned-object deletion, final `404`, cleared profile markers,
+  and zero remaining bucket objects.
+- The disposable avatar account and any residual owned object were removed,
+  and a prefix-bounded admin check reported zero synthetic avatar accounts.
+- Chrome still needs one visual file-picker pass after extension file access
+  is enabled; the deployed UI-to-route styling and chooser interaction are not
+  claimed by the server-level lifecycle above.
 
 ## Backup and logical restore rehearsal — July 27, 2026
 
@@ -215,12 +235,42 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
 - Production application remains open and requires the separately reviewed
   confirmation command in `SUPABASE_SECURITY_ROLLOUT.md`.
 
+## Console deployment and production monitor recovery — July 27, 2026
+
+- Production history reconciliation merged through PR `#33`; `main` CI passed
+  at merge commit `8daa3b0aebaacb13b0a63ae68edf0fc69528293a`.
+- `console.biblequest.co` was moved to that ready release without changing
+  `www.biblequest.co`. The console health contract reported schema `0028`,
+  guest-only customer auth containment, and the canonical console origin.
+- A manual production synthetic run correctly found that monitor code on
+  `main` expected schema `0028` while the intentionally frozen customer release
+  still reported `0026`. The other nine checks passed.
+- PR `#35` decoupled the deployed schema, content, and worker expectations from
+  the checkout. Repository variables now pin the live customer contracts
+  `0026`, `seed-manifest-v1`, and `biblequest-v21`.
+- PR `#35` merged at
+  `9b2f206a06384ca4000f2f09cd4351c2d66fe204`; local verification passed
+  84 Vitest files / 571 tests, ESLint, TypeScript, and the production build.
+- Post-merge CI passed. The read-only production monitor then passed all 10/10
+  checks at `2026-07-27T20:13:20Z` and automatically closed the deduplicated
+  failure issue.
+- The latest ready `main` deployment is
+  `bible-quest-749v4zjxq-winterhill.vercel.app`.
+  `console.biblequest.co` now reports the exact `9b2f206a...` release, returns
+  its sign-in page without a configuration warning, and Vercel reported no
+  runtime error cluster in the surrounding hour.
+- The customer domain remains deliberately frozen at
+  `cb0d857361cbd32a876580cf428903209456611f`, schema `0026`, auth configured.
+  Its manifest, worker, static assets, app bootstrap, public content, provider
+  posture, and release-health contract passed the synthetic monitor.
+
 ## Remaining gates
 
 - Apply and verify the reviewed production lifetime packet after named
-  database-owner approval.
+  database-owner approval and the hosted-restore decision.
 - Complete iCloud email-code/link delivery with a disposable test address.
-- Complete avatar upload/replace/delete after browser file upload is enabled.
+- Complete the visual avatar file-picker pass after browser file access is
+  enabled; the deployed route lifecycle itself now passes.
 - Complete the physical-device push and PWA matrix.
 - Complete a separately approved hosted physical-backup restore and the
   physical-device worker update/rollback observation.
