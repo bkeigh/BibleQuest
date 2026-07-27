@@ -90,9 +90,12 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
 
 - Vercel Preview deployment reached `READY`; the stable branch alias resolves
   to the branch head and no Production target or domain is attached.
-- The superseded deployment returned HTTP 200 with auth `configured`, legacy
-  schema contract `0027`, Stripe mode `test`, purchases enabled, and support
-  disabled. It is not a release candidate after the migration renumber.
+- The current immutable deployment is
+  `bible-quest-npc27y688-winterhill.vercel.app` at
+  `b220cb7239f1fca4e7a5dbc83fbf65dd85474b1d`.
+- Its health contract reports auth `configured`, schema `0028`, Stripe mode
+  `test`, purchases enabled, support disabled, and the expected
+  `SYNC-ENABLED STAGING — NEVER PROMOTE` warning.
 - The canonical-origin mismatch is expected on the isolated Preview origin.
 - `/api/billing/plans` returned only the reviewed monthly, annual, and lifetime
   USD amounts: 899, 8999, and 14499 cents.
@@ -120,10 +123,69 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
   currently have file-URL access. The upload contract and linked database
   security tests passed; browser upload/replace/delete remains a manual gate.
 
+## Rebuilt staging and signed isolation — July 27, 2026
+
+- The disposable staging database was rebuilt from the reviewed migration set.
+  Linked history now matches all 27 files through `0028`; production was never
+  linked, reset, or migrated.
+- Linked pgTAP passed 14 files / 389 tests after the rebuild.
+- Public readiness passed every schema, CAS, deletion, avatar, push, Stripe,
+  support, RLS, content-count, and provider-config contract.
+- A new staging-only harness created two confirmed disposable accounts, seeded
+  bounded fixtures, and exercised normal authenticated sessions in both
+  directions.
+- Twenty-one user-owned or safe-posture relations hid the other owner's rows;
+  spoofed owner inserts and cross-owner mutation attempts were denied or
+  changed zero rows.
+- Seven server-only financial/operator relations rejected client reads, and
+  both guessed private-avatar folder checks returned no object names.
+- The harness used the reviewed self-service account-deletion RPC, removed
+  nullable subscription fixtures first, deleted both disposable accounts, and
+  emitted aggregate counts only.
+- A real confirmation code sent through staging SMTP was reported delivered
+  and completed signup in the same Preview context.
+- Google account selection completed the full OAuth callback and restored the
+  same signed-in account and journey.
+
+## Backup and logical restore rehearsal — July 27, 2026
+
+- Supabase reported completed physical backups for both staging and production.
+  The newest observed staging backup was `2026-07-27T14:50:11.878Z`; the newest
+  observed production backup was `2026-07-27T07:59:04.823Z`.
+- Both projects reported physical/WAL-G backups available and PITR disabled.
+  This was a read-only provider-posture check; no hosted restore ran.
+- A staging logical dump included only the reviewed public content catalogue;
+  every user-owned, financial, push, support, and operator-audit table was
+  explicitly excluded.
+- The dump restored into the disposable local database after its content tables
+  were truncated. Restored aggregate counts were exactly 150 quests, 180 daily
+  passages, 38 milestones, and 32/32 prompts.
+- The temporary dump was moved to the local Trash after verification and was
+  never committed or printed into evidence.
+- A full physical-backup restore into a new hosted project remains open because
+  it creates a separately billed Supabase project and requires explicit cost
+  approval.
+
+## Same-origin rollback rehearsal — July 27, 2026
+
+- The isolated `biblequest-rollback-drill.vercel.app` alias first targeted
+  previous known-good Preview commit
+  `11bd78512cee79aeca8834d8a4413e30eb346a6a`, then candidate
+  `b220cb7239f1fca4e7a5dbc83fbf65dd85474b1d`, then the previous commit again.
+- Every alias transition returned health `ok` with the exact expected release
+  SHA. The previous artifact honestly reported schema `0027`; the candidate
+  reported `0028`.
+- Both artifacts served the identical `biblequest-v21` worker with the same
+  SHA-256, establishing the reviewed compatibility boundary for this rollback.
+- After the rollback was proven, the isolated alias was returned to candidate
+  `b220cb7239f1fca4e7a5dbc83fbf65dd85474b1d` for review.
+- No production domain or production deployment alias changed during the
+  rehearsal.
+
 ## Remaining gates
 
-- Rebuild or forward-reconcile staging so `0027` is the console foundation and
-  `0028` is lifetime Stripe, then redeploy the rebased commit.
 - Complete iCloud email-code/link delivery with a disposable test address.
 - Complete avatar upload/replace/delete after browser file upload is enabled.
-- Complete the second-account isolation, physical-device push, and PWA matrix.
+- Complete the physical-device push and PWA matrix.
+- Complete a separately approved hosted physical-backup restore and the
+  physical-device worker update/rollback observation.
