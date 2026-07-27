@@ -1,6 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
+// Replaces the Next.js server boundary so pure console configuration can be tested.
+vi.mock("server-only", () => ({}));
+
+// Keeps console configuration tests independent from request cookies.
+vi.mock("@/lib/supabase/server", () => ({
+  createServerSupabase: vi.fn(),
+  isSupabaseConfigured: vi.fn(() => false),
+}));
+
+import {
+  consoleAuthEnabled,
+  consoleAllowedEmails,
+  isConsoleAuthConfigured,
+} from "@/lib/console/auth.server";
 import {
   consoleHref,
   consoleRewritePath,
@@ -21,6 +36,58 @@ import {
   formatAuditAction,
   sanitizeAuditDetails,
 } from "@/lib/console/audit";
+
+describe("console authentication boundary", () => {
+  it("fails closed unless the dedicated server-only latch is exact", () => {
+    expect(consoleAuthEnabled()).toBe(false);
+    expect(consoleAuthEnabled("TRUE")).toBe(false);
+    expect(consoleAuthEnabled("true")).toBe(true);
+  });
+
+  it("normalizes and bounds the private operator allowlist", () => {
+    expect(
+      consoleAllowedEmails(
+        " Owner@BibleQuest.co,invalid,biblequestco@proton.me ",
+      ),
+    ).toEqual(
+      new Set(["owner@biblequest.co", "biblequestco@proton.me"]),
+    );
+  });
+
+  it("stays available while customer account sync is contained", () => {
+    vi.stubEnv("NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED", "false");
+
+    expect(
+      isConsoleAuthConfigured({
+        enabled: true,
+        allowedEmails: new Set(["owner@biblequest.co"]),
+        supabaseConfigured: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("requires the latch, allowlist, and Supabase independently", () => {
+    const configured = {
+      enabled: true,
+      allowedEmails: new Set(["owner@biblequest.co"]),
+      supabaseConfigured: true,
+    };
+
+    expect(isConsoleAuthConfigured(configured)).toBe(true);
+    expect(
+      isConsoleAuthConfigured({ ...configured, enabled: false }),
+    ).toBe(false);
+    expect(
+      isConsoleAuthConfigured({ ...configured, allowedEmails: new Set() }),
+    ).toBe(false);
+    expect(
+      isConsoleAuthConfigured({
+        ...configured,
+        supabaseConfigured: false,
+      }),
+    ).toBe(false);
+  });
+});
 
 describe("console hostname routing", () => {
   it("recognizes only the dedicated production hostname", () => {
