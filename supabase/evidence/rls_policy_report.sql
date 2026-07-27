@@ -42,7 +42,8 @@ with expected (table_name, classification) as (
     ('stripe_webhook_events', 'server-owned financial'),
     ('stripe_action_claims', 'server-owned'),
     ('stripe_billing_signals', 'server-owned financial'),
-    ('stripe_support_payments', 'server-owned financial')
+    ('stripe_support_payments', 'server-owned financial'),
+    ('console_audit_logs', 'server-owned operator audit')
 )
 select
   expected.table_name,
@@ -116,8 +117,8 @@ where tables.schemaname = 'public'
 group by tables.tablename
 order by tables.tablename;
 
--- 4. Security-definer account functions must have an empty fixed search_path
--- and the exact intended API-role execution posture.
+-- 4. Privileged functions must have a fixed search_path and the exact intended
+-- API-role execution posture.
 select
   procedure.proname as function_name,
   procedure.prosecdef as security_definer,
@@ -165,6 +166,8 @@ where namespace.nspname = 'public'
     'claim_stripe_support_checkout',
     'complete_stripe_support_checkout',
     'stripe_support_contract',
+    'console_insights',
+    'append_console_audit_log',
     'assert_user_sync_context',
     'enforce_user_sync_generation',
     'advance_account_sync_revision',

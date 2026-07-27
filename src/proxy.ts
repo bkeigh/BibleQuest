@@ -2,9 +2,18 @@ import { NextResponse, type NextRequest } from "next/server";
 import { rateLimitProviderRequest } from "@/lib/bible/provider-request-guard";
 import { translationMetadata } from "@/lib/bible/translations";
 import { updateSession } from "@/lib/supabase/middleware";
+import { consoleRewritePath } from "@/lib/console/paths";
 
 /** Refresh the optional Supabase session before matched app requests. */
 export async function proxy(request: NextRequest) {
+  const consolePath = consoleRewritePath(
+    request.headers.get("host"),
+    request.nextUrl.pathname,
+    request.headers.get("x-forwarded-host"),
+  );
+  const consoleUrl = consolePath ? request.nextUrl.clone() : undefined;
+  if (consoleUrl) consoleUrl.pathname = consolePath!;
+
   const requestedTranslation = translationMetadata(
     request.nextUrl.searchParams.get("translation"),
   );
@@ -30,7 +39,9 @@ export async function proxy(request: NextRequest) {
       return response;
     }
   }
-  return await updateSession(request);
+  const response = await updateSession(request, consoleUrl);
+  if (consoleUrl) response.headers.set("Cache-Control", "private, no-store");
+  return response;
 }
 
 export const config = {

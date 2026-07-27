@@ -14,7 +14,9 @@ export function ServiceWorkerRegistrar() {
     if (
       process.env.NODE_ENV !== "production" ||
       typeof navigator === "undefined" ||
-      !("serviceWorker" in navigator)
+      !("serviceWorker" in navigator) ||
+      window.location.hostname === "console.biblequest.co" ||
+      window.location.pathname.startsWith("/console")
     ) {
       return;
     }
