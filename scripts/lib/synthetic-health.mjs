@@ -475,6 +475,16 @@ export async function runSyntheticHealth({
     const expectedBillingSupport =
       env.BIBLEQUEST_MONITOR_EXPECTED_BILLING_SUPPORT_ENABLED === "true";
     const expectedSha = env.BIBLEQUEST_MONITOR_EXPECTED_SHA?.trim().toLowerCase();
+    // Pin deploy-owned contracts separately from the newer checkout on main.
+    const expectedSchema =
+      env.BIBLEQUEST_MONITOR_EXPECTED_SCHEMA_CONTRACT?.trim() ||
+      expectations.schemaContract;
+    const expectedContent =
+      env.BIBLEQUEST_MONITOR_EXPECTED_CONTENT_CONTRACT?.trim() ||
+      expectations.contentContract;
+    const expectedServiceWorker =
+      env.BIBLEQUEST_MONITOR_EXPECTED_SERVICE_WORKER_VERSION?.trim() ||
+      expectations.serviceWorkerVersion;
     releaseSha =
       typeof health?.release_sha === "string" && SHA.test(health.release_sha)
         ? health.release_sha
@@ -487,9 +497,9 @@ export async function runSyntheticHealth({
       health?.contract === expectations.contract &&
       health?.canonical_origin === canonicalOrigin &&
       health?.canonical_origin_matches === true &&
-      health?.schema_contract === expectations.schemaContract &&
-      health?.content_contract === expectations.contentContract &&
-      health?.service_worker_version === expectations.serviceWorkerVersion &&
+      health?.schema_contract === expectedSchema &&
+      health?.content_contract === expectedContent &&
+      health?.service_worker_version === expectedServiceWorker &&
       health?.billing_mode === expectedBilling &&
       health?.billing_purchases_enabled === expectedBillingPurchases &&
       health?.billing_support_enabled === expectedBillingSupport &&
