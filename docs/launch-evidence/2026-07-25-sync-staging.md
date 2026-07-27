@@ -23,8 +23,12 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
 `yjwlunqssyztxkedstjb`; this project was used instead. Production ref
 `iacnjqnssovaaojswjoh` was not linked or migrated.
 
-- Remote migration history matches the repository through `0027`.
-- Forward-only migrations `0023`–`0027` were applied to staging.
+- This rehearsal applied the then-current Stripe migration as legacy `0027`.
+- The rebased repository now reserves `0027` for the console foundation and
+  renumbers lifetime Stripe to `0028`; this staging history no longer matches
+  the branch and must be rebuilt or forward-reconciled before reuse.
+- Forward-only migrations `0023`–legacy `0027` were applied during the
+  historical rehearsal.
 - Linked pgTAP: 5 files, 137 tests, PASS.
 - Site URL is the stable Preview origin.
 - Exact allowed callback URLs cover `/app`, `/app/quests`, and `/onboarding`.
@@ -63,14 +67,29 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
   guest-only production fixture.
 - Local billing pgTAP: PASS.
 - Linked staging pgTAP: 5 files, 137 tests, PASS.
-- Migration `0027` SHA-256 matches `supabase/migrations/manifest.sha256`.
+- Current migration `0028` SHA-256 matches
+  `supabase/migrations/manifest.sha256`.
+
+## Rebase verification — July 27, 2026
+
+- Rebased onto `main` after the console foundation merged.
+- TypeScript, ESLint, 82 Vitest files / 562 tests, seed parity, and the
+  contained production build passed.
+- A clean local database reset applied all 27 migrations in order through
+  `0028`.
+- Local pgTAP passed 14 files / 389 tests.
+- All 39 public tables had RLS enabled; every public posture contract returned
+  its fixed identity and passing state.
+- Live billing remained unapproved and purchase/support latches remained off
+  in the contained build.
 
 ## Deployed Preview verification
 
 - Vercel Preview deployment reached `READY`; the stable branch alias resolves
   to the branch head and no Production target or domain is attached.
-- `/api/health` returned HTTP 200 with auth `configured`, schema contract
-  `0027`, Stripe mode `test`, purchases enabled, and support disabled.
+- The superseded deployment returned HTTP 200 with auth `configured`, legacy
+  schema contract `0027`, Stripe mode `test`, purchases enabled, and support
+  disabled. It is not a release candidate after the migration renumber.
 - The canonical-origin mismatch is expected on the isolated Preview origin.
 - `/api/billing/plans` returned only the reviewed monthly, annual, and lifetime
   USD amounts: 899, 8999, and 14499 cents.
@@ -100,6 +119,8 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
 
 ## Remaining gates
 
+- Rebuild or forward-reconcile staging so `0027` is the console foundation and
+  `0028` is lifetime Stripe, then redeploy the rebased commit.
 - Complete iCloud email-code/link delivery with a disposable test address.
 - Complete avatar upload/replace/delete after browser file upload is enabled.
 - Complete the second-account isolation, physical-device push, and PWA matrix.
