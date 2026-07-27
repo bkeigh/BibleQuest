@@ -7,7 +7,9 @@ preference/bookmark migration `0011_bible_translation_preference.sql`, the KJV
 default migration `0012_kjv_bible_translation_default.sql`, immutable Journey
 identity `0014_journey_event_identity.sql`, and transactional daily-quest
 migration `0015_transactional_daily_quest_sync.sql`, followed by the reviewed
-account-sync and deletion boundary `0016` through `0022`. It is
+account-sync and deletion boundary `0016` through `0022`, sealed avatar/push
+and billing/support/console boundaries `0023` through `0027`, and lifetime
+Plus billing `0028`. It is
 deliberately local/staging-first. Do not run any linked or remote command until
 the project reference and exact command have been reviewed and explicitly
 approved.
@@ -36,6 +38,9 @@ The repository timeline is:
 | 2026-07-21 | Daily-quest CAS pass | Re-versions the reviewed but untracked local `0013` work as `0015_transactional_daily_quest_sync.sql`: owner-RLS day revisions, authenticated atomic replacement, bounded duplicate-request protection, completed-state preservation, legacy-client revision tracking, and complete purge coverage. `0013` remains absent because no immutable linked history proved insertion below `0014` safe. |
 | 2026-07-23 | Account boundary hardening | Adds `0016`–`0019`: mutable-row guards, an enforced account boundary, identity/generation binding, and server-ordered revisions. |
 | 2026-07-23 | Resilient self-service deletion | Adds `0020`–`0022`: authenticated self-service deletion, generation-bound deletion, and resilient cleanup. |
+| 2026-07-24 | Private account features | Adds `0023`–`0024`: sealed profile avatars and private push-reminder state. |
+| 2026-07-25 | Server-owned commerce and console | Adds `0025`–`0027`: test billing, one-time support, aggregate console insights, and append-only operator audit. |
+| 2026-07-27 | Lifetime Plus | Adds `0028`: sealed one-time/lifetime Stripe projection fields and the v2 billing contract. |
 
 If a database recorded an old `0002`, `0003`, or `0004` before the renames,
 the later filenames do not change those recorded versions. Conversely, a
@@ -45,16 +50,66 @@ ambiguous because migration comparison is version-based. The new `0008`
 converges policy and purge state without claiming anything about the older
 history rows.
 
+## Frozen production legacy history and forward packet
+
+The read-only July 27 production audit proved that project
+`iacnjqnssovaaojswjoh` records 23 timestamped migrations ending at
+`20260723160600_resilient_account_deletion`, which maps through repository
+`0022`. The live database separately passes the reviewed `0023`–`0027`
+avatar, push, billing v1, support, and console boundaries, but those changes
+are not present as migration-history rows. Lifetime columns are absent,
+`stripe_billing_contract()` still reports
+`biblequest_stripe_test_billing_v1`, and `subscriptions` has zero rows.
+
+Do not run normal `supabase db push` against that project: the checked-in
+numbered history and frozen timestamped production history intentionally
+disagree, and the CLI correctly refuses the push. Do not run
+`migration repair`, `--include-all`, replay old migrations, delete history, or
+reset Production.
+
+For this one convergence, use
+`scripts/reconcile-production-lifetime-migration.mjs`. It creates a disposable
+Supabase workdir containing exact markers for the immutable production
+history, then proposes one higher timestamped migration:
+`20260727193000_reconcile_launch_contracts_and_lifetime_plus.sql`. The packet:
+
+1. requires the exact production project and legacy history;
+2. requires a completed physical backup less than 30 hours old;
+3. requires zero subscription rows and no partial lifetime columns;
+4. re-verifies the complete `0023`–`0027` security contracts;
+5. applies checked-in `0028` only when its pinned SHA-256 matches; and
+6. verifies the v2 billing contract in the same transaction.
+
+The dry run is non-mutating:
+
+```bash
+pnpm check:production-lifetime-migration
+```
+
+It must report exactly one proposed packet and `"applied":false`. The real
+push remains a separate production-owner approval:
+
+```bash
+BIBLEQUEST_PRODUCTION_MIGRATION_CONFIRM='apply 20260727193000 to iacnjqnssovaaojswjoh' \
+  node scripts/reconcile-production-lifetime-migration.mjs --apply
+```
+
+It must report `"applied":true`, after which the production readiness probe,
+RLS report, anonymous-denial checks, and limited signed-in checks must all be
+rerun. The packet adds one honest forward migration row; it does not rewrite
+or relabel any earlier production history.
+
 ## Complete public-table inventory
 
 | Classification | Tables | Intended access |
 | --- | --- | --- |
 | Public content | `faith_providers`, `bible_translations`, `bible_books`, `bible_chapters`, `bible_verses`, `daily_verses`, `quest_templates`, `prayer_prompts`, `reflection_prompts`, `milestones`, `feature_flags` | Anonymous and authenticated `SELECT` only. Reads are limited to active/approved content; disabled feature flags are hidden. No client writes. Prompt tables contain generic seed prompts, not a user's prayer or reflection text. |
-| User-owned | `profiles`, `user_settings`, `user_daily_quests`, `user_daily_quest_days`, `user_quests`, `quest_completions`, `prayers`, `reflections`, `verse_bookmarks`, `user_recent_verses`, `reading_progress`, `chapters_read`, `journey_events`, `growth_events`, `user_milestones`, `notification_preferences` | Authenticated owner only. Most tables allow all owner operations; profiles have no client delete, journey/growth events have no client update, and `user_daily_quest_days` exposes only `assigned_date`/`revision` SELECT while its authenticated RPC owns writes. |
-| Server-owned | `subscriptions` | Authenticated owner `SELECT` only. Inserts, updates, and deletes require trusted service-role/webhook code. |
-| Internal | None in `public`. Supabase-managed schemas are outside this migration. |
+| User-owned | `profiles`, `user_sync_state`, `user_settings`, `user_daily_quests`, `user_daily_quest_days`, `user_quests`, `quest_completions`, `prayers`, `reflections`, `verse_bookmarks`, `user_recent_verses`, `reading_progress`, `chapters_read`, `journey_events`, `growth_events`, `user_milestones`, `notification_preferences` | Authenticated owner only. Most tables allow bounded owner operations; sync revisions and destructive account actions stay behind reviewed RPCs. |
+| Server-managed user state | `push_reminder_preferences`, `push_subscriptions`, `push_deliveries` | Normal users can reach only the reviewed owner-scoped functions or projections; delivery mutation is service-role only. |
+| Server-owned | `subscriptions`, `push_test_claims`, `stripe_customers`, `stripe_webhook_events`, `stripe_action_claims`, `stripe_billing_signals`, `stripe_support_payments`, `console_audit_logs` | Only documented owner projections are client-readable. Provider identifiers, money, webhook state, test claims, and operator audit remain service-role only. |
+| Internal | Supabase-managed schemas remain outside the public-table inventory. Private avatar objects use the sealed `storage.objects` policies and non-public bucket. |
 
-RLS is enabled on all 29 tables. Private prayers, reflections, recent Scripture
+RLS is enabled on all 39 tables. Private prayers, reflections, recent Scripture
 history, notes, and
 journey data have no anonymous policy and every authenticated policy includes
 an `auth.uid()` owner condition.
@@ -100,9 +155,15 @@ Expected migration order:
 0020_self_service_account_deletion.sql
 0021_generation_bound_account_deletion.sql
 0022_resilient_account_deletion.sql
+0023_private_profile_avatars.sql
+0024_private_push_reminders.sql
+0025_stripe_test_billing.sql
+0026_stripe_one_time_support.sql
+0027_console_insights_and_audit.sql
+0028_stripe_lifetime_plus.sql
 ```
 
-Evidence must show 29 existing tables with `rowsecurity = true`, only the
+Evidence must show all 39 expected tables with `rowsecurity = true`, only the
 documented policy names, no `anon` role on user/server-owned policies, and
 `purge_user_data` as `security_definer = true`, `search_path=""`, anonymous
 execute false, authenticated execute true. Table grants must also match the
@@ -190,9 +251,10 @@ separate procedure in [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md).
 
 ## Production rollout and rollback
 
-Production is a separate manual approval. Repeat the staging sequence against
-the confirmed production project: migration list, dry run, reviewed backup,
-approved push, migration list, evidence SQL, then limited smoke/negative tests.
+Production is a separate manual approval. For the currently frozen legacy
+history, use only the forward packet described above: guarded dry run, reviewed
+backup, approved apply, migration list, evidence SQL, then limited
+smoke/negative tests.
 Keep this schema/RLS approval separate from the frozen idempotent content seed;
 follow [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md) only after the
 schema evidence passes, and verify content counts separately.
@@ -201,12 +263,10 @@ Use the exact natural-key/content-hash manifest checks in
 content parity.
 
 ```bash
-supabase link --project-ref iacnjqnssovaaojswjoh
-supabase migration list --linked
-supabase db push --linked --dry-run
-# Stop here for review and explicit approval of this exact push.
-supabase db push --linked
-supabase migration list --linked
+pnpm check:production-lifetime-migration
+# Stop here for review and explicit approval of this exact one-packet push.
+BIBLEQUEST_PRODUCTION_MIGRATION_CONFIRM='apply 20260727193000 to iacnjqnssovaaojswjoh' \
+  node scripts/reconcile-production-lifetime-migration.mjs --apply
 ```
 
 `0008` changes policies and a function, `0010` backfills quest timestamps and

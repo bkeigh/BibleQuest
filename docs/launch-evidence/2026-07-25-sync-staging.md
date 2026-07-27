@@ -182,8 +182,43 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
 - No production domain or production deployment alias changed during the
   rehearsal.
 
+## Production history audit and forward packet — July 27, 2026
+
+- Production was linked only from the isolated
+  `codex/production-readiness-2026-07-27` worktree for read-only inspection.
+  No production SQL, migration history, rows, configuration, or domain changed.
+- The authoritative production migration history has 23 timestamped rows and
+  ends at `20260723160600_resilient_account_deletion`, the repository
+  `0022`-equivalent.
+- Public contract checks prove the avatar, push, Stripe billing v1, support,
+  and console foundations from repository `0023`–`0027` are present. The
+  lifetime columns are absent and billing still reports
+  `biblequest_stripe_test_billing_v1`.
+- Both the exact production table count and the provider table-stat probe
+  reported zero subscription rows. The Stripe customer, webhook, action,
+  signal, and support tables also reported zero rows.
+- The latest completed physical production backup remained
+  `2026-07-27T07:59:04.823Z`; physical/WAL-G backup was enabled and PITR was
+  disabled.
+- A normal production `supabase db push --dry-run` correctly stopped on the
+  legacy history mismatch. No history repair, `--include-all`, replay, reset,
+  or production push was attempted.
+- The guarded forward-only reconciliation command generated one proposed
+  migration only:
+  `20260727193000_reconcile_launch_contracts_and_lifetime_plus.sql`.
+  It pinned the exact production ref, immutable legacy history, backup age,
+  zero-row/partial-schema guard, `0023`–`0027` security posture, and the
+  checked-in `0028` SHA-256.
+- The complete packet passed in one transaction against a disposable local
+  database reset through `0027`, returned the v2 billing contract, and then
+  rejected a second/partial application as designed.
+- Production application remains open and requires the separately reviewed
+  confirmation command in `SUPABASE_SECURITY_ROLLOUT.md`.
+
 ## Remaining gates
 
+- Apply and verify the reviewed production lifetime packet after named
+  database-owner approval.
 - Complete iCloud email-code/link delivery with a disposable test address.
 - Complete avatar upload/replace/delete after browser file upload is enabled.
 - Complete the physical-device push and PWA matrix.
