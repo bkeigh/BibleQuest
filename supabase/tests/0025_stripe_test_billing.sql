@@ -9,7 +9,7 @@ select plan(36);
 
 select is(
   public.stripe_billing_contract(),
-  '{"contract":"biblequest_stripe_test_billing_v1","ok":true}'::jsonb,
+  '{"contract":"biblequest_stripe_test_billing_v2","ok":true}'::jsonb,
   'the sealed Stripe billing contract is ready'
 );
 select is(
@@ -530,7 +530,7 @@ select is(
 set local role anon;
 select is(
   public.stripe_billing_contract(),
-  '{"contract":"biblequest_stripe_test_billing_v1","ok":true}'::jsonb,
+  '{"contract":"biblequest_stripe_test_billing_v2","ok":true}'::jsonb,
   'anonymous readiness remains fixed and identifier-free'
 );
 

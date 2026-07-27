@@ -233,6 +233,7 @@ into chat.
 | `STRIPE_WEBHOOK_SECRET` | server secret | webhook signature verification |
 | `STRIPE_PLUS_MONTHLY_PRICE_ID` | server | monthly Price allowlist |
 | `STRIPE_PLUS_ANNUAL_PRICE_ID` | server | annual Price allowlist |
+| `STRIPE_PLUS_LIFETIME_PRICE_ID` | server | one-time lifetime Price allowlist |
 | `NEXT_PUBLIC_APP_URL` | shared | exact origin for returns and CSRF checks |
 | `BIBLEQUEST_MONITOR_VERCEL_PROJECT_ID` | GitHub secret, optional | log posture |
 | `BIBLEQUEST_MONITOR_VERCEL_TEAM_ID` | GitHub secret, optional | log posture |

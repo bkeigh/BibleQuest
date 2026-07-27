@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/billing/records.server", () => ({
   synchronizeSubscription: vi.fn(),
+  synchronizeLifetimeSession: vi.fn(),
+  synchronizeLifetimeCharge: vi.fn(),
 }));
 vi.mock("@/lib/support/records.server", () => ({
   synchronizeSupportSession: vi.fn(),
@@ -12,7 +14,11 @@ vi.mock("@/lib/support/records.server", () => ({
   synchronizeSupportDispute: vi.fn(),
 }));
 
-import { synchronizeSubscription } from "@/lib/billing/records.server";
+import {
+  synchronizeLifetimeCharge,
+  synchronizeLifetimeSession,
+  synchronizeSubscription,
+} from "@/lib/billing/records.server";
 import {
   synchronizeSupportDispute,
   synchronizeSupportRefund,
@@ -33,6 +39,7 @@ const CONFIGURATION = {
   priceIds: {
     monthly: "price_TestMonthly123",
     annual: "price_TestAnnual123",
+    lifetime: "price_TestLifetime123",
   },
   appOrigin: "https://preview.biblequest.test",
   livemode: false,
@@ -54,6 +61,8 @@ function event(type: string, object: object): Stripe.Event {
 describe("order-tolerant Stripe webhook processing", () => {
   beforeEach(() => {
     vi.mocked(synchronizeSubscription).mockReset();
+    vi.mocked(synchronizeLifetimeSession).mockReset();
+    vi.mocked(synchronizeLifetimeCharge).mockReset();
     vi.mocked(synchronizeSupportSession).mockReset();
     vi.mocked(synchronizeSupportRefund).mockReset();
     vi.mocked(synchronizeSupportDispute).mockReset();
@@ -190,6 +199,59 @@ describe("order-tolerant Stripe webhook processing", () => {
       admin,
       current,
       supportEvent,
+    );
+    expect(synchronizeSubscription).not.toHaveBeenCalled();
+  });
+
+  it("rehydrates and projects one-time lifetime Checkout events", async () => {
+    const current = {
+      id: "cs_test_LifetimeSession123",
+      mode: "payment",
+      payment_intent: "pi_LifetimeIntent123",
+      metadata: {
+        purpose: "biblequest_plus",
+        billing_interval: "lifetime",
+      },
+    };
+    const paymentIntent = {
+      id: "pi_LifetimeIntent123",
+      latest_charge: { id: "ch_LifetimeCharge123" },
+    };
+    const stripe = {
+      checkout: {
+        sessions: { retrieve: vi.fn().mockResolvedValue(current) },
+      },
+      paymentIntents: {
+        retrieve: vi.fn().mockResolvedValue(paymentIntent),
+      },
+    } as unknown as Stripe;
+    const admin = {} as SupabaseClient;
+    const lifetimeEvent = event("checkout.session.completed", {
+      id: "cs_test_LifetimeSession123",
+    });
+
+    await expect(
+      processStripeWebhookEvent(
+        admin,
+        stripe,
+        CONFIGURATION,
+        lifetimeEvent,
+      ),
+    ).resolves.toBe("processed");
+    expect(stripe.checkout.sessions.retrieve).toHaveBeenCalledWith(
+      "cs_test_LifetimeSession123",
+      { expand: ["line_items.data.price.product"] },
+    );
+    expect(stripe.paymentIntents.retrieve).toHaveBeenCalledWith(
+      "pi_LifetimeIntent123",
+      { expand: ["latest_charge"] },
+    );
+    expect(synchronizeLifetimeSession).toHaveBeenCalledWith(
+      admin,
+      current,
+      paymentIntent,
+      CONFIGURATION,
+      lifetimeEvent,
     );
     expect(synchronizeSubscription).not.toHaveBeenCalled();
   });

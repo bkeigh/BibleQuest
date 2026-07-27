@@ -77,6 +77,7 @@ export function stripeBillingAvailability(
   const webhookSecret = env.STRIPE_WEBHOOK_SECRET?.trim() || "";
   const monthly = env.STRIPE_PLUS_MONTHLY_PRICE_ID?.trim() || "";
   const annual = env.STRIPE_PLUS_ANNUAL_PRICE_ID?.trim() || "";
+  const lifetime = env.STRIPE_PLUS_LIFETIME_PRICE_ID?.trim() || "";
   const origin = applicationOrigin(env.NEXT_PUBLIC_APP_URL, rawMode);
   const secretMatch = secretKey.match(STRIPE_SECRET);
   const publishableMatch = publishableKey.match(STRIPE_PUBLISHABLE);
@@ -86,7 +87,8 @@ export function stripeBillingAvailability(
     !STRIPE_WEBHOOK.test(webhookSecret) ||
     !STRIPE_PRICE.test(monthly) ||
     !STRIPE_PRICE.test(annual) ||
-    monthly === annual ||
+    !STRIPE_PRICE.test(lifetime) ||
+    new Set([monthly, annual, lifetime]).size !== 3 ||
     !origin
   ) {
     return { status: "invalid", mode: rawMode };
@@ -98,7 +100,7 @@ export function stripeBillingAvailability(
     secretKey,
     publishableKey,
     webhookSecret,
-    priceIds: { monthly, annual },
+    priceIds: { monthly, annual, lifetime },
     appOrigin: origin,
     livemode: rawMode === "live",
     purchasesEnabled:

@@ -312,7 +312,7 @@ describe("privacy-safe observability contract", () => {
       canonical_origin_matches: true,
       auth_posture: "configured",
       analytics_posture: "configured",
-      schema_contract: "0026",
+      schema_contract: "0028",
       service_worker_version: "biblequest-v21",
       billing_mode: "coming-soon",
       billing_purchases_enabled: false,
@@ -333,6 +333,7 @@ describe("privacy-safe observability contract", () => {
       STRIPE_WEBHOOK_SECRET: `whsec_${"c".repeat(24)}`,
       STRIPE_PLUS_MONTHLY_PRICE_ID: "price_TestMonthly123",
       STRIPE_PLUS_ANNUAL_PRICE_ID: "price_TestAnnual123",
+      STRIPE_PLUS_LIFETIME_PRICE_ID: "price_TestLifetime123",
       BIBLEQUEST_STRIPE_PURCHASES_ENABLED: "true",
       BIBLEQUEST_STRIPE_SUPPORT_ENABLED: "true",
     });

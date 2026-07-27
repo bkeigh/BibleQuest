@@ -32,7 +32,7 @@ type AccountContext =
 type SignInMethod = "magic_link" | "google";
 type SignInSource = "account" | "onboarding";
 type SyncStatus = "initial" | "push";
-type BillingInterval = "monthly" | "annual";
+type BillingInterval = "monthly" | "annual" | "lifetime";
 
 /** Compile-time event/property allowlist. No arbitrary strings are accepted. */
 export interface AnalyticsEventProps {
@@ -176,7 +176,10 @@ const EVENT_RULES = {
   pwa_install_dismissed: noProps,
   plus_checkout_opened: {
     props: {
-      interval: { kind: "enum", values: ["monthly", "annual"] },
+      interval: {
+        kind: "enum",
+        values: ["monthly", "annual", "lifetime"],
+      },
     },
   },
   plus_billing_portal_opened: noProps,

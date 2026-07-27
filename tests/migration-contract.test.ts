@@ -34,6 +34,7 @@ const EXPECTED_MIGRATIONS = [
   "0025_stripe_test_billing.sql",
   "0026_stripe_one_time_support.sql",
   "0027_console_insights_and_audit.sql",
+  "0028_stripe_lifetime_plus.sql",
 ];
 
 /** Hash a migration exactly as the release manifest does. */
@@ -52,6 +53,26 @@ describe("release migration contracts", () => {
       sha256(join(MIGRATIONS_DIR, "0014_journey_event_identity.sql")),
     ).toBe(JOURNEY_IDENTITY_SHA256);
     expect(migrations).not.toContain("0013_transactional_daily_quest_sync.sql");
+  });
+
+  it("keeps lifetime Plus compatible with the superseded staging migration", () => {
+    const lifetime = readFileSync(
+      join(
+        MIGRATIONS_DIR,
+        "0028_stripe_lifetime_plus.sql",
+      ),
+      "utf8",
+    );
+
+    expect(lifetime).toContain(
+      "drop constraint if exists subscriptions_lifetime_amount_check",
+    );
+    expect(lifetime).toContain(
+      "drop constraint if exists subscriptions_checkout_session_key",
+    );
+    expect(lifetime).toContain(
+      "drop index if exists public.subscriptions_payment_intent_idx",
+    );
   });
 
   it("matches the checked-in SHA-256 migration manifest", () => {

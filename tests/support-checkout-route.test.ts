@@ -54,6 +54,7 @@ const CONFIGURATION = {
   priceIds: {
     monthly: "price_TestMonthly123",
     annual: "price_TestAnnual123",
+    lifetime: "price_TestLifetime123",
   },
   appOrigin: "https://preview.biblequest.test",
   livemode: false,

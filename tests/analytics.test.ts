@@ -248,13 +248,13 @@ describe("privacy-first analytics", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { track } = await loadAnalytics();
 
-    track("plus_checkout_opened", { interval: "annual" });
+    track("plus_checkout_opened", { interval: "lifetime" });
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(JSON.parse(String(init.body))).toMatchObject({
       name: "plus_checkout_opened",
-      props: { interval: "annual" },
+      props: { interval: "lifetime" },
     });
     expect(String(init.body)).not.toMatch(/cus_|sub_|price_|card/i);
   });

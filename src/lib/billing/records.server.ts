@@ -162,3 +162,219 @@ export async function refreshUserSubscriptions(
   }
   return subscriptions.data.length;
 }
+
+export class StripeLifetimeProjectionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StripeLifetimeProjectionError";
+  }
+}
+
+interface LifetimeProjectionRow {
+  id: string;
+  livemode: boolean;
+  amount_total: number;
+  amount_refunded: number;
+  currency: string;
+  outcome_status: string;
+}
+
+function id(value: string | { id: string } | null): string | null {
+  if (!value) return null;
+  return typeof value === "string" ? value : value.id;
+}
+
+/** Projects a paid lifetime Checkout from current Stripe objects only. */
+export async function synchronizeLifetimeSession(
+  admin: SupabaseClient,
+  session: Stripe.Checkout.Session,
+  paymentIntent: Stripe.PaymentIntent,
+  configuration: StripeBillingConfiguration,
+  event: Pick<Stripe.Event, "id" | "created">,
+): Promise<boolean> {
+  const customerId = id(session.customer);
+  const paymentIntentId = id(session.payment_intent);
+  const lineItem = session.line_items?.data[0];
+  const price =
+    lineItem?.price && typeof lineItem.price !== "string"
+      ? lineItem.price
+      : null;
+  const product = price ? id(price.product) : null;
+  const charge =
+    paymentIntent.latest_charge &&
+    typeof paymentIntent.latest_charge !== "string"
+      ? paymentIntent.latest_charge
+      : null;
+  const userId = customerId
+    ? await userForStripeCustomer(
+        admin,
+        customerId,
+        configuration.livemode,
+      )
+    : null;
+  if (
+    session.mode !== "payment" ||
+    session.livemode !== configuration.livemode ||
+    session.status !== "complete" ||
+    session.payment_status !== "paid" ||
+    session.metadata?.purpose !== "biblequest_plus" ||
+    session.metadata?.billing_interval !== "lifetime" ||
+    session.metadata?.biblequest_user_id !== userId ||
+    session.client_reference_id !== userId ||
+    !userId ||
+    !customerId ||
+    !paymentIntentId ||
+    paymentIntent.id !== paymentIntentId ||
+    id(paymentIntent.customer) !== customerId ||
+    paymentIntent.status !== "succeeded" ||
+    !charge ||
+    !charge.paid ||
+    id(charge.payment_intent) !== paymentIntent.id ||
+    lineItem?.quantity !== 1 ||
+    session.line_items?.data.length !== 1 ||
+    !price ||
+    price.id !== configuration.priceIds.lifetime ||
+    price.type !== "one_time" ||
+    price.recurring !== null ||
+    !Number.isSafeInteger(price.unit_amount) ||
+    (price.unit_amount ?? 0) <= 0 ||
+    product === null ||
+    session.amount_total !== price.unit_amount ||
+    paymentIntent.amount_received !== price.unit_amount ||
+    charge.amount !== price.unit_amount ||
+    session.currency !== price.currency ||
+    paymentIntent.currency !== price.currency ||
+    charge.currency !== price.currency ||
+    charge.amount_refunded < 0 ||
+    charge.amount_refunded > charge.amount
+  ) {
+    throw new StripeLifetimeProjectionError(
+      "Stripe lifetime Checkout mismatch.",
+    );
+  }
+
+  const refunded = charge.amount_refunded === charge.amount;
+  const disputed = charge.disputed;
+  const entitled = !refunded && !disputed;
+  const now = new Date().toISOString();
+  const { error } = await admin.from("subscriptions").upsert(
+    {
+      user_id: userId,
+      provider: "stripe",
+      status: entitled ? "active" : "canceled",
+      plan_key: entitled ? "plus" : "free",
+      current_period_start: null,
+      current_period_end: null,
+      external_customer_id: customerId,
+      external_subscription_id: null,
+      stripe_price_id: price.id,
+      stripe_product_id: product,
+      billing_interval: "lifetime",
+      currency: price.currency,
+      livemode: session.livemode,
+      cancel_at_period_end: false,
+      canceled_at: entitled
+        ? null
+        : new Date(event.created * 1000).toISOString(),
+      trial_end: null,
+      latest_invoice_id: null,
+      stripe_checkout_session_id: session.id,
+      stripe_payment_intent_id: paymentIntent.id,
+      amount_total: charge.amount,
+      amount_refunded: charge.amount_refunded,
+      outcome_status: refunded
+        ? "refunded"
+        : disputed
+          ? "disputed"
+          : charge.amount_refunded > 0
+            ? "partially_refunded"
+            : "completed",
+      last_stripe_event_created: event.created,
+      last_stripe_event_id: event.id,
+      synchronized_at: now,
+      updated_at: now,
+    },
+    { onConflict: "stripe_checkout_session_id" },
+  );
+  if (error) {
+    throw new Error("Stripe lifetime projection unavailable.");
+  }
+  return true;
+}
+
+/** Reconciles refunds and disputes against one known lifetime PaymentIntent. */
+export async function synchronizeLifetimeCharge(
+  admin: SupabaseClient,
+  charge: Stripe.Charge,
+  event: Pick<Stripe.Event, "id" | "created">,
+  dispute?: Stripe.Dispute,
+): Promise<boolean> {
+  const paymentIntentId = id(charge.payment_intent);
+  if (!paymentIntentId) return false;
+  const { data, error } = await admin
+    .from("subscriptions")
+    .select(
+      "id,livemode,amount_total,amount_refunded,currency,outcome_status",
+    )
+    .eq("stripe_payment_intent_id", paymentIntentId)
+    .maybeSingle();
+  if (error) throw new Error("Stripe lifetime projection unavailable.");
+  if (!data) return false;
+  const row = data as LifetimeProjectionRow;
+  if (
+    charge.livemode !== row.livemode ||
+    charge.currency !== row.currency ||
+    charge.amount !== row.amount_total ||
+    charge.amount_refunded < 0 ||
+    charge.amount_refunded > row.amount_total ||
+    (dispute &&
+      (dispute.livemode !== row.livemode ||
+        dispute.currency !== row.currency ||
+        dispute.amount <= 0 ||
+        dispute.amount > row.amount_total ||
+        id(dispute.charge) !== charge.id))
+  ) {
+    throw new StripeLifetimeProjectionError(
+      "Stripe lifetime adjustment mismatch.",
+    );
+  }
+  const refunded = charge.amount_refunded === row.amount_total;
+  const disputeOutcome = dispute
+    ? dispute.status === "won"
+      ? "dispute_won"
+      : dispute.status === "lost"
+        ? "dispute_lost"
+        : "disputed"
+    : null;
+  const entitled =
+    !refunded &&
+    (!disputeOutcome || disputeOutcome === "dispute_won");
+  const outcome =
+    disputeOutcome ??
+    (refunded
+      ? "refunded"
+      : charge.amount_refunded > 0
+        ? "partially_refunded"
+        : "completed");
+  const now = new Date().toISOString();
+  const { error: updateError } = await admin
+    .from("subscriptions")
+    .update({
+      status: entitled ? "active" : "canceled",
+      plan_key: entitled ? "plus" : "free",
+      amount_refunded: charge.amount_refunded,
+      outcome_status: outcome,
+      canceled_at: entitled
+        ? null
+        : new Date(event.created * 1000).toISOString(),
+      last_stripe_event_created: event.created,
+      last_stripe_event_id: event.id,
+      synchronized_at: now,
+      updated_at: now,
+    })
+    .eq("id", row.id);
+  if (updateError) {
+    throw new Error("Stripe lifetime projection unavailable.");
+  }
+  return true;
+}

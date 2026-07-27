@@ -19,6 +19,7 @@
     "test:service-worker": "vitest run tests/service-worker.test.ts",
     "check:seed": "node scripts/build-supabase-seed.mjs && git diff --exit-code -- supabase/seed.sql supabase/seed-manifest.json",
     "check:production-readiness": "node --env-file-if-exists=.env.local scripts/check-production-readiness.mjs",
+    "check:staging-isolation": "node --env-file-if-exists=.env.staging.local scripts/check-staging-two-user-isolation.mjs",
     "evidence:launch": "node --env-file-if-exists=.env.local scripts/collect-launch-evidence.mjs",
     "test:launch-evidence": "pnpm evidence:launch --phase=preflight --fixture",
     "synthetic:health": "node --env-file-if-exists=.env.local scripts/run-synthetic-health.mjs",

@@ -3,7 +3,11 @@ import "server-only";
 import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StripeBillingConfiguration } from "./config.server";
-import { synchronizeSubscription } from "./records.server";
+import {
+  synchronizeLifetimeCharge,
+  synchronizeLifetimeSession,
+  synchronizeSubscription,
+} from "./records.server";
 import {
   synchronizeSupportDispute,
   synchronizeSupportRefund,
@@ -179,12 +183,36 @@ async function processCheckout(
   event: Stripe.Event,
 ): Promise<void> {
   const eventSession = event.data.object as Stripe.Checkout.Session;
-  const session = await stripe.checkout.sessions.retrieve(eventSession.id);
+  const session = await stripe.checkout.sessions.retrieve(eventSession.id, {
+    expand: ["line_items.data.price.product"],
+  });
   if (
     session.mode === "payment" &&
     session.metadata?.purpose === "biblequest_support"
   ) {
     await synchronizeSupportSession(admin, session, event);
+    return;
+  }
+  if (
+    session.mode === "payment" &&
+    session.metadata?.purpose === "biblequest_plus" &&
+    session.metadata?.billing_interval === "lifetime"
+  ) {
+    const paymentIntentId = id(session.payment_intent);
+    if (!paymentIntentId) {
+      throw new StripeWebhookProcessingError("invalid");
+    }
+    const paymentIntent = await stripe.paymentIntents.retrieve(
+      paymentIntentId,
+      { expand: ["latest_charge"] },
+    );
+    await synchronizeLifetimeSession(
+      admin,
+      session,
+      paymentIntent,
+      configuration,
+      event,
+    );
     return;
   }
   if (session.mode !== "subscription") return;
@@ -213,12 +241,19 @@ async function processRefund(
     currentCharge = await stripe.charges.retrieve(chargeId);
     customerId = id(currentCharge.customer);
     // A known one-time payment has no invoice, so skip the unrelated lookup.
-    const supportPayment = await synchronizeSupportRefund(
+    const lifetimePayment = await synchronizeLifetimeCharge(
       admin,
       currentCharge,
       event,
     );
-    if (!supportPayment) {
+    const supportPayment = lifetimePayment
+      ? false
+      : await synchronizeSupportRefund(
+          admin,
+          currentCharge,
+          event,
+        );
+    if (!lifetimePayment && !supportPayment) {
       const context = await subscriptionContextFromCharge(
         stripe,
         currentCharge,
@@ -263,13 +298,21 @@ async function processDispute(
     currentCharge = await stripe.charges.retrieve(chargeId);
     customerId = id(currentCharge.customer);
     // A known one-time payment has no invoice, so skip the unrelated lookup.
-    const supportPayment = await synchronizeSupportDispute(
+    const lifetimePayment = await synchronizeLifetimeCharge(
       admin,
       currentCharge,
-      dispute,
       event,
+      dispute,
     );
-    if (!supportPayment) {
+    const supportPayment = lifetimePayment
+      ? false
+      : await synchronizeSupportDispute(
+          admin,
+          currentCharge,
+          dispute,
+          event,
+        );
+    if (!lifetimePayment && !supportPayment) {
       const context = await subscriptionContextFromCharge(
         stripe,
         currentCharge,
@@ -341,7 +384,10 @@ export async function processStripeWebhookEvent(
     if (error instanceof StripeWebhookProcessingError) throw error;
     if (
       error instanceof Error &&
-      error.name === "StripeSupportProjectionError"
+      (
+        error.name === "StripeSupportProjectionError" ||
+        error.name === "StripeLifetimeProjectionError"
+      )
     ) {
       throw new StripeWebhookProcessingError("invalid");
     }
