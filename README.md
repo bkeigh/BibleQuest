@@ -172,3 +172,17 @@ docs/                   # Codex + setup/deployment/security/content/QA guides
 
 BibleQuest is not a church, and not a replacement for clergy, counseling, or
 emergency services.
+
+---
+
+## License
+
+Copyright (c) 2026 Brendan Kenney and Winterhill Media LLC. All rights
+reserved.
+
+BibleQuest is proprietary, source-available software. Apart from the limited
+rights that apply through GitHub's public-repository functionality, public
+access does not grant permission to copy, modify, distribute, deploy, or
+commercially use the original BibleQuest code, content, or assets. See
+[`LICENSE`](LICENSE) for the complete terms and the exclusions for third-party
+and public-domain materials.

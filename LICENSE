@@ -1,0 +1,107 @@
+BibleQuest Proprietary License
+
+Copyright (c) 2026 Brendan Kenney and Winterhill Media LLC.
+All rights reserved.
+
+1. Ownership
+
+The software source code, original documentation, original visual assets,
+original written content, and other original materials in this repository
+that are jointly owned by Brendan Kenney and Winterhill Media LLC (collectively,
+the "BibleQuest Materials") are their proprietary intellectual property.
+Brendan Kenney and Winterhill Media LLC are collectively referred to as the
+"Copyright Owners." All right, title, and interest in the BibleQuest Materials
+are reserved.
+
+2. No License Granted
+
+Except for the limited rights granted to GitHub and its users under GitHub's
+Terms of Service solely through GitHub's public-repository functionality, no
+license or permission is granted to any person or entity.
+
+Without prior express written permission from the Copyright Owners, you may
+not:
+
+- use, copy, reproduce, download, or clone the BibleQuest Materials, except
+  through GitHub functionality to the limited extent expressly permitted by
+  GitHub's Terms of Service;
+- modify, adapt, translate, reverse engineer, or create derivative works from
+  the BibleQuest Materials;
+- distribute, publish, transmit, sublicense, sell, rent, lease, or otherwise
+  make the BibleQuest Materials available to any third party;
+- run, deploy, host, operate, or commercially exploit the BibleQuest
+  Materials, in whole or in part;
+- use the BibleQuest Materials to build or improve any competing or
+  substantially similar product or service;
+- scrape, harvest, data mine, or use the BibleQuest Materials as training,
+  evaluation, or input data for any artificial intelligence, machine learning,
+  or automated code-generation system, except to the limited extent included
+  in the rights expressly granted under GitHub's Terms of Service; or
+- remove, obscure, or alter any copyright, ownership, attribution, or
+  proprietary notice.
+
+Viewing this repository, accessing it through GitHub, or obtaining a copy by
+any means does not transfer ownership or grant any right beyond those
+expressly granted under GitHub's Terms of Service or applicable law.
+
+3. Rights Preserved by Law
+
+Nothing in this notice restricts fair use, independent creation, or any other
+right that cannot lawfully be restricted. No rights are granted by implication,
+waiver, estoppel, or otherwise.
+
+4. Third-Party Materials
+
+This license applies only to the BibleQuest Materials owned by the Copyright
+Owners. It does not apply to third-party or public-domain materials included
+in or referenced by this repository. Such materials remain subject to their
+respective licenses, notices, terms, or public-domain status.
+
+Third-party materials include, without limitation, software dependencies,
+fonts distributed under separate licenses, Bible translations and Scripture
+texts, external services and APIs, and any file or directory containing its
+own license or attribution notice. Nothing in this license claims ownership
+of, or restricts rights already granted in, those materials.
+
+5. Contributions
+
+Contributions are not accepted for incorporation into BibleQuest unless the
+contributor and the Copyright Owners first enter into a separate written
+agreement that expressly addresses copyright ownership and licensing.
+Submitting a proposal, issue, pull request, patch, or other material does not
+transfer its ownership to the Copyright Owners.
+
+6. Permission Requests
+
+Permission to use any BibleQuest Materials may be requested from the
+repository owner. Permission is valid only if granted in an express written
+agreement signed by Brendan Kenney individually and by an authorized
+representative of Winterhill Media LLC.
+
+7. Trademarks and Patents
+
+No permission is granted to use the BibleQuest name, logos, product identity,
+or other source identifiers. Any permitted use of the BibleQuest Materials
+does not include a trademark license unless a signed written agreement
+expressly says otherwise. No patent license is granted.
+
+8. Disclaimer
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE BIBLEQUEST MATERIALS ARE PROVIDED
+"AS IS," WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT OWNERS BE LIABLE FOR ANY
+CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM OR RELATED TO THE BIBLEQUEST
+MATERIALS OR THEIR USE.
+
+9. Enforcement
+
+Any unauthorized use of the BibleQuest Materials may violate copyright,
+trademark, or other applicable law. The Copyright Owners reserve all rights
+and remedies not expressly waived in a signed written agreement.
+
+10. Severability
+
+If any provision of this notice is held unenforceable, that provision will be
+limited or removed only to the minimum extent necessary, and the remaining
+provisions will remain in effect.
