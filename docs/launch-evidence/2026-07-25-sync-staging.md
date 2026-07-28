@@ -163,9 +163,13 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
   and zero remaining bucket objects.
 - The disposable avatar account and any residual owned object were removed,
   and a prefix-bounded admin check reported zero synthetic avatar accounts.
-- Chrome still needs one visual file-picker pass after extension file access
-  is enabled; the deployed UI-to-route styling and chooser interaction are not
-  claimed by the server-level lifecycle above.
+- Chrome file access was enabled and the deployed avatar file picker accepted
+  the repo-owned synthetic `public/icons/icon-192.png` fixture on an isolated
+  immutable staging origin.
+- The settings UI displayed `Remove photo` after selection, Chrome reported no
+  console errors or warnings, and the photo was removed afterward.
+- The exact disposable staging QA account was deleted after the pass; no test
+  avatar or account was retained.
 
 ## Backup and logical restore rehearsal — July 27, 2026
 
@@ -347,8 +351,6 @@ isolated project `BibleQuest-Account-Sync-Staging` with ref
 
 - Confirm delivery of the staging sign-in message already sent to the
   disposable iCloud QA address.
-- Complete the visual avatar file-picker pass after browser file access is
-  enabled; the deployed route lifecycle itself now passes.
 - Complete the physical-device push and PWA matrix.
 - Complete the physical-device worker update/rollback observation.
 - Complete the full Stripe Sandbox lifecycle matrix before any separately
