@@ -53,6 +53,7 @@ export function InstallPrompt() {
   // the in-session latch the re-fire path checks, so "Not now" actually sticks.
   const dismissedRef = useRef(false);
   const shownRef = useRef(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -91,6 +92,33 @@ export function InstallPrompt() {
     };
   }, []);
 
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!show || !panel) {
+      document.documentElement.style.removeProperty(
+        "--app-install-prompt-height",
+      );
+      return;
+    }
+
+    // Reserve the panel plus its 16px nav gap so the next popup stacks cleanly.
+    const publishHeight = () => {
+      document.documentElement.style.setProperty(
+        "--app-install-prompt-height",
+        `${panel.getBoundingClientRect().height + 16}px`,
+      );
+    };
+    publishHeight();
+    const observer = new ResizeObserver(publishHeight);
+    observer.observe(panel);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty(
+        "--app-install-prompt-height",
+      );
+    };
+  }, [show, deferred]);
+
   function dismiss() {
     dismissedRef.current = true;
     setShow(false);
@@ -121,11 +149,12 @@ export function InstallPrompt() {
     <AnimatePresence>
       {show && (
         <motion.div
+          ref={panelRef}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 12 }}
           transition={{ duration: 0.4, ease: gentleEase }}
-          className="app-glass-surface fixed inset-x-4 bottom-24 z-40 mx-auto max-w-md rounded-[var(--radius-card-lg)] border border-mist bg-paper p-4 paper-shadow-lg sm:bottom-6"
+          className="app-glass-surface fixed inset-x-4 bottom-[calc(var(--app-bottom-nav-height,5rem)+1rem)] z-40 mx-auto max-w-md rounded-[var(--radius-card-lg)] border border-mist bg-paper p-4 paper-shadow-lg"
         >
           <div className="flex items-start gap-3">
             <PixelIcon name="chapel" size={5} />

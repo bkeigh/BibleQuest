@@ -17,6 +17,14 @@ describe("launch content catalog", () => {
       path.join(process.cwd(), "src/components/app-shell/BottomNav.tsx"),
       "utf8",
     );
+    const installPrompt = readFileSync(
+      path.join(process.cwd(), "src/components/app-shell/InstallPrompt.tsx"),
+      "utf8",
+    );
+    const toast = readFileSync(
+      path.join(process.cwd(), "src/components/design-system/Toast.tsx"),
+      "utf8",
+    );
     const globalStyles = readFileSync(
       path.join(process.cwd(), "src/app/globals.css"),
       "utf8",
@@ -24,7 +32,7 @@ describe("launch content catalog", () => {
 
     const accountSurface = home.indexOf("Personal welcome");
     const verseEntry = home.indexOf("<TodaysVerseLink />");
-    const questSection = home.indexOf("<HomeQuestDisclosure");
+    const questSection = home.indexOf('<section id="quests"');
     expect(accountSurface).toBeGreaterThan(-1);
     expect(verseEntry).toBeGreaterThan(accountSurface);
     expect(questSection).toBeGreaterThan(verseEntry);
@@ -40,26 +48,32 @@ describe("launch content catalog", () => {
     );
     expect(focusRule).toContain("display: none");
     expect(focusRule).not.toContain("transform:");
+
+    // Bottom popups clear the measured nav and stack at 16px intervals.
+    expect(bottomNav).toContain("--app-bottom-nav-height");
+    expect(installPrompt).toContain(
+      "bottom-[calc(var(--app-bottom-nav-height,5rem)+1rem)]",
+    );
+    expect(toast).toContain(
+      "bottom-[calc(var(--app-bottom-nav-height,5rem)+var(--app-install-prompt-height,0px)+1rem)]",
+    );
   });
 
-  it("keeps one default-open Home quest collection with nested status drawers", () => {
+  it("keeps Home to one compact snapshot of the canonical Quest board", () => {
     const home = readFileSync(
       path.join(process.cwd(), "src/components/home/HomeScreen.tsx"),
       "utf8",
     );
 
-    // Counts stay in one outer summary while every status owns a compact drawer.
-    expect(home).toContain("<HomeQuestDisclosure");
-    expect(home).toContain("title={t.nav.quests}");
-    expect(home).toContain("summary={questSummary}");
-    expect(home).toContain("defaultOpen");
-    expect(home).toContain("label={t.quests.groupActive}");
-    expect(home).toContain("label={t.quests.groupReady}");
-    expect(home).toContain("label={t.quests.groupCompleted}");
-    expect(home).toContain("buildHomeQuestGroups");
-    expect(home).not.toContain("<QuestFeed");
-    expect(home).not.toContain("Swipe sideways to review every open quest.");
-    expect(home).not.toContain("useCompactQuestRail");
+    // Home previews one relevant card; lifecycle management stays on Quests.
+    expect(home).toContain('<section id="quests"');
+    expect(home).toContain('href="/app/quests"');
+    expect(home).toContain("{questSummary || \"Choose a quest\"}");
+    expect(home).toContain("activePicks[0] ?? readyPicks[0]");
+    expect(home).toContain("View all quests");
+    expect(home).not.toContain("<HomeQuestDisclosure");
+    expect(home).not.toContain("buildHomeQuestGroups");
+    expect(home).not.toContain("completedToday");
   });
 
   it("uses a larger tree-only Home growth preview", () => {

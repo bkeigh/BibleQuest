@@ -19,7 +19,6 @@ import {
   FREE_QUEST_SLOTS,
   isQuestWindowOpen,
   normalizeAssignmentWindow,
-  QUEST_PICK_UNDO_MS,
   QUEST_WINDOW_MS,
   questSlotsRemaining,
 } from "./quest-engine";
@@ -155,7 +154,7 @@ function normalizePrayerArchive(prayer: Prayer): Prayer {
 interface QuestOSState {
   profile: Profile | null;
   settings: Settings;
-  /** Rolling windows grouped by local pick date for persistence and sync. */
+  /** Ready and Active board assignments grouped by local pick date. */
   assignments: Record<string, DailyQuestAssignment[]>;
   /**
    * The persistent quest shelf ("My Quests"), keyed by quest slug. A quest
@@ -220,12 +219,12 @@ interface QuestOSState {
     opts?: { purgeAccount?: string }
   ) => void;
 
-  // -- rolling quest windows (three concurrent for free; unlimited for Plus)
-  /** Open a 24-hour quest window. Plus status must come from usePlus(). */
+  // -- quest board (three outstanding for free; unlimited for Plus)
+  /** Add a quest to Ready without starting its 24-hour window. */
   pickQuest: (slug: string, isPlus?: boolean) => boolean;
-  /** Hide an unfinished quest; free reservations persist after the undo grace. */
+  /** Remove a Ready quest and release its spot immediately. */
   unpickQuest: (slug: string, isPlus?: boolean) => void;
-  /** Atomically pick (if needed) and mark a quest underway. */
+  /** Atomically add if needed, then begin or resume a fresh 24-hour window. */
   startQuest: (slug: string, isPlus?: boolean) => boolean;
   completeQuestBySlug: (
     slug: string,
@@ -317,7 +316,7 @@ function findOpenAssignment(
       .find(
         (candidate) =>
           candidate.questSlug === slug &&
-          candidate.status !== "released" &&
+          candidate.status === "started" &&
           isQuestWindowOpen(candidate, now),
       );
     if (assignment) return { dateKey, assignment };
@@ -325,21 +324,42 @@ function findOpenAssignment(
   return null;
 }
 
+/** Finds the Ready or Active board row even when an Active timer has ended. */
 function findOccupiedAssignment(
   assignments: Record<string, DailyQuestAssignment[]>,
   slug: string,
-  now: Date | number = Date.now(),
 ): { dateKey: string; assignment: DailyQuestAssignment } | null {
   for (const [dateKey, list] of Object.entries(assignments)) {
     const assignment = list
       ?.map(normalizeAssignmentWindow)
       .find(
         (candidate) =>
-          candidate.questSlug === slug && isQuestWindowOpen(candidate, now),
+          candidate.questSlug === slug &&
+          (candidate.status === "assigned" || candidate.status === "started"),
       );
     if (assignment) return { dateKey, assignment };
   }
   return null;
+}
+
+/** Finds the newest legacy released row so it can become a normal Ready row. */
+function findReleasedAssignment(
+  assignments: Record<string, DailyQuestAssignment[]>,
+  slug: string,
+): { dateKey: string; assignment: DailyQuestAssignment } | null {
+  const matches = Object.entries(assignments).flatMap(([dateKey, list]) =>
+    (list ?? [])
+      .filter(
+        (assignment) =>
+          assignment.questSlug === slug && assignment.status === "released",
+      )
+      .map((assignment) => ({ dateKey, assignment })),
+  );
+  return (
+    matches.sort((a, b) =>
+      b.assignment.pickedAt.localeCompare(a.assignment.pickedAt),
+    )[0] ?? null
+  );
 }
 
 function recentVerseKey(
@@ -542,49 +562,24 @@ export const useQuestOS = create<QuestOSState>()(
         set({ myQuests: { ...s.myQuests, [slug]: entry } });
       }
 
-      /**
-       * Hide an unfinished window without turning removal into a free-tier
-       * cap bypass. Plus can release freely. A brand-new, unstarted free pick
-       * gets a two-minute true undo for accidental taps; after that the row is
-       * marked released and invisibly reserves its slot until expiry.
-       */
-      function releaseQuestWindow(
-        slug: string,
-        isPlus: boolean,
-      ): DailyQuestAssignment | null {
+      /** Removes an unfinished board assignment and releases its spot now. */
+      function releaseQuestWindow(slug: string): DailyQuestAssignment | null {
         const s = get();
-        const open = findOpenAssignment(s.assignments, slug);
-        if (!open || open.assignment.status === "completed") return null;
-
-        const pickedAt = Date.parse(open.assignment.pickedAt);
-        const withinUndo =
-          open.assignment.status === "assigned" &&
-          Number.isFinite(pickedAt) &&
-          Date.now() - pickedAt <= QUEST_PICK_UNDO_MS;
-        const dayPicks = s.assignments[open.dateKey] ?? [];
+        const occupied = findOccupiedAssignment(s.assignments, slug);
+        if (!occupied) return null;
+        const dayPicks = s.assignments[occupied.dateKey] ?? [];
         set({
           assignments: {
             ...s.assignments,
-            [open.dateKey]:
-              isPlus || withinUndo
-                ? dayPicks.filter(
-                    (assignment) =>
-                      assignment.questSlug !== slug ||
-                      assignment.status === "completed"
-                  )
-                : dayPicks.map((assignment) =>
-                    assignment.questSlug === slug &&
-                    assignment.status !== "completed" &&
-                    isQuestWindowOpen(assignment)
-                      ? {
-                          ...normalizeAssignmentWindow(assignment),
-                          status: "released" as const,
-                        }
-                      : assignment
-                  ),
+            [occupied.dateKey]: dayPicks.filter(
+              (assignment) =>
+                assignment.questSlug !== slug ||
+                (assignment.status !== "assigned" &&
+                  assignment.status !== "started"),
+            ),
           },
         });
-        return open.assignment;
+        return occupied.assignment;
       }
 
       function completeQuest(
@@ -595,22 +590,36 @@ export const useQuestOS = create<QuestOSState>()(
         const now = new Date();
         const dateKey = toDateKey(now);
 
-        // Completion is only available inside an open 24-hour window. Every
-        // UI begin path atomically opens one first, which keeps the free limit
-        // a domain rule instead of a presentation-only suggestion.
+        // Completion is available only while an Active window is open.
         const openPick = findOpenAssignment(s.assignments, quest.slug, now);
         if (!openPick) {
+          const outstanding = findOccupiedAssignment(
+            s.assignments,
+            quest.slug,
+          );
+          if (
+            s.myQuests[quest.slug]?.status === "completed" ||
+            Object.values(s.assignments)
+              .flat()
+              .some(
+                (assignment) =>
+                  assignment.questSlug === quest.slug &&
+                  assignment.status === "completed",
+              )
+          ) {
+            return {
+              completed: false,
+              newMilestones: [],
+              reason: "already_completed",
+            };
+          }
           return {
             completed: false,
             newMilestones: [],
-            reason: "window_closed",
-          };
-        }
-        if (openPick.assignment.status === "completed") {
-          return {
-            completed: false,
-            newMilestones: [],
-            reason: "already_completed",
+            reason:
+              outstanding?.assignment.status === "assigned"
+                ? "not_started"
+                : "window_closed",
           };
         }
 
@@ -631,16 +640,6 @@ export const useQuestOS = create<QuestOSState>()(
           };
         }
 
-        // Completion is a transition from an underway quest, never directly
-        // from a merely assigned card. This also closes non-UI bypasses.
-        if (openPick.assignment.status !== "started") {
-          return {
-            completed: false,
-            newMilestones: [],
-            reason: "not_started",
-          };
-        }
-
         // The disabled button is guidance; this domain guard is authority.
         // Generic steps stay optional unless content explicitly supplies a
         // checklist for this quest.
@@ -653,7 +652,7 @@ export const useQuestOS = create<QuestOSState>()(
         }
 
         let reflectionId: string | undefined;
-        if (reflection?.body.trim()) {
+        if (reflection?.body.trim() || reflection?.mood) {
           const r: Reflection = {
             id: id(),
             prompt: quest.reflectionPrompt,
@@ -932,23 +931,22 @@ export const useQuestOS = create<QuestOSState>()(
           const s = get();
           if (!questBySlug.has(slug)) return false;
           const occupied = findOccupiedAssignment(s.assignments, slug);
-          if (occupied) {
-            // A free member may hide a quest without releasing its slot. If
-            // they change their mind, restore that same reservation instead
-            // of trapping the quest or charging a second slot.
-            if (occupied.assignment.status !== "released") return false;
+          if (occupied) return false;
+          if (questSlotsRemaining(s.assignments, isPlus) <= 0) return false;
+
+          // Legacy hidden reservations become ordinary Ready rows. Their old
+          // expiry is dormant until Begin writes a fresh Active window.
+          const released = findReleasedAssignment(s.assignments, slug);
+          if (released) {
+            const now = new Date().toISOString();
             set({
               assignments: {
                 ...s.assignments,
-                [occupied.dateKey]: (s.assignments[occupied.dateKey] ?? []).map(
+                [released.dateKey]: (s.assignments[released.dateKey] ?? []).map(
                   (assignment) =>
                     assignment.questSlug === slug &&
-                    assignment.status === "released" &&
-                    isQuestWindowOpen(assignment)
-                      ? {
-                          ...normalizeAssignmentWindow(assignment),
-                          status: "assigned" as const,
-                        }
+                    assignment.status === "released"
+                      ? { ...assignment, status: "assigned" as const, pickedAt: now }
                       : assignment
                 ),
               },
@@ -957,7 +955,6 @@ export const useQuestOS = create<QuestOSState>()(
             track("quest_picked");
             return true;
           }
-          if (questSlotsRemaining(s.assignments, isPlus) <= 0) return false;
 
           const dateKey = toDateKey();
           const dayPicks = s.assignments[dateKey] ?? [];
@@ -967,7 +964,6 @@ export const useQuestOS = create<QuestOSState>()(
           if (dayPicks.some((a) => a.questSlug === slug)) return false;
           const nowDate = new Date();
           const now = nowDate.toISOString();
-          const expiresAt = new Date(nowDate.getTime() + QUEST_WINDOW_MS).toISOString();
           set({
             assignments: {
               ...s.assignments,
@@ -978,7 +974,8 @@ export const useQuestOS = create<QuestOSState>()(
                   questSlug: slug,
                   status: "assigned" as const,
                   pickedAt: now,
-                  expiresAt,
+                  // Ready has no countdown. Begin replaces this marker.
+                  expiresAt: now,
                   rerolls: 0,
                 },
               ],
@@ -1008,28 +1005,17 @@ export const useQuestOS = create<QuestOSState>()(
           return true;
         },
 
-        unpickQuest: (slug, isPlus = false) => {
-          const s = get();
-          const open = findOpenAssignment(s.assignments, slug);
-          if (!open) return;
-          const { assignment: target } = open;
-          // Completed picks are part of the record — they don't come off.
-          if (target.status === "completed") return;
-          releaseQuestWindow(slug, isPlus);
-          // Tidy the shelf: an entry born from this very pick (addedAt ===
-          // pickedAt) that was never begun leaves with it — the person was
-          // browsing, not committing. Removal must tombstone or sync
-          // resurrects the row. Older un-begun entries restore their prior
-          // standing: a re-picked completed quest returns to the completed
-          // record (its walks aren't erased by a change of heart about
-          // today), anything else goes back to saved-for-later. A walk
-          // that's already begun stays active. After the accidental-tap
-          // grace, free-tier removal hides the quest but keeps its slot
-          // reservation until the rolling window ends.
+        unpickQuest: (slug) => {
+          const target = findOccupiedAssignment(get().assignments, slug);
+          if (!target || target.assignment.status !== "assigned") return;
+          releaseQuestWindow(slug);
+          // A brand-new Ready card disappears; an older shelf entry returns
+          // to Saved so removing it from the board never erases its history.
           const entry = get().myQuests[slug];
           if (entry && entry.status === "active") {
             const begun = entry.stepsDone.length > 0 || Boolean(entry.startedAt);
-            const bornFromPick = entry.addedAt === target.pickedAt && !begun;
+            const bornFromPick =
+              entry.addedAt === target.assignment.pickedAt && !begun;
             if (bornFromPick) {
               const rest = { ...get().myQuests };
               delete rest[slug];
@@ -1051,32 +1037,45 @@ export const useQuestOS = create<QuestOSState>()(
         },
 
         startQuest: (slug, isPlus = false) => {
-          let open = findOpenAssignment(get().assignments, slug);
-          if (!open) {
+          let occupied = findOccupiedAssignment(get().assignments, slug);
+          if (!occupied) {
             if (!get().pickQuest(slug, isPlus)) return false;
-            open = findOpenAssignment(get().assignments, slug);
+            occupied = findOccupiedAssignment(get().assignments, slug);
           }
-          if (!open || open.assignment.status === "completed") return false;
+          if (!occupied) return false;
 
-          const now = new Date().toISOString();
-          if (open.assignment.status === "assigned") {
+          const nowDate = new Date();
+          const now = nowDate.toISOString();
+          const windowOpen =
+            occupied.assignment.status === "started" &&
+            isQuestWindowOpen(occupied.assignment, nowDate);
+          if (!windowOpen) {
             const s = get();
-            const dayPicks = s.assignments[open.dateKey] ?? [];
+            const dayPicks = s.assignments[occupied.dateKey] ?? [];
             set({
               assignments: {
                 ...s.assignments,
-                [open.dateKey]: dayPicks.map((a) =>
-                  a.questSlug === slug && isQuestWindowOpen(a)
+                [occupied.dateKey]: dayPicks.map((assignment) =>
+                  assignment.questSlug === slug &&
+                  (assignment.status === "assigned" ||
+                    assignment.status === "started")
                     ? {
-                        ...normalizeAssignmentWindow(a),
+                        ...normalizeAssignmentWindow(assignment),
                         status: "started" as const,
                         startedAt: now,
+                        expiresAt: new Date(
+                          nowDate.getTime() + QUEST_WINDOW_MS,
+                        ).toISOString(),
                       }
-                    : a
+                    : assignment
                 ),
               },
             });
-            track("quest_started");
+            track(
+              occupied.assignment.status === "assigned"
+                ? "quest_started"
+                : "quest_resumed",
+            );
           }
           touchMyQuest(slug, {
             status: "active",
@@ -1138,7 +1137,7 @@ export const useQuestOS = create<QuestOSState>()(
           track("quest_resumed");
         },
 
-        archiveQuest: (slug, isPlus = false) => {
+        archiveQuest: (slug) => {
           const s = get();
           const entry = s.myQuests[slug];
           if (!entry || entry.status === "archived") return;
@@ -1147,11 +1146,11 @@ export const useQuestOS = create<QuestOSState>()(
             archivedAt: new Date().toISOString(),
             pausedAt: undefined,
           });
-          releaseQuestWindow(slug, isPlus);
+          releaseQuestWindow(slug);
           track("quest_archived");
         },
 
-        removeQuest: (slug, isPlus = false) => {
+        removeQuest: (slug) => {
           const s = get();
           if (!s.myQuests[slug]) return;
           const rest = { ...s.myQuests };
@@ -1165,7 +1164,7 @@ export const useQuestOS = create<QuestOSState>()(
               myQuests: [...s.tombstones.myQuests, slug],
             },
           });
-          releaseQuestWindow(slug, isPlus);
+          releaseQuestWindow(slug);
           track("quest_removed");
         },
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils/cn";
 import { useStrings } from "@/lib/i18n";
 import { en } from "@/lib/i18n/en";
@@ -32,6 +32,7 @@ const ITEMS: NavItem[] = [
 
 export function BottomNav() {
   const pathname = usePathname();
+  const navRef = useRef<HTMLElement>(null);
   const strings = useStrings();
   const shouldReduceMotion = useShouldReduceMotion();
   // The server renders English (no persisted language on the server), so
@@ -43,6 +44,33 @@ export function BottomNav() {
     () => false
   );
   const t = hydrated ? strings : en;
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) {
+      document.documentElement.style.removeProperty(
+        "--app-bottom-nav-height",
+      );
+      return;
+    }
+
+    // Floating UI anchors to the rendered nav, including device safe area.
+    const publishHeight = () => {
+      document.documentElement.style.setProperty(
+        "--app-bottom-nav-height",
+        `${nav.getBoundingClientRect().height}px`,
+      );
+    };
+    publishHeight();
+    const observer = new ResizeObserver(publishHeight);
+    observer.observe(nav);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty(
+        "--app-bottom-nav-height",
+      );
+    };
+  }, [pathname]);
 
   // Journal composers are intentional, full-page writing spaces. Keeping the
   // tab bar onscreen competes with the editor and can be tapped accidentally
@@ -56,6 +84,7 @@ export function BottomNav() {
 
   return (
     <nav
+      ref={navRef}
       aria-label="Primary"
       data-app-bottom-nav
       className="app-glass-nav fixed inset-x-0 bottom-0 z-40 border-t border-mist bg-parchment pb-safe sm:bg-parchment/90 sm:backdrop-blur-md"
