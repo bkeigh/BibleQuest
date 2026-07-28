@@ -20,6 +20,7 @@
     "check:seed": "node scripts/build-supabase-seed.mjs && git diff --exit-code -- supabase/seed.sql supabase/seed-manifest.json",
     "check:production-readiness": "node --env-file-if-exists=.env.local scripts/check-production-readiness.mjs",
     "check:production-lifetime-migration": "node scripts/reconcile-production-lifetime-migration.mjs --dry-run",
+    "check:production-user-row-hardening": "node scripts/reconcile-production-user-row-hardening.mjs --dry-run",
     "check:staging-isolation": "node --env-file-if-exists=.env.staging.local scripts/check-staging-two-user-isolation.mjs",
     "evidence:launch": "node --env-file-if-exists=.env.local scripts/collect-launch-evidence.mjs",
     "test:launch-evidence": "pnpm evidence:launch --phase=preflight --fixture",
