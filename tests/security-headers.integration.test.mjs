@@ -60,9 +60,6 @@ function assertSharedSecurityContract(response, production) {
   assert.deepEqual(csp.get("font-src"), ["'self'"]);
   assert.deepEqual(csp.get("media-src"), ["'self'", "blob:"]);
 
-  // Compare full CSP source tokens so host checks cannot be bypassed by substrings.
-  const allSources = [...csp.values()].flat();
-  assert.equal(allSources.includes("https://api.rc-backup.com"), false);
   assert.equal(/revenuecat|stripe|link\.com/i.test(rawCsp), false);
   assert.equal(rawCsp.includes("https://*.supabase.co"), false);
   assert.equal(rawCsp.includes("wss://*.supabase.co"), false);
@@ -72,10 +69,19 @@ function assertSharedSecurityContract(response, production) {
   );
 
   if (production) {
+    assert.deepEqual(csp.get("connect-src"), [
+      "'self'",
+      "https://header-fixture.supabase.co",
+    ]);
     assert.equal(response.headers.get("strict-transport-security"), "max-age=15552000");
     assert.equal(csp.get("script-src").includes("'unsafe-eval'"), false);
     assert.deepEqual(csp.get("upgrade-insecure-requests"), []);
   } else {
+    assert.deepEqual(csp.get("connect-src"), [
+      "'self'",
+      "https://header-fixture.supabase.co",
+      "ws://localhost:*",
+    ]);
     assert.equal(response.headers.get("strict-transport-security"), null);
     assert.ok(csp.get("script-src").includes("'unsafe-eval'"));
     assert.equal(csp.has("upgrade-insecure-requests"), false);
