@@ -421,6 +421,7 @@ function ReaderInner({
               disabled={resolved.loading}
               aria-pressed={isSel}
               aria-current={isTargeted ? "location" : undefined}
+              data-selected={isSel ? "true" : undefined}
               onClick={() => {
                 if (!resolved.loading) toggle();
               }}
@@ -447,7 +448,7 @@ function ReaderInner({
               className={cn(
                 "inline scroll-mt-28 appearance-none rounded border-0 bg-transparent p-0 text-left transition-colors",
                 resolved.loading ? "cursor-wait" : "cursor-pointer",
-                isSel && "bg-gold-500/20",
+                isSel && "verse-selection",
                 isTargeted && !isSel && "bg-gold-500/15 ring-1 ring-gold-500/35",
                 isSaved && !isSel && !isTargeted && "bg-gold-500/10"
               )}

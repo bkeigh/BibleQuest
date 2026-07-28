@@ -97,6 +97,10 @@ describe("launch content catalog", () => {
       path.join(process.cwd(), "src/components/bible/BibleIndex.tsx"),
       "utf8",
     );
+    const globalStyles = readFileSync(
+      path.join(process.cwd(), "src/app/globals.css"),
+      "utf8",
+    );
     const questDetail = readFileSync(
       path.join(process.cwd(), "src/components/quests/QuestDetail.tsx"),
       "utf8",
@@ -104,6 +108,11 @@ describe("launch content catalog", () => {
 
     expect(reader).toContain("<button");
     expect(reader).not.toContain('role="button"');
+    expect(reader).toContain('aria-pressed={isSel}');
+    expect(reader).toContain('data-selected={isSel ? "true" : undefined}');
+    expect(reader).toContain('isSel && "verse-selection"');
+    expect(globalStyles).toContain(".verse-selection {");
+    expect(globalStyles).toContain("box-decoration-break: clone");
     expect(reader).toContain("persistableVerseText(i)");
     expect(bibleIndex).toContain("onPresentedText={recordPresentedVerse}");
     expect(questDetail).toContain("Back to Quests");
