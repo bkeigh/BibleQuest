@@ -1093,19 +1093,30 @@ function SettingsInner() {
         <PaperCard variant="paper" padding="none" className="overflow-hidden">
           <Link
             href="/app/account"
-            className="flex items-center justify-between px-4 py-3.5 text-charcoal hover:bg-linen"
+            className="flex items-center justify-between gap-3 px-4 py-3.5 text-charcoal hover:bg-linen"
           >
-            <span className="text-[0.9375rem]">
-              {ACCOUNT_SYNC_CONTAINED ? "Account sync" : "Sync across devices"}
+            {/* The row states sign-in plainly on both lines, so nobody has to
+                open the account screen to learn whether syncing is on. */}
+            <span className="min-w-0 flex-1">
+              <span className="block text-[0.9375rem]">Account sync</span>
+              <span className="mt-0.5 block truncate text-[0.8125rem] text-ash">
+                {ACCOUNT_SYNC_CONTAINED
+                  ? "Paused for everyone right now — this device keeps your journey."
+                  : sessionLoading
+                    ? "Checking your sign-in…"
+                    : user
+                      ? `Signed in${user.email ? ` as ${user.email}` : ""}`
+                      : "Not signed in — your journey stays on this device."}
+              </span>
             </span>
-            <span className="flex items-center gap-1 text-[0.8125rem] text-ash">
+            <span className="flex shrink-0 items-center gap-1 text-[0.8125rem] text-ash">
               {ACCOUNT_SYNC_CONTAINED
-                ? "Temporarily unavailable"
+                ? "Unavailable"
                 : sessionLoading
                   ? "Checking…"
                   : user
                     ? "Signed in"
-                    : "Set up sync"}
+                    : "Sign in"}
               <IconChevronRight size={15} />
             </span>
           </Link>

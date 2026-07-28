@@ -26,7 +26,7 @@ export function SupportLink({ className }: SupportLinkProps) {
       </span>
       <span className="relative min-w-0 flex-1">
         <span className="block font-display text-[1.125rem] leading-tight">
-          Support BibleQuest once
+          Support BibleQuest
         </span>
         <span className="mt-1 block text-caption text-[#fdfbf3]/70">
           Help keep BibleQuest free and growing.

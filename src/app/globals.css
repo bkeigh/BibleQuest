@@ -426,8 +426,8 @@ html.theme-dark .milestone-glass-surface[data-milestone-state="reached"] {
   color: var(--color-graphite);
 }
 
-/* Calm, visible focus — accessibility is part of the ministry */
-:focus-visible {
+/* Calm, visible focus — verse buttons place theirs on the wrapped text. */
+:focus-visible:not([id^="verse-"]) {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
   border-radius: 4px;
@@ -588,22 +588,6 @@ html.theme-dark .milestone-glass-surface[data-milestone-state="reached"] {
   vertical-align: super;
   margin-right: 0.3em;
   user-select: none;
-}
-
-/* A selected verse reads like a deliberate highlighter mark across wrapped
-   lines, with a firm edge that remains visible in light and dark themes. */
-.verse-selection {
-  background: color-mix(in srgb, var(--color-gold-500) 28%, var(--color-paper));
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--color-gold-500) 68%, transparent),
-    0 2px 8px color-mix(in srgb, var(--color-gold-500) 16%, transparent);
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
-}
-
-.verse-selection .verse-number {
-  color: color-mix(in srgb, var(--color-gold-700) 84%, var(--color-graphite));
-  font-weight: 700;
 }
 
 /* ============================================================

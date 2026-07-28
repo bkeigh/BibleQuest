@@ -164,6 +164,7 @@ function usePlusCoordinator(): PlusState {
   );
   const sequence = useRef(0);
   const currentSubject = useRef(subjectKey);
+  const reconciledReturn = useRef(false);
 
   useEffect(() => {
     currentSubject.current = subjectKey;
@@ -295,6 +296,22 @@ function usePlusCoordinator(): PlusState {
     }
     await load();
   }, [load, session.user]);
+
+  // Checkout redirects back before Stripe's webhook is guaranteed to have
+  // landed, and a missed or blocked event would otherwise strand a paid
+  // membership at "free" until someone pressed a button. Reconcile against
+  // Stripe once on return; the server projection still decides entitlement.
+  useEffect(() => {
+    if (session.loading || !session.user) return;
+    if (reconciledReturn.current) return;
+    if (safeReturnNotice() !== "checkout-returned") return;
+    reconciledReturn.current = true;
+    // Deferred like the initial load so no state cascades in the effect body.
+    const timer = window.setTimeout(() => {
+      void refresh().catch(() => {});
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [refresh, session.loading, session.user]);
 
   const startCheckout = useCallback(
     async (interval: BillingInterval) => {
