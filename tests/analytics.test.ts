@@ -103,7 +103,7 @@ describe("privacy-first analytics", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { track } = await loadAnalytics();
 
-    track("sign_in_started", { method: "magic_link", source: "account" });
+    track("sign_in_started", { method: "apple", source: "onboarding" });
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
     expect(
@@ -116,7 +116,7 @@ describe("privacy-first analytics", () => {
       domain: "biblequest.test",
       name: "sign_in_started",
       url: "https://biblequest.test/app/quests/[quest]",
-      props: { method: "magic_link", source: "account" },
+      props: { method: "apple", source: "onboarding" },
     });
     expect(init.credentials).toBe("omit");
     expect(init.referrerPolicy).toBe("no-referrer");
