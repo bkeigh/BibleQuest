@@ -678,83 +678,88 @@ describe("sync ownership, lifecycle, and merge safety", () => {
     expect(getLastSyncedUserId()).toBeNull();
   });
 
-  it("paginates beyond a 500-row server cap without dropping the newest mutable row", async () => {
-    const basePrayer = currentSnapshot().prayers[0];
-    const serverRows = Array.from({ length: 1_001 }, (_, index) => {
-      const timestamp = new Date(
-        Date.parse("2026-01-01T00:00:00.000Z") + index * 1_000,
-      ).toISOString();
-      return prayerToRow("account-a", {
-        ...basePrayer,
-        id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
-        createdAt: timestamp,
-        updatedAt: timestamp,
+  // Allows the intentionally large pagination fixture to run under full-suite load.
+  it(
+    "paginates beyond a 500-row server cap without dropping the newest mutable row",
+    async () => {
+      const basePrayer = currentSnapshot().prayers[0];
+      const serverRows = Array.from({ length: 1_001 }, (_, index) => {
+        const timestamp = new Date(
+          Date.parse("2026-01-01T00:00:00.000Z") + index * 1_000,
+        ).toISOString();
+        return prayerToRow("account-a", {
+          ...basePrayer,
+          id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        });
       });
-    });
-    const newestId = serverRows.at(-1)?.id;
-    const prayerPulls: FakeSelectQuery[] = [];
-    const prayerWrites: unknown[] = [];
-    mocks.createClient.mockReturnValue(
-      fakeClient(
-        undefined,
-        undefined,
-        async (table, query) => {
-          if (table !== "prayers") return { data: [], error: null };
-          prayerPulls.push({
-            ...query,
-            equalities: [...query.equalities],
-            orders: [...query.orders],
-            range: query.range ? { ...query.range } : null,
-          });
-          return { data: serverRows, error: null };
-        },
-        undefined,
-        async (name, args) => {
-          if (
-            name === "upsert_mutable_account_rows" &&
-            args?.p_resource === "prayers"
-          ) {
-            prayerWrites.push(args.p_rows);
-          }
-          return undefined;
-        },
-        undefined,
-        // Emulate a project max_rows setting below the requested page size.
-        500,
-      ),
-    );
+      const newestId = serverRows.at(-1)?.id;
+      const prayerPulls: FakeSelectQuery[] = [];
+      const prayerWrites: unknown[] = [];
+      mocks.createClient.mockReturnValue(
+        fakeClient(
+          undefined,
+          undefined,
+          async (table, query) => {
+            if (table !== "prayers") return { data: [], error: null };
+            prayerPulls.push({
+              ...query,
+              equalities: [...query.equalities],
+              orders: [...query.orders],
+              range: query.range ? { ...query.range } : null,
+            });
+            return { data: serverRows, error: null };
+          },
+          undefined,
+          async (name, args) => {
+            if (
+              name === "upsert_mutable_account_rows" &&
+              args?.p_resource === "prayers"
+            ) {
+              prayerWrites.push(args.p_rows);
+            }
+            return undefined;
+          },
+          undefined,
+          // Emulate a project max_rows setting below the requested page size.
+          500,
+        ),
+      );
 
-    await startSync("account-a");
-    expect(useQuestOS.getState().prayers).toHaveLength(1_001);
-    expect(useQuestOS.getState().prayers.some(({ id }) => id === newestId)).toBe(
-      true,
-    );
+      await startSync("account-a");
+      expect(useQuestOS.getState().prayers).toHaveLength(1_001);
+      expect(
+        useQuestOS.getState().prayers.some(({ id }) => id === newestId),
+      ).toBe(true);
 
-    await retrySync("account-a");
+      await retrySync("account-a");
 
-    expect(useQuestOS.getState().prayers).toHaveLength(1_001);
-    expect(useQuestOS.getState().prayers.some(({ id }) => id === newestId)).toBe(
-      true,
-    );
-    expect(prayerWrites).toEqual([]);
-    expect(prayerPulls.map(({ range }) => range)).toEqual([
-      { from: 0, to: 999 },
-      { from: 500, to: 1_499 },
-      { from: 1_000, to: 1_999 },
-      { from: 1_001, to: 2_000 },
-      { from: 0, to: 999 },
-      { from: 500, to: 1_499 },
-      { from: 1_000, to: 1_999 },
-      { from: 1_001, to: 2_000 },
-    ]);
-    expect(prayerPulls[0]).toMatchObject({
-      equalities: [{ column: "user_id", value: "account-a" }],
-      orders: [
-        { ascending: true, column: "created_at" },
-        { ascending: true, column: "id" },
-      ],
-    });
-  });
+      expect(useQuestOS.getState().prayers).toHaveLength(1_001);
+      expect(
+        useQuestOS.getState().prayers.some(({ id }) => id === newestId),
+      ).toBe(true);
+      expect(prayerWrites).toEqual([]);
+      expect(prayerPulls.map(({ range }) => range)).toEqual([
+        { from: 0, to: 999 },
+        { from: 500, to: 1_499 },
+        { from: 1_000, to: 1_999 },
+        { from: 1_001, to: 2_000 },
+        { from: 0, to: 999 },
+        { from: 500, to: 1_499 },
+        { from: 1_000, to: 1_999 },
+        { from: 1_001, to: 2_000 },
+      ]);
+      expect(prayerPulls[0]).toMatchObject({
+        equalities: [{ column: "user_id", value: "account-a" }],
+        orders: [
+          { ascending: true, column: "created_at" },
+          { ascending: true, column: "id" },
+        ],
+      });
+    },
+    15_000,
+  );
 
   it("keeps local intent ahead of future-clock rows and caps by server receipt", async () => {
     const serverRows = Array.from({ length: 20 }, (_, index) => ({

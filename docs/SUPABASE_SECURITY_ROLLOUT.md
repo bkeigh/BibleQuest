@@ -100,6 +100,45 @@ RLS report, anonymous-denial checks, and limited signed-in checks must all be
 rerun. The packet adds one honest forward migration row; it does not rewrite
 or relabel any earlier production history.
 
+### Production 0029 user-row hardening packet
+
+Production records the lifetime packet above as applied. Migration `0029` must
+therefore use the next reviewed forward-only packet rather than the normal
+repository migration path. Use
+`scripts/reconcile-production-user-row-hardening.mjs`; it creates a disposable
+Supabase workdir containing the exact frozen legacy history and the applied
+lifetime marker, then proposes only
+`20260728191500_user_row_size_and_trigger_privileges.sql`. The packet:
+
+1. requires the exact production project and reviewed history through the
+   lifetime packet;
+2. requires a completed physical backup less than 30 hours old;
+3. rejects a partially installed function or trigger set;
+4. requires all 16 protected sync tables to exist with RLS enabled and rejects
+   any existing protected row larger than one MiB;
+5. applies checked-in `0029` only when its pinned SHA-256 matches; and
+6. verifies the complete trigger set, fixed function posture, and revoked
+   Data API execution privileges in the same transaction.
+
+The dry run is non-mutating and must propose exactly one packet:
+
+```bash
+pnpm check:production-user-row-hardening
+```
+
+Apply only after reviewing that output and the named backup:
+
+```bash
+BIBLEQUEST_PRODUCTION_MIGRATION_CONFIRM='apply 20260728191500 to iacnjqnssovaaojswjoh' \
+  node scripts/reconcile-production-user-row-hardening.mjs --apply
+```
+
+The apply must report `"applied":true`. Rerun the same command in dry-run mode;
+it must then report an empty proposed set and `"applied":true`. Follow with the
+production migration list, RLS/readiness checks, anonymous denials, and the
+limited signed-in smoke plan. Never substitute `db push --include-all`,
+normal linked `db push`, or migration-history repair.
+
 ## Complete public-table inventory
 
 | Classification | Tables | Intended access |
@@ -266,9 +305,11 @@ content parity.
 
 ```bash
 pnpm check:production-lifetime-migration
-# Stop here for review and explicit approval of this exact one-packet push.
-BIBLEQUEST_PRODUCTION_MIGRATION_CONFIRM='apply 20260727193000 to iacnjqnssovaaojswjoh' \
-  node scripts/reconcile-production-lifetime-migration.mjs --apply
+pnpm check:production-user-row-hardening
+# Stop here for review and explicit approval of the exact pending packet.
+BIBLEQUEST_PRODUCTION_MIGRATION_CONFIRM='apply 20260728191500 to iacnjqnssovaaojswjoh' \
+  node scripts/reconcile-production-user-row-hardening.mjs --apply
+pnpm check:production-user-row-hardening
 ```
 
 `0008` changes policies and a function, `0010` backfills quest timestamps and
