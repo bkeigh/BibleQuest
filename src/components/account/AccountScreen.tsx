@@ -167,7 +167,7 @@ function AccountInner() {
         <p className="text-small leading-relaxed text-charcoal">
           {intent === "create"
             ? "A free account syncs this device’s journey across your devices behind per-user access controls. Journal text stays out of analytics and AI."
-            : "Use the email or Google account connected to BibleQuest. We’ll restore its saved journey before opening the app."}
+            : "Use the email, Apple, or Google account connected to BibleQuest. We’ll restore its saved journey before opening the app."}
         </p>
 
         <ul className="mt-4 space-y-2">

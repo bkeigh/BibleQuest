@@ -28,6 +28,7 @@ import {
 import { withDeadline } from "@/lib/async/deadline";
 
 type EmailStatus = "idle" | "sending" | "requested";
+type OAuthProvider = "apple" | "google";
 
 // A quick client-side affordance. Supabase remains the source of truth.
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -77,7 +78,7 @@ export function SignInMethods({
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resending, setResending] = useState(false);
-  const [oauthPending, setOauthPending] = useState(false);
+  const [oauthPending, setOauthPending] = useState<OAuthProvider | null>(null);
   const [error, setError] = useState<AuthRequestFailure | null>(null);
 
   useEffect(() => {
@@ -211,10 +212,11 @@ export function SignInMethods({
     }
   }
 
-  async function oauth(provider: "google") {
+  async function oauth(provider: OAuthProvider) {
+    const providerName = provider === "apple" ? "Apple" : "Google";
     setError(null);
-    setOauthPending(true);
-    track("sign_in_started", { method: "google", source });
+    setOauthPending(provider);
+    track("sign_in_started", { method: provider, source });
     try {
       const { error: requestError } = await withDeadline(
         createClient().auth.signInWithOAuth({
@@ -222,7 +224,7 @@ export function SignInMethods({
           options: { redirectTo: callbackUrl() },
         }),
         AUTH_REQUEST_DEADLINE_MS,
-        "Google sign-in request",
+        `${providerName} sign-in request`,
       );
       if (requestError) {
         reportClientSignal({
@@ -231,8 +233,8 @@ export function SignInMethods({
           outcome: "failure",
           category: classifyOperationalError(requestError, online()),
         });
-        setOauthPending(false);
-        showFailure(oauthRequestFailure(requestError, online()));
+        setOauthPending(null);
+        showFailure(oauthRequestFailure(requestError, provider, online()));
       }
       // On success the browser navigates away; pending intentionally remains.
     } catch (requestError) {
@@ -242,8 +244,8 @@ export function SignInMethods({
         outcome: "failure",
         category: classifyOperationalError(requestError, online()),
       });
-      setOauthPending(false);
-      showFailure(oauthRequestFailure(requestError, online()));
+      setOauthPending(null);
+      showFailure(oauthRequestFailure(requestError, provider, online()));
     }
   }
 
@@ -359,17 +361,12 @@ export function SignInMethods({
 
         <Divider />
 
-        <GentleButton
-          type="button"
-          variant="outline"
-          size="md"
-          fullWidth
-          onClick={() => void oauth("google")}
-          disabled={oauthPending || resending || verifyingOtp}
-          aria-busy={oauthPending}
-        >
-          {oauthPending ? "Opening Google…" : "Continue with Google instead"}
-        </GentleButton>
+        <OAuthButtons
+          intent={intent}
+          pending={oauthPending}
+          disabled={Boolean(oauthPending) || resending || verifyingOtp}
+          onSelect={oauth}
+        />
       </div>
     );
   }
@@ -410,7 +407,9 @@ export function SignInMethods({
           size="md"
           fullWidth
           className="mt-3"
-          disabled={!emailValid || emailStatus === "sending" || oauthPending}
+          disabled={
+            !emailValid || emailStatus === "sending" || Boolean(oauthPending)
+          }
           aria-busy={emailStatus === "sending"}
         >
           {emailStatus === "sending"
@@ -423,24 +422,57 @@ export function SignInMethods({
 
       <Divider />
 
-      <GentleButton
-        type="button"
-        variant="outline"
-        size="md"
-        fullWidth
-        onClick={() => void oauth("google")}
-        disabled={oauthPending || emailStatus === "sending"}
-        aria-busy={oauthPending}
-      >
-        {oauthPending
-          ? "Opening Google…"
-          : intent === "create"
-            ? "Create account with Google"
-            : "Continue with Google"}
-      </GentleButton>
+      <OAuthButtons
+        intent={intent}
+        pending={oauthPending}
+        disabled={Boolean(oauthPending) || emailStatus === "sending"}
+        onSelect={oauth}
+      />
 
       {error && <FailureNotice failure={error} />}
     </>
+  );
+}
+
+/** Keeps Apple and Google behavior aligned across both email states. */
+function OAuthButtons({
+  intent,
+  pending,
+  disabled,
+  onSelect,
+}: {
+  intent: "create" | "signin";
+  pending: OAuthProvider | null;
+  disabled: boolean;
+  onSelect: (provider: OAuthProvider) => Promise<void>;
+}) {
+  return (
+    <div className="space-y-2">
+      {(["apple", "google"] as const).map((provider) => {
+        const providerName = provider === "apple" ? "Apple" : "Google";
+        const label =
+          pending === provider
+            ? `Opening ${providerName}…`
+            : intent === "create"
+              ? `Create account with ${providerName}`
+              : `Continue with ${providerName}`;
+
+        return (
+          <GentleButton
+            key={provider}
+            type="button"
+            variant="outline"
+            size="md"
+            fullWidth
+            onClick={() => void onSelect(provider)}
+            disabled={disabled}
+            aria-busy={pending === provider}
+          >
+            {label}
+          </GentleButton>
+        );
+      })}
+    </div>
   );
 }
 

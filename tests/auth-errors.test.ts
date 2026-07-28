@@ -4,6 +4,7 @@ import {
   authFailureReason,
   emailOtpFailure,
   emailRequestFailure,
+  oauthRequestFailure,
   parseAuthFailureReason,
 } from "@/lib/auth/errors";
 
@@ -31,8 +32,22 @@ describe("auth diagnostics", () => {
       emailRequestFailure({ code: "email_address_not_authorized" }),
     ).toEqual({
       message:
-        "Email delivery is not enabled for this address yet. Use Google for now, or ask the BibleQuest team to finish production email setup.",
+        "Email delivery is not enabled for this address yet. Use Apple or Google for now, or ask the BibleQuest team to finish production email setup.",
       reference: "AUTH-EMAIL-SETUP",
+      unavailable: false,
+    });
+  });
+
+  it("identifies the OAuth provider without exposing provider details", () => {
+    expect(
+      oauthRequestFailure({ code: "provider_disabled" }, "apple"),
+    ).toMatchObject({
+      reference: "AUTH-APPLE-DISABLED",
+      unavailable: true,
+    });
+    expect(oauthRequestFailure({ message: "private detail" }, "google")).toEqual({
+      message: "We couldn’t open Google sign-in. Please try again.",
+      reference: "AUTH-GOOGLE-REQUEST",
       unavailable: false,
     });
   });

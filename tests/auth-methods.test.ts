@@ -16,12 +16,13 @@ import {
 } from "@/components/account/SignInMethods";
 
 describe("production sign-in methods", () => {
-  it("offers email and Google without advertising disabled phone auth", () => {
+  it("offers email, Apple, and Google without advertising disabled phone auth", () => {
     const markup = renderToStaticMarkup(
       createElement(SignInMethods, { source: "account" }),
     );
 
     expect(markup).toContain("Email me a sign-in code");
+    expect(markup).toContain("Continue with Apple");
     expect(markup).toContain("Continue with Google");
     expect(markup).not.toContain("Text me a code");
     expect(markup).not.toContain('type="tel"');
@@ -42,8 +43,10 @@ describe("production sign-in methods", () => {
     );
 
     expect(createMarkup).toContain("Create account with email");
+    expect(createMarkup).toContain("Create account with Apple");
     expect(createMarkup).toContain("Create account with Google");
     expect(signInMarkup).toContain("Email me a sign-in code");
+    expect(signInMarkup).toContain("Continue with Apple");
     expect(signInMarkup).toContain("Continue with Google");
   });
 
