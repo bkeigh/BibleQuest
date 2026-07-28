@@ -139,6 +139,28 @@ production migration list, RLS/readiness checks, anonymous denials, and the
 limited signed-in smoke plan. Never substitute `db push --include-all`,
 normal linked `db push`, or migration-history repair.
 
+#### July 28, 2026 production execution record
+
+The reviewed production owner approval was executed at approximately
+`2026-07-28T19:37Z` against project `iacnjqnssovaaojswjoh`:
+
+- the current completed physical backup was
+  `2026-07-28T07:57:26.423Z`;
+- the applied packet was
+  `20260728191500_user_row_size_and_trigger_privileges.sql`;
+- the pinned `0029` source SHA-256 was
+  `65f9c340e7733696f220f2fc92b0cdc486098f7e4bcde1a03ec6b999784fc4be`;
+- the guarded apply reported `"applied":true`;
+- the immediate guarded dry run reported `"proposed":[]` and
+  `"applied":true`; and
+- linked public-schema lint reported no schema errors.
+
+The packet transaction's postflight also proved all 16 active row-size
+triggers, the security-invoker/fixed-search-path function posture, and no
+anonymous, authenticated, or service-role execution privilege on either
+trigger helper. This record contains no credentials, user rows, or private
+catalog output.
+
 ## Complete public-table inventory
 
 | Classification | Tables | Intended access |
