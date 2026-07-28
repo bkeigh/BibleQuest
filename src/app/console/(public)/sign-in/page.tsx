@@ -58,8 +58,8 @@ export default async function ConsoleSignInPage() {
           <div className="mt-7 rounded-[12px] border border-gold-300 bg-gold-50 p-4">
             <p className="font-medium text-gold-700">Operator access is locked.</p>
             <p className="mt-1 text-caption leading-relaxed text-ash">
-              Configure the server-only operator allowlist and account sync
-              before signing in. The console fails closed until both exist.
+              Configure Supabase Auth and the server-only operator allowlist
+              before signing in. Customer account sync stays independent.
             </p>
           </div>
         )}

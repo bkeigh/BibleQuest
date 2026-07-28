@@ -1,10 +1,10 @@
 import { privateError } from "./request";
 
-/** Reads a request stream without allowing a missing length to bypass its cap. */
-export async function boundedText(
+/** Reads raw request bytes without trusting Content-Length to enforce the cap. */
+export async function boundedBytes(
   request: Request,
   maximumBytes: number,
-): Promise<string | Response> {
+): Promise<Uint8Array<ArrayBuffer> | Response> {
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
   if (
     !Number.isFinite(declaredLength) ||
@@ -36,6 +36,20 @@ export async function boundedText(
       bytes.set(chunk, offset);
       offset += chunk.byteLength;
     }
+    return bytes;
+  } catch {
+    return privateError("invalid_request", 400);
+  }
+}
+
+/** Decodes one capped request body as strict UTF-8. */
+export async function boundedText(
+  request: Request,
+  maximumBytes: number,
+): Promise<string | Response> {
+  try {
+    const bytes = await boundedBytes(request, maximumBytes);
+    if (bytes instanceof Response) return bytes;
     return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch {
     return privateError("invalid_request", 400);

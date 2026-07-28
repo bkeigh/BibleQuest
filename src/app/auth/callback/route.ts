@@ -11,6 +11,11 @@ import {
 } from "@/lib/auth/errors";
 import { AUTH_COMPLETION_COOKIE } from "@/lib/auth/completion-signal";
 import { accountSyncAvailable } from "@/lib/sync/containment";
+import { isConsoleRequestHost } from "@/lib/console/paths";
+import {
+  consoleAllowedEmails,
+  consoleAuthEnabled,
+} from "@/lib/console/auth-config";
 
 /**
  * Email OTP types we accept on the token_hash path. An allow-list, not a cast:
@@ -30,6 +35,25 @@ function asEmailOtpType(value: string | null): EmailOtpType | null {
   return value && EMAIL_OTP_TYPES.has(value as EmailOtpType)
     ? (value as EmailOtpType)
     : null;
+}
+
+/** Allows the independent operator console to complete auth while product sync stays contained. */
+function isConfiguredConsoleCallback(
+  request: Request,
+  url: URL,
+  next: string,
+): boolean {
+  const consoleTarget =
+    isConsoleRequestHost(
+      url.host,
+      request.headers.get("x-forwarded-host"),
+    ) || next === "/console";
+
+  return (
+    consoleTarget &&
+    consoleAuthEnabled() &&
+    consoleAllowedEmails().size > 0
+  );
 }
 
 /**
@@ -57,24 +81,37 @@ export async function GET(request: Request) {
   const next = safeNextPath(url.searchParams.get("next"));
   const providerError =
     url.searchParams.get("error_code") ?? url.searchParams.get("error");
+  const consoleCallback = isConfiguredConsoleCallback(request, url, next);
   let failure: AuthFailureReason = "unknown";
 
-  // Fail closed before exchanging any credential while guest-only containment
-  // is active, even when the deployment still carries valid Supabase config.
-  if (!accountSyncAvailable(isSupabaseConfigured())) {
+  // Customer auth stays fail-closed during containment. The independently
+  // configured operator console can still exchange its own callback.
+  if (
+    !accountSyncAvailable(isSupabaseConfigured()) &&
+    !consoleCallback
+  ) {
     failure = "configuration";
   } else if (providerError) {
     failure = authFailureReason(null, providerError);
   } else if (code || (tokenHash && type)) {
     try {
       const supabase = await createServerSupabase();
-      const { error } = code
+      const { data, error } = code
         ? await supabase.auth.exchangeCodeForSession(code)
         : await supabase.auth.verifyOtp({ type: type!, token_hash: tokenHash! });
       if (!error) {
-        return privateRedirect(new URL(next, url.origin), true);
+        const email = data.user?.email?.trim().toLowerCase();
+        if (!consoleCallback || (email && consoleAllowedEmails().has(email))) {
+          return privateRedirect(new URL(next, url.origin), true);
+        }
+
+        // A valid Supabase account is not automatically a console operator.
+        // Remove its local session before returning a generic sign-in failure.
+        await supabase.auth.signOut({ scope: "local" });
+        failure = "invalid";
+      } else {
+        failure = authFailureReason(error);
       }
-      failure = authFailureReason(error);
     } catch (error) {
       failure = authFailureReason(error);
     }
@@ -88,6 +125,16 @@ export async function GET(request: Request) {
   // sending a fresh device to /app/account would put it behind the very gate
   // that is waiting for account restoration. Other account invitations keep
   // the established in-app recovery screen.
+  if (consoleCallback) {
+    const consoleSignInPath = isConsoleRequestHost(
+      url.host,
+      request.headers.get("x-forwarded-host"),
+    )
+      ? "/sign-in"
+      : "/console/sign-in";
+    return privateRedirect(new URL(consoleSignInPath, url.origin));
+  }
+
   const errorUrl = new URL(
     new URL(next, url.origin).pathname === "/onboarding"
       ? "/onboarding"

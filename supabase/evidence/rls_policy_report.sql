@@ -170,6 +170,8 @@ where namespace.nspname = 'public'
     'append_console_audit_log',
     'assert_user_sync_context',
     'enforce_user_sync_generation',
+    'enforce_user_owned_row_size',
+    'ensure_journey_event_date_key',
     'advance_account_sync_revision',
     'handle_new_user',
     'bump_daily_quest_revision_for_legacy_write',
@@ -262,6 +264,8 @@ join pg_catalog.pg_namespace as namespace
 where namespace.nspname = 'public'
   and procedure.proname in (
     'keep_newest_recent_verse',
+    'ensure_journey_event_date_key',
+    'enforce_user_owned_row_size',
     'advance_account_sync_revision',
     'delete_own_account',
     'bump_daily_quest_revision_for_legacy_write',

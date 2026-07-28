@@ -169,6 +169,8 @@ browser on the immutable URL and an upgraded browser/installed PWA on the
 approved same-origin transition alias. The sanitized request summary may
 name endpoint categories and counts, but must not include keys, tokens, email,
 user/record IDs, private text, raw URLs, or query strings.
+The independently gated operator console is tested separately; its allowlisted
+auth session does not count as customer account-sync traffic.
 
 - [ ] `/api/health` reports `guest-only`, the exact release SHA, canonical
       origin, expected worker/schema/content contracts, and selected billing
@@ -199,9 +201,9 @@ user/record IDs, private text, raw URLs, or query strings.
 - [ ] The named account posture owner and rollback authority accept the complete
       evidence and residual-client decision with UTC timestamps.
 
-Any visible account control, credential exchange, session refresh, sync-client
-activity, Supabase auth/sync browser request, local-first data loss, or missing
-acceptance is a hard failure.
+Any visible customer account control, customer credential exchange or session
+refresh, sync-client activity, customer-browser Supabase auth/sync request,
+local-first data loss, or missing acceptance is a hard failure.
 
 ## Manual — transactional daily-quest sync
 

@@ -22,7 +22,7 @@ as a containment breach.
 - `configured`, `guest-only`, or `invalid` effective auth posture without a
   host or key; the containment latch reports `guest-only` even when dormant
   provider credentials remain configured;
-- schema/content contract labels (`0028` and `seed-manifest-v1`);
+- schema/content contract labels (`0029` and `seed-manifest-v1`);
 - the checked-in service-worker version;
 - `coming-soon`, `test`, `live`, or `invalid` direct Stripe posture without a
   key, plus a boolean purchase-UI gate.
@@ -38,11 +38,13 @@ Health reports posture; it does not prove behavior. A `configured` release must
 complete the full auth/sync synthetic, SMTP delivery, callback, and
 cross-account evidence in the launch runbook. A `guest-only` release must
 complete the containment canary below: enrollment, sign-in, and account-action
-controls absent (a status-only containment notice/page is allowed), callback
-and middleware/session handling inert, sync/client creation inert, no browser
-Supabase Auth/session/user-table/sync-RPC traffic, and local-first core behavior
-complete. `invalid` is always a hard hold. Dormant credentials do not upgrade or
-downgrade these requirements.
+controls absent (a status-only containment notice/page is allowed), customer
+callback and middleware/session handling inert, sync/client creation inert, no
+customer-browser Supabase Auth/session/user-table/sync-RPC traffic, and
+local-first core behavior complete. The separately allowlisted operator console
+is measured as a private surface and does not change customer account posture.
+`invalid` is always a hard hold. Dormant credentials do not upgrade or downgrade
+these requirements.
 
 ## Browser signal contract
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
+import { boundedText } from "@/lib/http/json";
 import { safeClientSignalLog } from "@/lib/observability/client-signals";
 
 const MAX_BODY_BYTES = 512;
@@ -42,9 +43,12 @@ export async function POST(request: Request) {
 
   let candidate: unknown;
   try {
-    const body = await request.text();
-    if (new TextEncoder().encode(body).byteLength > MAX_BODY_BYTES) {
-      return NextResponse.json({ accepted: false }, { status: 413 });
+    const body = await boundedText(request, MAX_BODY_BYTES);
+    if (body instanceof Response) {
+      return NextResponse.json(
+        { accepted: false },
+        { status: body.status },
+      );
     }
     candidate = JSON.parse(body);
   } catch {

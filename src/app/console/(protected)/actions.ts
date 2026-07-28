@@ -12,12 +12,15 @@ export async function recordConsoleSignIn() {
   const access = await getConsoleAccess();
   if (access.state !== "authorized") return false;
 
-  return appendConsoleAuditLog({
+  // Authorization is fail-closed, but an audit storage outage must not strand
+  // an already verified operator outside the recovery console.
+  await appendConsoleAuditLog({
     actor: { userId: access.userId, email: access.email },
     action: "operator.sign_in",
     targetType: "console",
     targetKey: "session",
   });
+  return true;
 }
 
 /** Ends the operator session and returns to the correct sign-in URL. */

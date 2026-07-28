@@ -1,4 +1,9 @@
 import { describe, expect, it } from "vitest";
+import {
+  boundedBytes,
+  boundedJson,
+  boundedText,
+} from "@/lib/http/json";
 import { hasSameOrigin, privateError } from "@/lib/http/request";
 
 /** Builds a proxied request whose internal URL differs from the browser host. */
@@ -43,5 +48,48 @@ describe("private mutation request guards", () => {
     expect(response.status).toBe(503);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     await expect(response.json()).resolves.toEqual({ error: "unavailable" });
+  });
+
+  it("caps the bytes actually read even when Content-Length understates them", async () => {
+    const request = new Request("https://biblequest.test/api/private", {
+      method: "POST",
+      headers: { "Content-Length": "2" },
+      body: new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array([1, 2, 3]));
+          controller.enqueue(new Uint8Array([4, 5, 6]));
+          controller.close();
+        },
+      }),
+      duplex: "half",
+    } as RequestInit & { duplex: "half" });
+
+    const result = await boundedBytes(request, 4);
+
+    expect(result).toBeInstanceOf(Response);
+    expect((result as Response).status).toBe(413);
+  });
+
+  it("strictly decodes capped UTF-8 and requires exact JSON content type", async () => {
+    const invalidUtf8 = await boundedText(
+      new Request("https://biblequest.test/api/private", {
+        method: "POST",
+        body: new Uint8Array([0xc3, 0x28]),
+      }),
+      8,
+    );
+    expect(invalidUtf8).toBeInstanceOf(Response);
+    expect((invalidUtf8 as Response).status).toBe(400);
+
+    const wrongType = await boundedJson(
+      new Request("https://biblequest.test/api/private", {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: "{}",
+      }),
+      8,
+    );
+    expect(wrongType).toBeInstanceOf(Response);
+    expect((wrongType as Response).status).toBe(400);
   });
 });

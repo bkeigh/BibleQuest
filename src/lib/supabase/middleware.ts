@@ -6,12 +6,17 @@ import { accountSyncAvailable } from "@/lib/sync/containment";
 /**
  * Refreshes the Supabase auth session cookie on each request so server
  * components see a valid session. No-ops when Supabase isn't configured or
- * guest-only containment is active, so local mode is completely unaffected.
+ * guest-only containment is active, unless an independent private surface
+ * explicitly requests auth refresh. Local mode remains completely unaffected.
  *
  * Follows the @supabase/ssr guidance: do not run logic between createServerClient
  * and getUser(), and always return the response object it produces.
  */
-export async function updateSession(request: NextRequest, rewriteUrl?: URL) {
+export async function updateSession(
+  request: NextRequest,
+  rewriteUrl?: URL,
+  refreshContainedSession = false,
+) {
   const responseForRequest = () => {
     const forwardedHeaders = new Headers(request.headers);
     // The proxy owns this marker so a caller cannot spoof clean console URLs.
@@ -25,9 +30,14 @@ export async function updateSession(request: NextRequest, rewriteUrl?: URL) {
   };
   let response = responseForRequest();
 
-  // Contained builds must not create a server client or refresh a session,
-  // even if Supabase environment variables remain available for later rollout.
-  if (!accountSyncAvailable(isSupabaseConfigured())) return response;
+  // Customer routes stay fully contained. The private console may refresh its
+  // own operator cookie without enabling product account sync.
+  if (
+    !isSupabaseConfigured() ||
+    (!accountSyncAvailable(true) && !refreshContainedSession)
+  ) {
+    return response;
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

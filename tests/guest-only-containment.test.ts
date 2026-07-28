@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
   createServerSupabase: vi.fn(),
 }));
 
+// Allows Vitest to exercise the server-only console callback boundary.
+vi.mock("server-only", () => ({}));
+
 vi.mock("@/lib/supabase/client", () => ({
   createClient: mocks.createClient,
   isSupabaseConfigured: () => true,
@@ -170,6 +173,90 @@ describe("guest-only account-sync containment", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.createServerClient).not.toHaveBeenCalled();
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("refreshes an independent console session while customer sync stays contained", async () => {
+    vi.stubEnv("BIBLEQUEST_CONSOLE_AUTH_ENABLED", "true");
+    mocks.createServerClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: null },
+          error: null,
+        }),
+      },
+    });
+
+    const response = await proxy(
+      new NextRequest("https://console.biblequest.co/insights", {
+        headers: { host: "console.biblequest.co" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.createServerClient).toHaveBeenCalledOnce();
+    expect(response.headers.get("x-middleware-rewrite")).toContain(
+      "/console/insights",
+    );
+  });
+
+  it("allows only a configured console callback through containment", async () => {
+    vi.stubEnv("BIBLEQUEST_CONSOLE_AUTH_ENABLED", "true");
+    vi.stubEnv(
+      "BIBLEQUEST_CONSOLE_ALLOWED_EMAILS",
+      "operator@biblequest.co",
+    );
+    mocks.createServerSupabase.mockResolvedValue({
+      auth: {
+        exchangeCodeForSession: vi.fn().mockResolvedValue({
+          data: { user: { email: "operator@biblequest.co" } },
+          error: null,
+        }),
+      },
+    });
+
+    const response = await authCallback(
+      new Request(
+        "https://console.biblequest.co/auth/callback?code=operator-code&next=%2F",
+      ),
+    );
+
+    expect(mocks.createServerSupabase).toHaveBeenCalledOnce();
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "https://console.biblequest.co/",
+    );
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  it("removes a non-operator console callback session", async () => {
+    vi.stubEnv("BIBLEQUEST_CONSOLE_AUTH_ENABLED", "true");
+    vi.stubEnv(
+      "BIBLEQUEST_CONSOLE_ALLOWED_EMAILS",
+      "operator@biblequest.co",
+    );
+    const signOut = vi.fn().mockResolvedValue({ error: null });
+    mocks.createServerSupabase.mockResolvedValue({
+      auth: {
+        exchangeCodeForSession: vi.fn().mockResolvedValue({
+          data: { user: { email: "customer@example.com" } },
+          error: null,
+        }),
+        signOut,
+      },
+    });
+
+    const response = await authCallback(
+      new Request(
+        "https://console.biblequest.co/auth/callback?code=customer-code&next=%2F",
+      ),
+    );
+
+    expect(signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "https://console.biblequest.co/sign-in",
+    );
     expect(response.headers.get("set-cookie")).toBeNull();
   });
 

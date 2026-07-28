@@ -121,7 +121,7 @@ Live support remains a hard no-go until:
 
 - the complete matrix above passes in an approved test deployment;
 - migration history, the 39-table RLS report, backup/restore, and production
-  public readiness through schema contract `0028` pass;
+  public readiness through schema contract `0029` pass;
 - counsel or the named communications owner approves voluntary,
   non-recurring, non-tax-deductible, refund, receipt, and separation-from-Plus
   copy;
