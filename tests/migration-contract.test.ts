@@ -35,6 +35,7 @@ const EXPECTED_MIGRATIONS = [
   "0026_stripe_one_time_support.sql",
   "0027_console_insights_and_audit.sql",
   "0028_stripe_lifetime_plus.sql",
+  "0029_user_row_size_and_trigger_privileges.sql",
 ];
 
 /** Hash a migration exactly as the release manifest does. */
@@ -141,6 +142,8 @@ describe("release migration contracts", () => {
     expect(report).toContain("'complete_stripe_support_checkout'");
     expect(report).toContain("'console_insights'");
     expect(report).toContain("'append_console_audit_log'");
+    expect(report).toContain("'enforce_user_owned_row_size'");
+    expect(report).toContain("'ensure_journey_event_date_key'");
     expect(report).toContain(
       "select public.account_deletion_contract() as account_deletion_contract;",
     );

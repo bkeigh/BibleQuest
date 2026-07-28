@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
 import { API_BIBLE_FUMS_TOKEN } from "@/lib/bible/fums";
+import { boundedJson } from "@/lib/http/json";
 
 export const dynamic = "force-dynamic";
 
@@ -13,30 +14,8 @@ export async function POST(request: Request) {
   ]);
   if (blocked) return blocked;
 
-  const contentLength = Number(request.headers.get("content-length") ?? "0");
-  if (!Number.isFinite(contentLength) || contentLength > 4_096) {
-    return NextResponse.json(
-      { error: "invalid_request" },
-      { status: 413, headers: { "Cache-Control": "private, no-store" } },
-    );
-  }
-
-  let body: unknown;
-  try {
-    const raw = await request.text();
-    if (raw.length > 4_096) {
-      return NextResponse.json(
-        { error: "invalid_request" },
-        { status: 413, headers: { "Cache-Control": "private, no-store" } },
-      );
-    }
-    body = JSON.parse(raw);
-  } catch {
-    return NextResponse.json(
-      { error: "invalid_request" },
-      { status: 400, headers: { "Cache-Control": "private, no-store" } },
-    );
-  }
+  const body = await boundedJson(request, 4_096);
+  if (body instanceof Response) return body;
   const value = body as { token?: unknown; deviceId?: unknown; sessionId?: unknown };
   if (
     typeof value.token !== "string" ||

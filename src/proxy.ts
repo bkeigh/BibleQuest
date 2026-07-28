@@ -2,7 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { rateLimitProviderRequest } from "@/lib/bible/provider-request-guard";
 import { translationMetadata } from "@/lib/bible/translations";
 import { updateSession } from "@/lib/supabase/middleware";
-import { consoleRewritePath } from "@/lib/console/paths";
+import {
+  consoleRewritePath,
+  isConsoleRequestHost,
+} from "@/lib/console/paths";
 
 /** Refresh the optional Supabase session before matched app requests. */
 export async function proxy(request: NextRequest) {
@@ -13,6 +16,14 @@ export async function proxy(request: NextRequest) {
   );
   const consoleUrl = consolePath ? request.nextUrl.clone() : undefined;
   if (consoleUrl) consoleUrl.pathname = consolePath!;
+  const consoleSessionRequest =
+    process.env.BIBLEQUEST_CONSOLE_AUTH_ENABLED === "true" &&
+    (isConsoleRequestHost(
+      request.headers.get("host"),
+      request.headers.get("x-forwarded-host"),
+    ) ||
+      request.nextUrl.pathname === "/console" ||
+      request.nextUrl.pathname.startsWith("/console/"));
 
   const requestedTranslation = translationMetadata(
     request.nextUrl.searchParams.get("translation"),
@@ -39,7 +50,11 @@ export async function proxy(request: NextRequest) {
       return response;
     }
   }
-  const response = await updateSession(request, consoleUrl);
+  const response = await updateSession(
+    request,
+    consoleUrl,
+    consoleSessionRequest,
+  );
   if (consoleUrl) response.headers.set("Cache-Control", "private, no-store");
   return response;
 }

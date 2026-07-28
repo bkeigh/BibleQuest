@@ -12,6 +12,7 @@ import {
   MAX_AVATAR_INPUT_BYTES,
   MAX_AVATAR_OUTPUT_BYTES,
 } from "@/lib/avatar/validation";
+import { boundedBytes, boundedJson } from "@/lib/http/json";
 import { hasSameOrigin, privateError } from "@/lib/http/request";
 import { createServerSupabase } from "@/lib/supabase/server";
 
@@ -171,13 +172,12 @@ export async function GET() {
 export async function POST(request: Request) {
   if (!featureEnabled()) return privateError("unavailable", 503);
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
-  const declaredLength = Number(request.headers.get("content-length") ?? "0");
+  const contentType = request.headers.get("content-type") ?? "";
   if (
-    !Number.isFinite(declaredLength) ||
-    declaredLength < 0 ||
-    declaredLength > MAX_FORM_BYTES
+    contentType.length > 256 ||
+    !/^multipart\/form-data;\s*boundary=[\x20-\x7e]{1,200}$/i.test(contentType)
   ) {
-    return privateError("invalid_avatar", 413);
+    return privateError("invalid_avatar", 400);
   }
 
   const context = await authenticatedContext();
@@ -189,7 +189,15 @@ export async function POST(request: Request) {
 
   let normalized: Uint8Array;
   try {
-    const form = await request.formData();
+    // Reparse only the capped bytes so chunked uploads cannot force an
+    // unbounded multipart allocation before image validation begins.
+    const bytes = await boundedBytes(request, MAX_FORM_BYTES);
+    if (bytes instanceof Response) {
+      return privateError("invalid_avatar", bytes.status);
+    }
+    const form = await new Response(bytes, {
+      headers: { "Content-Type": contentType },
+    }).formData();
     const file = form.get("avatar");
     const fields = [...form.keys()];
     if (
@@ -306,18 +314,20 @@ export async function DELETE(request: Request) {
   }
 
   let allOwnedObjects = false;
+  const body = await boundedJson(request, 1024);
+  if (body instanceof Response) return body;
   try {
-    if (Number(request.headers.get("content-length") ?? "0") > 1024) {
-      return privateError("invalid_request", 413);
-    }
-    const body = (await request.json()) as { allOwnedObjects?: unknown };
     if (
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body) ||
       Object.keys(body).some((key) => key !== "allOwnedObjects") ||
-      typeof body.allOwnedObjects !== "boolean"
+      typeof (body as { allOwnedObjects?: unknown }).allOwnedObjects !==
+        "boolean"
     ) {
       return privateError("invalid_request", 400);
     }
-    allOwnedObjects = body.allOwnedObjects;
+    allOwnedObjects = (body as { allOwnedObjects: boolean }).allOwnedObjects;
   } catch {
     return privateError("invalid_request", 400);
   }

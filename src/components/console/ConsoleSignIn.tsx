@@ -61,16 +61,18 @@ export function ConsoleSignIn() {
     setMessage(null);
     setState("verifying");
     try {
-      const { error } = await createClient().auth.verifyOtp({
+      const supabase = createClient();
+      const { error } = await supabase.auth.verifyOtp({
         email: requestedEmail,
         token: code,
         type: "email",
       });
       if (error) throw error;
-      try {
-        await recordConsoleSignIn();
-      } catch {
-        // Audit availability never blocks a verified operator session.
+      const authorized = await recordConsoleSignIn();
+      if (!authorized) {
+        // A valid account outside the operator allowlist keeps no local session.
+        await supabase.auth.signOut({ scope: "local" });
+        throw new Error("console_access_denied");
       }
       window.location.assign(returnPath());
     } catch {

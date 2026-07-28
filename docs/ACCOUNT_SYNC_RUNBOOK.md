@@ -58,13 +58,15 @@ The launch record must select exactly one track:
 - **Guest-only contained:** omit `NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED` or set it
   to anything except the exact string `true`; require health to
   report `guest-only`; prove enrollment, sign-in, and account-action controls
-  are absent (a status-only containment notice/page is allowed); callback exchange,
-  middleware session refresh, and sync/client creation are no-ops; prove clean
-  and upgraded browsers make no Supabase Auth/session/user-table/sync-RPC
-  requests; and prove the complete local-first core, persistence, export/clear,
-  offline/reconnect, and PWA update paths. The named account posture owner and
-  rollback authority must accept the evidence and any stale-client/backend
-  containment decision.
+  are absent (a status-only containment notice/page is allowed); customer
+  callback exchange, middleware session refresh, and sync/client creation are
+  no-ops; prove clean and upgraded customer browsers make no Supabase
+  Auth/session/user-table/sync-RPC requests; and prove the complete local-first
+  core, persistence, export/clear, offline/reconnect, and PWA update paths. The
+  independently gated operator console may authenticate only on its dedicated
+  host or internal console path and remains outside customer account sync. The
+  named account posture owner and rollback authority must accept the evidence
+  and any stale-client/backend containment decision.
 
 Guest-only does not turn active auth or sync tests into passes. Record SMTP,
 Gmail/iCloud, provider callback, signed-in sync, and A/B client behavior as

@@ -9,7 +9,7 @@ identity `0014_journey_event_identity.sql`, and transactional daily-quest
 migration `0015_transactional_daily_quest_sync.sql`, followed by the reviewed
 account-sync and deletion boundary `0016` through `0022`, sealed avatar/push
 and billing/support/console boundaries `0023` through `0027`, and lifetime
-Plus billing `0028`. It is
+Plus billing `0028` and user-row/trigger hardening `0029`. It is
 deliberately local/staging-first. Do not run any linked or remote command until
 the project reference and exact command have been reviewed and explicitly
 approved.
@@ -41,6 +41,7 @@ The repository timeline is:
 | 2026-07-24 | Private account features | Adds `0023`–`0024`: sealed profile avatars and private push-reminder state. |
 | 2026-07-25 | Server-owned commerce and console | Adds `0025`–`0027`: test billing, one-time support, aggregate console insights, and append-only operator audit. |
 | 2026-07-27 | Lifetime Plus | Adds `0028`: sealed one-time/lifetime Stripe projection fields and the v2 billing contract. |
+| 2026-07-28 | Sync resource hardening | Adds `0029`: a one-MiB cap on every generation-bound row and removes direct Data API access to trigger helpers. |
 
 If a database recorded an old `0002`, `0003`, or `0004` before the renames,
 the later filenames do not change those recorded versions. Conversely, a
@@ -161,6 +162,7 @@ Expected migration order:
 0026_stripe_one_time_support.sql
 0027_console_insights_and_audit.sql
 0028_stripe_lifetime_plus.sql
+0029_user_row_size_and_trigger_privileges.sql
 ```
 
 Evidence must show all 39 expected tables with `rowsecurity = true`, only the
