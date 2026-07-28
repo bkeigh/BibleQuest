@@ -110,9 +110,9 @@ describe("launch content catalog", () => {
     expect(reader).not.toContain('role="button"');
     expect(reader).toContain('aria-pressed={isSel}');
     expect(reader).toContain('data-selected={isSel ? "true" : undefined}');
-    expect(reader).toContain('isSel && "verse-selection"');
-    expect(globalStyles).toContain(".verse-selection {");
-    expect(globalStyles).toContain("box-decoration-break: clone");
+    expect(reader).toContain('"box-decoration-clone');
+    expect(reader).toContain('isSel && "bg-gold-500/20"');
+    expect(globalStyles).toContain(':focus-visible:not([id^="verse-"])');
     expect(reader).toContain("persistableVerseText(i)");
     expect(bibleIndex).toContain("onPresentedText={recordPresentedVerse}");
     expect(questDetail).toContain("Back to Quests");

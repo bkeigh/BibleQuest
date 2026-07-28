@@ -446,20 +446,32 @@ function ReaderInner({
                 }
               }}
               className={cn(
-                "inline scroll-mt-28 appearance-none rounded border-0 bg-transparent p-0 text-left transition-colors",
+                "group inline scroll-mt-28 appearance-none border-0 bg-transparent p-0 text-left focus-visible:outline-none",
                 resolved.loading ? "cursor-wait" : "cursor-pointer",
-                isSel && "verse-selection",
-                isTargeted && !isSel && "bg-gold-500/15 ring-1 ring-gold-500/35",
-                isSaved && !isSel && !isTargeted && "bg-gold-500/10"
               )}
             >
-              <span className="verse-number">{num}</span>
               <span
-                className="verse-text"
-                dir={resolved.effectiveTranslation.direction}
-                lang={resolved.effectiveTranslation.languageId}
+                className={cn(
+                  "box-decoration-clone rounded-[0.2em] px-[0.08em] pt-[0.04em] pb-[0.08em] transition-colors",
+                  !isSel &&
+                    !isTargeted &&
+                    !isSaved &&
+                    "group-focus-visible:bg-gold-500/10",
+                  isSel && "bg-gold-500/20",
+                  isTargeted &&
+                    !isSel &&
+                    "bg-gold-500/15 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--color-gold-500)_35%,transparent)]",
+                  isSaved && !isSel && !isTargeted && "bg-gold-500/10",
+                )}
               >
-                {text || "This verse is presented in this edition’s notes."}{" "}
+                <span className="verse-number">{num}</span>
+                <span
+                  className="verse-text"
+                  dir={resolved.effectiveTranslation.direction}
+                  lang={resolved.effectiveTranslation.languageId}
+                >
+                  {text || "This verse is presented in this edition’s notes."}{" "}
+                </span>
               </span>
               {isSaved && <span className="sr-only">(saved)</span>}
             </button>

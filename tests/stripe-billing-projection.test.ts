@@ -37,6 +37,7 @@ function subscription(
     id: "sub_TestSubscription123",
     customer: "cus_TestCustomer123",
     status,
+    livemode: false,
     currency: "usd",
     cancel_at_period_end: false,
     canceled_at: null,
@@ -69,6 +70,8 @@ describe("server-authoritative Stripe projection", () => {
       plan_key: "plus",
       billing_interval: "monthly",
       stripe_price_id: CONFIGURATION.priceIds.monthly,
+      // Recorded so a test row can never be read as a live membership.
+      livemode: false,
     });
 
     const unknown = subscriptionProjection(

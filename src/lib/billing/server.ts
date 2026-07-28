@@ -123,6 +123,8 @@ export function subscriptionProjection(
     external_subscription_id: subscription.id,
     stripe_price_id: priceId,
     stripe_product_id: product,
+    // Recorded so a test-mode row can never be mistaken for a live one.
+    livemode: subscription.livemode,
     billing_interval: recognizedInterval ?? "unknown",
     currency: subscription.currency,
     cancel_at_period_end: subscription.cancel_at_period_end,

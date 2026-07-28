@@ -95,7 +95,7 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
           One-time supporters get our gratitude — no spiritual perks, ever.
         </p>
         <GentleLink variant="gold" size="sm" href="/support" className="mt-4 min-h-11">
-          Support BibleQuest once
+          Support BibleQuest
         </GentleLink>
         <p className="mt-2 text-[0.75rem] leading-relaxed text-ash">
           One-time support is separate from Plus and is not tax-deductible.
