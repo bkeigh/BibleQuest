@@ -43,6 +43,7 @@ export function statusTone(
       "approved",
       "sent",
       "succeeded",
+      "operator",
     ].includes(status)
   ) {
     return "good";

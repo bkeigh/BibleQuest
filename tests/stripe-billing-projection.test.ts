@@ -6,6 +6,7 @@ vi.mock("server-only", () => ({}));
 import {
   billingStatusFromRows,
   subscriptionProjection,
+  type OperatorPlusGrantRow,
   type SubscriptionProjectionRow,
 } from "@/lib/billing/server";
 import type { StripeBillingConfiguration } from "@/lib/billing/config";
@@ -139,6 +140,50 @@ describe("server-authoritative Stripe projection", () => {
       plan: "plus",
       isPlus: true,
       status: "active",
+    });
+  });
+
+  it("unions a current operator grant without fabricating Stripe state", () => {
+    const grant = {
+      id: "d1000000-0000-4000-8000-000000000001",
+      user_id: "c1000000-0000-4000-8000-000000000001",
+      starts_at: "2026-07-01T00:00:00.000Z",
+      expires_at: "2026-08-01T00:00:00.000Z",
+      revoked_at: null,
+    } satisfies OperatorPlusGrantRow;
+    expect(
+      billingStatusFromRows([], false, [grant], Date.parse("2026-07-15")),
+    ).toMatchObject({
+      plan: "plus",
+      isPlus: true,
+      status: "active",
+      entitlementSource: "operator",
+      interval: null,
+      currentPeriodEnd: grant.expires_at,
+      hasCustomer: false,
+    });
+    expect(
+      billingStatusFromRows(
+        [],
+        false,
+        [grant],
+        Date.parse("2026-08-02"),
+      ),
+    ).toMatchObject({
+      plan: "free",
+      isPlus: false,
+      entitlementSource: null,
+    });
+    expect(
+      billingStatusFromRows(
+        [],
+        false,
+        [{ ...grant, expires_at: null, revoked_at: "2026-07-10T00:00:00Z" }],
+        Date.parse("2026-07-15"),
+      ),
+    ).toMatchObject({
+      plan: "free",
+      isPlus: false,
     });
   });
 

@@ -13,6 +13,7 @@ import {
   type ConsoleInsightRange,
   type ConsoleInsights,
 } from "./insights";
+import { findConsoleAccountByEmail } from "./plus-grants.server";
 
 export type ConsoleDataStatus = "live" | "setup_required" | "degraded";
 
@@ -44,6 +45,7 @@ export interface ConsoleOverview {
 }
 
 export interface ConsoleAccount {
+  id: string;
   email: string;
   displayName: string;
   createdAt: string;
@@ -51,6 +53,12 @@ export interface ConsoleAccount {
   onboardingCompleted: boolean;
   syncGeneration: number | null;
   subscriptionStatus: string;
+  entitlementSource: "stripe" | "operator" | "free";
+  manualGrant: {
+    duration: string;
+    expiresAt: string | null;
+    active: boolean;
+  } | null;
 }
 
 export interface ConsoleAccountsResult {
@@ -177,7 +185,8 @@ export async function loadConsoleOverview(): Promise<ConsoleOverview> {
     accounts,
     onboarded,
     completions,
-    activePlus,
+    stripePlus,
+    operatorPlus,
     supportPayments,
     pushFailures,
     webhookFailures,
@@ -193,8 +202,18 @@ export async function loadConsoleOverview(): Promise<ConsoleOverview> {
       .gte("completed_at", sevenDaysAgo),
     admin
       .from("subscriptions")
-      .select("id", { count: "exact", head: true })
-      .in("status", ["active", "trialing"]),
+      .select("user_id")
+      .eq("plan_key", "plus")
+      .in("status", ["active", "trialing"])
+      .not("user_id", "is", null)
+      .limit(5000),
+    admin
+      .from("operator_plus_grants")
+      .select("user_id")
+      .is("revoked_at", null)
+      .lte("starts_at", new Date(now).toISOString())
+      .or(`expires_at.is.null,expires_at.gt.${new Date(now).toISOString()}`)
+      .limit(5000),
     admin
       .from("stripe_support_payments")
       .select("amount_total, amount_refunded, outcome_status")
@@ -232,13 +251,22 @@ export async function loadConsoleOverview(): Promise<ConsoleOverview> {
           ),
         0,
       );
+  const activePlus =
+    stripePlus.error || operatorPlus.error
+      ? null
+      : new Set(
+          [...(stripePlus.data ?? []), ...(operatorPlus.data ?? [])]
+            .map((row) => row.user_id)
+            .filter((userId): userId is string => typeof userId === "string"),
+        ).size;
 
   return {
     source: sourceFor([
       accounts,
       onboarded,
       completions,
-      activePlus,
+      stripePlus,
+      operatorPlus,
       supportPayments,
       pushFailures,
       webhookFailures,
@@ -248,7 +276,7 @@ export async function loadConsoleOverview(): Promise<ConsoleOverview> {
       accounts: safeCount(accounts),
       onboardedAccounts: safeCount(onboarded),
       questCompletions7d: safeCount(completions),
-      activePlus: safeCount(activePlus),
+      activePlus,
       supportCents30d,
       pushFailures24h: safeCount(pushFailures),
       webhookFailures24h: safeCount(webhookFailures),
@@ -301,20 +329,31 @@ export async function loadConsoleInsights(
 }
 
 /** Loads bounded account diagnostics without sacred writing or auth tokens. */
-export async function loadConsoleAccounts(): Promise<ConsoleAccountsResult> {
+export async function loadConsoleAccounts(
+  query = "",
+): Promise<ConsoleAccountsResult> {
   const admin = adminClient();
   if (!admin) return { source: SETUP_SOURCE, accounts: [] };
 
-  const { data: authData, error: authError } =
-    await admin.auth.admin.listUsers({ page: 1, perPage: 50 });
-  if (authError) {
-    return {
-      source: { status: "degraded", label: "Account directory unavailable" },
-      accounts: [],
-    };
+  const exactEmail =
+    query.includes("@") && query.length <= 254
+      ? query.trim().toLowerCase()
+      : "";
+  let users;
+  if (exactEmail) {
+    const exactUser = await findConsoleAccountByEmail(exactEmail);
+    users = exactUser ? [exactUser] : [];
+  } else {
+    const { data: authData, error: authError } =
+      await admin.auth.admin.listUsers({ page: 1, perPage: 50 });
+    if (authError) {
+      return {
+        source: { status: "degraded", label: "Account directory unavailable" },
+        accounts: [],
+      };
+    }
+    users = authData.users;
   }
-
-  const users = authData.users;
   const ids = users.map((user) => user.id);
   if (ids.length === 0) {
     return {
@@ -323,7 +362,7 @@ export async function loadConsoleAccounts(): Promise<ConsoleAccountsResult> {
     };
   }
 
-  const [profiles, syncStates, subscriptions] = await Promise.all([
+  const [profiles, syncStates, subscriptions, manualGrants] = await Promise.all([
     admin
       .from("profiles")
       .select("id, display_name, onboarding_completed")
@@ -334,7 +373,13 @@ export async function loadConsoleAccounts(): Promise<ConsoleAccountsResult> {
       .in("user_id", ids),
     admin
       .from("subscriptions")
-      .select("user_id, status")
+      .select("user_id, status, plan_key, synchronized_at")
+      .order("synchronized_at", { ascending: false })
+      .in("user_id", ids),
+    admin
+      .from("operator_plus_grants")
+      .select("user_id,duration_key,starts_at,expires_at,revoked_at")
+      .is("revoked_at", null)
       .in("user_id", ids),
   ]);
 
@@ -344,20 +389,46 @@ export async function loadConsoleAccounts(): Promise<ConsoleAccountsResult> {
   const syncById = new Map(
     (syncStates.data ?? []).map((state) => [state.user_id, state]),
   );
-  const subscriptionById = new Map(
-    (subscriptions.data ?? []).map((subscription) => [
-      subscription.user_id,
-      subscription,
-    ]),
+  const subscriptionById = new Map();
+  for (const subscription of subscriptions.data ?? []) {
+    const existing = subscriptionById.get(subscription.user_id);
+    const entitled =
+      subscription.plan_key === "plus" &&
+      ["active", "trialing"].includes(subscription.status);
+    const existingEntitled =
+      existing?.plan_key === "plus" &&
+      ["active", "trialing"].includes(existing.status);
+    if (!existing || (entitled && !existingEntitled)) {
+      subscriptionById.set(subscription.user_id, subscription);
+    }
+  }
+  const manualGrantById = new Map(
+    (manualGrants.data ?? []).map((grant) => [grant.user_id, grant]),
   );
+  const now = Date.now();
 
   return {
-    source: sourceFor([profiles, syncStates, subscriptions]),
+    source: sourceFor([profiles, syncStates, subscriptions, manualGrants]),
     accounts: users.map((user) => {
       const profile = profileById.get(user.id);
       const sync = syncById.get(user.id);
       const subscription = subscriptionById.get(user.id);
+      const manualGrant = manualGrantById.get(user.id);
+      const grantStartsAt = Date.parse(manualGrant?.starts_at ?? "");
+      const grantExpiresAt = manualGrant?.expires_at
+        ? Date.parse(manualGrant.expires_at)
+        : null;
+      const manualActive =
+        Boolean(manualGrant) &&
+        Number.isFinite(grantStartsAt) &&
+        grantStartsAt <= now &&
+        (grantExpiresAt === null ||
+          (Number.isFinite(grantExpiresAt) && grantExpiresAt > now));
+      const stripeActive =
+        subscription?.plan_key === "plus" &&
+        ["active", "trialing"].includes(subscription.status);
       return {
+        id: user.id,
         email: user.email ?? "Email unavailable",
         displayName: profile?.display_name ?? "friend",
         createdAt: user.created_at,
@@ -365,7 +436,23 @@ export async function loadConsoleAccounts(): Promise<ConsoleAccountsResult> {
         onboardingCompleted: Boolean(profile?.onboarding_completed),
         syncGeneration:
           typeof sync?.generation === "number" ? sync.generation : null,
-        subscriptionStatus: subscription?.status ?? "free",
+        subscriptionStatus: stripeActive
+          ? subscription.status
+          : manualActive
+            ? "operator"
+            : subscription?.status ?? "free",
+        entitlementSource: stripeActive
+          ? "stripe"
+          : manualActive
+            ? "operator"
+            : "free",
+        manualGrant: manualGrant
+          ? {
+              duration: manualGrant.duration_key,
+              expiresAt: manualGrant.expires_at,
+              active: manualActive,
+            }
+          : null,
       };
     }),
   };

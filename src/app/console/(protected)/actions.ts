@@ -2,10 +2,22 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { isConsoleHost } from "@/lib/console/paths";
 import { getConsoleAccess } from "@/lib/console/auth.server";
 import { appendConsoleAuditLog } from "@/lib/console/audit.server";
+import {
+  grantOperatorPlusInput,
+  revokeOperatorPlusInput,
+  type OperatorPlusActionState,
+} from "@/lib/console/plus-grants";
+import {
+  consoleAccountIdentityMatches,
+  findConsoleAccountByEmail,
+  grantConsolePlus,
+  revokeConsolePlus,
+} from "@/lib/console/plus-grants.server";
 
 /** Records a newly verified operator session without trusting client identity. */
 export async function recordConsoleSignIn() {
@@ -21,6 +33,144 @@ export async function recordConsoleSignIn() {
     targetKey: "session",
   });
   return true;
+}
+
+/** Grants one exact account an audited, bounded manual Plus entitlement. */
+export async function grantOperatorPlusAction(
+  _previousState: OperatorPlusActionState,
+  formData: FormData,
+): Promise<OperatorPlusActionState> {
+  const access = await getConsoleAccess();
+  if (access.state !== "authorized") {
+    return {
+      status: "error",
+      message: "Your operator session is not authorized.",
+    };
+  }
+
+  const input = grantOperatorPlusInput(formData);
+  if (!input) {
+    await appendConsoleAuditLog({
+      actor: { userId: access.userId, email: access.email },
+      action: "entitlement.plus_grant",
+      targetType: "account",
+      targetKey: "unresolved",
+      outcome: "denied",
+      details: { error: "invalid_confirmation_or_input" },
+    });
+    return {
+      status: "error",
+      message:
+        "Enter a valid exact email, matching confirmation, duration, and reason.",
+    };
+  }
+
+  const target = await findConsoleAccountByEmail(input.email);
+  if (!target) {
+    await appendConsoleAuditLog({
+      actor: { userId: access.userId, email: access.email },
+      action: "entitlement.plus_grant",
+      targetType: "account",
+      targetKey: "unresolved",
+      outcome: "denied",
+      details: { error: "account_not_found" },
+    });
+    return {
+      status: "error",
+      message: "No exact BibleQuest account matches that email.",
+    };
+  }
+
+  const succeeded = await grantConsolePlus({
+    ...input,
+    targetUserId: target.id,
+    operatorUserId: access.userId,
+    operatorEmail: access.email,
+  });
+  if (!succeeded) {
+    await appendConsoleAuditLog({
+      actor: { userId: access.userId, email: access.email },
+      action: "entitlement.plus_grant",
+      targetType: "account",
+      targetKey: target.id,
+      outcome: "failed",
+      details: { error: "mutation_unavailable" },
+    });
+    return {
+      status: "error",
+      message: "Plus could not be granted. No entitlement change was saved.",
+    };
+  }
+
+  revalidatePath("/console/accounts");
+  revalidatePath("/accounts");
+  return {
+    status: "success",
+    message: `Plus is now active for ${input.email}.`,
+    completedAt: new Date().toISOString(),
+  };
+}
+
+/** Revokes only an exact account's manual grant after fresh identity checks. */
+export async function revokeOperatorPlusAction(
+  _previousState: OperatorPlusActionState,
+  formData: FormData,
+): Promise<OperatorPlusActionState> {
+  const access = await getConsoleAccess();
+  if (access.state !== "authorized") {
+    return {
+      status: "error",
+      message: "Your operator session is not authorized.",
+    };
+  }
+
+  const input = revokeOperatorPlusInput(formData);
+  if (
+    !input ||
+    !(await consoleAccountIdentityMatches(input.userId, input.email))
+  ) {
+    await appendConsoleAuditLog({
+      actor: { userId: access.userId, email: access.email },
+      action: "entitlement.plus_revoke",
+      targetType: "account",
+      targetKey: input?.userId ?? "unresolved",
+      outcome: "denied",
+      details: { error: "invalid_confirmation_or_identity" },
+    });
+    return {
+      status: "error",
+      message: "Account identity or email confirmation did not match.",
+    };
+  }
+
+  const succeeded = await revokeConsolePlus({
+    ...input,
+    operatorUserId: access.userId,
+    operatorEmail: access.email,
+  });
+  if (!succeeded) {
+    await appendConsoleAuditLog({
+      actor: { userId: access.userId, email: access.email },
+      action: "entitlement.plus_revoke",
+      targetType: "account",
+      targetKey: input.userId,
+      outcome: "failed",
+      details: { error: "mutation_unavailable" },
+    });
+    return {
+      status: "error",
+      message:
+        "Manual Plus could not be revoked. Stripe access was not changed.",
+    };
+  }
+
+  revalidatePath("/console/accounts");
+  revalidatePath("/accounts");
+  return {
+    status: "success",
+    message: `Manual Plus was revoked for ${input.email}.`,
+    completedAt: new Date().toISOString(),
+  };
 }
 
 /** Ends the operator session and returns to the correct sign-in URL. */

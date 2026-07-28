@@ -122,7 +122,7 @@ needed — just don't remove that config.
       push (if enabling sync).
 - [ ] Complete [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md): apply its
       account boundary through `0022`, then the launch capability migrations
-      through `0029`
+      through `0030`
       with the reviewed seed applied separately,
       configure custom SMTP, and pass production readiness, daily-quest CAS,
       cached-client, and two-user isolation checks.

@@ -5,6 +5,10 @@ import {
   ConsoleSourceNotice,
   ConsoleStatus,
 } from "@/components/console/ConsolePrimitives";
+import {
+  ConsolePlusGrantForm,
+  ConsolePlusRevokeForm,
+} from "@/components/console/ConsolePlusGrantControls";
 import { loadConsoleAccounts } from "@/lib/console/data.server";
 import { formatDateTime, statusTone } from "@/lib/console/format";
 
@@ -18,11 +22,9 @@ export const dynamic = "force-dynamic";
 export default async function ConsoleAccountsPage({
   searchParams,
 }: AccountsPageProps) {
-  const [result, params] = await Promise.all([
-    loadConsoleAccounts(),
-    searchParams,
-  ]);
+  const params = await searchParams;
   const query = params.q?.trim().toLowerCase().slice(0, 100) ?? "";
+  const result = await loadConsoleAccounts(query);
   const accounts = query
     ? result.accounts.filter((account) =>
         `${account.email} ${account.displayName}`.toLowerCase().includes(query),
@@ -38,6 +40,13 @@ export default async function ConsoleAccountsPage({
       />
 
       <ConsoleSourceNotice source={result.source} />
+
+      <ConsolePanel
+        title="Grant BibleQuest Plus"
+        description="Adds a separate manual entitlement. It never creates, edits, or cancels a Stripe subscription."
+      >
+        <ConsolePlusGrantForm />
+      </ConsolePanel>
 
       <form className="console-filter-bar" role="search">
         <label className="sr-only" htmlFor="account-search">
@@ -58,7 +67,7 @@ export default async function ConsoleAccountsPage({
 
       <ConsolePanel
         title={`${accounts.length} ${accounts.length === 1 ? "account" : "accounts"}`}
-        description="Newest 50 authentication records. Read-only."
+        description="Newest 50 accounts, or one exact email match from the bounded auth directory."
       >
         {accounts.length === 0 ? (
           <ConsoleEmptyState
@@ -80,11 +89,12 @@ export default async function ConsoleAccountsPage({
                   <th>Onboarding</th>
                   <th>Sync</th>
                   <th>Plan</th>
+                  <th>Manual access</th>
                 </tr>
               </thead>
               <tbody>
                 {accounts.map((account) => (
-                  <tr key={account.email}>
+                  <tr key={account.id}>
                     <td>
                       <p className="font-medium text-graphite">
                         {account.displayName}
@@ -117,6 +127,40 @@ export default async function ConsoleAccountsPage({
                       >
                         {account.subscriptionStatus}
                       </ConsoleStatus>
+                      <p className="mt-1 text-caption capitalize text-ash">
+                        {account.entitlementSource === "free"
+                          ? "No Plus entitlement"
+                          : `${account.entitlementSource} entitlement`}
+                      </p>
+                    </td>
+                    <td>
+                      {account.manualGrant ? (
+                        <div className="console-manual-grant">
+                          <ConsoleStatus
+                            tone={
+                              account.manualGrant.active ? "good" : "neutral"
+                            }
+                          >
+                            {account.manualGrant.active ? "active" : "expired"}
+                          </ConsoleStatus>
+                          <p className="mt-2 text-caption text-ash">
+                            {account.manualGrant.duration === "lifetime"
+                              ? "Lifetime"
+                              : account.manualGrant.duration}
+                            {account.manualGrant.expiresAt
+                              ? ` · ${formatDateTime(account.manualGrant.expiresAt)}`
+                              : ""}
+                          </p>
+                          {account.manualGrant.active ? (
+                            <ConsolePlusRevokeForm
+                              userId={account.id}
+                              email={account.email}
+                            />
+                          ) : null}
+                        </div>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -130,7 +174,9 @@ export default async function ConsoleAccountsPage({
         <p className="font-medium text-graphite">No impersonation.</p>
         <p className="mt-1 text-caption leading-relaxed text-ash">
           Support uses bounded diagnostics and synthetic accounts. The console
-          never opens a member’s private app session.
+          never opens a member’s private app session. Granting or revoking
+          manual Plus requires an exact email confirmation and writes an
+          append-only audit event.
         </p>
       </div>
     </>

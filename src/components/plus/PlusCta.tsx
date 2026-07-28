@@ -18,7 +18,7 @@ function formattedDate(value: string | null): string | null {
     : new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
 }
 
-/** Purchase and management controls backed only by the Stripe server projection. */
+/** Shows Plus access from the server entitlement union and Stripe controls. */
 export function PlusCta() {
   const plus = usePlus();
   const [busy, setBusy] = useState<
@@ -114,34 +114,40 @@ export function PlusCta() {
   }
 
   if (plus.isPlus) {
+    const membershipDescription =
+      plus.entitlementSource === "operator"
+        ? periodEnd
+          ? `BibleQuest Plus is active through ${periodEnd}.`
+          : "BibleQuest Plus is active with no scheduled end."
+        : plus.interval === "lifetime"
+          ? "Stripe confirms your lifetime access."
+          : plus.cancelAtPeriodEnd && periodEnd
+            ? `Access remains active through ${periodEnd}; renewal is canceled.`
+            : periodEnd
+              ? `Your current period runs through ${periodEnd}.`
+              : "Stripe confirms your membership is active.";
     return (
       <div className="mt-5 space-y-3">
         <p className="text-[0.8125rem] leading-relaxed text-charcoal">
-          You’re a Plus member.{" "}
-          {plus.interval === "lifetime"
-            ? "Stripe confirms your lifetime access."
-            : plus.cancelAtPeriodEnd && periodEnd
-              ? `Access remains active through ${periodEnd}; renewal is canceled.`
-              : periodEnd
-                ? `Your current period runs through ${periodEnd}.`
-                : "Stripe confirms your membership is active."}
+          You’re a Plus member. {membershipDescription}
         </p>
         {plus.mode === "test" && (
           <p className="text-[0.75rem] text-gilt">
             Stripe test mode — no real payment is accepted.
           </p>
         )}
-        {plus.interval !== "lifetime" && (
-          <GentleButton
-            variant="text"
-            size="sm"
-            onClick={() => void portal()}
-            disabled={!plus.hasCustomer || busy !== null}
-          >
-            Manage renewal, payment method, or invoices
-            {busy === "portal" ? " …" : ""}
-          </GentleButton>
-        )}
+        {plus.entitlementSource === "stripe" &&
+          plus.interval !== "lifetime" && (
+            <GentleButton
+              variant="text"
+              size="sm"
+              onClick={() => void portal()}
+              disabled={!plus.hasCustomer || busy !== null}
+            >
+              Manage renewal, payment method, or invoices
+              {busy === "portal" ? " …" : ""}
+            </GentleButton>
+          )}
         {actionError && (
           <p className="text-[0.8125rem] text-rose-700">{actionError}</p>
         )}
