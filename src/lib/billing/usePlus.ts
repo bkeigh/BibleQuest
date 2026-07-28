@@ -34,6 +34,7 @@ interface BillingStatusResponse {
   purchasesEnabled: boolean;
   plan: PlanKey;
   isPlus: boolean;
+  entitlementSource?: "stripe" | "operator" | null;
   status: string;
   interval?: BillingInterval | "unknown" | null;
   currentPeriodEnd?: string | null;
@@ -56,6 +57,7 @@ interface StoredPlusState {
   status: PlusStatus;
   plan: PlanKey;
   isPlus: boolean;
+  entitlementSource: "stripe" | "operator" | null;
   purchasesEnabled: boolean;
   plans: BillingPlan[];
   interval: BillingInterval | "unknown" | null;
@@ -78,6 +80,7 @@ function initialState(subjectKey: string): StoredPlusState {
     status: "loading",
     plan: "free",
     isPlus: false,
+    entitlementSource: null,
     purchasesEnabled: false,
     plans: [],
     interval: null,
@@ -91,8 +94,8 @@ function initialState(subjectKey: string): StoredPlusState {
 }
 
 function safePlusStatus(value: BillingStatusResponse): PlusStatus {
-  if (value.availability === "coming-soon") return "coming-soon";
   if (value.isPlus) return "plus";
+  if (value.availability === "coming-soon") return "coming-soon";
   return [
     "past_due",
     "unpaid",
@@ -133,6 +136,7 @@ export interface PlusState {
   loading: boolean;
   plan: PlanKey;
   isPlus: boolean;
+  entitlementSource: "stripe" | "operator" | null;
   canPurchase: boolean;
   plans: BillingPlan[];
   interval: BillingInterval | "unknown" | null;
@@ -227,6 +231,7 @@ function usePlusCoordinator(): PlusState {
         status: safePlusStatus(statusPayload),
         plan: statusPayload.plan,
         isPlus: statusPayload.isPlus,
+        entitlementSource: statusPayload.entitlementSource ?? null,
         purchasesEnabled:
           statusPayload.purchasesEnabled && plansPayload.purchasesEnabled,
         plans: plansPayload.plans,
@@ -339,6 +344,7 @@ function usePlusCoordinator(): PlusState {
     loading: visible.status === "loading",
     plan: visible.plan,
     isPlus: visible.isPlus,
+    entitlementSource: visible.entitlementSource,
     canPurchase:
       Boolean(session.user) &&
       visible.purchasesEnabled &&

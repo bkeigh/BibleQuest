@@ -43,7 +43,8 @@ with expected (table_name, classification) as (
     ('stripe_action_claims', 'server-owned'),
     ('stripe_billing_signals', 'server-owned financial'),
     ('stripe_support_payments', 'server-owned financial'),
-    ('console_audit_logs', 'server-owned operator audit')
+    ('console_audit_logs', 'server-owned operator audit'),
+    ('operator_plus_grants', 'server-owned entitlement history')
 )
 select
   expected.table_name,
@@ -168,6 +169,9 @@ where namespace.nspname = 'public'
     'stripe_support_contract',
     'console_insights',
     'append_console_audit_log',
+    'grant_operator_plus',
+    'revoke_operator_plus',
+    'operator_plus_grant_contract',
     'assert_user_sync_context',
     'enforce_user_sync_generation',
     'enforce_user_owned_row_size',
@@ -319,6 +323,7 @@ select public.profile_avatar_contract() as profile_avatar_contract;
 select public.push_reminder_contract() as push_reminder_contract;
 select public.stripe_billing_contract() as stripe_billing_contract;
 select public.stripe_support_contract() as stripe_support_contract;
+select public.operator_plus_grant_contract() as operator_plus_grant_contract;
 
 -- 9. Unbound security-definer entry points remain absent after 0019.
 select

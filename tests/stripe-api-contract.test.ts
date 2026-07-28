@@ -73,6 +73,14 @@ describe("direct Stripe API boundary", () => {
     expect(client).not.toMatch(
       /external_customer_id|external_subscription_id|stripe_price_id/,
     );
+    expect(status).toContain('from("operator_plus_grants")');
+    expect(status).toContain("operatorPlusGrantContractReady(admin)");
+    expect(status.indexOf("authenticatedServerContext()")).toBeLessThan(
+      status.indexOf("stripeBillingAvailability()"),
+    );
+    expect(client.indexOf("if (value.isPlus)")).toBeLessThan(
+      client.indexOf('value.availability === "coming-soon"'),
+    );
     const returnParser = client.slice(
       client.indexOf("function safeReturnNotice"),
       client.indexOf("export interface PlusState"),

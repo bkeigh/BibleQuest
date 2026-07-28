@@ -9,7 +9,8 @@ identity `0014_journey_event_identity.sql`, and transactional daily-quest
 migration `0015_transactional_daily_quest_sync.sql`, followed by the reviewed
 account-sync and deletion boundary `0016` through `0022`, sealed avatar/push
 and billing/support/console boundaries `0023` through `0027`, and lifetime
-Plus billing `0028` and user-row/trigger hardening `0029`. It is
+Plus billing `0028`, user-row/trigger hardening `0029`, and sealed operator Plus
+grants `0030`. It is
 deliberately local/staging-first. Do not run any linked or remote command until
 the project reference and exact command have been reviewed and explicitly
 approved.
@@ -42,6 +43,7 @@ The repository timeline is:
 | 2026-07-25 | Server-owned commerce and console | Adds `0025`–`0027`: test billing, one-time support, aggregate console insights, and append-only operator audit. |
 | 2026-07-27 | Lifetime Plus | Adds `0028`: sealed one-time/lifetime Stripe projection fields and the v2 billing contract. |
 | 2026-07-28 | Sync resource hardening | Adds `0029`: a one-MiB cap on every generation-bound row and removes direct Data API access to trigger helpers. |
+| 2026-07-28 | Operator Plus grants | Adds `0030`: sealed manual entitlement history, atomic grant/revoke RPCs, and append-only operator auditing. |
 
 If a database recorded an old `0002`, `0003`, or `0004` before the renames,
 the later filenames do not change those recorded versions. Conversely, a
@@ -161,6 +163,14 @@ anonymous, authenticated, or service-role execution privilege on either
 trigger helper. This record contains no credentials, user rows, or private
 catalog output.
 
+### Production 0030 operator Plus packet
+
+Migration `0030` uses the next isolated forward-only packet described in
+[`CONSOLE_PLUS_GRANTS.md`](CONSOLE_PLUS_GRANTS.md). Run
+`pnpm check:production-operator-plus`, review the exact single packet and named
+fresh physical backup, then apply only with the pinned confirmation string.
+Never substitute normal linked `db push`, `--include-all`, or migration repair.
+
 ## Complete public-table inventory
 
 | Classification | Tables | Intended access |
@@ -168,10 +178,10 @@ catalog output.
 | Public content | `faith_providers`, `bible_translations`, `bible_books`, `bible_chapters`, `bible_verses`, `daily_verses`, `quest_templates`, `prayer_prompts`, `reflection_prompts`, `milestones`, `feature_flags` | Anonymous and authenticated `SELECT` only. Reads are limited to active/approved content; disabled feature flags are hidden. No client writes. Prompt tables contain generic seed prompts, not a user's prayer or reflection text. |
 | User-owned | `profiles`, `user_sync_state`, `user_settings`, `user_daily_quests`, `user_daily_quest_days`, `user_quests`, `quest_completions`, `prayers`, `reflections`, `verse_bookmarks`, `user_recent_verses`, `reading_progress`, `chapters_read`, `journey_events`, `growth_events`, `user_milestones`, `notification_preferences` | Authenticated owner only. Most tables allow bounded owner operations; sync revisions and destructive account actions stay behind reviewed RPCs. |
 | Server-managed user state | `push_reminder_preferences`, `push_subscriptions`, `push_deliveries` | Normal users can reach only the reviewed owner-scoped functions or projections; delivery mutation is service-role only. |
-| Server-owned | `subscriptions`, `push_test_claims`, `stripe_customers`, `stripe_webhook_events`, `stripe_action_claims`, `stripe_billing_signals`, `stripe_support_payments`, `console_audit_logs` | Only documented owner projections are client-readable. Provider identifiers, money, webhook state, test claims, and operator audit remain service-role only. |
+| Server-owned | `subscriptions`, `push_test_claims`, `stripe_customers`, `stripe_webhook_events`, `stripe_action_claims`, `stripe_billing_signals`, `stripe_support_payments`, `console_audit_logs`, `operator_plus_grants` | Only documented owner projections are client-readable. Provider identifiers, money, webhook state, test claims, operator audit, and manual entitlement history remain sealed behind server boundaries. |
 | Internal | Supabase-managed schemas remain outside the public-table inventory. Private avatar objects use the sealed `storage.objects` policies and non-public bucket. |
 
-RLS is enabled on all 39 tables. Private prayers, reflections, recent Scripture
+RLS is enabled on all 40 tables. Private prayers, reflections, recent Scripture
 history, notes, and
 journey data have no anonymous policy and every authenticated policy includes
 an `auth.uid()` owner condition.
@@ -226,7 +236,7 @@ Expected migration order:
 0029_user_row_size_and_trigger_privileges.sql
 ```
 
-Evidence must show all 39 expected tables with `rowsecurity = true`, only the
+Evidence must show all 40 expected tables with `rowsecurity = true`, only the
 documented policy names, no `anon` role on user/server-owned policies, and
 `purge_user_data` as `security_definer = true`, `search_path=""`, anonymous
 execute false, authenticated execute true. Table grants must also match the

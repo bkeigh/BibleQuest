@@ -29,6 +29,14 @@ export interface SubscriptionProjectionRow {
   synchronized_at: string | null;
 }
 
+export interface OperatorPlusGrantRow {
+  id: string;
+  user_id: string;
+  starts_at: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+}
+
 function isBillingContract(value: unknown): boolean {
   return (
     value !== null &&
@@ -37,6 +45,23 @@ function isBillingContract(value: unknown): boolean {
     Object.keys(value).sort().join(",") === "contract,ok" &&
     (value as { contract?: unknown }).contract === STRIPE_BILLING_CONTRACT &&
     (value as { ok?: unknown }).ok === true
+  );
+}
+
+/** Proves that manual Plus access is private and mutation-gated. */
+export async function operatorPlusGrantContractReady(
+  client: SupabaseClient,
+): Promise<boolean> {
+  const { data, error } = await client.rpc("operator_plus_grant_contract");
+  return (
+    !error &&
+    data !== null &&
+    typeof data === "object" &&
+    !Array.isArray(data) &&
+    Object.keys(data).sort().join(",") === "contract,ok" &&
+    (data as { contract?: unknown }).contract ===
+      "biblequest_operator_plus_grant_v1" &&
+    (data as { ok?: unknown }).ok === true
   );
 }
 
@@ -119,6 +144,8 @@ export function subscriptionProjection(
 export function billingStatusFromRows(
   rows: SubscriptionProjectionRow[],
   hasCustomer: boolean,
+  operatorGrants: OperatorPlusGrantRow[] = [],
+  now = Date.now(),
 ) {
   const ordered = [...rows].sort((left, right) => {
     const leftEnd = Date.parse(left.current_period_end ?? "") || 0;
@@ -130,15 +157,39 @@ export function billingStatusFromRows(
       row.plan_key === "plus" &&
       (row.status === "trialing" || row.status === "active"),
   );
+  const operatorGrant = operatorGrants.find((grant) => {
+    const startsAt = Date.parse(grant.starts_at);
+    const expiresAt = grant.expires_at ? Date.parse(grant.expires_at) : null;
+    return (
+      grant.revoked_at === null &&
+      Number.isFinite(startsAt) &&
+      startsAt <= now &&
+      (expiresAt === null || (Number.isFinite(expiresAt) && expiresAt > now))
+    );
+  });
   const current = entitled ?? ordered[0] ?? null;
+  const isPlus = Boolean(entitled || operatorGrant);
   return {
-    plan: entitled ? ("plus" as const) : ("free" as const),
-    isPlus: Boolean(entitled),
-    status: current?.status ?? "none",
-    interval: current?.billing_interval ?? null,
-    currentPeriodEnd: current?.current_period_end ?? null,
-    cancelAtPeriodEnd: current?.cancel_at_period_end ?? false,
+    plan: isPlus ? ("plus" as const) : ("free" as const),
+    isPlus,
+    status: entitled
+      ? current?.status ?? "active"
+      : operatorGrant
+        ? "active"
+        : current?.status ?? "none",
+    entitlementSource: entitled
+      ? ("stripe" as const)
+      : operatorGrant
+        ? ("operator" as const)
+        : null,
+    interval: entitled ? current?.billing_interval ?? null : null,
+    currentPeriodEnd: entitled
+      ? current?.current_period_end ?? null
+      : operatorGrant?.expires_at ?? null,
+    cancelAtPeriodEnd: entitled
+      ? current?.cancel_at_period_end ?? false
+      : false,
     hasCustomer,
-    synchronizedAt: current?.synchronized_at ?? null,
+    synchronizedAt: entitled ? current?.synchronized_at ?? null : null,
   };
 }

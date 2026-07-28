@@ -137,6 +137,12 @@ const POSTURE_CONTRACTS = [
     migration: "0026",
     label: "one-time Stripe support posture",
   },
+  {
+    rpc: "operator_plus_grant_contract",
+    contract: "biblequest_operator_plus_grant_v1",
+    migration: "0030",
+    label: "operator Plus grant posture",
+  },
 ];
 
 const supabaseUrlValue = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
@@ -217,7 +223,7 @@ function safeHealthBody(value) {
     typeof candidate.canonical_origin_matches !== "boolean" ||
     !["configured", "guest-only", "invalid"].includes(candidate.auth_posture) ||
     !["configured", "disabled", "invalid"].includes(candidate.analytics_posture) ||
-    candidate.schema_contract !== "0029" ||
+    candidate.schema_contract !== "0030" ||
     candidate.content_contract !== "seed-manifest-v1" ||
     !/^biblequest-v\d{1,4}$/.test(candidate.service_worker_version) ||
     !["coming-soon", "test", "live", "invalid"].includes(

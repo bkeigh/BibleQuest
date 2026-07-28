@@ -22,7 +22,7 @@ as a containment breach.
 - `configured`, `guest-only`, or `invalid` effective auth posture without a
   host or key; the containment latch reports `guest-only` even when dormant
   provider credentials remain configured;
-- schema/content contract labels (`0029` and `seed-manifest-v1`);
+- schema/content contract labels (`0030` and `seed-manifest-v1`);
 - the checked-in service-worker version;
 - `coming-soon`, `test`, `live`, or `invalid` direct Stripe posture without a
   key, plus a boolean purchase-UI gate.

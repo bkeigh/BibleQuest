@@ -410,6 +410,7 @@ export function fixtureReadiness() {
     ["biblequest_private_push_v1", "0024"],
     ["biblequest_stripe_test_billing_v2", "0028"],
     ["biblequest_stripe_one_time_support_v1", "0026"],
+    ["biblequest_operator_plus_grant_v1", "0030"],
   ]) {
     schemaChecks.push({ contract, migration, ok: true });
   }
