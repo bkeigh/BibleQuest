@@ -30,13 +30,23 @@ export interface ChapterContent {
 
 export async function loadChapter(
   bookSlug: string,
-  chapter: number
+  chapter: number,
 ): Promise<ChapterContent | null> {
   const meta = getBookMeta(bookSlug);
   if (!meta) return null;
-  if (chapter < 1 || chapter > meta.chapterCount) return null;
+  if (
+    !Number.isSafeInteger(chapter) ||
+    chapter < 1 ||
+    chapter > meta.chapterCount
+  ) {
+    return null;
+  }
 
-  const file = path.join(process.cwd(), "src", "data", "bible", `${bookSlug}.json`);
+  // Resolve only the metadata-approved slug and prove it stays inside the Bible root.
+  const bibleRoot = path.resolve(process.cwd(), "src", "data", "bible");
+  const file = path.resolve(bibleRoot, `${meta.slug}.json`);
+  if (!file.startsWith(`${bibleRoot}${path.sep}`)) return null;
+
   let raw: string;
   try {
     raw = await readFile(file, "utf8");

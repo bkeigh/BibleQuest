@@ -60,7 +60,9 @@ function assertSharedSecurityContract(response, production) {
   assert.deepEqual(csp.get("font-src"), ["'self'"]);
   assert.deepEqual(csp.get("media-src"), ["'self'", "blob:"]);
 
-  assert.equal(rawCsp.includes("https://api.rc-backup.com"), false);
+  // Compare full CSP source tokens so host checks cannot be bypassed by substrings.
+  const allSources = [...csp.values()].flat();
+  assert.equal(allSources.includes("https://api.rc-backup.com"), false);
   assert.equal(/revenuecat|stripe|link\.com/i.test(rawCsp), false);
   assert.equal(rawCsp.includes("https://*.supabase.co"), false);
   assert.equal(rawCsp.includes("wss://*.supabase.co"), false);

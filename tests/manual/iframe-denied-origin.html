@@ -20,10 +20,51 @@
     <p id="target"></p>
     <iframe id="frame" title="BibleQuest denied-origin check"></iframe>
     <script>
+      // Accept only BibleQuest release hosts or the local development target.
+      function approvedTarget(value) {
+        if (!value) return new URL("http://localhost:3000/");
+        try {
+          const url = new URL(value);
+          const canonicalHosts = [
+            "biblequest.co",
+            "www.biblequest.co",
+            "console.biblequest.co",
+          ];
+          const previewHost =
+            /^bible-quest-[a-z0-9-]+-winterhill\.vercel\.app$/.test(
+              url.hostname,
+            );
+          const localHost =
+            url.protocol === "http:" &&
+            url.hostname === "localhost" &&
+            url.port === "3000";
+          const deployedHost =
+            url.protocol === "https:" &&
+            (canonicalHosts.includes(url.hostname) || previewHost);
+          if (
+            url.username ||
+            url.password ||
+            (!localHost && !deployedHost)
+          ) {
+            return null;
+          }
+          return url;
+        } catch {
+          return null;
+        }
+      }
+
       const candidate = new URLSearchParams(window.location.search).get("target");
-      const target = candidate || "http://localhost:3000/";
-      document.querySelector("#target").textContent = `Target: ${target}`;
-      document.querySelector("#frame").src = target;
+      const target = approvedTarget(candidate);
+      const targetLabel = document.querySelector("#target");
+      const frame = document.querySelector("#frame");
+      if (target) {
+        targetLabel.textContent = `Target: ${target.href}`;
+        frame.src = target.href;
+      } else {
+        targetLabel.textContent = "Rejected: target is not an approved BibleQuest host.";
+        frame.removeAttribute("src");
+      }
     </script>
   </body>
 </html>
