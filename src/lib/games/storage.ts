@@ -40,8 +40,10 @@ function isBaseProgress(value: unknown): value is GameProgress {
     entry.sessionKey.length > 0 &&
     entry.sessionKey.length <= 160 &&
     typeof entry.puzzleId === "string" &&
+    entry.puzzleId.length > 0 &&
     entry.puzzleId.length <= 100 &&
     Number.isInteger(entry.contentVersion) &&
+    Number(entry.contentVersion) > 0 &&
     (entry.status === "playing" ||
       entry.status === "completed" ||
       entry.status === "revealed") &&

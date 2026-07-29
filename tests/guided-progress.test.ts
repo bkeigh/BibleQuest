@@ -3,6 +3,7 @@ import {
   advanceGuidedSession,
   beginGuidedSession,
   guidedProgressPercent,
+  isGuidedSessionProgress,
   makeGuidedSessionKey,
   mergeGuidedProgressRecords,
   nextGuidedMovement,
@@ -121,6 +122,37 @@ describe("guided progress engine", () => {
         },
       }),
     ).toEqual({});
+  });
+
+  it("rejects future-poisoned or internally impossible progress clocks", () => {
+    const completed = GUIDED_MOVEMENT_KEYS.reduce(
+      (progress, movement, index) =>
+        advanceGuidedSession(
+          progress,
+          movement,
+          `2026-07-29T12:0${index + 1}:00.000Z`,
+        ),
+      beginGuidedSession(
+        SESSION_KEY,
+        CONTENT_ID,
+        "pilgrimage_day",
+        START,
+      )!,
+    );
+
+    expect(
+      isGuidedSessionProgress({
+        ...completed,
+        completedAt: "2026-07-29T12:07:00.000Z",
+      }),
+    ).toBe(false);
+    expect(
+      isGuidedSessionProgress({
+        ...completed,
+        updatedAt: "2099-07-29T12:06:00.000Z",
+        completedAt: "2099-07-29T12:06:00.000Z",
+      }),
+    ).toBe(false);
   });
 
   it("refuses to skip an unfinished movement", () => {

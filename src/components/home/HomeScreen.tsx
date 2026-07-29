@@ -213,7 +213,7 @@ function HomeInner() {
           {/* One reviewed guide leads; the daily game and an optional rhythm
               remain close without becoming a score-driven dashboard. */}
           <TodayFormation dayKey={dayKey} />
-          <RhythmTodayCard dayKey={dayKey} />
+          <RhythmTodayCard dayKey={dayKey} now={now} />
 
           {/* Home shows one next quest and sends all management to Quests. */}
           <section id="quests" className="scroll-mt-6">

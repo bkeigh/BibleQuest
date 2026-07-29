@@ -44,6 +44,19 @@ describe("device-local Scripture game progress", () => {
     ).toBeNull();
   });
 
+  it("reports unavailable persistence instead of pretending resume was saved", () => {
+    const puzzle = connectionPuzzles[0];
+    const progress = createConnectionsProgress(puzzle, "2026-08-01:test", 10);
+    const unavailable = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("blocked");
+      },
+    } as unknown as Storage;
+
+    expect(writeGameProgress(progress, puzzle, unavailable)).toBe(false);
+  });
+
   it("bounds retained sessions without touching unrelated local data", () => {
     const puzzle = connectionPuzzles[0];
     window.localStorage.setItem("biblequest:unrelated", "keep");

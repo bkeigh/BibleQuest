@@ -21,7 +21,6 @@ import type {
   ScriptureSource,
 } from "@/lib/games/types";
 import { scriptureSourceHref } from "@/lib/games/links";
-import { useHydrated } from "@/lib/utils/useHydrated";
 import { track } from "@/lib/analytics/events";
 import { GameLearningCard } from "./GameLearningCard";
 
@@ -75,7 +74,6 @@ export function ConnectionsGame({
   puzzle: ConnectionsPuzzle;
   sessionKey: string;
 }) {
-  const hydrated = useHydrated();
   const [progress, setProgress] = useState<ConnectionsProgress>(() => {
     if (typeof window !== "undefined") {
       const restored = readGameProgress(puzzle, sessionKey);
@@ -86,12 +84,9 @@ export function ConnectionsGame({
   const [announcement, setAnnouncement] = useState(
     "Choose four terms that share one clear connection.",
   );
+  const [resumeAvailable, setResumeAvailable] = useState(true);
   const resultHeadingRef = useRef<HTMLHeadingElement>(null);
   const resultWasFocused = useRef(false);
-
-  useEffect(() => {
-    if (hydrated) writeGameProgress(progress, puzzle);
-  }, [hydrated, progress, puzzle]);
 
   const solvedTerms = useMemo(
     () =>
@@ -120,10 +115,14 @@ export function ConnectionsGame({
     resultHeadingRef.current?.focus();
   }, [finished]);
 
+  // Persist in the same user action so storage failure is visible immediately.
+  function commitProgress(next: ConnectionsProgress) {
+    setResumeAvailable(writeGameProgress(next, puzzle));
+    setProgress(next);
+  }
+
   function toggle(term: string) {
-    setProgress((current) =>
-      toggleConnectionTerm(current, term, availableTerms),
-    );
+    commitProgress(toggleConnectionTerm(progress, term, availableTerms));
   }
 
   function checkGroup() {
@@ -132,7 +131,7 @@ export function ConnectionsGame({
     if (opensLearning && !result.progress.learningEventRecorded) {
       track("scripture_game_completed", { kind: "connections" });
     }
-    setProgress(
+    commitProgress(
       opensLearning
         ? { ...result.progress, learningEventRecorded: true }
         : result.progress,
@@ -147,9 +146,9 @@ export function ConnectionsGame({
       !revealed.learningEventRecorded
     ) {
       track("scripture_game_completed", { kind: "connections" });
-      setProgress({ ...revealed, learningEventRecorded: true });
+      commitProgress({ ...revealed, learningEventRecorded: true });
     } else {
-      setProgress(revealed);
+      commitProgress(revealed);
     }
     setAnnouncement(
       "The connections are shown below so you can explore the passages.",
@@ -166,6 +165,16 @@ export function ConnectionsGame({
         >
           {announcement}
         </div>
+
+        {!resumeAvailable && (
+          <p
+            role="status"
+            className="mt-3 rounded-[var(--radius-button)] border border-gold-500/35 bg-gold-500/10 px-3 py-2 text-caption leading-relaxed text-charcoal"
+          >
+            You can keep playing, but this browser cannot save your place.
+            Leaving this page may restart the study.
+          </p>
+        )}
 
         {groupsToShow.length > 0 && (
           <div className="mt-4 grid gap-3">

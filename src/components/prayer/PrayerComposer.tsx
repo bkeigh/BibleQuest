@@ -58,9 +58,10 @@ function PrayerComposerInner() {
   );
   const isEdit = Boolean(existing);
   const guidedHandoff = useMemo(
-    () => guidedJournalHandoff(params.get("guided")),
-    [params],
+    () => (editId ? null : guidedJournalHandoff(params.get("guided"))),
+    [editId, params],
   );
+  const exitHref = guidedHandoff?.returnPath ?? "/app/prayer";
   const requestedPrompt = useMemo(() => {
     const id = params.get("prompt");
     return id ? prayerPrompts.find((prompt) => prompt.id === id) : undefined;
@@ -101,7 +102,7 @@ function PrayerComposerInner() {
     clearDraft,
   } = useDeviceLocalJournalDraft<PrayerDraft>({
     kind: "prayer",
-    entryId: editId,
+    entryId: editId ?? guidedHandoff?.draftScopeId,
     initialValue,
     isEmpty: prayerDraftIsEmpty,
     clearedValue: { title: "", body: "", category: "general" },
@@ -132,12 +133,12 @@ function PrayerComposerInner() {
       toast("Prayer saved.", { variant: "success" });
     }
     clearDraft();
-    router.replace("/app/prayer");
+    router.replace(exitHref);
   }
 
   function discard() {
     clearDraft();
-    router.replace("/app/prayer");
+    router.replace(exitHref);
   }
 
   if (editId && !existing) {
@@ -168,7 +169,7 @@ function PrayerComposerInner() {
     <PageContainer className="pt-safe pb-10">
       <div className="flex min-h-16 items-center justify-between gap-3 pt-3">
         <Link
-          href="/app/prayer"
+          href={exitHref}
           onClick={saveDraft}
           className="inline-flex min-h-11 items-center px-1 text-[0.9375rem] text-ash transition-colors hover:text-charcoal"
         >
@@ -176,7 +177,7 @@ function PrayerComposerInner() {
         </Link>
         <div className="min-w-0 text-center">
           <p className="text-[0.75rem] uppercase tracking-[0.12em] text-ash">
-            Prayer Journal
+            {guidedHandoff ? "Guided Scripture" : "Prayer Journal"}
           </p>
           <h1 className="truncate font-display text-[1.0625rem] text-graphite">
             {isEdit ? "Edit prayer" : "New prayer"}

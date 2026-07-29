@@ -16,7 +16,6 @@ import {
   writeGameProgress,
 } from "@/lib/games/storage";
 import type { TimelineProgress, TimelinePuzzle } from "@/lib/games/types";
-import { useHydrated } from "@/lib/utils/useHydrated";
 import { track } from "@/lib/analytics/events";
 import { GameLearningCard } from "./GameLearningCard";
 
@@ -28,7 +27,6 @@ export function TimelineGame({
   puzzle: TimelinePuzzle;
   sessionKey: string;
 }) {
-  const hydrated = useHydrated();
   const [progress, setProgress] = useState<TimelineProgress>(() => {
     if (typeof window !== "undefined") {
       const restored = readGameProgress(puzzle, sessionKey);
@@ -39,12 +37,9 @@ export function TimelineGame({
   const [announcement, setAnnouncement] = useState(
     "Use the move buttons to place the moments from first to last.",
   );
+  const [resumeAvailable, setResumeAvailable] = useState(true);
   const resultHeadingRef = useRef<HTMLHeadingElement>(null);
   const resultWasFocused = useRef(false);
-
-  useEffect(() => {
-    if (hydrated) writeGameProgress(progress, puzzle);
-  }, [hydrated, progress, puzzle]);
 
   const finished = progress.status !== "playing";
   const orderedItems = progress.itemOrder.flatMap((id) => {
@@ -60,10 +55,14 @@ export function TimelineGame({
     resultHeadingRef.current?.focus();
   }, [finished]);
 
+  // Persist in the same user action so storage failure is visible immediately.
+  function commitProgress(next: TimelineProgress) {
+    setResumeAvailable(writeGameProgress(next, puzzle));
+    setProgress(next);
+  }
+
   function move(itemId: string, direction: "up" | "down") {
-    setProgress((current) =>
-      moveTimelineItem(current, itemId, direction),
-    );
+    commitProgress(moveTimelineItem(progress, itemId, direction));
     const item = puzzle.items.find((candidate) => candidate.id === itemId);
     setAnnouncement(
       `${item?.label ?? "The moment"} moved ${direction === "up" ? "earlier" : "later"}.`,
@@ -76,7 +75,7 @@ export function TimelineGame({
     if (opensLearning && !result.progress.learningEventRecorded) {
       track("scripture_game_completed", { kind: "timeline" });
     }
-    setProgress(
+    commitProgress(
       opensLearning
         ? { ...result.progress, learningEventRecorded: true }
         : result.progress,
@@ -91,9 +90,9 @@ export function TimelineGame({
       !revealed.learningEventRecorded
     ) {
       track("scripture_game_completed", { kind: "timeline" });
-      setProgress({ ...revealed, learningEventRecorded: true });
+      commitProgress({ ...revealed, learningEventRecorded: true });
     } else {
-      setProgress(revealed);
+      commitProgress(revealed);
     }
     setAnnouncement(
       "The narrative order is shown below so you can explore each passage.",
@@ -110,6 +109,15 @@ export function TimelineGame({
         >
           {announcement}
         </div>
+        {!resumeAvailable && (
+          <p
+            role="status"
+            className="mt-3 rounded-[var(--radius-button)] border border-gold-500/35 bg-gold-500/10 px-3 py-2 text-caption leading-relaxed text-charcoal"
+          >
+            You can keep playing, but this browser cannot save your place.
+            Leaving this page may restart the study.
+          </p>
+        )}
         <ol className="mt-5 grid gap-3" aria-label="Timeline from first to last">
           {orderedItems.map((item, index) => (
             <li key={item.id}>

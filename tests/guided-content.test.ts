@@ -60,6 +60,17 @@ describe("reviewed Guided Scripture content", () => {
     expect(guidedScriptureForDate("2026-07-29")).toBe(today);
   });
 
+  it("walks every daily guide once in each seven-day rotation", () => {
+    const rotation = Array.from({ length: 7 }, (_, offset) =>
+      guidedScriptureForDate(`2026-08-${String(offset + 1).padStart(2, "0")}`),
+    );
+
+    expect(new Set(rotation)).toEqual(new Set(dailyGuidedScripture));
+    expect(() => guidedScriptureForDate("2026-02-30")).toThrow(
+      "Invalid local date key",
+    );
+  });
+
   it("uses unique, stable versioned ids and the six canonical movements", () => {
     const ids = [
       ...practices.map((practice) => practice.id),

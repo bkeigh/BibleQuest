@@ -147,3 +147,19 @@ export function rhythmBlocksForDate(
         left.time.localeCompare(right.time) || left.id.localeCompare(right.id),
     );
 }
+
+/** Chooses the next scheduled block, or the latest one when today's times passed. */
+export function rhythmBlockForCurrentTime(
+  blocks: readonly RhythmBlock[],
+  localTime: string,
+): RhythmBlock | null {
+  const ordered = [...blocks].sort(
+    (left, right) =>
+      left.time.localeCompare(right.time) || left.id.localeCompare(right.id),
+  );
+  return (
+    ordered.find((block) => block.time >= localTime) ??
+    ordered.at(-1) ??
+    null
+  );
+}

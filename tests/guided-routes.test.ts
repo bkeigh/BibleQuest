@@ -70,4 +70,21 @@ describe("guided route and access boundaries", () => {
     expect(runner).toContain("Open Prayer Journal");
     expect(runner).not.toContain("?prompt=${practice.");
   });
+
+  it("returns guided journals to their practice without sharing draft slots", () => {
+    for (const path of [
+      "src/components/reflection/ReflectionComposer.tsx",
+      "src/components/prayer/PrayerComposer.tsx",
+    ]) {
+      const composer = source(path);
+      expect(composer).toContain(
+        "entryId: editId ?? guidedHandoff?.draftScopeId",
+      );
+      expect(composer).toContain(
+        'const exitHref = guidedHandoff?.returnPath ?? "/app/prayer"',
+      );
+      expect(composer).toContain("router.replace(exitHref)");
+      expect(composer).toContain("href={exitHref}");
+    }
+  });
 });

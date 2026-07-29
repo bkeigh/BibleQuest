@@ -3,7 +3,7 @@ import type {
   GuidedPractice,
   PilgrimageDefinition,
 } from "@/lib/guided/types";
-import { hashString } from "@/lib/utils/dates";
+import { dateKeyOrdinal } from "@/lib/utils/dates";
 
 // This shared stamp records the required adversarial editorial pass.
 const REVIEW: GuidedContentReview = {
@@ -735,9 +735,11 @@ export const guidedPracticeById = new Map<string, GuidedPractice>(
   ].map((practice) => [practice.id, practice]),
 );
 
-/** The same local date always resolves to the same reviewed daily practice. */
+/** Consecutive local dates traverse every reviewed guide once before repeating. */
 export function guidedScriptureForDate(dateKey: string): GuidedPractice {
+  const ordinal = dateKeyOrdinal(dateKey);
   return dailyGuidedScripture[
-    hashString(`guided-scripture:${dateKey}`) % dailyGuidedScripture.length
+    ((ordinal % dailyGuidedScripture.length) + dailyGuidedScripture.length) %
+      dailyGuidedScripture.length
   ];
 }

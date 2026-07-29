@@ -9,7 +9,10 @@ import {
   RHYTHM_PRACTICE_LABELS,
   type RhythmPractice,
 } from "@/lib/rhythm/types";
-import { rhythmBlocksForDate } from "@/lib/rhythm/validation";
+import {
+  rhythmBlockForCurrentTime,
+  rhythmBlocksForDate,
+} from "@/lib/rhythm/validation";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { IconChevronRight } from "@/components/design-system/icons";
@@ -31,14 +34,30 @@ function practiceEnabled(practice: RhythmPractice): boolean {
   return true;
 }
 
-/** Shows the first scheduled rhythm for this local day as a calm set of links. */
-export function RhythmTodayCard({ dayKey }: { dayKey: string }) {
+/** Shows the next useful rhythm for this local day as a calm set of links. */
+export function RhythmTodayCard({
+  dayKey,
+  now,
+}: {
+  dayKey: string;
+  now: number;
+}) {
   const plus = usePlus();
   const state = useRhythmState();
   const date = useMemo(() => new Date(`${dayKey}T12:00:00`), [dayKey]);
-  const block = useMemo(
-    () => rhythmBlocksForDate(state, date, plus.isPlus)[0],
+  const localTime = useMemo(() => {
+    const current = new Date(now);
+    return `${String(current.getHours()).padStart(2, "0")}:${String(
+      current.getMinutes(),
+    ).padStart(2, "0")}`;
+  }, [now]);
+  const blocks = useMemo(
+    () => rhythmBlocksForDate(state, date, plus.isPlus),
     [date, plus.isPlus, state],
+  );
+  const block = useMemo(
+    () => rhythmBlockForCurrentTime(blocks, localTime),
+    [blocks, localTime],
   );
   const practices = useMemo(
     () => block?.practices.filter(practiceEnabled) ?? [],
@@ -96,19 +115,34 @@ export function RhythmTodayCard({ dayKey }: { dayKey: string }) {
           </div>
 
           <nav aria-label={`${block.label} practices`} className="mt-3">
-            <ul className="flex flex-wrap gap-2">
-              {practices.map((practice) => (
-                <li key={practice}>
-                  <Link
-                    href={PRACTICE_HREF[practice]}
-                    className="inline-flex min-h-11 items-center rounded-full border border-mist bg-paper px-3 py-2 text-small text-charcoal transition-colors hover:border-accent/35 hover:text-accent"
-                  >
-                    {RHYTHM_PRACTICE_LABELS[practice]}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            {practices.length > 0 ? (
+              <ul className="flex flex-wrap gap-2">
+                {practices.map((practice) => (
+                  <li key={practice}>
+                    <Link
+                      href={PRACTICE_HREF[practice]}
+                      className="inline-flex min-h-11 items-center rounded-full border border-mist bg-paper px-3 py-2 text-small text-charcoal transition-colors hover:border-accent/35 hover:text-accent"
+                    >
+                      {RHYTHM_PRACTICE_LABELS[practice]}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-caption leading-relaxed text-ash">
+                These practices are temporarily unavailable. Adjust this
+                rhythm to choose another gentle step.
+              </p>
+            )}
           </nav>
+
+          {blocks.length > 1 && (
+            <p className="mt-3 text-caption text-ash">
+              {blocks.length - 1} other{" "}
+              {blocks.length - 1 === 1 ? "rhythm is" : "rhythms are"} also
+              scheduled today.
+            </p>
+          )}
 
           {plus.isPlus &&
             block.fallbackPractice &&

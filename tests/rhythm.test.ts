@@ -7,6 +7,7 @@ import {
 import {
   parseRhythmBlock,
   parseRhythmState,
+  rhythmBlockForCurrentTime,
   rhythmBlocksForDate,
 } from "@/lib/rhythm/validation";
 import type { RhythmBlock } from "@/lib/rhythm/types";
@@ -105,6 +106,14 @@ describe("Rhythm validation", () => {
     expect(
       rhythmBlocksForDate(state, new Date("2026-07-29T12:00:00"), false),
     ).toEqual([evening]);
+
+    expect(rhythmBlockForCurrentTime([MORNING, evening], "12:00")).toBe(
+      evening,
+    );
+    expect(rhythmBlockForCurrentTime([MORNING, evening], "21:00")).toBe(
+      evening,
+    );
+    expect(rhythmBlockForCurrentTime([], "12:00")).toBeNull();
   });
 
   it("preserves lapsed Plus rhythms without allowing Free mutation", () => {

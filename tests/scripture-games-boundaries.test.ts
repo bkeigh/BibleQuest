@@ -77,6 +77,8 @@ describe("Scripture game product boundaries", () => {
       const source = readFileSync(join("src/components/games", file), "utf8");
       expect(source).toContain("resultHeadingRef.current?.focus()");
       expect(source).toContain("tabIndex={-1}");
+      expect(source).toContain("commitProgress");
+      expect(source).toContain("this browser cannot save your place");
     }
     const route = readFileSync(
       "src/app/app/games/archive/[puzzle]/page.tsx",

@@ -6,6 +6,7 @@ import {
 import { prayerPrompts } from "@/data/seed/prayer-prompts";
 import { selectReflectionPrompts } from "@/lib/journal/reflection-prompts";
 import { guidedJournalHandoff } from "@/lib/guided/journal-handoff";
+import { journalDraftStorageKey } from "@/lib/questos/journal-drafts";
 
 // One catalog proves every authored guide reaches its exact reviewed fallback.
 const practices = [
@@ -42,6 +43,7 @@ describe("guided journal handoffs", () => {
     for (const practice of practices) {
       expect(guidedJournalHandoff(practice.id)).toMatchObject({
         practiceId: practice.id,
+        draftScopeId: `guided:${practice.id}`,
         title: practice.title,
         verseReference: practice.scripture.reference,
         reflectionPrompt: practice.reflect,
@@ -49,5 +51,30 @@ describe("guided journal handoffs", () => {
       });
     }
     expect(guidedJournalHandoff("guide.unknown.v1")).toBeNull();
+  });
+
+  it("returns to the exact guide and isolates its unfinished journal draft", () => {
+    for (const practice of dailyGuidedScripture) {
+      const handoff = guidedJournalHandoff(practice.id)!;
+      expect(handoff.returnPath).toBe("/app/guided/daily");
+      expect(
+        journalDraftStorageKey("reflection", handoff.draftScopeId),
+      ).not.toBe(journalDraftStorageKey("reflection"));
+    }
+
+    for (const pilgrimage of pilgrimages) {
+      pilgrimage.days.forEach((practice, index) => {
+        const handoff = guidedJournalHandoff(practice.id)!;
+        expect(handoff.returnPath).toBe(
+          `/app/pilgrimages/${pilgrimage.slug}/${index + 1}`,
+        );
+      });
+    }
+
+    const first = guidedJournalHandoff(practices[0].id)!;
+    const second = guidedJournalHandoff(practices[1].id)!;
+    expect(
+      journalDraftStorageKey("prayer", first.draftScopeId),
+    ).not.toBe(journalDraftStorageKey("prayer", second.draftScopeId));
   });
 });

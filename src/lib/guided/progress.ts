@@ -7,6 +7,7 @@ import {
 import { isValidDateKey } from "@/lib/utils/dates";
 
 export const MAX_GUIDED_PROGRESS_RECORDS = 500;
+const MAX_GUIDED_CLOCK_SKEW_MS = 5 * 60 * 1000;
 const GUIDED_CONTENT_ID =
   /^(?:guide|pilgrimage)\.[a-z0-9]+(?:[.-][a-z0-9]+)*\.v[1-9]\d*$/;
 const ISO_TIMESTAMP =
@@ -60,7 +61,11 @@ export function isGuidedSessionKey(
 function isIsoTimestamp(value: unknown): value is string {
   if (typeof value !== "string" || !ISO_TIMESTAMP.test(value)) return false;
   const parsed = new Date(value);
-  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString() === value;
+  return (
+    !Number.isNaN(parsed.valueOf()) &&
+    parsed.toISOString() === value &&
+    parsed.valueOf() <= Date.now() + MAX_GUIDED_CLOCK_SKEW_MS
+  );
 }
 
 /**
@@ -109,7 +114,8 @@ export function isGuidedSessionProgress(
     record.updatedAt < record.startedAt ||
     (record.completedAt !== undefined &&
       (!isIsoTimestamp(record.completedAt) ||
-        record.completedAt < record.startedAt))
+        record.completedAt < record.startedAt ||
+        record.completedAt > record.updatedAt))
   ) {
     return false;
   }

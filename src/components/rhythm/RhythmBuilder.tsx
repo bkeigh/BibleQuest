@@ -258,6 +258,7 @@ export function RhythmBuilder() {
   const state = useRhythmState();
   const { toast } = useToast();
   const [editing, setEditing] = useState<RhythmBlock | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const limit = plus.isPlus
     ? PLUS_RHYTHM_BLOCK_LIMIT
     : FREE_RHYTHM_BLOCK_LIMIT;
@@ -364,17 +365,56 @@ export function RhythmBuilder() {
                 <GentleButton
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    if (removeRhythmBlock(block.id)) {
-                      toast("Rhythm removed.", { variant: "success" });
-                    } else {
-                      toast("Rhythm could not be removed.");
-                    }
-                  }}
+                  aria-expanded={removingId === block.id}
+                  aria-controls={
+                    removingId === block.id
+                      ? `remove-${block.id}`
+                      : undefined
+                  }
+                  onClick={() =>
+                    setRemovingId((current) =>
+                      current === block.id ? null : block.id,
+                    )
+                  }
                 >
-                  Remove
+                  {removingId === block.id ? "Cancel removal" : "Remove"}
                 </GentleButton>
               </div>
+              {removingId === block.id && (
+                <div
+                  id={`remove-${block.id}`}
+                  role="group"
+                  aria-label={`Confirm removal of ${block.label}`}
+                  className="mt-3 rounded-[var(--radius-button)] border border-rose-300/60 bg-rose-50/60 p-3"
+                >
+                  <p className="text-small text-charcoal">
+                    Remove this rhythm from this device?
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <GentleButton
+                      variant="danger"
+                      size="sm"
+                      onClick={() => {
+                        if (removeRhythmBlock(block.id)) {
+                          setRemovingId(null);
+                          toast("Rhythm removed.", { variant: "success" });
+                        } else {
+                          toast("Rhythm could not be removed.");
+                        }
+                      }}
+                    >
+                      Remove rhythm
+                    </GentleButton>
+                    <GentleButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setRemovingId(null)}
+                    >
+                      Keep it
+                    </GentleButton>
+                  </div>
+                </div>
+              )}
             </PaperCard>
           );
         })}
