@@ -343,6 +343,64 @@ describe("order-tolerant Stripe webhook processing", () => {
     expect(stripe.invoicePayments.list).not.toHaveBeenCalled();
   });
 
+  it("recovers an out-of-order support dispute from intent metadata", async () => {
+    vi.mocked(synchronizeLifetimeCharge).mockResolvedValue(false);
+    vi.mocked(synchronizeSupportDispute)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    const dispute = {
+      id: "du_SupportDisputeOutOfOrder123",
+      charge: "ch_SupportChargeOutOfOrder123",
+      status: "needs_response",
+      amount: 2_500,
+      currency: "usd",
+    };
+    const charge = {
+      id: "ch_SupportChargeOutOfOrder123",
+      payment_intent: "pi_SupportIntentOutOfOrder123",
+      customer: "cus_SupportCustomerOutOfOrder123",
+    };
+    const requestId = "d2000000-0000-4000-8000-000000000002";
+    const upsert = vi.fn().mockResolvedValue({ error: null });
+    const admin = {
+      from: vi.fn().mockReturnValue({ upsert }),
+    } as unknown as SupabaseClient;
+    const stripe = {
+      disputes: { retrieve: vi.fn().mockResolvedValue(dispute) },
+      charges: { retrieve: vi.fn().mockResolvedValue(charge) },
+      paymentIntents: {
+        retrieve: vi.fn().mockResolvedValue({
+          metadata: {
+            purpose: "biblequest_support",
+            support_request_id: requestId,
+          },
+        }),
+      },
+      invoicePayments: { list: vi.fn() },
+    } as unknown as Stripe;
+    const disputeEvent = event("charge.dispute.created", {
+      id: dispute.id,
+    });
+
+    await expect(
+      processStripeWebhookEvent(
+        admin,
+        stripe,
+        CONFIGURATION,
+        disputeEvent,
+      ),
+    ).resolves.toBe("processed");
+    expect(synchronizeSupportDispute).toHaveBeenNthCalledWith(
+      2,
+      admin,
+      charge,
+      dispute,
+      disputeEvent,
+      requestId,
+    );
+    expect(stripe.invoicePayments.list).not.toHaveBeenCalled();
+  });
+
   it("categorizes provider failures without retaining provider details", async () => {
     const stripe = {
       subscriptions: {

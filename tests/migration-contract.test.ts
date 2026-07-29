@@ -38,6 +38,7 @@ const EXPECTED_MIGRATIONS = [
   "0029_user_row_size_and_trigger_privileges.sql",
   "0030_operator_plus_grants.sql",
   "0031_stripe_subscription_conflict_key.sql",
+  "0032_stripe_dispute_signal_prefix.sql",
 ];
 
 /** Hash a migration exactly as the release manifest does. */

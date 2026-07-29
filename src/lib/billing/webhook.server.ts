@@ -139,6 +139,21 @@ async function subscriptionContextFromCharge(
   };
 }
 
+/** Reads only immutable support routing metadata from the current intent. */
+async function supportRequestIdFromCharge(
+  stripe: Stripe,
+  charge: Stripe.Charge,
+): Promise<string | null> {
+  const paymentIntentId = id(charge.payment_intent);
+  if (!paymentIntentId) return null;
+  const paymentIntent =
+    await stripe.paymentIntents.retrieve(paymentIntentId);
+  if (paymentIntent.metadata?.purpose !== "biblequest_support") {
+    return null;
+  }
+  return paymentIntent.metadata.support_request_id ?? null;
+}
+
 async function processInvoice(
   admin: SupabaseClient,
   stripe: Stripe,
@@ -253,7 +268,16 @@ async function processRefund(
           currentCharge,
           event,
         );
-    if (!lifetimePayment && !supportPayment) {
+    const recoveredSupportPayment =
+      !lifetimePayment && !supportPayment
+        ? await synchronizeSupportRefund(
+            admin,
+            currentCharge,
+            event,
+            await supportRequestIdFromCharge(stripe, currentCharge),
+          )
+        : supportPayment;
+    if (!lifetimePayment && !recoveredSupportPayment) {
       const context = await subscriptionContextFromCharge(
         stripe,
         currentCharge,
@@ -312,7 +336,17 @@ async function processDispute(
           dispute,
           event,
         );
-    if (!lifetimePayment && !supportPayment) {
+    const recoveredSupportPayment =
+      !lifetimePayment && !supportPayment
+        ? await synchronizeSupportDispute(
+            admin,
+            currentCharge,
+            dispute,
+            event,
+            await supportRequestIdFromCharge(stripe, currentCharge),
+          )
+        : supportPayment;
+    if (!lifetimePayment && !recoveredSupportPayment) {
       const context = await subscriptionContextFromCharge(
         stripe,
         currentCharge,

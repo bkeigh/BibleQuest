@@ -44,6 +44,10 @@ export interface StripeSupportPaymentRow {
   outcome_status: string;
 }
 
+interface StripeSupportLookupRow extends StripeSupportPaymentRow {
+  stripe_payment_intent_id: string | null;
+}
+
 export type SupportCheckoutClaim =
   | { status: "claimed"; token: string }
   | { status: "created"; sessionId: string }
@@ -130,6 +134,46 @@ function id(value: string | { id: string } | null): string | null {
 
 function occurredAt(created: number): string {
   return new Date(created * 1000).toISOString();
+}
+
+/** Finds a support row by its projected intent or immutable request fallback. */
+async function findSupportPayment(
+  admin: SupabaseClient,
+  paymentIntentId: string,
+  requestId?: string | null,
+): Promise<StripeSupportLookupRow | null> {
+  const columns =
+    "id,request_id,user_id,livemode,requested_amount,amount_total,amount_refunded,currency,checkout_status,payment_status,outcome_status,stripe_payment_intent_id";
+  const direct = await admin
+    .from("stripe_support_payments")
+    .select(columns)
+    .eq("stripe_payment_intent_id", paymentIntentId)
+    .maybeSingle();
+  if (direct.error) {
+    throw new Error("Stripe support payment unavailable.");
+  }
+  if (direct.data) return direct.data as StripeSupportLookupRow;
+  if (!requestId || !UUID.test(requestId)) return null;
+
+  const fallback = await admin
+    .from("stripe_support_payments")
+    .select(columns)
+    .eq("request_id", requestId)
+    .maybeSingle();
+  if (fallback.error) {
+    throw new Error("Stripe support payment unavailable.");
+  }
+  if (!fallback.data) return null;
+  const row = fallback.data as StripeSupportLookupRow;
+  if (
+    row.stripe_payment_intent_id &&
+    row.stripe_payment_intent_id !== paymentIntentId
+  ) {
+    throw new StripeSupportProjectionError(
+      "Stripe support PaymentIntent mismatch.",
+    );
+  }
+  return row;
 }
 
 /** Validates one current support Session against its immutable server request. */
@@ -263,26 +307,27 @@ export async function synchronizeSupportRefund(
   admin: SupabaseClient,
   charge: Stripe.Charge,
   event: Pick<Stripe.Event, "id" | "created">,
+  requestId?: string | null,
 ): Promise<boolean> {
   const paymentIntentId = id(charge.payment_intent);
   if (!paymentIntentId) return false;
-  const { data, error } = await admin
-    .from("stripe_support_payments")
-    .select(
-      "id,request_id,user_id,livemode,requested_amount,amount_total,amount_refunded,currency,checkout_status,payment_status,outcome_status",
-    )
-    .eq("stripe_payment_intent_id", paymentIntentId)
-    .maybeSingle();
-  if (error) throw new Error("Stripe support payment unavailable.");
+  const data = await findSupportPayment(
+    admin,
+    paymentIntentId,
+    requestId,
+  );
   if (!data) return false;
   const projection = supportRefundProjection(
-    data as StripeSupportPaymentRow,
+    data,
     charge,
     event,
   );
   const { error: updateError } = await admin
     .from("stripe_support_payments")
-    .update(projection)
+    .update({
+      ...projection,
+      stripe_payment_intent_id: paymentIntentId,
+    })
     .eq("id", data.id);
   if (updateError) throw new Error("Stripe support payment unavailable.");
   return true;
@@ -330,27 +375,28 @@ export async function synchronizeSupportDispute(
   charge: Stripe.Charge,
   dispute: Stripe.Dispute,
   event: Pick<Stripe.Event, "id" | "created">,
+  requestId?: string | null,
 ): Promise<boolean> {
   const paymentIntentId = id(charge.payment_intent);
   if (!paymentIntentId) return false;
-  const { data, error } = await admin
-    .from("stripe_support_payments")
-    .select(
-      "id,request_id,user_id,livemode,requested_amount,amount_total,amount_refunded,currency,checkout_status,payment_status,outcome_status",
-    )
-    .eq("stripe_payment_intent_id", paymentIntentId)
-    .maybeSingle();
-  if (error) throw new Error("Stripe support payment unavailable.");
+  const data = await findSupportPayment(
+    admin,
+    paymentIntentId,
+    requestId,
+  );
   if (!data) return false;
   const projection = supportDisputeProjection(
-    data as StripeSupportPaymentRow,
+    data,
     charge,
     dispute,
     event,
   );
   const { error: updateError } = await admin
     .from("stripe_support_payments")
-    .update(projection)
+    .update({
+      ...projection,
+      stripe_payment_intent_id: paymentIntentId,
+    })
     .eq("id", data.id);
   if (updateError) throw new Error("Stripe support payment unavailable.");
   return true;
