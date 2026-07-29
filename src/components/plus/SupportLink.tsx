@@ -2,6 +2,7 @@ import Link from "next/link";
 import { IconArrowRight } from "@/components/design-system/icons";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { cn } from "@/lib/utils/cn";
+import { webCommerceAvailable } from "@/lib/platform/purchases";
 
 interface SupportLinkProps {
   className?: string;
@@ -9,6 +10,8 @@ interface SupportLinkProps {
 
 /** Gives the one-time support path the same prominent treatment as Home's verse card. */
 export function SupportLink({ className }: SupportLinkProps) {
+  if (!webCommerceAvailable()) return null;
+
   return (
     <Link
       href="/support"

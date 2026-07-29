@@ -11,6 +11,8 @@ import {
   SUPPORT_MINIMUM_AMOUNT,
   SUPPORT_PRESET_AMOUNTS,
 } from "@/lib/support/config";
+import { apiFetch } from "@/lib/platform/api";
+import { webCommerceAvailable } from "@/lib/platform/purchases";
 
 interface SupportCheckoutProps {
   enabled: boolean;
@@ -29,11 +31,12 @@ export function SupportCheckout({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const request = useRef<{ id: string; amount: number } | null>(null);
+  const commerceAvailable = webCommerceAvailable();
   const amount =
     selected === "custom" ? parseCustomSupportAmount(custom) : selected;
 
   const submit = async () => {
-    if (!enabled || amount === null) return;
+    if (!enabled || !commerceAvailable || amount === null) return;
     setBusy(true);
     setError(null);
     // Preserve idempotency for a retry, but use a fresh identity after an
@@ -42,7 +45,7 @@ export function SupportCheckout({
       request.current = { id: crypto.randomUUID(), amount };
     }
     try {
-      const response = await fetch("/api/support/checkout", {
+      const response = await apiFetch("/api/support/checkout", {
         method: "POST",
         credentials: "same-origin",
         cache: "no-store",
@@ -75,7 +78,7 @@ export function SupportCheckout({
     }
   };
 
-  if (!enabled) {
+  if (!enabled || !commerceAvailable) {
     return (
       <div role="status">
         <h2 className="font-display text-[1.375rem] text-graphite">

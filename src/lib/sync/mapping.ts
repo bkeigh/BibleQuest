@@ -15,6 +15,8 @@ import type {
   DailyQuestStatus,
   GrowthEvent,
   GrowthType,
+  GuidedMovementKey,
+  GuidedSessionProgress,
   JourneyEvent,
   JourneyEventType,
   EarnedMilestone,
@@ -33,6 +35,11 @@ import type {
   Settings,
   VerseBookmark,
 } from "@/lib/questos/types";
+import { GUIDED_MOVEMENT_KEYS } from "@/lib/questos/types";
+import {
+  isGuidedSessionKey,
+  sanitizeGuidedProgress,
+} from "@/lib/guided/progress";
 import { normalizeBibleTranslationKey } from "@/lib/bible/translations";
 import { DEFAULT_SETTINGS } from "@/lib/questos/types";
 
@@ -204,6 +211,42 @@ export interface NotificationPrefsRow {
   weekly_recap_enabled: boolean;
   preferred_time: string | null;
   updated_at: string;
+}
+
+/** Append-only account row for one pilgrimage start or completed movement. */
+export interface GuidedMovementRow {
+  user_id: string;
+  session_key: string;
+  content_id: string;
+  movement_key: "started" | GuidedMovementKey;
+  occurred_at: string;
+}
+
+const MAX_GUIDED_CLOCK_SKEW_MS = 5 * 60 * 1000;
+const POSTGRES_TIMESTAMP =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/** Canonicalizes Postgres timestamptz values and rejects poisoned future rows. */
+function canonicalGuidedOccurredAt(
+  value: unknown,
+  nowMs = Date.now(),
+): string | null {
+  if (
+    typeof value !== "string" ||
+    value.length > 64 ||
+    !POSTGRES_TIMESTAMP.test(value)
+  ) {
+    return null;
+  }
+  const parsed = new Date(value);
+  const timestamp = parsed.valueOf();
+  if (
+    !Number.isFinite(timestamp) ||
+    timestamp > nowMs + MAX_GUIDED_CLOCK_SKEW_MS
+  ) {
+    return null;
+  }
+  return parsed.toISOString();
 }
 
 // ---------------------------------------------------------------------------
@@ -411,6 +454,38 @@ export function settingsToRows(
       updated_at: notificationsUpdatedAt,
     },
   };
+}
+
+/**
+ * Emit only pilgrimage markers. Daily-guide history remains device-local,
+ * while each immutable row makes cross-device progress monotonic.
+ */
+export function guidedProgressToRows(
+  uid: string,
+  progress: Record<string, GuidedSessionProgress> | undefined,
+): GuidedMovementRow[] {
+  return Object.values(progress ?? {}).flatMap((entry) => {
+    if (entry.kind !== "pilgrimage_day") return [];
+    return [
+      {
+        user_id: uid,
+        session_key: entry.sessionKey,
+        content_id: entry.contentId,
+        movement_key: "started" as const,
+        occurred_at: entry.startedAt,
+      },
+      ...entry.completedMovements.map((movement) => ({
+        user_id: uid,
+        session_key: entry.sessionKey,
+        content_id: entry.contentId,
+        movement_key: movement,
+        occurred_at:
+          movement === "pray" && entry.completedAt
+            ? entry.completedAt
+            : entry.updatedAt,
+      })),
+    ];
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -622,4 +697,65 @@ export function rowsToSettings(
     notificationsUpdatedAt:
       notifications?.updated_at ?? d.notificationsUpdatedAt,
   };
+}
+
+/** Rebuild versioned pilgrimage progress from immutable movement markers. */
+export function rowsToGuidedProgress(
+  rows: readonly GuidedMovementRow[],
+): Record<string, GuidedSessionProgress> {
+  const grouped = new Map<string, GuidedMovementRow[]>();
+  for (const row of rows) {
+    const occurredAt = canonicalGuidedOccurredAt(row.occurred_at);
+    if (
+      !occurredAt ||
+      !isGuidedSessionKey(
+        row.session_key,
+        "pilgrimage_day",
+        row.content_id,
+      ) ||
+      (row.movement_key !== "started" &&
+        !GUIDED_MOVEMENT_KEYS.includes(row.movement_key))
+    ) {
+      continue;
+    }
+    const list = grouped.get(row.session_key) ?? [];
+    list.push({ ...row, occurred_at: occurredAt });
+    grouped.set(row.session_key, list);
+  }
+
+  const progress: Record<string, GuidedSessionProgress> = {};
+  for (const [sessionKey, markers] of grouped) {
+    const ordered = [...markers].sort((left, right) =>
+      left.occurred_at.localeCompare(right.occurred_at),
+    );
+    const started =
+      ordered.find((marker) => marker.movement_key === "started") ?? ordered[0];
+    if (!started) continue;
+    // A later movement is causal evidence that earlier movements were passed.
+    // Rebuilding the prefix also lets disjoint device marker sets merge safely.
+    const furthestMovement = GUIDED_MOVEMENT_KEYS.reduce(
+      (furthest, movement, index) =>
+        ordered.some((marker) => marker.movement_key === movement)
+          ? Math.max(furthest, index)
+          : furthest,
+      -1,
+    );
+    const completedMovements = GUIDED_MOVEMENT_KEYS.slice(
+      0,
+      furthestMovement + 1,
+    );
+    const updatedAt = ordered.at(-1)?.occurred_at ?? started.occurred_at;
+    const complete =
+      completedMovements.length === GUIDED_MOVEMENT_KEYS.length;
+    progress[sessionKey] = {
+      sessionKey,
+      contentId: started.content_id,
+      kind: "pilgrimage_day",
+      completedMovements,
+      startedAt: started.occurred_at,
+      updatedAt,
+      completedAt: complete ? updatedAt : undefined,
+    };
+  }
+  return sanitizeGuidedProgress(progress);
 }

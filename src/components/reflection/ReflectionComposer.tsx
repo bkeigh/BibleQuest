@@ -13,11 +13,12 @@ import { MoodPicker } from "@/components/reflection/MoodPicker";
 import { JournalEditorToolbar } from "@/components/journal/JournalEditorToolbar";
 import { JournalPrivacyBoundary } from "@/components/journal/JournalPrivacyBoundary";
 import { IconArrowLeft } from "@/components/design-system/icons";
-import { reflectionPrompts } from "@/data/seed/reflection-prompts";
 import { hashString, toDateKey } from "@/lib/utils/dates";
 import { useDeviceLocalJournalDraft } from "@/lib/questos/journal-drafts";
 import type { ReflectionMood } from "@/lib/questos/types";
 import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
+import { selectReflectionPrompts } from "@/lib/journal/reflection-prompts";
+import { guidedJournalHandoff } from "@/lib/guided/journal-handoff";
 
 type ReflectionDraft = {
   body: string;
@@ -42,19 +43,20 @@ function ReflectionComposerInner() {
       : undefined,
   );
   const isEdit = Boolean(existing);
-  const verseRef = existing?.relatedVerseReference ?? params.get("verse") ?? undefined;
-
-  const promptPool = useMemo(() => {
-    if (!verseRef) return reflectionPrompts;
-    const scripturePrompts = reflectionPrompts.filter(
-      (prompt) => prompt.context === "after_scripture",
-    );
-    return scripturePrompts.length ? scripturePrompts : reflectionPrompts;
-  }, [verseRef]);
-  const requestedPrompt = useMemo(() => {
-    const id = params.get("prompt");
-    return id ? promptPool.find((prompt) => prompt.id === id) : undefined;
-  }, [params, promptPool]);
+  const guidedHandoff = useMemo(
+    () => guidedJournalHandoff(params.get("guided")),
+    [params],
+  );
+  const verseRef =
+    existing?.relatedVerseReference ??
+    guidedHandoff?.verseReference ??
+    params.get("verse") ??
+    undefined;
+  const requestedPromptId = params.get("prompt") ?? undefined;
+  const { promptPool, requestedPrompt } = useMemo(
+    () => selectReflectionPrompts(verseRef, requestedPromptId),
+    [requestedPromptId, verseRef],
+  );
   const dailyPromptIndex = useMemo(
     () => hashString(toDateKey() + (verseRef ?? "")) % promptPool.length,
     [promptPool.length, verseRef],
@@ -72,7 +74,11 @@ function ReflectionComposerInner() {
   const initialValue: ReflectionDraft = {
     body: existing?.body ?? "",
     mood: existing?.mood ?? "",
-    prompt: existing?.prompt ?? requestedPrompt?.text ?? currentPrompt.text,
+    prompt:
+      existing?.prompt ??
+      guidedHandoff?.reflectionPrompt ??
+      requestedPrompt?.text ??
+      currentPrompt.text,
   };
   const {
     value,

@@ -19,6 +19,7 @@ import { useDeviceLocalJournalDraft } from "@/lib/questos/journal-drafts";
 import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 import { hashString, toDateKey } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils/cn";
+import { guidedJournalHandoff } from "@/lib/guided/journal-handoff";
 
 export const CATEGORY_LABEL: Record<PrayerCategory, string> = {
   morning: "Morning",
@@ -56,6 +57,10 @@ function PrayerComposerInner() {
     editId ? state.prayers.find((prayer) => prayer.id === editId) : undefined,
   );
   const isEdit = Boolean(existing);
+  const guidedHandoff = useMemo(
+    () => guidedJournalHandoff(params.get("guided")),
+    [params],
+  );
   const requestedPrompt = useMemo(() => {
     const id = params.get("prompt");
     return id ? prayerPrompts.find((prompt) => prompt.id === id) : undefined;
@@ -75,9 +80,17 @@ function PrayerComposerInner() {
   const prompt = prayerPrompts[promptIndex];
 
   const initialValue: PrayerDraft = {
-    title: existing?.title ?? "",
-    body: existing?.body ?? requestedPrompt?.text ?? "",
-    category: existing?.category ?? requestedPrompt?.category ?? "general",
+    title: existing?.title ?? guidedHandoff?.title ?? "",
+    body:
+      existing?.body ??
+      guidedHandoff?.prayerBody ??
+      requestedPrompt?.text ??
+      "",
+    category:
+      existing?.category ??
+      guidedHandoff?.prayerCategory ??
+      requestedPrompt?.category ??
+      "general",
   };
   const {
     value,

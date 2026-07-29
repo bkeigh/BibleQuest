@@ -237,7 +237,7 @@ describe("Bible translation preference and licensing boundary", () => {
       ),
       "utf8",
     );
-    expect(store).toContain("version: 14");
+    expect(store).toContain("version: 15");
     expect(store).toContain("if (version < 9)");
     expect(store).toContain("DEFAULT_BIBLE_TRANSLATION_KEY");
     expect(preferenceMigration).toContain("preferred_bible_translation");

@@ -27,6 +27,7 @@ with expected (table_name, classification) as (
     ('reflections', 'user-owned'),
     ('verse_bookmarks', 'user-owned'),
     ('user_recent_verses', 'user-owned'),
+    ('user_guided_movements', 'user-owned'),
     ('reading_progress', 'user-owned'),
     ('chapters_read', 'user-owned'),
     ('journey_events', 'user-owned'),
@@ -150,6 +151,7 @@ where namespace.nspname = 'public'
     'delete_user_sync_rows',
     'account_sync_generation',
     'account_sync_contract',
+    'guided_progress_sync_contract',
     'delete_own_account',
     'account_deletion_contract',
     'set_profile_avatar',
@@ -236,6 +238,7 @@ where table_namespace.nspname = 'public'
     'user_settings',
     'notification_preferences',
     'user_recent_verses',
+    'user_guided_movements',
     'user_daily_quests',
     'user_daily_quest_days',
     'user_quests',
@@ -318,6 +321,7 @@ order by table_name;
 select public.daily_quest_sync_contract() as daily_quest_sync_contract;
 select public.mutable_account_sync_contract() as mutable_account_sync_contract;
 select public.account_sync_contract() as account_sync_contract;
+select public.guided_progress_sync_contract() as guided_progress_sync_contract;
 select public.account_deletion_contract() as account_deletion_contract;
 select public.profile_avatar_contract() as profile_avatar_contract;
 select public.push_reminder_contract() as push_reminder_contract;

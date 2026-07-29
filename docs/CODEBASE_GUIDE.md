@@ -44,11 +44,17 @@ flowchart LR
 | `src/lib/sync/` | Supabase row mapping, pull/merge/push coordination, deletion tombstones, and sync status. |
 | `src/lib/supabase/` | Browser/server clients, auth-session middleware, and the client session hook. |
 | `src/lib/billing/` | Deny-by-default Stripe configuration, current-object projection, webhook processing, and the account-bound React Plus hook. |
+| `src/lib/platform/` | Web behavior plus closed, typed API, auth, share, notification, and purchase seams for a later native build. |
+| `src/lib/guided/` | Guided-session validation, resume progress, and monotonic Pilgrimage merge rules. |
+| `src/lib/games/` | Scripture-game selection, access, pure engines, validation, links, and bounded device-local resume. |
+| `src/lib/rhythm/` | Strictly validated device-local weekly rhythm preferences and Free/Plus limits. |
 | `src/lib/analytics/` | Explicit-consent analytics schema, sanitization, offline queue, and transport. |
 | `src/lib/bible/` | Bible metadata and server-only chapter loading. |
 | `src/lib/i18n/` | English source strings, locale dictionaries, language metadata, and typed lookup helpers. |
 | `src/lib/utils/` | Small dependency-free helpers for dates, names, Scripture, avatars, class names, and hydration. |
 | `src/data/seed/` | Reviewed quests, milestones, prompts, and daily verses. Treat this as product content, not arbitrary fixtures. |
+| `src/data/guided/` | Reviewed, versioned Guided Scripture and Pilgrimage content with exact bundled WEB passages. |
+| `src/data/games/` | Reviewed, sourced Scripture Connections and Bible Timeline puzzle catalogs. |
 | `src/data/bible/` | Public-domain World English Bible JSON, loaded on the server. |
 | `supabase/` | Local Supabase configuration, ordered migrations, seed SQL, and policy evidence. |
 | `public/` | PWA icons, brand files, tree sprites, and the production service worker. |
@@ -193,6 +199,10 @@ When the worker policy changes, increment `CACHE_VERSION` and update
 | `/app/bible` | Daily verse, reading shortcuts/history, book search, and testament browser. |
 | `/app/bible/[book]/[chapter]` | Translation-aware chapter reader with WEB offline fallback. |
 | `/app/bible/saved` | Saved verse bookmarks. |
+| `/app/guided` and `/app/guided/daily` | The daily six-movement Guided Scripture invitation and runner. |
+| `/app/pilgrimages` and nested path/day routes | Free and Plus multi-day guided paths with resumable progress and no missed-day penalty. |
+| `/app/games` | One free rotating Scripture game plus optional Plus breadth. |
+| `/app/rhythm` | One Free or up to three Plus weekly formation rhythms with a busy-day alternative. |
 | `/app/prayer`, `/app/prayer/reflections`, and `/app/prayer/new` | Unified, date-grouped Prayer Journal with local search, filters, privacy screen, prompts, and the prayer composer. The reflections URL opens the same journal prefiltered. |
 | `/app/prayer/reflection/new` | Focused reflection composer with prompts, mood, safe plain-text formatting, and device draft recovery. |
 | `/app/reflection` and `/new` | Legacy redirects retained for bookmarks and older app links. |

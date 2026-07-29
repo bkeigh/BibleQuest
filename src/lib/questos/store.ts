@@ -54,6 +54,9 @@ import {
   type ChapterRead,
   type VerseBookmark,
   type GrowthType,
+  type GuidedMovementKey,
+  type GuidedSessionKind,
+  type GuidedSessionProgress,
   type QuestOSSnapshot,
   type SyncTombstones,
   type StreakState,
@@ -77,6 +80,12 @@ import {
   isWallpaperId,
 } from "@/lib/wallpapers/catalog";
 import { normalizeGlassOpacity } from "@/lib/glass-opacity";
+import {
+  advanceGuidedSession,
+  beginGuidedSession,
+  sanitizeGuidedProgress,
+  upsertGuidedProgress,
+} from "@/lib/guided/progress";
 
 const meaningfulJourneyEventTypes = new Set<JourneyEventType>(
   MEANINGFUL_JOURNEY_EVENT_TYPES
@@ -191,6 +200,11 @@ interface QuestOSState {
    * excluded from sync mapping but rides through snapshot/importData.
    */
   accountNudge: AccountNudgeState;
+  /**
+   * Guided-session bookmarks. Daily entries stay device-local; pilgrimage
+   * entries also sync through their narrow owner-only account table.
+   */
+  guidedProgress: Record<string, GuidedSessionProgress>;
   /** Local deletions the sync engine still needs to propagate remotely. */
   tombstones: SyncTombstones;
 
@@ -202,6 +216,20 @@ interface QuestOSState {
   updateProfile: (patch: Partial<Profile>) => void;
   updateSettings: (patch: Partial<Settings>) => void;
   recordVisit: () => void;
+  /** Start once or return the existing versioned guided-session bookmark. */
+  startGuidedSession: (data: {
+    sessionKey: string;
+    contentId: string;
+    kind: GuidedSessionKind;
+  }) => GuidedSessionProgress | null;
+  /**
+   * Mark one guided movement without creating Journey, growth, or candle
+   * events. The underlying user actions remain the only meaningful records.
+   */
+  completeGuidedMovement: (
+    sessionKey: string,
+    movement: GuidedMovementKey,
+  ) => GuidedSessionProgress | null;
   /**
    * Reset to factory state. When a session exists, pass the signed-in user id
    * as `purgeAccount` so the sync engine also deletes the account copy —
@@ -737,6 +765,7 @@ export const useQuestOS = create<QuestOSState>()(
         streak: emptyStreak(),
         verseRefresh: null,
         accountNudge: emptyAccountNudge(),
+        guidedProgress: {},
         tombstones: emptyTombstones(),
 
         completeOnboarding: (profileData, settingsPatch) => {
@@ -812,6 +841,54 @@ export const useQuestOS = create<QuestOSState>()(
           set({ lastVisitDateKey: toDateKey() });
         },
 
+        startGuidedSession: ({ sessionKey, contentId, kind }) => {
+          const existing = get().guidedProgress[sessionKey];
+          if (existing) {
+            return existing.contentId === contentId && existing.kind === kind
+              ? existing
+              : null;
+          }
+          const progress = beginGuidedSession(
+            sessionKey,
+            contentId,
+            kind,
+            new Date().toISOString(),
+          );
+          if (!progress) return null;
+          set({
+            guidedProgress: upsertGuidedProgress(
+              get().guidedProgress,
+              progress,
+            ),
+          });
+          track("guided_practice_started", {
+            kind: kind === "daily" ? "daily" : "pilgrimage",
+          });
+          return progress;
+        },
+
+        completeGuidedMovement: (sessionKey, movement) => {
+          const existing = get().guidedProgress[sessionKey];
+          if (!existing) return null;
+          const progress = advanceGuidedSession(
+            existing,
+            movement,
+            new Date().toISOString(),
+          );
+          set({
+            guidedProgress: upsertGuidedProgress(
+              get().guidedProgress,
+              progress,
+            ),
+          });
+          if (!existing.completedAt && progress.completedAt) {
+            track("guided_practice_completed", {
+              kind: progress.kind === "daily" ? "daily" : "pilgrimage",
+            });
+          }
+          return progress;
+        },
+
         clearAllData: (opts) => {
           set({
             profile: null,
@@ -833,6 +910,7 @@ export const useQuestOS = create<QuestOSState>()(
             streak: emptyStreak(),
             verseRefresh: null,
             accountNudge: emptyAccountNudge(),
+            guidedProgress: {},
             // The purge marker survives the reset (it IS the reset's remote
             // half); it subsumes any pending per-row tombstones.
             tombstones: {
@@ -904,6 +982,9 @@ export const useQuestOS = create<QuestOSState>()(
             // Device-local like the streak: the sync engine's merge-apply
             // passes the local value through; old exports just reset it.
             accountNudge: snapshot.accountNudge ?? emptyAccountNudge(),
+            guidedProgress: sanitizeGuidedProgress(
+              snapshot.guidedProgress ?? {},
+            ),
             // Device-local and day-scoped — survives restores and the sync
             // engine's merge-apply alike; self-resets at the next midnight.
             verseRefresh: get().verseRefresh,
@@ -1609,7 +1690,7 @@ export const useQuestOS = create<QuestOSState>()(
     {
       name: "biblequest:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 14,
+      version: 15,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
@@ -1827,6 +1908,11 @@ export const useQuestOS = create<QuestOSState>()(
             settings.updatedAt ??= fallback;
             settings.notificationsUpdatedAt ??= settings.updatedAt;
           }
+        }
+        if (version < 15) {
+          // v15 introduces versioned guide bookmarks without synthesizing
+          // Journey or growth records for opening/completing a guide screen.
+          state.guidedProgress = {};
         }
         return state as unknown as QuestOSState;
       },

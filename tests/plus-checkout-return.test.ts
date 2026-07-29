@@ -6,6 +6,10 @@ const SOURCE = readFileSync(
   path.join(process.cwd(), "src/lib/billing/usePlus.ts"),
   "utf8",
 );
+const PURCHASE_SOURCE = readFileSync(
+  path.join(process.cwd(), "src/lib/platform/purchases.ts"),
+  "utf8",
+);
 
 /**
  * A Checkout redirect returns before Stripe's webhook is guaranteed to have
@@ -32,7 +36,8 @@ describe("Plus reconciliation after a Checkout return", () => {
 
   it("keeps the reconcile server-driven rather than trusting the redirect", () => {
     // The return parameter only triggers a request; it never sets isPlus.
-    expect(SOURCE).toContain('"/api/billing/refresh"');
+    expect(SOURCE).toContain("purchases.restore()");
+    expect(PURCHASE_SOURCE).toContain('"/api/billing/refresh"');
     expect(SOURCE).not.toContain('isPlus: true');
   });
 });

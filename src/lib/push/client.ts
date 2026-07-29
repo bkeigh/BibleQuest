@@ -4,6 +4,11 @@ import type {
   PushReminderPreferences,
   SerializedPushSubscription,
 } from "./validation";
+import { apiFetch } from "@/lib/platform/api";
+import {
+  notificationCapability,
+  type NotificationPosture,
+} from "@/lib/platform/notifications";
 
 export interface PushConfig {
   available: true;
@@ -13,9 +18,7 @@ export interface PushConfig {
   subscriptionCount: number;
 }
 
-export type PushClientPosture =
-  | { supported: true; iosHomeScreenRequired: false }
-  | { supported: false; iosHomeScreenRequired: boolean };
+export type PushClientPosture = NotificationPosture;
 
 export class PushClientError extends Error {
   constructor(readonly status = 0) {
@@ -26,28 +29,12 @@ export class PushClientError extends Error {
 
 /** Detects browser support and the iOS Home Screen requirement without prompts. */
 export function pushClientPosture(): PushClientPosture {
-  if (typeof window === "undefined" || typeof navigator === "undefined") {
-    return { supported: false, iosHomeScreenRequired: false };
-  }
-  const ios =
-    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  const standalone =
-    window.matchMedia("(display-mode: standalone)").matches ||
-    Boolean(
-      (navigator as Navigator & { standalone?: boolean }).standalone,
-    );
-  if (ios && !standalone) {
-    return { supported: false, iosHomeScreenRequired: true };
-  }
-  return {
-    supported:
-      window.isSecureContext &&
-      "serviceWorker" in navigator &&
-      "PushManager" in window &&
-      "Notification" in window,
-    iosHomeScreenRequired: false,
-  };
+  return notificationCapability().posture();
+}
+
+/** Reads the selected platform permission without prompting. */
+export function currentNotificationPermission(): NotificationPermission {
+  return notificationCapability().permission();
 }
 
 /** Converts a VAPID base64url public key to the PushManager byte shape. */
@@ -72,7 +59,7 @@ export async function fetchPushConfig(
   signal?: AbortSignal,
 ): Promise<PushConfig> {
   const response = await responseReady(
-    await fetch("/api/push/config", {
+    await apiFetch("/api/push/config", {
       cache: "no-store",
       credentials: "same-origin",
       signal,
@@ -127,7 +114,7 @@ export async function currentPushSubscription(): Promise<PushSubscription | null
 
 async function deleteEndpoint(endpoint: string): Promise<void> {
   await responseReady(
-    await fetch("/api/push/subscriptions", {
+    await apiFetch("/api/push/subscriptions", {
       method: "DELETE",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
@@ -142,7 +129,7 @@ export async function enablePushReminders(
   preferences: PushReminderPreferences,
 ): Promise<PushSubscription> {
   if (!pushClientPosture().supported) throw new PushClientError();
-  const permission = await Notification.requestPermission();
+  const permission = await notificationCapability().requestPermission();
   if (permission !== "granted") throw new PushClientError(403);
 
   const registration = await serviceWorkerRegistration();
@@ -155,7 +142,7 @@ export async function enablePushReminders(
   const serialized = serializedSubscription(subscription);
   try {
     await responseReady(
-      await fetch("/api/push/subscriptions", {
+      await apiFetch("/api/push/subscriptions", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
@@ -180,7 +167,7 @@ export async function savePushPreferences(
   preferences: PushReminderPreferences,
 ): Promise<void> {
   await responseReady(
-    await fetch("/api/push/preferences", {
+    await apiFetch("/api/push/preferences", {
       method: "PATCH",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
@@ -205,7 +192,7 @@ export async function sendTestPush(
   subscription: PushSubscription,
 ): Promise<void> {
   await responseReady(
-    await fetch("/api/push/test", {
+    await apiFetch("/api/push/test", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },

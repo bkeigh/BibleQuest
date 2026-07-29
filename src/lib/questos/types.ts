@@ -266,6 +266,40 @@ export interface RecentVerse {
 }
 
 // ---------------------------------------------------------------------------
+// Guided Scripture & Pilgrimages
+// ---------------------------------------------------------------------------
+
+/** The six movements shared by every reviewed guided practice. */
+export const GUIDED_MOVEMENT_KEYS = [
+  "arrive",
+  "read",
+  "notice",
+  "reflect",
+  "respond",
+  "pray",
+] as const;
+export type GuidedMovementKey = (typeof GUIDED_MOVEMENT_KEYS)[number];
+
+export type GuidedSessionKind = "daily" | "pilgrimage_day";
+
+/**
+ * Device-local progress for one versioned guided practice.
+ *
+ * Guide completion is intentionally separate from Journey and growth ledgers.
+ * Scripture, reflection, prayer, and quest actions keep using their existing
+ * records, so moving through a guide can never double-count spiritual growth.
+ */
+export interface GuidedSessionProgress {
+  sessionKey: string;
+  contentId: string;
+  kind: GuidedSessionKind;
+  completedMovements: GuidedMovementKey[];
+  startedAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Prayer
 // ---------------------------------------------------------------------------
 
@@ -709,6 +743,11 @@ export interface QuestOSSnapshot {
   streak?: StreakState;
   /** Optional & device-local — rides through restores like the streak. */
   accountNudge?: AccountNudgeState;
+  /**
+   * Optional for pre-guides exports. Progress is device-local but portable in
+   * an explicit backup and preserved across account-sync merge applies.
+   */
+  guidedProgress?: Record<string, GuidedSessionProgress>;
 }
 
 export function emptyStreak(): StreakState {

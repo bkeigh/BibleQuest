@@ -43,6 +43,8 @@ import { ExplorePlusLink } from "@/components/plus/ExplorePlusLink";
 import { NewsletterLink } from "@/components/newsletter/NewsletterLink";
 import { profileAvatarMarker } from "@/lib/utils/avatar";
 import { cn } from "@/lib/utils/cn";
+import { TodayFormation } from "@/components/home/TodayFormation";
+import { RhythmTodayCard } from "@/components/rhythm/RhythmTodayCard";
 
 function HomeInner() {
   const profile = useQuestOS((s) => s.profile);
@@ -207,6 +209,11 @@ function HomeInner() {
           {/* Scripture stays directly beneath the personal account surface,
               while the compact treatment leaves quests as Home's main work. */}
           <TodaysVerseLink />
+
+          {/* One reviewed guide leads; the daily game and an optional rhythm
+              remain close without becoming a score-driven dashboard. */}
+          <TodayFormation dayKey={dayKey} />
+          <RhythmTodayCard dayKey={dayKey} />
 
           {/* Home shows one next quest and sends all management to Quests. */}
           <section id="quests" className="scroll-mt-6">
