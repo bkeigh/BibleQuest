@@ -474,48 +474,27 @@ function OAuthButtons({
   );
 }
 
-/** Uses Apple's official silhouette as a compact white provider mark. */
+/** Renders the supplied Apple silhouette converted to white for contrast. */
 function AppleMark() {
   return (
-    <svg
+    <span
       aria-hidden="true"
       data-provider-mark="apple"
-      viewBox="0 0 16 16"
-      className="h-5 w-5 shrink-0 fill-current"
-    >
-      <path d="M11.182.008c-.034-.038-1.259.015-2.452 1.24-1.069 1.097-1.803 2.455-1.628 3.775 1.317.102 2.66-.596 3.47-1.596.8-.987 1.31-2.376.61-3.419Z" />
-      <path d="M14.651 8.946c-.015-2.039 1.667-3.018 1.742-3.063-.954-1.389-2.436-1.58-2.955-1.595-1.243-.131-2.45.744-3.083.744-.646 0-1.622-.731-2.672-.709-1.35.021-2.613.803-3.306 2.014-1.432 2.48-.364 6.126 1.008 8.13.686.981 1.487 2.072 2.536 2.033 1.026-.043 1.409-.653 2.648-.653 1.228 0 1.589.653 2.658.629 1.101-.018 1.794-.984 2.456-1.974.793-1.125 1.112-2.23 1.125-2.287-.026-.009-2.135-.814-2.157-3.269Z" />
-    </svg>
+      className="h-5 w-5 shrink-0 bg-contain bg-center bg-no-repeat"
+      style={{ backgroundImage: "url('/brand/apple-logo-white.png')" }}
+    />
   );
 }
 
-/** Keeps Google's standard multicolor G isolated on its required white field. */
+/** Renders the supplied 2025 Google G without altering its colors. */
 function GoogleMark() {
   return (
     <span
       aria-hidden="true"
       data-provider-mark="google"
-      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white"
-    >
-      <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]">
-        <path
-          fill="#4285F4"
-          d="M21.35 12.18c0-.74-.07-1.45-.19-2.14H12v4.05h5.24a4.48 4.48 0 0 1-1.94 2.94v2.62h3.14c1.84-1.69 2.91-4.18 2.91-7.47Z"
-        />
-        <path
-          fill="#34A853"
-          d="M12 21.7c2.62 0 4.82-.87 6.43-2.35l-3.14-2.62c-.87.58-1.98.93-3.29.93-2.53 0-4.67-1.71-5.44-4.01H3.32v2.7A9.7 9.7 0 0 0 12 21.7Z"
-        />
-        <path
-          fill="#FBBC05"
-          d="M6.56 13.65A5.83 5.83 0 0 1 6.25 12c0-.57.1-1.13.31-1.65v-2.7H3.32A9.7 9.7 0 0 0 2.3 12c0 1.56.37 3.04 1.02 4.35l3.24-2.7Z"
-        />
-        <path
-          fill="#EA4335"
-          d="M12 6.34c1.43 0 2.71.49 3.72 1.45l2.79-2.79A9.35 9.35 0 0 0 12 2.3a9.7 9.7 0 0 0-8.68 5.35l3.24 2.7C7.33 8.05 9.47 6.34 12 6.34Z"
-        />
-      </svg>
-    </span>
+      className="h-6 w-6 shrink-0 bg-contain bg-center bg-no-repeat"
+      style={{ backgroundImage: "url('/brand/google-g-2025.png')" }}
+    />
   );
 }
 

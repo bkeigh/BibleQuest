@@ -26,8 +26,10 @@ describe("production sign-in methods", () => {
     expect(markup).toContain("Sign in with Google");
     expect(markup).toContain('data-provider-button="apple"');
     expect(markup).toContain('data-provider-mark="apple"');
+    expect(markup).toContain("/brand/apple-logo-white.png");
     expect(markup).toContain('data-provider-button="google"');
     expect(markup).toContain('data-provider-mark="google"');
+    expect(markup).toContain("/brand/google-g-2025.png");
     expect(markup).not.toContain("Text me a code");
     expect(markup).not.toContain('type="tel"');
   });
