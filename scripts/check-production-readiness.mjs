@@ -31,6 +31,7 @@ const contentEvidence = [];
 const authEvidence = {
   settings_reachable: false,
   email_enabled: false,
+  apple_enabled: false,
   google_enabled: false,
   phone_disabled: false,
 };
@@ -715,11 +716,16 @@ async function checkAuthMethods() {
     const providers = body.external ?? {};
     authEvidence.settings_reachable = true;
     authEvidence.email_enabled = providers.email === true;
+    authEvidence.apple_enabled = providers.apple === true;
     authEvidence.google_enabled = providers.google === true;
     authEvidence.phone_disabled = providers.phone !== true;
     result(
       providers.email === true,
       "email provider enabled (delivery manual)",
+    );
+    result(
+      providers.apple === true,
+      "Apple provider enabled (round trip manual)",
     );
     result(
       providers.google === true,
