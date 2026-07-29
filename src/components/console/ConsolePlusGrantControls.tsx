@@ -121,20 +121,13 @@ export function ConsolePlusGrantForm() {
   );
 }
 
-/** Revokes only the selected account's open manual grant. */
-export function ConsolePlusRevokeForm({
-  userId,
-  email,
-}: {
-  userId: string;
-  email: string;
-}) {
+/** Revokes one exact account's manual grant from a deliberately hidden tool. */
+export function ConsolePlusRevokeForm() {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, action, pending] = useActionState(
     revokeOperatorPlusAction,
     INITIAL_STATE,
   );
-  const suffix = userId.slice(0, 8);
 
   // Clears confirmation text while leaving the completed outcome visible.
   useEffect(() => {
@@ -142,40 +135,51 @@ export function ConsolePlusRevokeForm({
   }, [state.completedAt, state.status]);
 
   return (
-    <details className="console-revoke-details">
-      <summary>Revoke manual grant</summary>
+    <details className="console-revoke-details console-revoke-details--standalone">
+      <summary>Revoke Plus for developer testing</summary>
+      <p className="console-revoke-warning" role="note">
+        <strong>Use sparingly.</strong> This control is only for developer
+        testing and exceptional manual-access cleanup. It never cancels a
+        Stripe membership.
+      </p>
       <form ref={formRef} action={action} className="console-revoke-form">
-        <input type="hidden" name="userId" value={userId} />
-        <input type="hidden" name="email" value={email} />
-        <label
-          className="console-field-label"
-          htmlFor={`revoke-reason-${suffix}`}
-        >
-          Reason
+        <label className="console-field-label" htmlFor="revoke-account-email">
+          Exact account email
         </label>
         <input
           className="console-input"
-          id={`revoke-reason-${suffix}`}
+          id="revoke-account-email"
+          name="email"
+          type="email"
+          autoComplete="off"
+          required
+          maxLength={254}
+          placeholder="member@example.com"
+        />
+        <label className="console-field-label" htmlFor="revoke-reason">
+          Internal reason
+        </label>
+        <input
+          className="console-input"
+          id="revoke-reason"
           name="reason"
           required
           minLength={3}
           maxLength={240}
           placeholder="Why access is ending"
         />
-        <label
-          className="console-field-label"
-          htmlFor={`revoke-confirmation-${suffix}`}
-        >
-          Retype {email}
+        <label className="console-field-label" htmlFor="revoke-confirmation">
+          Confirm by retyping the exact email
         </label>
         <input
           className="console-input"
-          id={`revoke-confirmation-${suffix}`}
+          id="revoke-confirmation"
           name="confirmation"
           type="email"
           autoComplete="off"
           required
           maxLength={254}
+          placeholder="member@example.com"
         />
         <button
           className="console-danger-button"

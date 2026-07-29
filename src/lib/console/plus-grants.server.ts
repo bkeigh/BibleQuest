@@ -78,6 +78,7 @@ export async function grantConsolePlus(
 /** Revokes manual Plus and its audit event without touching Stripe rows. */
 export async function revokeConsolePlus(
   input: RevokeOperatorPlusInput & {
+    targetUserId: string;
     operatorUserId: string;
     operatorEmail: string;
   },
@@ -85,10 +86,10 @@ export async function revokeConsolePlus(
   const admin = createAdminSupabase();
   if (!(await operatorPlusGrantContractReady(admin))) return false;
   const { data, error } = await admin.rpc("revoke_operator_plus", {
-    p_target_user_id: input.userId,
+    p_target_user_id: input.targetUserId,
     p_reason: input.reason,
     p_operator_user_id: input.operatorUserId,
     p_operator_email: input.operatorEmail,
   });
-  return !error && isMutationSuccess(data, input.userId);
+  return !error && isMutationSuccess(data, input.targetUserId);
 }

@@ -125,26 +125,44 @@ export async function revokeOperatorPlusAction(
   }
 
   const input = revokeOperatorPlusInput(formData);
+  if (!input) {
+    await appendConsoleAuditLog({
+      actor: { userId: access.userId, email: access.email },
+      action: "entitlement.plus_revoke",
+      targetType: "account",
+      targetKey: "unresolved",
+      outcome: "denied",
+      details: { error: "invalid_confirmation_or_input" },
+    });
+    return {
+      status: "error",
+      message:
+        "Enter a valid exact email, matching confirmation, and a reason.",
+    };
+  }
+
+  const target = await findConsoleAccountByEmail(input.email);
   if (
-    !input ||
-    !(await consoleAccountIdentityMatches(input.userId, input.email))
+    !target ||
+    !(await consoleAccountIdentityMatches(target.id, input.email))
   ) {
     await appendConsoleAuditLog({
       actor: { userId: access.userId, email: access.email },
       action: "entitlement.plus_revoke",
       targetType: "account",
-      targetKey: input?.userId ?? "unresolved",
+      targetKey: target?.id ?? "unresolved",
       outcome: "denied",
-      details: { error: "invalid_confirmation_or_identity" },
+      details: { error: "account_not_found_or_identity_changed" },
     });
     return {
       status: "error",
-      message: "Account identity or email confirmation did not match.",
+      message: "No exact BibleQuest account matches that email.",
     };
   }
 
   const succeeded = await revokeConsolePlus({
     ...input,
+    targetUserId: target.id,
     operatorUserId: access.userId,
     operatorEmail: access.email,
   });
@@ -153,14 +171,14 @@ export async function revokeOperatorPlusAction(
       actor: { userId: access.userId, email: access.email },
       action: "entitlement.plus_revoke",
       targetType: "account",
-      targetKey: input.userId,
+      targetKey: target.id,
       outcome: "failed",
       details: { error: "mutation_unavailable" },
     });
     return {
       status: "error",
       message:
-        "Manual Plus could not be revoked. Stripe access was not changed.",
+        "No active manual Plus grant was revoked. Stripe access was not changed.",
     };
   }
 

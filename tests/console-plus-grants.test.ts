@@ -53,18 +53,16 @@ describe("console Plus grant validation", () => {
     ).toBeNull();
   });
 
-  it("binds revocation to one UUID, email, and explicit reason", () => {
+  it("binds revocation to one exact email and explicit reason", () => {
     expect(
       revokeOperatorPlusInput(
         form({
-          userId: "d2000000-0000-4000-8000-000000000002",
           email: "member@example.com",
           confirmation: "member@example.com",
           reason: "QA access completed.",
         }),
       ),
     ).toEqual({
-      userId: "d2000000-0000-4000-8000-000000000002",
       email: "member@example.com",
       confirmation: "member@example.com",
       reason: "QA access completed.",
@@ -72,9 +70,8 @@ describe("console Plus grant validation", () => {
     expect(
       revokeOperatorPlusInput(
         form({
-          userId: "../../other-user",
           email: "member@example.com",
-          confirmation: "member@example.com",
+          confirmation: "other@example.com",
           reason: "QA access completed.",
         }),
       ),

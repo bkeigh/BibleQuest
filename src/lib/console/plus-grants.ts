@@ -22,15 +22,12 @@ export interface GrantOperatorPlusInput {
 }
 
 export interface RevokeOperatorPlusInput {
-  userId: string;
   email: string;
   confirmation: string;
   reason: string;
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /** Normalizes an account address for exact-match support operations. */
 export function normalizeConsoleAccountEmail(value: unknown): string {
@@ -76,10 +73,6 @@ export function grantOperatorPlusInput(
 export function revokeOperatorPlusInput(
   formData: FormData,
 ): RevokeOperatorPlusInput | null {
-  const userId =
-    typeof formData.get("userId") === "string"
-      ? String(formData.get("userId")).trim()
-      : "";
   const email = normalizeConsoleAccountEmail(formData.get("email"));
   const confirmation = normalizeConsoleAccountEmail(
     formData.get("confirmation"),
@@ -89,7 +82,6 @@ export function revokeOperatorPlusInput(
       ? String(formData.get("reason")).trim()
       : "";
   if (
-    !UUID.test(userId) ||
     !EMAIL.test(email) ||
     confirmation !== email ||
     reason.length < 3 ||
@@ -98,5 +90,5 @@ export function revokeOperatorPlusInput(
   ) {
     return null;
   }
-  return { userId, email, confirmation, reason };
+  return { email, confirmation, reason };
 }

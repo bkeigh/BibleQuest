@@ -46,6 +46,7 @@ export default async function ConsoleAccountsPage({
         description="Adds a separate manual entitlement. It never creates, edits, or cancels a Stripe subscription."
       >
         <ConsolePlusGrantForm />
+        <ConsolePlusRevokeForm />
       </ConsolePanel>
 
       <form className="console-filter-bar" role="search">
@@ -151,12 +152,6 @@ export default async function ConsoleAccountsPage({
                               ? ` · ${formatDateTime(account.manualGrant.expiresAt)}`
                               : ""}
                           </p>
-                          {account.manualGrant.active ? (
-                            <ConsolePlusRevokeForm
-                              userId={account.id}
-                              email={account.email}
-                            />
-                          ) : null}
                         </div>
                       ) : (
                         "—"
