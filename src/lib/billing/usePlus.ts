@@ -180,6 +180,40 @@ function usePlusCoordinator(): PlusState {
     if (session.loading) return;
     const request = ++sequence.current;
     try {
+      // Guests need public plan copy but must not probe the protected account
+      // projection, which would create a noisy expected 401 on every app load.
+      if (subjectKey === "guest") {
+        const plansResponse = await billingFetch("/api/billing/plans");
+        if (
+          request !== sequence.current ||
+          currentSubject.current !== subjectKey
+        ) {
+          return;
+        }
+        if (!plansResponse.ok) throw new Error("failed");
+        const planPayload =
+          (await plansResponse.json()) as BillingPlansResponse;
+        if (
+          request !== sequence.current ||
+          currentSubject.current !== subjectKey
+        ) {
+          return;
+        }
+        setStored({
+          ...initialState(subjectKey),
+          availability:
+            planPayload.availability === "configured"
+              ? "configured"
+              : "unavailable",
+          mode: planPayload.mode ?? null,
+          purchasesEnabled: planPayload.purchasesEnabled,
+          plans: planPayload.plans,
+          status: "sign-in-required",
+          returnNotice: safeReturnNotice(),
+        });
+        return;
+      }
+
       const [statusResponse, plansResponse] = await Promise.all([
         billingFetch("/api/billing/status"),
         billingFetch("/api/billing/plans"),
