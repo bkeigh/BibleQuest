@@ -178,15 +178,18 @@ export function QuestBoardCard({
   return (
     <motion.li
       ref={cardRef}
-      layout
-      layoutId={`quest-board-card-${quest.slug}`}
       data-quest-card={quest.slug}
+      data-quest-card-state={state}
       tabIndex={-1}
       className="list-none scroll-mt-28 outline-none"
-      transition={{ layout: { duration: 0.35 } }}
+      // A local entrance avoids Safari's stale shared-layout projections while
+      // still making a card's destination apparent after a state transition.
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
     >
       <PaperCard padding="none" className="overflow-hidden">
-        <div className="flex items-start gap-3.5 px-4 pt-4 sm:px-5">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3.5 px-4 pt-4 sm:px-5">
           <span className="mt-0.5 shrink-0 rounded-[10px] bg-linen p-2 ring-1 ring-mist">
             <PixelIcon
               name={CATEGORY_SPRITE[quest.category] ?? "leaf"}
@@ -203,20 +206,22 @@ export function QuestBoardCard({
               <span className="font-pixel text-[0.875rem] text-accent">
                 {CATEGORY_LABEL[quest.category]}
               </span>
-              <span
-                className={cn(
-                  "ml-auto inline-flex shrink-0 rounded-full px-2 py-0.5 font-pixel text-[0.875rem]",
-                  state === "completed" || readyToFinish
-                    ? "bg-accent-surface text-accent-ink"
-                    : expired
-                      ? "bg-linen text-ash ring-1 ring-mist"
-                      : "bg-accent-surface text-accent",
-                )}
-              >
-                {statusLabel}
-              </span>
             </div>
-            <h4 className="mt-1 font-display text-[1.1875rem] leading-snug text-graphite">
+            <span
+              className={cn(
+                "mt-2 inline-flex rounded-full px-2 py-0.5 font-pixel text-[0.875rem]",
+                state === "completed" || readyToFinish
+                  ? "bg-accent-surface text-accent-ink"
+                  : expired
+                    ? "bg-linen text-ash ring-1 ring-mist"
+                    : "bg-accent-surface text-accent",
+              )}
+            >
+              {statusLabel}
+            </span>
+          </div>
+          <div className="col-span-2 min-w-0 pt-3">
+            <h4 className="font-display text-[1.1875rem] leading-snug text-graphite">
               {quest.title}
             </h4>
             {state === "active" && activeWindowOpen && assignment ? (

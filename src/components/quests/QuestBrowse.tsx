@@ -5,7 +5,6 @@
  * cards share one flow; suggestions remain deterministic for the local day.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { LayoutGroup } from "framer-motion";
 import { seedQuests, questBySlug } from "@/data/seed/quests";
 import {
   activeQuestAssignments,
@@ -349,8 +348,7 @@ function QuestBrowseInner() {
             {boardAnnouncement}
           </p>
 
-          <LayoutGroup id="quest-board">
-            <div className="mt-3 space-y-3">
+          <div className="mt-3 space-y-3">
               <QuestBoardSection
                 label="Active"
                 count={activePicks.length}
@@ -363,7 +361,8 @@ function QuestBrowseInner() {
                 }
                 emptyBody="No quest is underway right now."
               >
-                <ul className="space-y-3">
+                {/* Native grid gaps stay stable while Safari reflows moved cards. */}
+                <ul data-quest-board-list className="grid gap-3">
                   {activePicks.flatMap((assignment) => {
                     const quest = questBySlug.get(assignment.questSlug);
                     return quest ? (
@@ -396,7 +395,7 @@ function QuestBrowseInner() {
                 }
                 emptyBody="Choose a quest below when you want a place to begin."
               >
-                <ul className="space-y-3">
+                <ul data-quest-board-list className="grid gap-3">
                   {readyPicks.flatMap((assignment) => {
                     const quest = questBySlug.get(assignment.questSlug);
                     return quest ? (
@@ -432,7 +431,7 @@ function QuestBrowseInner() {
                 }
                 emptyBody="Completed quests will gather here for today."
               >
-                <ul className="space-y-3">
+                <ul data-quest-board-list className="grid gap-3">
                   {completedQuests.map((quest) => (
                     <QuestBoardCard
                       key={quest.slug}
@@ -449,8 +448,7 @@ function QuestBrowseInner() {
                   ))}
                 </ul>
               </QuestBoardSection>
-            </div>
-          </LayoutGroup>
+          </div>
         </section>
 
         <Disclosure
