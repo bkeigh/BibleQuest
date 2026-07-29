@@ -40,6 +40,7 @@ function subscription(
     livemode: false,
     currency: "usd",
     cancel_at_period_end: false,
+    cancel_at: null,
     canceled_at: null,
     trial_end: null,
     latest_invoice: "in_TestInvoice123",
@@ -110,6 +111,24 @@ describe("server-authoritative Stripe projection", () => {
       last_stripe_event_id: "evt_TestEvent123",
       last_stripe_event_created: 1_784_916_100,
       plan_key: "plus",
+    });
+  });
+
+  it("records portal-scheduled cancellation timestamps", () => {
+    const scheduled = subscription("active");
+    scheduled.cancel_at = 1_787_594_400;
+    scheduled.canceled_at = 1_785_300_839;
+
+    expect(
+      subscriptionProjection(
+        scheduled,
+        "c1000000-0000-4000-8000-000000000001",
+        CONFIGURATION,
+      ),
+    ).toMatchObject({
+      plan_key: "plus",
+      cancel_at_period_end: true,
+      canceled_at: new Date(1_785_300_839 * 1000).toISOString(),
     });
   });
 

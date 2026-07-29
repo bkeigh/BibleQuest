@@ -1,4 +1,5 @@
 import type Stripe from "stripe";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -8,6 +9,7 @@ import {
   supportDisputeProjection,
   supportRefundProjection,
   supportSessionProjection,
+  synchronizeSupportDispute,
   type StripeSupportPaymentRow,
 } from "@/lib/support/records.server";
 
@@ -207,6 +209,71 @@ describe("one-time support current-object projections", () => {
         event,
       ).outcome_status,
     ).toBe("dispute_lost");
+  });
+
+  it("binds an out-of-order dispute through its immutable request", async () => {
+    const updateEq = vi.fn().mockResolvedValue({ error: null });
+    const update = vi.fn().mockReturnValue({ eq: updateEq });
+    const directMaybeSingle = vi.fn().mockResolvedValue({
+      data: null,
+      error: null,
+    });
+    const fallbackMaybeSingle = vi.fn().mockResolvedValue({
+      data: {
+        ...ROW,
+        stripe_payment_intent_id: null,
+      },
+      error: null,
+    });
+    const select = vi
+      .fn()
+      .mockReturnValueOnce({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: directMaybeSingle,
+        }),
+      })
+      .mockReturnValueOnce({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: fallbackMaybeSingle,
+        }),
+      });
+    const admin = {
+      from: vi.fn().mockReturnValue({ select, update }),
+    } as unknown as SupabaseClient;
+    const charge = {
+      id: "ch_SupportChargeOutOfOrder123",
+      payment_intent: "pi_SupportIntentOutOfOrder123",
+      livemode: false,
+      currency: "usd",
+      amount: 1_000,
+      amount_refunded: 0,
+    } as Stripe.Charge;
+    const dispute = {
+      charge: charge.id,
+      livemode: false,
+      currency: "usd",
+      amount: 1_000,
+      status: "needs_response",
+    } as Stripe.Dispute;
+
+    await expect(
+      synchronizeSupportDispute(
+        admin,
+        charge,
+        dispute,
+        {
+          id: "evt_SupportOutOfOrder123",
+          created: 1_784_916_700,
+        },
+        ROW.request_id,
+      ),
+    ).resolves.toBe(true);
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stripe_payment_intent_id: "pi_SupportIntentOutOfOrder123",
+        outcome_status: "disputed",
+      }),
+    );
   });
 
   it("allows only an open, exact hosted Checkout URL", () => {
