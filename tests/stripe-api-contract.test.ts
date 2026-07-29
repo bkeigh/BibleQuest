@@ -89,6 +89,18 @@ describe("direct Stripe API boundary", () => {
     expect(client).toContain("safePlusStatus(statusPayload)");
   });
 
+  it("does not probe the protected account projection for guests", () => {
+    const client = source("src/lib/billing/usePlus.ts");
+    const guestBoundary = client.slice(
+      client.indexOf('if (subjectKey === "guest")'),
+      client.indexOf("const [statusResponse, plansResponse]"),
+    );
+
+    expect(guestBoundary).toContain('billingFetch("/api/billing/plans")');
+    expect(guestBoundary).not.toContain('billingFetch("/api/billing/status")');
+    expect(guestBoundary).toContain('status: "sign-in-required"');
+  });
+
   it("allows only exact hosted Stripe redirect origins", () => {
     const checkout = source("src/app/api/billing/checkout/route.ts");
     const portal = source("src/app/api/billing/portal/route.ts");
