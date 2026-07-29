@@ -8,6 +8,25 @@ export type InstallPlatform =
 
 export const INSTALL_DISMISS_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
 
+interface StandaloneWindowLike {
+  matchMedia?: (query: string) => { matches: boolean };
+  navigator?: Navigator & { standalone?: boolean };
+}
+
+/** Recognizes installed PWAs across standard display mode and iOS Home Screen. */
+export function isStandaloneWebApp(
+  windowLike: StandaloneWindowLike | undefined =
+    typeof window === "undefined"
+      ? undefined
+      : (window as unknown as StandaloneWindowLike),
+): boolean {
+  if (!windowLike) return false;
+  return (
+    windowLike.matchMedia?.("(display-mode: standalone)").matches === true ||
+    Boolean(windowLike.navigator?.standalone)
+  );
+}
+
 /** Detects the smallest useful platform family without relying on UA brands. */
 export function detectInstallPlatform(
   navigatorLike: Pick<Navigator, "userAgent" | "maxTouchPoints">,

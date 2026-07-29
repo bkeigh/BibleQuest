@@ -4,6 +4,7 @@ import {
   detectInstallPlatform,
   installDirections,
   installDismissalIsActive,
+  isStandaloneWebApp,
 } from "@/lib/pwa/install-guidance";
 
 /** Builds the navigator fields used by install-platform detection. */
@@ -11,7 +12,24 @@ function browser(userAgent: string, maxTouchPoints = 0) {
   return { userAgent, maxTouchPoints };
 }
 
+/** Builds the minimal window shape used by installed-app detection. */
+function appWindow(displayModeStandalone: boolean, iosStandalone = false) {
+  return {
+    matchMedia: () => ({ matches: displayModeStandalone }),
+    navigator: { standalone: iosStandalone } as Navigator & {
+      standalone?: boolean;
+    },
+  };
+}
+
 describe("PWA install guidance", () => {
+  it("recognizes standard and iOS standalone app launches", () => {
+    expect(isStandaloneWebApp(appWindow(true))).toBe(true);
+    expect(isStandaloneWebApp(appWindow(false, true))).toBe(true);
+    expect(isStandaloneWebApp(appWindow(false))).toBe(false);
+    expect(isStandaloneWebApp(undefined)).toBe(false);
+  });
+
   it("recognizes iOS browsers and iPadOS desktop-style user agents", () => {
     expect(
       detectInstallPlatform(

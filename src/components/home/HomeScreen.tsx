@@ -169,10 +169,15 @@ function HomeInner() {
               {isPlus && (
                 <p
                   aria-label="BibleQuest Plus member"
-                  className="mb-1 flex items-center gap-1.5 text-[0.625rem] font-semibold uppercase tracking-[0.2em] text-[#8a5a12]"
+                  className="mb-1 flex items-center gap-1.5 whitespace-nowrap text-[0.625rem] font-semibold uppercase tracking-[0.2em] text-[#8a5a12] max-[360px]:gap-1 max-[360px]:tracking-[0.14em]"
                 >
                   <span aria-hidden="true">✦</span>
-                  BibleQuest Plus
+                  <span>
+                    BibleQuest{" "}
+                    <strong className="font-black" aria-hidden="true">
+                      +
+                    </strong>
+                  </span>
                   <span aria-hidden="true">✦</span>
                 </p>
               )}
