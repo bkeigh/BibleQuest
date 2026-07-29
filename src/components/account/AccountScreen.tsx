@@ -19,13 +19,18 @@ import {
   authFailureMessage,
   parseAuthFailureReason,
 } from "@/lib/auth/errors";
+import { isStandaloneWebApp } from "@/lib/pwa/install-guidance";
 
 function AccountInner() {
   const router = useRouter();
   const { toast } = useToast();
   const { user, loading, configured } = useSession();
   const sync = useSyncStatus();
-  const [intent, setIntent] = useState<"create" | "signin">("create");
+  // Installed app users are returning to a saved account more often than
+  // creating one, while ordinary browser visitors keep the onboarding default.
+  const [intent, setIntent] = useState<"create" | "signin">(() =>
+    isStandaloneWebApp() ? "signin" : "create",
+  );
 
   // A failed magic link / OAuth round-trip lands here as ?error=signin
   // (src/app/auth/callback/route.ts). This component only renders on the

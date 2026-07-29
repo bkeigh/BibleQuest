@@ -15,6 +15,7 @@ import {
   detectInstallPlatform,
   installDirections,
   installDismissalIsActive,
+  isStandaloneWebApp,
   type InstallPlatform,
 } from "@/lib/pwa/install-guidance";
 
@@ -59,11 +60,7 @@ export function InstallPrompt() {
     if (typeof window === "undefined") return;
     if (isDismissed()) return;
 
-    const standalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      // iOS
-      (window.navigator as unknown as { standalone?: boolean }).standalone;
-    if (standalone) return;
+    if (isStandaloneWebApp()) return;
 
     // Reveals at most once per mount so fallback and native events cannot
     // double-count the same prompt impression.

@@ -96,7 +96,9 @@ describe("launch content catalog", () => {
     // The sealed Plus projection controls both the visual state and its label.
     expect(home).toContain('data-plus-nameplate={isPlus ? "active" : "free"}');
     expect(home).toContain('aria-label="BibleQuest Plus member"');
-    expect(home).toContain("BibleQuest Plus");
+    expect(home).toContain("BibleQuest{\" \"}");
+    expect(home).toContain('<strong className="font-black"');
+    expect(home).toContain("whitespace-nowrap");
     expect(home).toContain("border-[#b88528]/70");
     expect(home).toContain("from-[#7d5013]");
     expect(home).not.toContain("subscription.status");
