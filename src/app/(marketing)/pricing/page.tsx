@@ -7,7 +7,7 @@ import { marketingMetadata } from "@/lib/metadata";
 export const metadata = marketingMetadata({
   title: "Pricing",
   description:
-    "BibleQuest is free for everything that matters — Scripture, prayer, reflection, quests, and your journey. Plus is coming later and adds depth, never access.",
+    "BibleQuest keeps Scripture, prayer, reflection, quests, and your journey free. Plus adds optional depth, never access.",
   path: "/pricing",
 });
 
@@ -23,9 +23,9 @@ export default function PricingPage() {
             Free is the product.
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-[1.125rem] leading-relaxed text-ash">
-            Everything BibleQuest does today is free. Plus arrives later — it
-            adds depth, never access. Your relationship with God is never behind
-            a paywall.
+            The complete BibleQuest journey remains free. Plus adds optional
+            depth, never access. Your relationship with God is never behind a
+            paywall.
           </p>
         </div>
 

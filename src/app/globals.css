@@ -1086,8 +1086,26 @@ html.theme-dark .milestone-glass-surface[data-milestone-state="reached"] {
   text-underline-offset: 3px;
 }
 
+/* Keeps the dangerous developer-only revoke workflow visually separate. */
+.console-revoke-details--standalone {
+  max-width: 48rem;
+  margin: 0 1.1rem 1.1rem;
+  border-top: 1px solid var(--color-rose-200);
+  padding-top: 0.9rem;
+}
+
+.console-revoke-warning {
+  max-width: 38rem;
+  margin-top: 0.7rem;
+  border-left: 3px solid var(--color-rose-700);
+  padding: 0.6rem 0.75rem;
+  color: var(--color-rose-700);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
 .console-revoke-form {
-  width: min(19rem, 70vw);
+  width: min(32rem, 100%);
   margin-top: 0.7rem;
   border: 1px solid var(--color-rose-200);
   border-radius: 9px;

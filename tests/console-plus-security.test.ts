@@ -23,6 +23,20 @@ describe("console Plus security boundary", () => {
     );
   });
 
+  it("keeps the rare revoke control collapsed under the grant workflow", () => {
+    const accounts = source("src/app/console/(protected)/accounts/page.tsx");
+    const controls = source(
+      "src/components/console/ConsolePlusGrantControls.tsx",
+    );
+    expect(accounts).toContain(
+      "<ConsolePlusGrantForm />\n        <ConsolePlusRevokeForm />",
+    );
+    expect(controls).toContain("<details");
+    expect(controls).toContain("Use sparingly.");
+    expect(controls).toContain("only for developer");
+    expect(controls).not.toContain('name="userId"');
+  });
+
   it("keeps successful entitlement and audit writes in each transaction", () => {
     const migration = source(
       "supabase/migrations/0030_operator_plus_grants.sql",

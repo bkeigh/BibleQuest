@@ -85,8 +85,8 @@ export function PlusCta() {
         <Link href="/app/account" className="text-accent underline">
           Sign in
         </Link>{" "}
-        to view test-mode plans or restore a membership. No account is created
-        by a billing redirect.
+        to view Plus plans or restore a membership. No account is created by a
+        billing redirect.
       </p>
     );
   }

@@ -10,8 +10,8 @@ editing a Stripe subscription. The entitlement source is always visible as
   Server Actions.
 - Grant requires an exact account email, the same email typed again, one of
   `7d`, `30d`, `365d`, or `lifetime`, and a bounded internal reason.
-- Revoke requires the current account UUID, a fresh server-side UUID/email
-  match, the exact email typed again, and a bounded reason.
+- Revoke requires an exact account email, a fresh server-side identity lookup,
+  the same email typed again, and a bounded reason.
 - The database validates the operator UUID/email pair and locks the target
   account before mutation.
 - Grant or revoke and its `console_audit_logs` event commit in one transaction.
@@ -31,9 +31,11 @@ editing a Stripe subscription. The entitlement source is always visible as
    expiry.
 7. Open **Audit** to verify `entitlement · plus grant`.
 
-To end manual access, expand **Revoke manual grant**, enter the reason, retype
-the exact email, and submit. If the account also has active Stripe access, the
-member remains Plus through Stripe.
+To end manual access, expand **Revoke Plus for developer testing** directly
+under the grant form, enter the exact account email and reason, retype the
+email, and submit. Use this control sparingly for developer testing or
+exceptional manual-access cleanup. If the account also has active Stripe
+access, the member remains Plus through Stripe.
 
 ## Production migration
 
