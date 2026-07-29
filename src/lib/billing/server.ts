@@ -127,7 +127,9 @@ export function subscriptionProjection(
     livemode: subscription.livemode,
     billing_interval: recognizedInterval ?? "unknown",
     currency: subscription.currency,
-    cancel_at_period_end: subscription.cancel_at_period_end,
+    // Stripe can represent a portal-scheduled end with either flag or timestamp.
+    cancel_at_period_end:
+      subscription.cancel_at_period_end || subscription.cancel_at !== null,
     canceled_at: instant(subscription.canceled_at),
     trial_end: instant(subscription.trial_end),
     latest_invoice_id: id(subscription.latest_invoice),
