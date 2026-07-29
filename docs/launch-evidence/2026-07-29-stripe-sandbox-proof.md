@@ -11,9 +11,9 @@ The result is not `PROVEN` for Live launch because renewal/Test Clock,
 subscription 3DS/failure, a second authenticated account, real account
 deletion, receipt delivery to a monitored inbox, deployment-wide Firewall
 rate limiting, cross-browser, and physical-device checks remain blocked or
-not run. The staging schema also has a migration-history discrepancy that must
-be reconciled through the reviewed forward-only process before any production
-database work.
+not run. The staging migration-history discrepancy described below was
+subsequently resolved through the guarded forward-only process documented in
+[`2026-07-29-staging-migration-reconciliation.md`](2026-07-29-staging-migration-reconciliation.md).
 
 ## Evidence identity
 
@@ -174,7 +174,7 @@ mapping fix; the post-fix $50 run is the current proof.
    mapping, binds the PaymentIntent safely, and applies the refund/dispute
    transition. Regression tests cover the reversed order.
 
-## Staging migration-history hold
+## Staging migration-history reconciliation
 
 The verified non-production schema contains the required objects and every
 billing/support/operator contract passes. However, the migration history
@@ -182,10 +182,11 @@ records only `0031` among the current `0029`–`0032` packet. The other schema
 changes were applied as reviewed SQL during sandbox diagnosis and were not
 falsely inserted into migration history.
 
-This is a **hard Live blocker**. Before production, reconcile the staging and
-production histories against the 31-file manifest using the repository's
-forward-only migration procedure. Do not use migration repair, rename old
-migrations, or treat a column/constraint probe as history evidence.
+This staging blocker is now **RESOLVED** by the higher-version attestation in
+[`2026-07-29-staging-migration-reconciliation.md`](2026-07-29-staging-migration-reconciliation.md).
+The clean 31-file schema diff and exact prehistory were verified before the
+marker was recorded. The absent `0029`, `0030`, and `0032` rows were not
+fabricated. Production reconciliation remains open and was not applied.
 
 ## Automated verification
 
@@ -194,7 +195,7 @@ Final commands and totals are recorded after the last source/evidence update:
 | Command | Result |
 | --- | --- |
 | `pnpm install --frozen-lockfile` | PASS; lockfile unchanged and supply-chain policy check passed |
-| Full Vitest suite | 89 files, 605 tests passed |
+| Full Vitest suite | 90 files, 610 tests passed |
 | `pnpm lint` | PASS; zero errors |
 | `pnpm exec tsc --noEmit` | PASS; zero errors |
 | `pnpm build` | PASS; Next.js production build completed and generated all 248 static pages |
@@ -227,8 +228,8 @@ Final commands and totals are recorded after the last source/evidence update:
 
 ## Exact remaining Live gates
 
-1. Reconcile and review the full 31-file migration history; stage `0031` and
-   `0032` through the guarded production proposal without applying them.
+1. Review the completed staging attestation; stage `0031` and `0032` through
+   the separate guarded production proposal without applying them.
 2. Create a fresh authenticated, inbox-accessible, Test-Clock-backed sandbox
    identity and prove initial subscription failure, subscription 3DS
    success/cancel, renewal success, and renewal failure.
