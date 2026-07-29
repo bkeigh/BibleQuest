@@ -435,6 +435,19 @@ describe("sanitized launch evidence", () => {
       expect.objectContaining({ code: "auth_posture_invalid" }),
     );
 
+    const disabledAppleProvider = fixtureReadiness();
+    disabledAppleProvider.auth_providers.apple_enabled = false;
+    const appleProviderEvidence = buildLaunchEvidence(
+      disabledAppleProvider,
+      aggregateClientSignals(fixtureSignals()),
+      "preflight",
+      "fixture",
+    );
+    expect(appleProviderEvidence.decision).toBe("HOLD");
+    expect(appleProviderEvidence.alerts).toContainEqual(
+      expect.objectContaining({ code: "auth_posture_invalid" }),
+    );
+
     const missingCasPosture = fixtureReadiness();
     missingCasPosture.schema_parity.checks =
       missingCasPosture.schema_parity.checks.filter(
@@ -531,7 +544,7 @@ describe("sanitized launch evidence", () => {
 
   it("builds complete fixture evidence with every required posture", () => {
     expect(fixtureReadiness()).toMatchObject({
-      check_count: 25,
+      check_count: 26,
       failed_check_count: 0,
       schema_parity: {
         ok: true,

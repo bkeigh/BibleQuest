@@ -59,10 +59,10 @@ function isConfiguredConsoleCallback(
 /**
  * Auth callback. Handles both flows Supabase can send us:
  *
- *  - `?code=…`  — the PKCE authorization-code flow, used by OAuth (Google) and
- *    by the default `{{ .ConfirmationURL }}` email template. Completing it
- *    needs the code-verifier cookie set in the browser that STARTED sign-in,
- *    so it only works when the link is opened in that same browser.
+ *  - `?code=…`  — the PKCE authorization-code flow, used by OAuth (Apple and
+ *    Google) and by the default `{{ .ConfirmationURL }}` email template.
+ *    Completing it needs the code-verifier cookie set in the browser that
+ *    STARTED sign-in, so it only works when the link is opened there.
  *
  *  - `?token_hash=…&type=…` — the OTP-verification flow. It carries no verifier
  *    cookie, so it works no matter where the email link is opened (Mail's

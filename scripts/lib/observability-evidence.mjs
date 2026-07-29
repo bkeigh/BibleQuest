@@ -448,10 +448,11 @@ export function fixtureReadiness() {
     auth_providers: {
       settings_reachable: true,
       email_enabled: true,
+      apple_enabled: true,
       google_enabled: true,
       phone_disabled: true,
     },
-    check_count: 25,
+    check_count: 26,
     failed_check_count: 0,
   };
 }
@@ -544,6 +545,7 @@ export function buildLaunchEvidence(
     !["configured", "guest-only"].includes(release?.auth_posture) ||
       readiness?.auth_providers?.settings_reachable !== true ||
       readiness?.auth_providers?.email_enabled !== true ||
+      readiness?.auth_providers?.apple_enabled !== true ||
       readiness?.auth_providers?.google_enabled !== true ||
       readiness?.auth_providers?.phone_disabled !== true,
     "critical",

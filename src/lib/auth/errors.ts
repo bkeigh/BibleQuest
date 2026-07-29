@@ -80,7 +80,7 @@ export function authFailureMessage(reason: AuthFailureReason): string {
     case "expired":
       return "That sign-in link has expired or was already used. Request a fresh link below.";
     case "browser_mismatch":
-      return "That link could not finish in this browser. Request a fresh link and open it in the same browser where you started, or use Google.";
+      return "That link could not finish in this browser. Request a fresh link and open it in the same browser where you started, or use Apple or Google.";
     case "invalid":
       return "That sign-in link is incomplete or invalid. Request a fresh link below.";
     case "provider":
@@ -88,7 +88,7 @@ export function authFailureMessage(reason: AuthFailureReason): string {
     case "configuration":
       return "Account sign-in is not configured on this deployment. Your journey is still safe on this device.";
     case "unknown":
-      return "We couldn’t finish that sign-in. Request a fresh link or try Google instead.";
+      return "We couldn’t finish that sign-in. Request a fresh link or try Apple or Google instead.";
   }
 }
 
@@ -119,7 +119,7 @@ export function emailRequestFailure(
   if (code === "email_address_not_authorized") {
     return {
       message:
-        "Email delivery is not enabled for this address yet. Use Google for now, or ask the BibleQuest team to finish production email setup.",
+        "Email delivery is not enabled for this address yet. Use Apple or Google for now, or ask the BibleQuest team to finish production email setup.",
       reference: "AUTH-EMAIL-SETUP",
       unavailable: false,
     };
@@ -150,7 +150,7 @@ export function emailRequestFailure(
   ) {
     return {
       message:
-        "Email sign-in is temporarily unavailable. Use Google or continue on this device.",
+        "Email sign-in is temporarily unavailable. Use Apple, Google, or continue on this device.",
       reference: "AUTH-EMAIL-DISABLED",
       unavailable: true,
     };
@@ -210,10 +210,13 @@ export function emailOtpFailure(
 
 export function oauthRequestFailure(
   error: unknown,
+  provider: "apple" | "google",
   online = true,
 ): AuthRequestFailure {
   const code = errorCode(error);
   const message = errorMessage(error);
+  const providerName = provider === "apple" ? "Apple" : "Google";
+  const providerReference = provider === "apple" ? "APPLE" : "GOOGLE";
   if (!online || message.includes("failed to fetch") || code === "request_timeout") {
     return {
       message:
@@ -224,15 +227,14 @@ export function oauthRequestFailure(
   }
   if (code === "provider_disabled" || code === "oauth_provider_not_supported") {
     return {
-      message:
-        "Google sign-in is temporarily unavailable. Try email or continue on this device.",
-      reference: "AUTH-GOOGLE-DISABLED",
+      message: `${providerName} sign-in is temporarily unavailable. Try another method or continue on this device.`,
+      reference: `AUTH-${providerReference}-DISABLED`,
       unavailable: true,
     };
   }
   return {
-    message: "We couldn’t open Google sign-in. Please try again.",
-    reference: "AUTH-GOOGLE-REQUEST",
+    message: `We couldn’t open ${providerName} sign-in. Please try again.`,
+    reference: `AUTH-${providerReference}-REQUEST`,
     unavailable: false,
   };
 }

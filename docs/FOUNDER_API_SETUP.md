@@ -100,6 +100,36 @@ credentials stay in Supabase; they are not Vercel variables. Keep the app's
 own `/auth/callback` URLs in the Supabase redirect allow-list described above.
 See [Supabase Login with Google](https://supabase.com/docs/guides/auth/social-login/auth-google).
 
+### Apple sign-in credentials
+
+Apple is the primary social sign-in option. Configure an Apple Services ID in
+**Supabase → Authentication → Sign In / Providers → Apple**, using the exact
+Supabase callback URL displayed there. The production provider currently uses
+`co.biblequest.web` as its Services ID. Register the Supabase project domain
+`iacnjqnssovaaojswjoh.supabase.co` and callback
+`https://iacnjqnssovaaojswjoh.supabase.co/auth/v1/callback` with that Services
+ID in Apple Developer.
+
+Apple client secrets expire after at most 180 days. Generate a replacement
+locally before the current secret expires:
+
+```bash
+node scripts/generate-apple-client-secret.mjs \
+  --team-id APPLE_TEAM_ID \
+  --key-id APPLE_KEY_ID \
+  --client-id co.biblequest.web \
+  --private-key /absolute/path/AuthKey_APPLE_KEY_ID.p8 \
+  --days 180
+```
+
+Paste only the generated JWT into Supabase's Apple provider configuration.
+Never put the `.p8` key in the repository, Vercel, command history, or a shared
+document. Record the new expiry date and schedule the next rotation before it.
+The Apple credentials stay in Supabase; they are not Vercel variables. Keep
+the app's `/auth/callback` URLs in the Supabase redirect allow-list described
+above. See
+[Supabase Login with Apple](https://supabase.com/docs/guides/auth/social-login/auth-apple).
+
 ## 2. Prepare one-time Support BibleQuest Checkout
 
 One-time support uses the same complete direct Stripe test configuration as
