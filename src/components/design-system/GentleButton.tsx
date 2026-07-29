@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils/cn";
 type Variant =
   | "primary"
   | "outline"
+  | "apple"
+  | "google"
   | "dark"
   | "ghost"
   | "text"
@@ -25,6 +27,11 @@ const VARIANTS: Record<Variant, string> = {
     "active:bg-evergreen-800 active:border-evergreen-800",
   outline:
     "border border-accent/60 text-accent bg-transparent hover:bg-accent-surface active:bg-accent-surface",
+  /** Provider fills stay brand-recognizable while sharing our touch geometry. */
+  apple:
+    "border border-black bg-black text-white hover:border-[#1d1d1f] hover:bg-[#1d1d1f] active:bg-[#2c2c2e]",
+  google:
+    "border border-[#1a73e8] bg-[#1a73e8] text-white hover:border-[#1765cc] hover:bg-[#1765cc] active:bg-[#1558b0]",
   /* Secondary dark fill — dusk is green-black; moon-paper text stays light
      in both themes (parchment flips dark in candle mode). */
   dark: "bg-dusk text-moon-paper border border-dusk hover:bg-twilight active:opacity-90",

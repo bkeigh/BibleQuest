@@ -68,7 +68,11 @@ export function QuestBoardSection({
         aria-hidden={!open}
         className={cn(
           "grid transition-[grid-template-rows] duration-300",
-          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+          // Explicit minimums prevent Safari from retaining a stale intrinsic
+          // row height after cards move between board sections.
+          open
+            ? "grid-rows-[minmax(0,1fr)]"
+            : "grid-rows-[minmax(0,0fr)]",
         )}
       >
         <div inert={!open} className="min-h-0 overflow-hidden">

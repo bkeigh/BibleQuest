@@ -22,8 +22,12 @@ describe("production sign-in methods", () => {
     );
 
     expect(markup).toContain("Email me a sign-in code");
-    expect(markup).toContain("Continue with Apple");
-    expect(markup).toContain("Continue with Google");
+    expect(markup).toContain("Sign in with Apple");
+    expect(markup).toContain("Sign in with Google");
+    expect(markup).toContain('data-provider-button="apple"');
+    expect(markup).toContain('data-provider-mark="apple"');
+    expect(markup).toContain('data-provider-button="google"');
+    expect(markup).toContain('data-provider-mark="google"');
     expect(markup).not.toContain("Text me a code");
     expect(markup).not.toContain('type="tel"');
   });
@@ -43,11 +47,11 @@ describe("production sign-in methods", () => {
     );
 
     expect(createMarkup).toContain("Create account with email");
-    expect(createMarkup).toContain("Create account with Apple");
-    expect(createMarkup).toContain("Create account with Google");
+    expect(createMarkup).toContain("Sign in with Apple");
+    expect(createMarkup).toContain("Sign in with Google");
     expect(signInMarkup).toContain("Email me a sign-in code");
-    expect(signInMarkup).toContain("Continue with Apple");
-    expect(signInMarkup).toContain("Continue with Google");
+    expect(signInMarkup).toContain("Sign in with Apple");
+    expect(signInMarkup).toContain("Sign in with Google");
   });
 
   it("allows email identity creation only from explicit create mode", () => {
