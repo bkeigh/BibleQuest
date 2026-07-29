@@ -153,7 +153,7 @@ use the approved same-origin non-production alias and record both artifact SHAs.
 | Avatar sync | Upload on one device, observe on the other three, replace on a second device, then delete on a third. | Current avatar converges everywhere after normal refresh signals; stale signed URLs fail safely; no old/account-switched avatar flash appears. |
 | Slow/interrupted upload | Throttle upload, disconnect mid-request, retry the same valid file, then try oversized, wrong-type, corrupt, and decompression-heavy files. | Calm bounded failure; no partial current avatar; retry succeeds once; server-decoded limits hold; temporary/obsolete objects do not accumulate. |
 | Offline edits and conflicts | While one device is offline, create/edit/delete prayer, reflection, quest, Bible, Journey, and settings state from both clients; reconnect in both orders. | Local work survives close/reopen; merge/CAS rules converge without duplication, resurrection, completion loss, silent overwrite, or retry loop. |
-| Service-worker update and rollback | Load the compatible old artifact, fully close, remap the controlled alias to candidate, relaunch twice, then rehearse the approved compatible rollback. | Worker becomes `biblequest-v21`; only allowlisted public shells/assets are cached; no auth/API/private response is cached; update and rollback do not strand the app. |
+| Service-worker update and rollback | Load the compatible old artifact, fully close, remap the controlled alias to candidate, relaunch twice, then rehearse the approved compatible rollback. | Worker becomes `biblequest-v22`; only allowlisted public shells/assets are cached; no auth/API/private response is cached; update and rollback do not strand the app. |
 | Push subscribe/unsubscribe | On each supported platform, grant permission only after the in-app action, subscribe, send a test reminder, change time/timezone, unsubscribe, and revoke browser permission. | One owner-bound subscription per endpoint; foreground/background behavior is honest; changes converge; unsubscribe/revocation stops delivery without affecting another device. Unsupported Safari/device posture is explicit, not reported as pass. |
 | Logout and deletion | With multiple active devices and push subscriptions, log out one device, then delete the disposable account from another; reopen all clients online and offline. | Logged-out client clears private UI/subscription posture; deletion purges/detaches reviewed data, prevents later push, and no offline client resurrects the account. |
 
@@ -399,7 +399,7 @@ change. Never move the production domain for a rehearsal.
 - [ ] Run a production build, open the app, and in DevTools → Application →
       Service Workers confirm `/sw.js` controls the page at scope `/`.
 - [ ] In Application → Cache Storage, confirm only the current
-      `biblequest-v21-shell` and `biblequest-v21-runtime` caches are BibleQuest
+      `biblequest-v22-shell` and `biblequest-v22-runtime` caches are BibleQuest
       owned; unrelated-origin cache names are not touched by activation.
 - [ ] Inspect every shell entry: only `/offline`, `/app`, `/onboarding`,
       `/manifest.webmanifest`, and the exact `/pixel/` catalogue from `sw.js`

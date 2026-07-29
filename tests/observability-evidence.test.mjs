@@ -581,7 +581,7 @@ describe("sanitized launch evidence", () => {
       rollback_target_sha: "b".repeat(40),
     });
     expect(evidence.service_worker_version.observed).toEqual([
-      "biblequest-v21",
+      "biblequest-v22",
     ]);
     expect(evidence.alerts).toEqual([
       expect.objectContaining({
