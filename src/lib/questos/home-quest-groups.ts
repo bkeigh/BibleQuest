@@ -9,6 +9,7 @@ import type {
   QuestTemplate,
 } from "./types";
 import { hasBegun } from "./quest-steps";
+import { toDateKey } from "@/lib/utils/dates";
 
 export type HomeQuestGroupKey = "active" | "ready" | "completed";
 
@@ -26,22 +27,36 @@ export type HomeQuestItem =
 
 export type HomeQuestGroups = Record<HomeQuestGroupKey, HomeQuestItem[]>;
 
-function shelfGroup(entry: MyQuest): HomeQuestGroupKey {
-  if (entry.status === "completed" || entry.status === "archived") {
+function shelfGroup(
+  entry: MyQuest,
+  todayKey: string,
+): HomeQuestGroupKey | null {
+  if (
+    entry.status === "completed" &&
+    entry.completedAt &&
+    toDateKey(new Date(entry.completedAt)) === todayKey
+  ) {
     return "completed";
   }
-  if (entry.status === "active" && hasBegun(entry)) {
-    return "active";
+  if (entry.status === "active") {
+    return hasBegun(entry) ? "active" : "ready";
   }
-  return "ready";
+  return null;
 }
 
 function assignmentGroup(
   assignment: DailyQuestAssignment,
+  todayKey: string,
 ): HomeQuestGroupKey | null {
   if (assignment.status === "started") return "active";
   if (assignment.status === "assigned") return "ready";
-  if (assignment.status === "completed") return "completed";
+  if (
+    assignment.status === "completed" &&
+    assignment.completedAt &&
+    toDateKey(new Date(assignment.completedAt)) === todayKey
+  ) {
+    return "completed";
+  }
   return null;
 }
 
@@ -55,8 +70,8 @@ function byShelfActivity(a: MyQuest, b: MyQuest): number {
 
 /**
  * Groups current assignments first, then shelf-only quests by recent activity.
- * Unknown templates, released windows, expired windows, and duplicate slugs
- * are ignored safely.
+ * Expired Active windows remain resumable; unknown templates, released legacy
+ * windows, and duplicate slugs are ignored safely.
  */
 export function buildHomeQuestGroups({
   assignments,
@@ -75,19 +90,13 @@ export function buildHomeQuestGroups({
     completed: [],
   };
   const seen = new Set<string>();
+  const todayKey = toDateKey(new Date(now));
 
   for (const assignment of assignments) {
     if (seen.has(assignment.questSlug)) continue;
-    const group = assignmentGroup(assignment);
+    const group = assignmentGroup(assignment, todayKey);
     const quest = questsBySlug.get(assignment.questSlug);
-    if (
-      !group ||
-      !quest ||
-      !Number.isFinite(Date.parse(assignment.expiresAt)) ||
-      Date.parse(assignment.expiresAt) <= now
-    ) {
-      continue;
-    }
+    if (!group || !quest) continue;
     groups[group].push({ kind: "assignment", quest, assignment });
     seen.add(assignment.questSlug);
   }
@@ -97,7 +106,9 @@ export function buildHomeQuestGroups({
     if (seen.has(entry.questSlug)) continue;
     const quest = questsBySlug.get(entry.questSlug);
     if (!quest) continue;
-    groups[shelfGroup(entry)].push({ kind: "shelf", quest, entry });
+    const group = shelfGroup(entry, todayKey);
+    if (!group) continue;
+    groups[group].push({ kind: "shelf", quest, entry });
     seen.add(entry.questSlug);
   }
 

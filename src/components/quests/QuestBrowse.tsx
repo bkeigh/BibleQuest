@@ -1,18 +1,15 @@
 "use client";
 
 /**
- * Quest discovery and rolling-pick surface. Suggestions are deterministic for
- * a given day and profile; the three-window free limit lives in QuestOS.
+ * Canonical Quest board and discovery surface. Ready, Active, and Completed
+ * cards share one flow; suggestions remain deterministic for the local day.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { LayoutGroup } from "framer-motion";
 import { seedQuests, questBySlug } from "@/data/seed/quests";
 import {
   activeQuestAssignments,
   filterQuests,
-  formatQuestWindowRemaining,
-  nextQuestSlotAt,
-  occupiedQuestAssignments,
-  QUEST_PICK_UNDO_MS,
   questSlotsRemaining,
   selectSuggestedQuests,
 } from "@/lib/questos/quest-engine";
@@ -35,6 +32,9 @@ import {
   formatDuration,
   CATEGORY_LABEL,
 } from "@/components/quests/QuestSlip";
+import { QuestBoardCard } from "@/components/quests/QuestBoardCard";
+import { QuestBoardSection } from "@/components/quests/QuestBoardSection";
+import { QuestCompletionSheet } from "@/components/quests/QuestCompletionSheet";
 import { Disclosure } from "@/components/design-system/Disclosure";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
@@ -42,7 +42,6 @@ import { SearchClearButton } from "@/components/design-system/SearchClearButton"
 import { useToast } from "@/components/design-system/Toast";
 import {
   IconPlus,
-  IconClose,
   IconBookmark,
 } from "@/components/design-system/icons";
 import { useStrings } from "@/lib/i18n";
@@ -71,7 +70,6 @@ function QuestBrowseInner() {
   const { toast } = useToast();
   const t = useStrings();
   const pickQuest = useQuestOS((s) => s.pickQuest);
-  const unpickQuest = useQuestOS((s) => s.unpickQuest);
   const saveQuestForLater = useQuestOS((s) => s.saveQuestForLater);
   const assignments = useQuestOS((s) => s.assignments);
   const myQuests = useQuestOS(selectMyQuests);
@@ -81,7 +79,7 @@ function QuestBrowseInner() {
   const { isPlus } = usePlus();
 
   // Rolling windows can expire without another store write. Refresh the
-  // projection gently so a freed slot appears while this page is open.
+  // projection gently so countdown and Resume states stay accurate.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const refresh = () => setNow(Date.now());
@@ -110,23 +108,6 @@ function QuestBrowseInner() {
   const visibleCount = pagination.key === resultKey ? pagination.count : 24;
 
   const slotsRemaining = questSlotsRemaining(assignments, isPlus, now);
-  const nextSlot = nextQuestSlotAt(assignments, isPlus, now);
-  const occupiedPicks = useMemo(
-    () => occupiedQuestAssignments(assignments, now),
-    [assignments, now]
-  );
-
-  // Released free-tier quests still own their original window. Keep them
-  // visible here so "restore" is a direct action, not a catalog scavenger hunt.
-  const releasedReservations = useMemo(
-    () =>
-      occupiedPicks.flatMap((pick) => {
-        if (pick.status !== "released") return [];
-        const quest = questBySlug.get(pick.questSlug);
-        return quest ? [{ pick, quest }] : [];
-      }),
-    [occupiedPicks]
-  );
 
   // Derive daily and seasonal discovery from the minute-refreshed clock so a
   // long-lived PWA rolls over without requiring a reload or route change.
@@ -149,12 +130,27 @@ function QuestBrowseInner() {
   );
   const activePicks = picks.filter((pick) => pick.status === "started");
   const readyPicks = picks.filter((pick) => pick.status === "assigned");
-  const donePicks = picks.filter((pick) => pick.status === "completed");
-  const pickGroups = [
-    { key: "active", label: "Active quests", items: activePicks },
-    { key: "ready", label: "Ready to begin", items: readyPicks },
-    { key: "done", label: "Completed", items: donePicks },
-  ].filter((group) => group.items.length > 0);
+  const completedQuests = useMemo(() => {
+    const seen = new Set<string>();
+    return completions
+      .filter((completion) => completion.dateKey === todayKey)
+      .toReversed()
+      .flatMap((completion) => {
+        if (seen.has(completion.questSlug)) return [];
+        seen.add(completion.questSlug);
+        const quest = questBySlug.get(completion.questSlug);
+        return quest ? [quest] : [];
+      });
+  }, [completions, todayKey]);
+  const [openSections, setOpenSections] = useState({
+    active: activePicks.length > 0,
+    ready: activePicks.length === 0,
+    completed: false,
+  });
+  const [completedQuest, setCompletedQuest] =
+    useState<QuestTemplate | null>(null);
+  const [boardAnnouncement, setBoardAnnouncement] = useState("");
+  const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
 
   const activeFilterCount =
     (duration ? 1 : 0) +
@@ -208,43 +204,18 @@ function QuestBrowseInner() {
 
   function handleAdd(quest: QuestTemplate) {
     if (pickQuest(quest.slug, isPlus)) {
-      toast(t.quests.added, { variant: "success" });
+      setOpenSections((current) => ({ ...current, ready: true }));
+      setBoardAnnouncement(`${quest.title} moved to Ready.`);
+      toast("Added to Ready.", { variant: "success" });
     } else {
-      toast(
-        nextSlot
-          ? `Your next slot opens in ${formatQuestWindowRemaining(nextSlot, now).replace(" left", "")}.`
-          : t.quests.capReached
-      );
+      toast("All three quest spots are filled. Finish or remove one first.");
     }
-  }
-
-  function handleRemove(quest: QuestTemplate) {
-    const pick = picks.find((assignment) => assignment.questSlug === quest.slug);
-    const trueUndo =
-      pick?.status === "assigned" &&
-      now - Date.parse(pick.pickedAt) <= QUEST_PICK_UNDO_MS;
-    unpickQuest(quest.slug, isPlus);
-    toast(
-      isPlus || trueUndo
-        ? t.quests.removed
-        : "Removed from your list. This slot resets when its 24-hour window ends."
-    );
   }
 
   function handleSave(quest: QuestTemplate) {
     if (saveQuestForLater(quest.slug)) {
       toast(t.myQuests.savedToast, { variant: "success" });
     }
-  }
-
-  // Reuses the original reservation through pickQuest, so restoring never
-  // consumes a second free slot or resets the existing expiry window.
-  function handleRestore(quest: QuestTemplate) {
-    if (pickQuest(quest.slug, isPlus)) {
-      toast(`${quest.title} is back in today.`, { variant: "success" });
-      return;
-    }
-    toast("That reservation has ended. You can choose the quest again below.");
   }
 
   // Return discovery to its broad, predictable starting state in one action.
@@ -257,7 +228,7 @@ function QuestBrowseInner() {
     setSearch("");
   }
 
-  /** A browse-list slip: shelf state + add-to-today / save-for-later. */
+  /** A browse-list slip: shelf state plus Add to Ready or Save for later. */
   function browseSlip(quest: QuestTemplate, compact = false) {
     const done = completedToday.has(quest.slug);
     const assignment = pickedBySlug.get(quest.slug);
@@ -280,8 +251,8 @@ function QuestBrowseInner() {
             <div className="flex flex-col items-center gap-2">
               <button
                 type="button"
-                aria-label={t.quests.addToToday}
-                title={t.quests.addToToday}
+                aria-label="Add to Ready"
+                title="Add to Ready"
                 onClick={() => handleAdd(quest)}
                 className="flex h-11 w-11 items-center justify-center rounded-full border border-accent/50 bg-paper text-accent transition-colors duration-300 hover:bg-accent-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
@@ -311,15 +282,49 @@ function QuestBrowseInner() {
   const todayStatusSummary = [
     activePicks.length > 0 ? `${activePicks.length} active` : null,
     readyPicks.length > 0 ? `${readyPicks.length} ready` : null,
-    donePicks.length > 0 ? `${donePicks.length} complete` : null,
+    completedQuests.length > 0 ? `${completedQuests.length} complete` : null,
     isPlus
-      ? "Unlimited slots"
+      ? "Unlimited spots"
       : Number.isFinite(slotsRemaining)
-        ? `${slotsRemaining} ${slotsRemaining === 1 ? "slot" : "slots"} open`
+        ? `${slotsRemaining} ${slotsRemaining === 1 ? "spot" : "spots"} open`
         : null,
   ]
     .filter((item): item is string => Boolean(item))
     .join(" · ");
+
+  /** Keeps the destination section open and restores focus after card motion. */
+  function handleTransition(
+    quest: QuestTemplate,
+    destination: "ready" | "active" | "completed",
+  ) {
+    setNow(Date.now());
+    setOpenSections((current) => ({ ...current, [destination]: true }));
+    setBoardAnnouncement(`${quest.title} moved to ${destination}.`);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        document
+          .querySelector<HTMLElement>(`[data-quest-card="${quest.slug}"]`)
+          ?.focus({ preventScroll: true });
+      });
+    });
+  }
+
+  /** Closes the sheet and focuses the card that just entered Completed. */
+  const closeCompletionSheet = useCallback(() => {
+    setCompletedQuest((current) => {
+      const slug = current?.slug;
+      if (slug) {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => {
+            document
+              .querySelector<HTMLElement>(`[data-quest-card="${slug}"]`)
+              ?.focus({ preventScroll: true });
+          });
+        });
+      }
+      return null;
+    });
+  }, [setCompletedQuest]);
 
   return (
     <>
@@ -327,120 +332,125 @@ function QuestBrowseInner() {
         title={t.nav.quests}
         subtitle={
           isPlus
-            ? "Choose freely. Plus gives you unlimited active quest windows."
-            : "Choose up to three quests at a time. Each window stays open for 24 hours."
+            ? "Keep any number of quests Ready or Active. The 24-hour timer starts when you begin."
+            : "Keep up to three quests Ready or Active. The 24-hour timer starts when you begin."
         }
       />
       <PageContainer>
-        {/* Today's visible rolling windows, pinned above discovery. */}
-        <section aria-label="Today's picks">
+        {/* The board is the one canonical lifecycle surface above discovery. */}
+        <section aria-label="Your quest board">
           <div className="flex items-baseline justify-between">
-            <ShelfTitle>{t.quests.today}</ShelfTitle>
+            <ShelfTitle>Your quests</ShelfTitle>
             <p aria-live="polite" className="text-caption text-ash">
               {todayStatusSummary}
             </p>
           </div>
-          {picks.length === 0 ? (
-            <PaperCard variant="quiet" padding="sm" className="mt-2">
-              <p className="text-small text-charcoal">
-                {releasedReservations.length > 0
-                  ? "Your visible list is clear. Restore a reserved quest below or browse for another."
-                  : t.empty.questsUnpicked}
-              </p>
-            </PaperCard>
-          ) : (
-            <div className="mt-3 space-y-4">
-              {pickGroups.map((group) => (
-                <div key={group.key}>
-                  <h3 className="mb-2 text-caption uppercase tracking-[0.16em] text-ash">
-                    {group.label}
-                  </h3>
-                  <div className="space-y-3">
-                    {group.items.map((pick) => {
-                      const quest = questBySlug.get(pick.questSlug);
-                      if (!quest) return null;
-                      const done =
-                        pick.status === "completed" ||
-                        completedToday.has(pick.questSlug);
-                      return (
-                        <QuestSlip
-                          key={pick.questSlug}
-                          quest={quest}
-                          href={`/app/quests/${quest.slug}`}
-                          assignmentStatus={pick.status}
-                          completed={done}
-                          expiresAt={pick.expiresAt}
-                          action={
-                            done ? undefined : (
-                              <button
-                                type="button"
-                                aria-label={`Remove ${quest.title} from today`}
-                                title="Remove from today"
-                                onClick={() => handleRemove(quest)}
-                                className="flex h-11 w-11 items-center justify-center rounded-full border border-mist bg-paper text-ash transition-colors duration-300 hover:border-accent/40 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                              >
-                                <IconClose size={16} />
-                              </button>
-                            )
-                          }
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <p aria-live="polite" aria-atomic="true" className="sr-only">
+            {boardAnnouncement}
+          </p>
 
-          {releasedReservations.length > 0 && (
-            <PaperCard variant="linen" padding="sm" className="mt-3">
-              <p className="font-display text-[1.0625rem] text-graphite">
-                {releasedReservations.length === 1
-                  ? "Reserved quest"
-                  : "Reserved quests"}
-              </p>
-              <p className="mt-1 text-caption leading-relaxed text-ash">
-                {releasedReservations.length === 1 ? "This keeps" : "These keep"} the
-                original 24-hour {releasedReservations.length === 1 ? "slot" : "slots"}.
-                Restoring a quest does not use another slot or restart its timer.
-              </p>
-              <ul className="mt-2 divide-y divide-mist/70">
-                {releasedReservations.map(({ pick, quest }) => (
-                  <li
-                    key={`${pick.pickedAt}:${quest.slug}`}
-                    className="flex min-h-16 items-center gap-3 py-2"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-small font-medium text-graphite">
-                        {quest.title}
-                      </span>
-                      <time
-                        dateTime={pick.expiresAt}
-                        title={new Date(pick.expiresAt).toLocaleString()}
-                        className="mt-0.5 block text-caption text-ash"
-                      >
-                        Slot opens in{" "}
-                        {formatQuestWindowRemaining(pick.expiresAt, now).replace(
-                          " left",
-                          ""
-                        )}
-                      </time>
-                    </span>
-                    <GentleButton
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      aria-label={`Restore ${quest.title} to today`}
-                      onClick={() => handleRestore(quest)}
-                      className="shrink-0"
-                    >
-                      Restore
-                    </GentleButton>
-                  </li>
-                ))}
-              </ul>
-            </PaperCard>
-          )}
+          <LayoutGroup id="quest-board">
+            <div className="mt-3 space-y-3">
+              <QuestBoardSection
+                label="Active"
+                count={activePicks.length}
+                open={openSections.active}
+                onOpenChange={(open) =>
+                  setOpenSections((current) => ({
+                    ...current,
+                    active: open,
+                  }))
+                }
+                emptyBody="No quest is underway right now."
+              >
+                <ul className="space-y-3">
+                  {activePicks.flatMap((assignment) => {
+                    const quest = questBySlug.get(assignment.questSlug);
+                    return quest ? (
+                      <QuestBoardCard
+                        key={quest.slug}
+                        quest={quest}
+                        assignment={assignment}
+                        state="active"
+                        now={now}
+                        open={expandedSlug === quest.slug}
+                        onOpenChange={(open) =>
+                          setExpandedSlug(open ? quest.slug : null)
+                        }
+                        onTransition={handleTransition}
+                        onCompleted={setCompletedQuest}
+                      />
+                    ) : (
+                      []
+                    );
+                  })}
+                </ul>
+              </QuestBoardSection>
+
+              <QuestBoardSection
+                label="Ready"
+                count={readyPicks.length}
+                open={openSections.ready}
+                onOpenChange={(open) =>
+                  setOpenSections((current) => ({ ...current, ready: open }))
+                }
+                emptyBody="Choose a quest below when you want a place to begin."
+              >
+                <ul className="space-y-3">
+                  {readyPicks.flatMap((assignment) => {
+                    const quest = questBySlug.get(assignment.questSlug);
+                    return quest ? (
+                      <QuestBoardCard
+                        key={quest.slug}
+                        quest={quest}
+                        assignment={assignment}
+                        state="ready"
+                        now={now}
+                        open={expandedSlug === quest.slug}
+                        onOpenChange={(open) =>
+                          setExpandedSlug(open ? quest.slug : null)
+                        }
+                        onTransition={handleTransition}
+                        onCompleted={setCompletedQuest}
+                      />
+                    ) : (
+                      []
+                    );
+                  })}
+                </ul>
+              </QuestBoardSection>
+
+              <QuestBoardSection
+                label="Completed today"
+                count={completedQuests.length}
+                open={openSections.completed}
+                onOpenChange={(open) =>
+                  setOpenSections((current) => ({
+                    ...current,
+                    completed: open,
+                  }))
+                }
+                emptyBody="Completed quests will gather here for today."
+              >
+                <ul className="space-y-3">
+                  {completedQuests.map((quest) => (
+                    <QuestBoardCard
+                      key={quest.slug}
+                      quest={quest}
+                      state="completed"
+                      now={now}
+                      open={expandedSlug === quest.slug}
+                      onOpenChange={(open) =>
+                        setExpandedSlug(open ? quest.slug : null)
+                      }
+                      onTransition={handleTransition}
+                      onCompleted={setCompletedQuest}
+                    />
+                  ))}
+                </ul>
+              </QuestBoardSection>
+            </div>
+          </LayoutGroup>
         </section>
 
         <Disclosure
@@ -646,6 +656,10 @@ function QuestBrowseInner() {
           )}
         </section>
       </PageContainer>
+      <QuestCompletionSheet
+        quest={completedQuest}
+        onClose={closeCompletionSheet}
+      />
     </>
   );
 }

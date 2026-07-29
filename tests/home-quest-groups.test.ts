@@ -25,6 +25,8 @@ function assignment(
     status,
     pickedAt: "2026-07-23T10:00:00.000Z",
     expiresAt,
+    completedAt:
+      status === "completed" ? "2026-07-23T11:00:00.000Z" : undefined,
     rerolls: 0,
   };
 }
@@ -41,6 +43,10 @@ function shelf(
     status,
     addedAt: "2026-07-20T09:00:00.000Z",
     startedAt: begun ? "2026-07-21T09:00:00.000Z" : undefined,
+    completedAt:
+      status === "completed" || status === "archived"
+        ? "2026-07-23T08:00:00.000Z"
+        : undefined,
     lastActivityAt,
     stepsDone: [],
     timesCompleted: status === "completed" || status === "archived" ? 1 : 0,
@@ -65,7 +71,7 @@ describe("Home quest groups", () => {
     expect(groups.completed.map((item) => item.quest.slug)).toEqual([slugs[2]]);
   });
 
-  it("places shelf walks by real progress and lifecycle", () => {
+  it("keeps only outstanding and today-completed shelf walks on the board", () => {
     const groups = buildHomeQuestGroups({
       assignments: [],
       myQuests: {
@@ -81,15 +87,8 @@ describe("Home quest groups", () => {
     });
 
     expect(groups.active.map((item) => item.quest.slug)).toEqual([slugs[0]]);
-    expect(groups.ready.map((item) => item.quest.slug)).toEqual([
-      slugs[1],
-      slugs[2],
-      slugs[3],
-    ]);
-    expect(groups.completed.map((item) => item.quest.slug)).toEqual([
-      slugs[4],
-      slugs[5],
-    ]);
+    expect(groups.ready.map((item) => item.quest.slug)).toEqual([slugs[1]]);
+    expect(groups.completed.map((item) => item.quest.slug)).toEqual([slugs[4]]);
   });
 
   it("lets a current assignment win a duplicate shelf slug", () => {
@@ -110,7 +109,7 @@ describe("Home quest groups", () => {
     expect(groups.completed).toHaveLength(0);
   });
 
-  it("ignores invalid windows and unknown templates without hiding shelf data", () => {
+  it("keeps expired Active rows visible while ignoring legacy hidden rows", () => {
     const groups = buildHomeQuestGroups({
       assignments: [
         assignment(slugs[0], "released"),
@@ -126,7 +125,7 @@ describe("Home quest groups", () => {
       now: NOW,
     });
 
-    expect(groups.ready.map((item) => item.quest.slug)).toEqual([slugs[0]]);
+    expect(groups.ready).toHaveLength(0);
     expect(groups.active.map((item) => item.quest.slug)).toEqual([slugs[1]]);
     expect(
       [...groups.active, ...groups.ready, ...groups.completed].some(
@@ -135,28 +134,18 @@ describe("Home quest groups", () => {
     ).toBe(false);
   });
 
-  it("orders shelf-only items by most recent activity", () => {
+  it("orders shelf-only Active items by most recent activity", () => {
     const groups = buildHomeQuestGroups({
       assignments: [],
       myQuests: {
-        older: shelf(
-          slugs[0],
-          "saved",
-          false,
-          "2026-07-20T09:00:00.000Z",
-        ),
-        newer: shelf(
-          slugs[1],
-          "saved",
-          false,
-          "2026-07-22T09:00:00.000Z",
-        ),
+        older: shelf(slugs[0], "active", true, "2026-07-20T09:00:00.000Z"),
+        newer: shelf(slugs[1], "active", true, "2026-07-22T09:00:00.000Z"),
       },
       questsBySlug: questBySlug,
       now: NOW,
     });
 
-    expect(groups.ready.map((item) => item.quest.slug)).toEqual([
+    expect(groups.active.map((item) => item.quest.slug)).toEqual([
       slugs[1],
       slugs[0],
     ]);

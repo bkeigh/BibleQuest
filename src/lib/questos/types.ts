@@ -104,12 +104,13 @@ export type DailyQuestStatus =
   | "assigned"
   | "started"
   | "completed"
-  /** Hidden from Today's Quests, but its free-tier slot remains reserved. */
+  /** Legacy hidden reservation; new removals delete the assignment instead. */
   | "released";
 
 /**
- * One rolling quest window, grouped by its local pick date for persistence.
- * Free members may hold three concurrent windows; Plus has no slot cap.
+ * One quest-board assignment, grouped by its local pick date for persistence.
+ * Ready assignments occupy a spot without a running timer. Beginning or
+ * resuming writes a fresh 24-hour window into startedAt/expiresAt.
  */
 export interface DailyQuestAssignment {
   dateKey: string; // YYYY-MM-DD (local)
@@ -117,7 +118,7 @@ export interface DailyQuestAssignment {
   status: DailyQuestStatus;
   /** When the user added this quest to their day. */
   pickedAt: string;
-  /** Rolling 24-hour window end; independent of local midnight. */
+  /** Active window end. Ignored while status is "assigned". */
   expiresAt: string;
   startedAt?: string;
   completedAt?: string;

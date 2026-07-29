@@ -1,7 +1,7 @@
 /**
  * Quest engine — picking, filtering, and suggestion.
  *
- * The user picks their own quests now (three concurrent windows for free);
+ * The user picks their own quests now (three outstanding quests for free);
  * the old daily-assignment scorer lives on as the "Suggested for today"
  * shelf. Suggestion is deterministic per user + date (seeded), avoids
  * recent repeats, respects preferences, and honors the current season.
@@ -18,13 +18,12 @@ import type {
 } from "./types";
 
 /**
- * Free members may hold this many concurrent quest windows. A window lasts a
- * rolling 24 hours from the instant it is picked; it is deliberately not tied
- * to midnight, so a late-night pick never disappears a few minutes later.
+ * Free members may hold this many Ready or Active quests. Ready quests have no
+ * countdown; the rolling window begins only when the quest becomes Active.
  */
 export const FREE_QUEST_SLOTS = 3;
 export const QUEST_WINDOW_MS = 24 * 60 * 60 * 1000;
-/** Brief protection for an accidental tap before a free slot is reserved. */
+/** Kept for import/test compatibility with pre-board assignment records. */
 export const QUEST_PICK_UNDO_MS = 2 * 60 * 1000;
 
 function validTime(value?: string): number | null {
@@ -67,30 +66,33 @@ export function isQuestWindowOpen(
   assignment: DailyQuestAssignment,
   now: Date | number = Date.now(),
 ): boolean {
+  if (assignment.status === "assigned") return true;
   const nowMs = typeof now === "number" ? now : now.getTime();
   return questWindowExpiresAt(assignment) > nowMs;
 }
 
-/** Every unexpired slot reservation, including a quest removed from the UI. */
+/** Every Ready or Active quest occupies one spot, even after an Active timer ends. */
 export function occupiedQuestAssignments(
   assignments: Record<string, DailyQuestAssignment[]>,
   now: Date | number = Date.now(),
 ): DailyQuestAssignment[] {
+  void now;
   return Object.values(assignments)
     .flat()
     .map(normalizeAssignmentWindow)
-    .filter((assignment) => isQuestWindowOpen(assignment, now))
+    .filter(
+      (assignment) =>
+        assignment.status === "assigned" || assignment.status === "started",
+    )
     .sort((a, b) => a.pickedAt.localeCompare(b.pickedAt));
 }
 
-/** Visible rolling-window picks, oldest first. */
+/** Visible Ready and Active board assignments, oldest first. */
 export function activeQuestAssignments(
   assignments: Record<string, DailyQuestAssignment[]>,
   now: Date | number = Date.now(),
 ): DailyQuestAssignment[] {
-  return occupiedQuestAssignments(assignments, now).filter(
-    (assignment) => assignment.status !== "released",
-  );
+  return occupiedQuestAssignments(assignments, now);
 }
 
 export function questSlotsRemaining(
@@ -111,8 +113,7 @@ export function nextQuestSlotAt(
   now: Date | number = Date.now(),
 ): string | null {
   if (isPlus || questSlotsRemaining(assignments, false, now) > 0) return null;
-  const [oldest] = occupiedQuestAssignments(assignments, now);
-  return oldest?.expiresAt ?? null;
+  return null;
 }
 
 /** Compact, human timing for quest cards; exact expiry remains in title/ARIA. */

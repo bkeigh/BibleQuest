@@ -11,17 +11,13 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   useQuestOS,
-  selectMyQuests,
   selectStreak,
 } from "@/lib/questos/store";
 import { calculateTreeState, stageProgress } from "@/lib/questos/growth-engine";
 import {
   activeQuestAssignments,
   formatQuestWindowRemaining,
-  nextQuestSlotAt,
-  occupiedQuestAssignments,
-  questSlotsRemaining,
-  selectSuggestedQuests,
+  isQuestWindowOpen,
 } from "@/lib/questos/quest-engine";
 import { timeOfDay, toDateKey } from "@/lib/utils/dates";
 import { useStrings, fmt } from "@/lib/i18n";
@@ -29,39 +25,30 @@ import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
 import { riseIn } from "@/lib/motion";
 import { PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { GentleLink } from "@/components/design-system/GentleButton";
-import { CATEGORY_LABEL, formatDuration } from "@/components/quests/QuestSlip";
 import { AccountPrompt } from "@/components/account/AccountPrompt";
 import { GrowthTree } from "@/components/journey/GrowthTree";
 import { SeasonalAtmosphere } from "@/components/design-system/SeasonalAtmosphere";
 import { CATEGORY_SPRITE, PixelIcon } from "@/components/design-system/PixelIcon";
 import { Avatar } from "@/components/profile/Avatar";
 import { StreakCard } from "@/components/home/StreakCard";
-import { HomeQuestCategory } from "@/components/home/HomeQuestCategory";
-import { HomeQuestDisclosure } from "@/components/home/HomeQuestDisclosure";
 import {
   IconArrowRight,
   IconChevronRight,
   IconSettings,
 } from "@/components/design-system/icons";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
-import { seedQuests, questBySlug } from "@/data/seed/quests";
+import { questBySlug } from "@/data/seed/quests";
 import { usePlus } from "@/lib/billing/usePlus";
 import { ExplorePlusLink } from "@/components/plus/ExplorePlusLink";
 import { NewsletterLink } from "@/components/newsletter/NewsletterLink";
-import { homeQuestSummary } from "@/lib/questos/home-quest-summary";
-import { buildHomeQuestGroups } from "@/lib/questos/home-quest-groups";
 import { profileAvatarMarker } from "@/lib/utils/avatar";
 import { cn } from "@/lib/utils/cn";
 
 function HomeInner() {
   const profile = useQuestOS((s) => s.profile);
-  const settings = useQuestOS((s) => s.settings);
   const growthEvents = useQuestOS((s) => s.growthEvents);
   const readingPosition = useQuestOS((s) => s.readingPosition);
-  const completions = useQuestOS((s) => s.completions);
   const assignments = useQuestOS((s) => s.assignments);
-  const myQuests = useQuestOS(selectMyQuests);
   const { isPlus } = usePlus();
   // The candle. Stable ref — the stored object itself.
   const streak = useQuestOS(selectStreak);
@@ -104,91 +91,23 @@ function HomeInner() {
   const t = useStrings();
   const hello = t.greeting[time];
 
-  // Quest windows are rolling rather than calendar-day based. Derive them
-  // from the full reservation record so hidden free-member reservations still
-  // count, and refresh the projection once a minute without a store write.
+  // Home projects only a compact snapshot from the canonical Quest board.
   const picks = useMemo(
     () => activeQuestAssignments(assignments, now),
     [assignments, now]
   );
-  const occupiedPicks = useMemo(
-    () => occupiedQuestAssignments(assignments, now),
-    [assignments, now]
-  );
-  const slotsRemaining = questSlotsRemaining(assignments, isPlus, now);
-  const nextSlot = nextQuestSlotAt(assignments, isPlus, now);
-
-  // Current rolling picks and the persistent shelf become one deduplicated
-  // collection. Current picks win so their 24-hour countdown stays visible.
-  const questGroups = useMemo(
-    () =>
-      buildHomeQuestGroups({
-        assignments: picks,
-        myQuests,
-        questsBySlug: questBySlug,
-        now,
-      }),
-    [picks, myQuests, now],
-  );
-  const activeCount = questGroups.active.length;
-  const readyCount = questGroups.ready.length;
-  const completedCount = questGroups.completed.length;
-  const questCount = activeCount + readyCount + completedCount;
-  const currentPickCount =
-    [...questGroups.active, ...questGroups.ready, ...questGroups.completed].filter(
-      (item) => item.kind === "assignment",
-    ).length;
-  const allDone = questCount > 0 && activeCount === 0 && readyCount === 0;
-  const hiddenReservationCount = Math.max(
-    0,
-    occupiedPicks.length - currentPickCount,
-  );
-  const canAddQuest = isPlus || slotsRemaining > 0;
-  const questSummary = homeQuestSummary({
-    activeCount,
-    readyCount,
-    completedCount,
-    visibleCount: questCount,
-    occupiedCount: occupiedPicks.length,
-    hiddenReservationCount,
-  });
-  const questAnnouncement =
-    questCount === 0
-      ? hiddenReservationCount > 0
-        ? questSummary
-        : t.quests.emptyTitle
-      : allDone
-        ? "All your quests are complete."
-        : questSummary;
-
-  // Suggested quests for the open day — the same deterministic shelf as the
-  // browse page, so home and browse always agree on today's offer.
-  const suggested = useMemo(() => {
-    if (currentPickCount > 0) return [];
-    return selectSuggestedQuests({
-      quests: seedQuests,
-      dateKey: dayKey,
-      profile,
-      settings,
-      season: season.key,
-      recentSlugs: completions.map((c) => c.questSlug),
-      excludeSlugs: [
-        ...Object.keys(myQuests),
-        ...completions
-          .filter((c) => c.dateKey === dayKey)
-          .map((c) => c.questSlug),
-      ],
-      count: 3,
-    });
-  }, [
-    currentPickCount,
-    dayKey,
-    profile,
-    settings,
-    season.key,
-    completions,
-    myQuests,
-  ]);
+  const activePicks = picks.filter((pick) => pick.status === "started");
+  const readyPicks = picks.filter((pick) => pick.status === "assigned");
+  const featuredPick = activePicks[0] ?? readyPicks[0];
+  const featuredQuest = featuredPick
+    ? questBySlug.get(featuredPick.questSlug)
+    : undefined;
+  const questSummary = [
+    activePicks.length > 0 ? `${activePicks.length} active` : null,
+    readyPicks.length > 0 ? `${readyPicks.length} ready` : null,
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join(" · ");
 
   return (
     <div className="relative">
@@ -284,97 +203,63 @@ function HomeInner() {
               while the compact treatment leaves quests as Home's main work. */}
           <TodaysVerseLink />
 
-          {/* One quest collection replaces the old daily/persistent split.
-              Its outer shell starts open; each status remains collapsible. */}
-          <HomeQuestDisclosure
-            title={t.nav.quests}
-            summary={questSummary}
-            announcement={questAnnouncement}
-            defaultOpen
-          >
-            {currentPickCount > 0 && (
-              <p className="mb-3 px-1 text-caption text-ash">
-                Today’s quest windows stay open for 24 hours. Each card keeps
-                its own countdown.
-              </p>
-            )}
-
-            <div className="space-y-3">
-              <HomeQuestCategory
-                label={t.quests.groupActive}
-                items={questGroups.active}
-                defaultOpen={questGroups.active.length > 0}
-                emptyBody="No quest is underway right now."
-              />
-              <HomeQuestCategory
-                label={t.quests.groupReady}
-                items={questGroups.ready}
-                defaultOpen={
-                  questGroups.active.length === 0 &&
-                  (questGroups.ready.length > 0 || questCount === 0)
-                }
-                emptyBody={
-                  suggested.length > 0
-                    ? "A few gentle places to begin."
-                    : "No quest is waiting to begin."
-                }
+          {/* Home shows one next quest and sends all management to Quests. */}
+          <section id="quests" className="scroll-mt-6">
+            <Link href="/app/quests" className="block">
+              <PaperCard
+                interactive
+                variant="paper"
+                padding="md"
+                className="flex items-center gap-4"
               >
-                {hiddenReservationCount > 0 && (
-                  <p className="px-1 text-caption leading-relaxed text-ash">
-                    {hiddenReservationCount} hidden{" "}
-                    {hiddenReservationCount === 1 ? "slot stays" : "slots stay"}{" "}
-                    reserved until its{" "}
-                    {hiddenReservationCount === 1 ? "window ends" : "windows end"}
-                    {nextSlot
-                      ? `. Your next slot opens in ${formatQuestWindowRemaining(
-                          nextSlot,
-                          now,
-                        ).replace(" left", "")}.`
-                      : "."}
-                  </p>
-                )}
-                {suggested.length > 0 && (
-                  <PaperCard
-                    variant="paper"
-                    padding="sm"
-                    className="overflow-hidden !p-2"
-                  >
-                    <ul
-                      aria-label="Suggested quests"
-                      className="divide-y divide-mist/75"
-                    >
-                      {suggested.slice(0, 2).map((quest) => (
-                        <li key={quest.slug}>
-                          <QuestSuggestionRow quest={quest} />
-                        </li>
-                      ))}
-                    </ul>
-                  </PaperCard>
-                )}
-                <div className="flex justify-center pt-1">
-                  <GentleLink
-                    variant={questCount === 0 ? "primary" : "text"}
-                    size={questCount === 0 ? undefined : "sm"}
-                    href="/app/quests"
-                  >
-                    {questCount === 0
-                      ? canAddQuest
-                        ? t.quests.pickCta
-                        : "Browse and save quests"
-                      : canAddQuest
-                        ? t.quests.addAnother
-                        : "Browse and save quests"}{" "}
-                    <IconArrowRight size={questCount === 0 ? undefined : 14} />
-                  </GentleLink>
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] bg-linen ring-1 ring-mist">
+                  <PixelIcon
+                    name={
+                      featuredQuest
+                        ? CATEGORY_SPRITE[featuredQuest.category] ?? "scroll"
+                        : "scroll"
+                    }
+                    size={5}
+                  />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <h2 className="font-pixel text-[1.25rem] uppercase tracking-[0.05em] text-accent">
+                      {t.nav.quests}
+                    </h2>
+                    <p className="text-caption text-ash">
+                      {questSummary || "Choose a quest"}
+                    </p>
+                  </div>
+                  {featuredQuest && featuredPick ? (
+                    <>
+                      <p className="mt-2 line-clamp-2 font-display text-[1.125rem] leading-snug text-graphite">
+                        {featuredQuest.title}
+                      </p>
+                      <p className="mt-1 text-caption text-ash">
+                        {featuredPick.status === "assigned"
+                          ? "Ready to begin"
+                          : isQuestWindowOpen(featuredPick, now)
+                            ? formatQuestWindowRemaining(
+                                featuredPick.expiresAt,
+                                now,
+                              )
+                            : "Window ended · Resume when ready"}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-2 text-small text-ash">
+                      Find a gentle next step for today.
+                    </p>
+                  )}
+                  <span className="mt-2 inline-flex items-center gap-1 text-small font-medium text-accent">
+                    View all quests <IconArrowRight size={14} />
+                  </span>
                 </div>
-              </HomeQuestCategory>
-              <HomeQuestCategory
-                label={t.quests.groupCompleted}
-                items={questGroups.completed}
-                emptyBody="Completed quests will gather here."
-              />
-            </div>
-          </HomeQuestDisclosure>
+                <IconChevronRight className="shrink-0 text-fog" />
+              </PaperCard>
+            </Link>
+          </section>
 
           {/* Home shows only the larger tree sprite; the full living scene
               remains on Journey where its accents have room to breathe. */}
@@ -523,28 +408,6 @@ function QuickRow({
         </div>
         <IconChevronRight className="text-fog" />
       </PaperCard>
-    </Link>
-  );
-}
-
-function QuestSuggestionRow({ quest }: { quest: (typeof seedQuests)[number] }) {
-  return (
-    <Link
-      href={`/app/quests/${quest.slug}`}
-      className="group flex min-h-[4.5rem] items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors duration-300 hover:bg-paper"
-    >
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-paper ring-1 ring-mist">
-        <PixelIcon name={CATEGORY_SPRITE[quest.category] ?? "leaf"} size={5} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block line-clamp-2 font-display text-[1.0625rem] leading-snug text-graphite">
-          {quest.title}
-        </span>
-        <span className="mt-0.5 block text-[0.75rem] text-ash">
-          {formatDuration(quest.durationMinutes)} · {CATEGORY_LABEL[quest.category]}
-        </span>
-      </span>
-      <IconChevronRight className="shrink-0 text-fog transition-transform duration-300 group-hover:translate-x-0.5" />
     </Link>
   );
 }

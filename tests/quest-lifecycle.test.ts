@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { seedQuests } from "@/data/seed/quests";
 import {
   activeQuestAssignments,
+  isQuestWindowOpen,
   occupiedQuestAssignments,
-  QUEST_PICK_UNDO_MS,
   QUEST_WINDOW_MS,
   questSlotsRemaining,
 } from "@/lib/questos/quest-engine";
@@ -61,16 +61,33 @@ describe("rolling quest lifecycle", () => {
     useQuestOS.getState().clearAllData();
   });
 
-  it("enforces three concurrent free slots for exactly 24 hours", () => {
+  it("keeps three Ready spots until one is removed or completed", () => {
     expect(useQuestOS.getState().pickQuest(slugs[0])).toBe(true);
     expect(useQuestOS.getState().pickQuest(slugs[1])).toBe(true);
     expect(useQuestOS.getState().pickQuest(slugs[2])).toBe(true);
     expect(useQuestOS.getState().pickQuest(slugs[3])).toBe(false);
 
-    vi.setSystemTime(new Date(START.getTime() + QUEST_WINDOW_MS - 1));
+    // Ready has no timer, so waiting never silently frees or loses a quest.
+    vi.setSystemTime(new Date(START.getTime() + QUEST_WINDOW_MS * 2));
     expect(useQuestOS.getState().pickQuest(slugs[3])).toBe(false);
-    vi.setSystemTime(new Date(START.getTime() + QUEST_WINDOW_MS));
+
+    useQuestOS.getState().unpickQuest(slugs[0]);
     expect(useQuestOS.getState().pickQuest(slugs[3])).toBe(true);
+  });
+
+  it("starts the 24-hour window at Begin rather than Add to Ready", () => {
+    expect(useQuestOS.getState().pickQuest(slugs[0])).toBe(true);
+    const [ready] = activeQuestAssignments(useQuestOS.getState().assignments);
+    expect(ready.status).toBe("assigned");
+    expect(isQuestWindowOpen(ready)).toBe(true);
+
+    vi.setSystemTime(new Date(START.getTime() + 6 * 60 * 60 * 1000));
+    expect(useQuestOS.getState().startQuest(slugs[0])).toBe(true);
+    const [started] = activeQuestAssignments(useQuestOS.getState().assignments);
+    expect(started.status).toBe("started");
+    expect(started.expiresAt).toBe(
+      new Date(START.getTime() + 30 * 60 * 60 * 1000).toISOString(),
+    );
   });
 
   it("gives Plus unlimited windows without changing the static catalog", () => {
@@ -102,11 +119,14 @@ describe("rolling quest lifecycle", () => {
       reason: "already_completed",
     });
     expect(useQuestOS.getState().completions).toHaveLength(1);
-    expect(activeQuestAssignments(useQuestOS.getState().assignments)[0].status).toBe(
-      "completed",
-    );
-    // Completion keeps the free reservation until its promised reset.
-    expect(questSlotsRemaining(useQuestOS.getState().assignments, false)).toBe(2);
+    const completedAssignment = Object.values(
+      useQuestOS.getState().assignments,
+    )
+      .flat()
+      .find((assignment) => assignment.questSlug === slugs[0]);
+    expect(completedAssignment?.status).toBe("completed");
+    // Completion releases the outstanding spot immediately.
+    expect(questSlotsRemaining(useQuestOS.getState().assignments, false)).toBe(3);
   });
 
   it("completes a cross-midnight quest on the original assignment row", () => {
@@ -122,30 +142,22 @@ describe("rolling quest lifecycle", () => {
     expect(useQuestOS.getState().assignments[originalDay][0].completedAt).toBeTruthy();
   });
 
-  it("allows a short accidental-tap undo, then preserves the free reservation", () => {
+  it("removes a Ready quest and frees its spot immediately", () => {
     expect(useQuestOS.getState().pickQuest(slugs[0])).toBe(true);
-    useQuestOS.getState().unpickQuest(slugs[0]);
-    expect(occupiedQuestAssignments(useQuestOS.getState().assignments)).toHaveLength(0);
-
-    expect(useQuestOS.getState().pickQuest(slugs[0])).toBe(true);
-    vi.setSystemTime(new Date(START.getTime() + QUEST_PICK_UNDO_MS + 1));
+    vi.setSystemTime(new Date(START.getTime() + QUEST_WINDOW_MS * 2));
     useQuestOS.getState().unpickQuest(slugs[0]);
     expect(activeQuestAssignments(useQuestOS.getState().assignments)).toHaveLength(0);
-    expect(occupiedQuestAssignments(useQuestOS.getState().assignments)).toHaveLength(1);
-    expect(questSlotsRemaining(useQuestOS.getState().assignments, false)).toBe(2);
+    expect(occupiedQuestAssignments(useQuestOS.getState().assignments)).toHaveLength(0);
+    expect(questSlotsRemaining(useQuestOS.getState().assignments, false)).toBe(3);
 
     expect(useQuestOS.getState().pickQuest(slugs[1])).toBe(true);
     expect(useQuestOS.getState().pickQuest(slugs[2])).toBe(true);
-    expect(useQuestOS.getState().pickQuest(slugs[3])).toBe(false);
-
-    // Returning to the hidden quest reuses its reservation, not another slot.
-    expect(useQuestOS.getState().startQuest(slugs[0])).toBe(true);
-    expect(occupiedQuestAssignments(useQuestOS.getState().assignments)).toHaveLength(3);
+    expect(useQuestOS.getState().pickQuest(slugs[3])).toBe(true);
   });
 
-  it("lets Plus release a window immediately", () => {
+  it("lets Plus remove a Ready quest immediately", () => {
     expect(useQuestOS.getState().pickQuest(slugs[0], true)).toBe(true);
-    vi.setSystemTime(new Date(START.getTime() + QUEST_PICK_UNDO_MS + 1));
+    vi.setSystemTime(new Date(START.getTime() + QUEST_WINDOW_MS * 2));
     useQuestOS.getState().unpickQuest(slugs[0], true);
     expect(occupiedQuestAssignments(useQuestOS.getState().assignments)).toHaveLength(0);
   });
@@ -155,11 +167,20 @@ describe("rolling quest lifecycle", () => {
     useQuestOS.getState().markQuestStep(slugs[0], "scripture");
     vi.setSystemTime(new Date(START.getTime() + QUEST_WINDOW_MS + 1));
 
-    expect(activeQuestAssignments(useQuestOS.getState().assignments)).toHaveLength(0);
+    const [expired] = activeQuestAssignments(useQuestOS.getState().assignments);
+    expect(expired.status).toBe("started");
+    expect(isQuestWindowOpen(expired)).toBe(false);
     expect(useQuestOS.getState().myQuests[slugs[0]].stepsDone).toEqual([
       "scripture",
     ]);
     expect(useQuestOS.getState().startQuest(slugs[0])).toBe(true);
+    const [resumed] = activeQuestAssignments(useQuestOS.getState().assignments);
+    expect(isQuestWindowOpen(resumed)).toBe(true);
+    expect(resumed.expiresAt).toBe(
+      new Date(
+        START.getTime() + QUEST_WINDOW_MS * 2 + 1,
+      ).toISOString(),
+    );
     expect(useQuestOS.getState().myQuests[slugs[0]].stepsDone).toEqual([
       "scripture",
     ]);
