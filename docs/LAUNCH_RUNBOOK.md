@@ -43,7 +43,7 @@ Vercel deployments. A Preview build is never the production artifact.
 | Staging rehearsal deployment | `[IMMUTABLE PREVIEW DEPLOYMENT URL]` | Vercel inspection showing the release SHA and confirmed staging Supabase pair: `[EVIDENCE URL]` | OPEN |
 | Staged production candidate | `[IMMUTABLE PRODUCTION-ENVIRONMENT DEPLOYMENT URL]` | Same release SHA; Production Supabase pair and other masked Production environment posture; custom domains not yet assigned: `[EVIDENCE URL]` | OPEN |
 | Production URL after promotion | Canonical `https://www.biblequest.co`; apex redirects to `www` | DNS/TLS, redirect, metadata, Supabase Site URL/callback, and Vercel `NEXT_PUBLIC_APP_URL`: `[EVIDENCE URL]` | OPEN |
-| Database migration set | Exact `0001`–`0012` and `0014`–`0030`; `0013` must remain absent and immutable `0014` must retain its pinned hash; record and verify the checked-in 29-file SHA-256 manifest at freeze | Local, staging, and production migration lists: `[EVIDENCE URLS]` | OPEN |
+| Database migration set | Exact `0001`–`0012` and `0014`–`0032`; `0013` must remain absent and immutable `0014` must retain its pinned hash; record and verify the checked-in 31-file SHA-256 manifest at freeze | Local, staging, and production migration lists: `[EVIDENCE URLS]` | OPEN |
 | Production backup | `[UTC TIMESTAMP]`; method `[DAILY BACKUP / PITR / OTHER]`; restore point `[ID WITHOUT CREDENTIALS]` | Provider backup record: `[RESTRICTED EVIDENCE URL]` | OPEN |
 | Previous known-good deployment | `[IMMUTABLE VERCEL DEPLOYMENT URL]`, commit `[SHA]` | Rollback rehearsal and PWA/privacy checks: `[EVIDENCE URL]` | OPEN |
 | Database compatibility decision | `[BACKWARD COMPATIBLE / APP FIRST / DB FIRST / ROLLBACK RESTRICTED]` | Signed decision: `[EVIDENCE URL]` | OPEN |
@@ -91,6 +91,8 @@ Expected filenames, in order:
 0028_stripe_lifetime_plus.sql
 0029_user_row_size_and_trigger_privileges.sql
 0030_operator_plus_grants.sql
+0031_stripe_subscription_conflict_key.sql
+0032_stripe_dispute_signal_prefix.sql
 ```
 
 The immutable `0014_journey_event_identity.sql` SHA-256 must remain:
@@ -271,8 +273,8 @@ billing, legal, monitoring, and rollback gates remain mandatory in both tracks.
 | Gate | Pass evidence required | Owner | No-go / recovery action | Status |
 | --- | --- | --- | --- | --- |
 | Account launch posture | Exactly one track is selected. Enabled requires every active auth/sync gate below. Guest-only requires the frozen source's `ACCOUNT_SYNC_CONTAINED` constant to be `true`; `/api/health` reports `guest-only`; customer enrollment, sign-in, and account-action controls are absent (a status-only containment notice/page is allowed); customer callback code/token exchange, middleware session refresh, and browser sync/client creation are no-ops; clean and upgraded customer browsers show no Supabase Auth, session-refresh, user-table, or sync-RPC network traffic; the separately allowlisted operator console is tested as a private surface; the complete local-first core loop, persistence, export/clear, offline/reconnect, and PWA update pass; the named account posture owner and rollback authority accept the evidence and residual cached-client risk | Account posture + QA + rollback authority | Hold or roll back on a customer posture mismatch, visible customer account action, customer exchange/refresh/client creation, customer-browser Supabase auth/sync request, local-data loss, or unaccepted residual client; use backend containment when a stale open client makes the browser latch insufficient | OPEN |
-| Migration history | Clean local reset; the checked-in 29-file manifest ends at `0030`, `0013` is absent, and immutable `0014` matches its pinned SHA; staging and production migration lists are captured and mapped to the reviewed forward-only production versions; the three guarded production checks verify the exact legacy history, applied lifetime and 0029 packets, fresh backup, pinned hashes, and exact 0030 one-packet proposal | Database owner | Stop on any filename/hash/history mismatch or replay of renamed `0002`-`0006`; follow the forward-only reconciliation procedure; never use `--include-all`, normal production `db push`, or repair as a shortcut | OPEN |
-| RLS | Catalog report shows all 40 expected public tables with RLS enabled, only documented policies, correct roles, sealed avatar/push/billing/support/console/entitlement functions, and the account identity/generation/revision/row-size boundary through `0030` | Database owner | Stop application rollout; correct with a new higher-numbered migration and repeat all DB gates | OPEN |
+| Migration history | Clean local reset; the checked-in 31-file manifest ends at `0032`, `0013` is absent, and immutable `0014` matches its pinned SHA; staging and production migration lists are captured and mapped to the reviewed forward-only production versions; the guarded production checks verify the exact legacy history, applied lifetime and 0029 packets, fresh backup, pinned hashes, and exact reviewed `0030`–`0032` forward-only proposal | Database owner | Stop on any filename/hash/history mismatch or replay of renamed `0002`-`0006`; follow the forward-only reconciliation procedure; never use `--include-all`, normal production `db push`, or repair as a shortcut | OPEN |
+| RLS | Catalog report shows all 40 expected public tables with RLS enabled, only documented policies, correct roles, sealed avatar/push/billing/support/console/entitlement functions, and the account identity/generation/revision/row-size/billing-correction boundary through `0032` | Database owner | Stop application rollout; correct with a new higher-numbered migration and repeat all DB gates | OPEN |
 | Daily-quest CAS | In both tracks, all 59 local CAS/contract DB tests and deterministic client tests pass and the public posture RPC returns only the fixed contract identity plus `ok: true`. Enabled auth/sync additionally requires staging simultaneous-device, stale-revision, duplicate-retry, rollback, unpick, completion-durability, bounded-conflict, and old-cached-client evidence. Guest-only records those active client scenarios out of scope until enablement | Database + QA owners | Keep account rollout on hold for any overwrite, resurrection, completion loss, retry loop, RLS, contract, or cached-client failure; a guest-only launch may continue only if containment remains proven | OPEN |
 | Content mirror | After schema/RLS passes: regenerated seed/manifest have clean diffs and approved digests; seed dry run reports no pending migrations; production readiness proves exact natural-key/content hashes for 150 quests, 180 passages, 38 milestones, and 32/32 prompts | Database + content owners | Keep sync beta-gated; inspect mismatch totals and frozen artifacts; never reset production or paste ad hoc SQL from chat | OPEN |
 | Auth email and callback | Enabled auth/sync: custom SMTP DNS/provider verification passes; Supabase Site URL and exact callback use canonical `www`; new and existing users complete real Gmail/iCloud links cross-browser. Guest-only: record active email/provider/callback completion `OUT OF SCOPE — APPROVED GUEST-ONLY`; prove enrollment/sign-in actions are absent (status-only containment copy is allowed) and every callback form exits without exchange or session creation | Deploy + QA owners | Stop invitations; correct provider/template/canonical configuration and retest without exposing single-use tokens, or return to reviewed guest-only containment | OPEN |
@@ -342,7 +344,7 @@ command, timestamp, exit code, and summary against the frozen SHA. Do not upload
 | `pnpm audit --prod` | Full production advisory report is reviewed and linked; every advisory has a disposition |
 | `pnpm audit --prod --audit-level high` | Exit 0; no high or critical production advisory |
 | `git diff --check` | Exit 0; no whitespace errors |
-| `pnpm check:production-readiness` | After the approved production push: all public schema through `0030`, including account, avatar, push, billing, lifetime entitlement, support, console, row-size hardening, and audited operator Plus grants, plus content, health, metadata, and auth-provider checks pass; deployed controls and other manual gates remain separate |
+| `pnpm check:production-readiness` | After the approved production push: all public schema through `0032`, including account, avatar, push, billing, lifetime entitlement, support, console, row-size hardening, audited operator Plus grants, and the Stripe subscription/dispute corrections, plus content, health, metadata, and auth-provider checks pass; deployed controls and other manual gates remain separate |
 
 The repository currently has no Markdown or link-check script in `package.json`.
 If one is added before freeze, it becomes required and its exact command and
@@ -364,7 +366,7 @@ docker exec -i supabase_db_BibleQuest \
   < supabase/evidence/rls_policy_report.sql
 ```
 
-Pass means all twenty-nine checked-in migrations apply in the documented order,
+Pass means all thirty-one checked-in migrations apply in the documented order,
 with `0013` absent and immutable `0014` matching its pinned SHA. Analytics
 consent defaults to and is reset to explicit opt-in (`false`) by `0009`, the
 rolling/recent-verse schema from `0010` exists, the Bible preference and
@@ -374,7 +376,7 @@ the daily-quest CAS/legacy compatibility contract from `0015` passes, the
 mutable-write, identity, generation, server-revision, and account-deletion
 boundaries from `0016` through `0022` pass, and the private avatar, push,
 billing, lifetime entitlement, one-time support, console, row-size, and operator
-Plus boundaries from `0023` through `0030` pass. Every
+Plus and Stripe correction boundaries from `0023` through `0032` pass. Every
 content-free public posture RPC reports the fixed contract identity and
 `ok: true`, and the report meets the 40-table RLS gate. Supabase CLI and
 a Docker-compatible daemon are required.
@@ -382,7 +384,7 @@ a Docker-compatible daemon are required.
 For a linked project, retain every history/RLS safeguard in the security
 runbook and follow the seed/auth/content sequence in
 [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md). The reviewed dry run must
-match the frozen manifest and end at `0030`; a column probe alone is not
+match the frozen manifest and end at `0032`; a column probe alone is not
 migration-history evidence.
 
 ### Immutable deployment checks
@@ -528,7 +530,7 @@ restores.
    - Checkpoint: production-targeted migration, RLS/grant, CAS posture, and
      anonymous-denial portions of E04/E05/E06 become PASS; no staging result is
      relabeled as production evidence; the linked migration list has no pending
-     version through `0030`. Do not continue to content until this passes.
+     version through `0032`. Do not continue to content until this passes.
    - Abort: any command error, unexpected row effect, RLS failure, privacy,
      auth, or sync regression. `0009` deliberately resets existing analytics
      consent to `false`; `0010` backfills/deduplicates data; `0011` changes
@@ -537,7 +539,8 @@ restores.
      revisions plus installs CAS/legacy triggers; `0016`–`0022` harden mutable
      sync, identity/generation/revision ordering, and account deletion; and
      `0023`–`0030` add sealed avatar, push, recurring/lifetime billing,
-     support, and console boundaries.
+     support, and console boundaries; `0031`–`0032` correct the Stripe
+     subscription conflict key and dispute-signal prefix.
      Capture failures and stop rather than attempting an ad hoc reversal.
 7. **Apply the approved content seed.** Regenerate the seed, require
    `git diff --exit-code -- supabase/seed.sql supabase/seed-manifest.json`,
@@ -699,7 +702,8 @@ adds daily-quest revisions/CAS and legacy tracking; `0016`–`0019` harden the
 mutable account sync boundary; and `0020`–`0022` harden self-service,
 generation-bound account deletion. `0023`–`0030` add private avatar storage,
 encrypted push state, recurring/lifetime billing projection, one-time support
-records, and the private console foundation.
+records, and the private console foundation. `0031`–`0032` correct the Stripe
+subscription conflict key and dispute-signal prefix.
 The reviewed seed upserts public content. An app rollback does not undo any
 of those row or schema changes. If verification fails, create a new
 higher-numbered reviewed corrective migration; never delete/edit an applied
