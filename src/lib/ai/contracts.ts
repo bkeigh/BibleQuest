@@ -12,11 +12,40 @@ import {
 
 export const MY_SHEPHERD_MAX_QUESTION_LENGTH = 400;
 
+export const MY_SHEPHERD_DESTINATIONS = [
+  "home",
+  "quests",
+  "bible",
+  "prayer",
+  "reflections",
+  "journey",
+  "games",
+  "guided",
+  "pilgrimages",
+  "rhythm",
+  "settings",
+] as const;
+
+export type MyShepherdDestination =
+  (typeof MY_SHEPHERD_DESTINATIONS)[number];
+
+export interface MyShepherdAppAction {
+  destination: MyShepherdDestination;
+  label: string;
+}
+
 export interface MyShepherdAnswer {
   answer: string;
   scriptureReferences: string[];
   nextStep: string;
   safetyNote: string | null;
+  /** Optional navigation is limited to a closed list of safe app destinations. */
+  appAction: MyShepherdAppAction | null;
+}
+
+export interface MyShepherdRequest {
+  question: string;
+  currentPath: string | null;
 }
 
 /** Accepts only the small, non-sensitive preference shape used by quest matching. */
@@ -61,10 +90,13 @@ export function parseQuestGenerationInput(
   return { category, duration, focus, variation };
 }
 
-/** Trims one bounded question and rejects object-shaped or oversized input. */
-export function parseMyShepherdQuestion(value: unknown): string | null {
+/** Accepts one bounded question and an optional non-sensitive app route. */
+export function parseMyShepherdRequest(
+  value: unknown,
+): MyShepherdRequest | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const question = (value as Record<string, unknown>).question;
+  const input = value as Record<string, unknown>;
+  const question = input.question;
   if (typeof question !== "string") return null;
   const trimmed = question.trim();
   if (
@@ -73,7 +105,18 @@ export function parseMyShepherdQuestion(value: unknown): string | null {
   ) {
     return null;
   }
-  return trimmed;
+  const currentPath =
+    typeof input.currentPath === "string" &&
+    input.currentPath.length <= 120 &&
+    /^\/app(?:\/[a-z0-9-]+){0,4}$/.test(input.currentPath)
+      ? input.currentPath
+      : null;
+  return { question: trimmed, currentPath };
+}
+
+/** Preserves the original one-question parser for existing clients and tests. */
+export function parseMyShepherdQuestion(value: unknown): string | null {
+  return parseMyShepherdRequest(value)?.question ?? null;
 }
 
 /** Stops immediate danger and self-harm requests before any model is called. */
@@ -102,5 +145,6 @@ export function immediateSafetyAnswer(): MyShepherdAnswer {
       "Tell a trusted person nearby what is happening and ask them to stay with you.",
     safetyNote:
       "MyShepherd is not emergency, crisis, medical, or mental-health care.",
+    appAction: null,
   };
 }

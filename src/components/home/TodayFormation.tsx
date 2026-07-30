@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import Image from "next/image";
+import { useMemo, useRef, useState } from "react";
 import { guidedScriptureForDate } from "@/data/guided/content";
 import { getDailyGameSnapshot } from "@/lib/games/daily-status";
 import { GREEN_FEATURES } from "@/lib/features/green";
@@ -13,21 +14,38 @@ import { useQuestOS } from "@/lib/questos/store";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import {
+  IconArrowLeft,
   IconArrowRight,
   IconClock,
 } from "@/components/design-system/icons";
+import { HomeSectionHeading } from "@/components/home/HomeSectionHeading";
+import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 
 type FormationSection = "all" | "guide" | "game";
+
+const GAME_ART = {
+  today: "/art/scripture-games-today.webp",
+  comingOne: "/art/scripture-games-coming-1.webp",
+  comingTwo: "/art/scripture-games-coming-2.webp",
+} as const;
 
 /** Renders the requested daily formation sections without changing their progress model. */
 export function TodayFormation({
   dayKey,
   show = "all",
+  afterGuide,
 }: {
   dayKey: string;
   show?: FormationSection;
+  afterGuide?: React.ReactNode;
 }) {
   const guide = useMemo(() => guidedScriptureForDate(dayKey), [dayKey]);
+  const shouldReduceMotion = useShouldReduceMotion();
+  const gameRailRef = useRef<HTMLDivElement>(null);
+  const [gameRailEdges, setGameRailEdges] = useState({
+    atStart: true,
+    atEnd: false,
+  });
   const guideKey = useMemo(
     () => makeGuidedSessionKey("daily", guide.id, dayKey),
     [dayKey, guide.id],
@@ -55,31 +73,52 @@ export function TodayFormation({
     GREEN_FEATURES.guidedScripture && (show === "all" || show === "guide");
   const showGame = Boolean(game) && (show === "all" || show === "game");
 
+  // Scrolls by most of one viewport so the following card stays recognizable.
+  function scrollGameRail(direction: -1 | 1) {
+    const rail = gameRailRef.current;
+    if (!rail) return;
+    rail.scrollBy({
+      left: direction * Math.max(240, rail.clientWidth * 0.82),
+      behavior: shouldReduceMotion ? "auto" : "smooth",
+    });
+  }
+
+  // Keeps the arrow states truthful for buttons, touch, mouse, and trackpads.
+  function updateGameRailEdges() {
+    const rail = gameRailRef.current;
+    if (!rail) return;
+    const next = {
+      atStart: rail.scrollLeft <= 2,
+      atEnd:
+        rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 2,
+    };
+    setGameRailEdges((current) =>
+      current.atStart === next.atStart &&
+      current.atEnd === next.atEnd
+        ? current
+        : next,
+    );
+  }
+
   return (
     <>
       {showGuide && (
         <section aria-labelledby="guided-scripture-home-title">
-          <div className="mb-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-1">
-            <div className="flex shrink-0 items-baseline gap-x-2 whitespace-nowrap sm:gap-x-3">
-              <h2
-                id="guided-scripture-home-title"
-                className="font-pixel text-[1.25rem] uppercase tracking-[0.05em] text-accent"
-              >
-                Guided Scripture
-              </h2>
-              <p className="text-[0.625rem] uppercase tracking-[0.08em] text-ash sm:text-caption sm:tracking-[0.12em]">
-                Read slowly
-              </p>
-            </div>
-            {GREEN_FEATURES.pilgrimages && (
-              <Link
-                href="/app/pilgrimages"
-                className="inline-flex min-h-12 items-center px-1 text-caption font-medium text-accent"
-              >
-                Pilgrimages
-              </Link>
-            )}
-          </div>
+          <HomeSectionHeading
+            id="guided-scripture-home-title"
+            title="Guided Scripture"
+            subtitle="Read slowly"
+            action={
+              GREEN_FEATURES.pilgrimages ? (
+                <Link
+                  href="/app/pilgrimages"
+                  className="inline-flex min-h-11 items-center px-1 text-caption font-medium text-accent"
+                >
+                  Pilgrimages
+                </Link>
+              ) : null
+            }
+          />
           <Link href="/app/guided/daily" className="block">
             <PaperCard
               interactive
@@ -120,60 +159,191 @@ export function TodayFormation({
               </div>
             </PaperCard>
           </Link>
+          {afterGuide && <div className="mt-4">{afterGuide}</div>}
         </section>
       )}
 
       {showGame && game && (
         <section aria-labelledby="scripture-games-home-title">
-          <div className="mb-2.5 flex items-baseline gap-x-2 whitespace-nowrap px-1 sm:gap-x-3">
-            <h2
-              id="scripture-games-home-title"
-              className="font-pixel text-[1.25rem] uppercase tracking-[0.05em] text-accent"
+          <HomeSectionHeading
+            id="scripture-games-home-title"
+            title="Scripture Games"
+            subtitle="Learn by playing"
+            action={
+              <span className="hidden text-caption font-medium text-ash sm:inline">
+                Scroll to explore →
+              </span>
+            }
+          />
+          <div className="relative">
+            {/* The rail previews future game space without presenting unfinished actions. */}
+            <div
+              ref={gameRailRef}
+              role="list"
+              aria-label="Scripture games"
+              onScroll={updateGameRailEdges}
+              className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
-              Scripture Games
-            </h2>
-            <p className="text-[0.625rem] uppercase tracking-[0.08em] text-ash sm:text-caption sm:tracking-[0.12em]">
-              Learn by playing
-            </p>
-          </div>
-          <Link href="/app/games" className="block">
-            <PaperCard
-              interactive
-              variant="paper"
-              padding="md"
-              className="h-full min-h-48"
-            >
-              <div className="flex items-start gap-3">
-                <PixelIcon
-                  name={game.kind === "connections" ? "links" : "path"}
-                  size={4}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-caption uppercase tracking-[0.1em] text-accent">
-                    Today’s game
-                  </p>
-                  <h3 className="mt-1 font-display text-[1.25rem] leading-tight text-graphite">
-                    {game.title}
-                  </h3>
-                  <p className="mt-2 line-clamp-2 text-small leading-relaxed text-charcoal">
-                    {game.description}
-                  </p>
-                  {/* Keep timing and action visually separate at every width. */}
-                  <div className="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="inline-flex items-center gap-1.5 text-caption text-ash">
-                      <IconClock size={14} /> About {game.estimatedMinutes}{" "}
-                      minutes · no timer
-                    </p>
-                    <span className="inline-flex min-h-12 items-center gap-1.5 rounded-[10px] bg-linen px-4 py-2 text-small font-medium text-accent ring-1 ring-mist">
-                      {gameAction} <IconArrowRight size={14} />
-                    </span>
-                  </div>
-                </div>
+              <div
+                role="listitem"
+                className="w-[88%] shrink-0 snap-start sm:w-[72%]"
+              >
+                <Link
+                  href="/app/games"
+                  className="group block rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  <ScriptureGameCard
+                    image={GAME_ART.today}
+                    eyebrow="Today’s game"
+                    title={game.title}
+                    description={game.description}
+                    icon={game.kind === "connections" ? "links" : "path"}
+                    footer={
+                      <>
+                        <span className="inline-flex items-center gap-1.5">
+                          <IconClock size={14} /> About {game.estimatedMinutes}{" "}
+                          minutes
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 font-medium text-white">
+                          {gameAction} <IconArrowRight size={14} />
+                        </span>
+                      </>
+                    }
+                  />
+                </Link>
               </div>
-            </PaperCard>
-          </Link>
+              <div
+                role="listitem"
+                className="w-[82%] shrink-0 snap-start sm:w-[66%]"
+              >
+                <ScriptureGameCard
+                  image={GAME_ART.comingOne}
+                  eyebrow="Game preview"
+                  title="Seven Days Match"
+                  description="Match three, answer a Bible question, and open the next level across creation’s seven-day story."
+                  icon="crown"
+                  footer={
+                    <>
+                      <span>7 chapters · 7 levels each</span>
+                      <span className="font-medium text-white">
+                        Genesis 1:1
+                      </span>
+                    </>
+                  }
+                  muted
+                />
+              </div>
+              <div
+                role="listitem"
+                className="w-[82%] shrink-0 snap-start sm:w-[66%]"
+              >
+                <ScriptureGameCard
+                  image={GAME_ART.comingTwo}
+                  eyebrow="Game preview"
+                  title="Miracle Journey"
+                  description="Place Gospel moments in order and follow the disciples through seven story scenes."
+                  icon="open-book"
+                  footer={
+                    <>
+                      <span>Story path · 7 scenes</span>
+                      <span className="font-medium text-white">
+                        Matthew 14:22–33
+                      </span>
+                    </>
+                  }
+                  muted
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => scrollGameRail(-1)}
+              disabled={gameRailEdges.atStart}
+              aria-label="Previous Scripture game"
+              className="absolute -left-3 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-paper/90 text-accent paper-shadow backdrop-blur-md transition-opacity disabled:pointer-events-none disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:-left-5"
+            >
+              <IconArrowLeft size={17} />
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollGameRail(1)}
+              disabled={gameRailEdges.atEnd}
+              aria-label="Next Scripture game"
+              className="absolute -right-3 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-paper/90 text-accent paper-shadow backdrop-blur-md transition-opacity disabled:pointer-events-none disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:-right-5"
+            >
+              <IconArrowRight size={17} />
+            </button>
+          </div>
         </section>
       )}
     </>
+  );
+}
+
+/** Layers readable game information over one scene from the Instagram art set. */
+function ScriptureGameCard({
+  image,
+  eyebrow,
+  title,
+  description,
+  icon,
+  footer,
+  muted = false,
+}: {
+  image: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+  icon: Parameters<typeof PixelIcon>[0]["name"];
+  footer?: React.ReactNode;
+  muted?: boolean;
+}) {
+  return (
+    <PaperCard
+      interactive={!muted}
+      variant="paper"
+      padding="none"
+      className="relative isolate flex min-h-[17rem] overflow-hidden"
+    >
+      <Image
+        src={image}
+        alt=""
+        fill
+        sizes="(max-width: 640px) 88vw, 34rem"
+        className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+      />
+      <span
+        aria-hidden="true"
+        className="absolute inset-0 bg-gradient-to-t from-[#071813]/95 via-[#102b22]/70 to-black/10"
+      />
+      {muted && (
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 bg-graphite/15"
+        />
+      )}
+      <div className="relative z-10 mt-auto w-full p-5 text-white">
+        <div className="flex items-center gap-2">
+          <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white/12 ring-1 ring-white/25 backdrop-blur-sm">
+            <PixelIcon name={icon} size={4} />
+          </span>
+          <p className="text-caption font-medium uppercase tracking-[0.12em] text-white/80">
+            {eyebrow}
+          </p>
+        </div>
+        <h3 className="mt-3 max-w-[18ch] font-pixel text-[2rem] leading-[0.95] tracking-[0.03em] text-white min-[390px]:text-[2.125rem]">
+          {title}
+        </h3>
+        <p className="mt-2 max-w-[42ch] text-small leading-relaxed text-white/80">
+          {description}
+        </p>
+        {footer && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-caption text-white/75">
+            {footer}
+          </div>
+        )}
+      </div>
+    </PaperCard>
   );
 }

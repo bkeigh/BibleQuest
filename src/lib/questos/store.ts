@@ -97,6 +97,8 @@ function normalizeAppearanceSettings(
   return {
     ...appearance,
     glassOpacity: normalizeGlassOpacity(appearance.glassOpacity),
+    myShepherdFloatingButton:
+      appearance.myShepherdFloatingButton === true,
   };
 }
 

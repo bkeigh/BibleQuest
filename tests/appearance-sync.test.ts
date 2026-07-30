@@ -17,17 +17,22 @@ import {
 } from "@/lib/sync/engine";
 
 describe("device-local profile and appearance sync", () => {
-  it("keeps this device's opacity while adopting an account profile", () => {
+  it("keeps device-only appearance while adopting an account profile", () => {
     const local = emptySnapshot();
     local.settings.appearance.glassOpacity = 23;
+    local.settings.appearance.myShepherdFloatingButton = true;
 
     const remote = currentSnapshot();
     remote.settings.appearance.glassOpacity = 88;
+    remote.settings.appearance.myShepherdFloatingButton = false;
 
     const merged = mergeSnapshots(local, remote);
 
     expect(merged.profile?.onboardingCompleted).toBe(true);
     expect(merged.settings.appearance.glassOpacity).toBe(23);
+    expect(
+      merged.settings.appearance.myShepherdFloatingButton,
+    ).toBe(true);
   });
 
   it("keeps a saved profile photo visible while adopting account profile data", () => {

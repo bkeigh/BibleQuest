@@ -311,6 +311,11 @@ export function parseSnapshot(rawText: string): ParseResult {
       if (typeof appearance.glassSurfaces !== "boolean") {
         delete appearance.glassSurfaces;
       }
+      if (
+        typeof appearance.myShepherdFloatingButton !== "boolean"
+      ) {
+        delete appearance.myShepherdFloatingButton;
+      }
       // Keep valid backup preferences, but never let an imported file bypass
       // the same readability floor enforced by the Settings slider.
       if ("glassOpacity" in appearance) {

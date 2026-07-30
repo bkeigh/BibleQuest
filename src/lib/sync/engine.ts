@@ -1476,6 +1476,8 @@ async function reconcileRevisionedMutableSnapshot(
       wallpaperMode: local.settings.appearance.wallpaperMode,
       glassSurfaces: local.settings.appearance.glassSurfaces,
       glassOpacity: local.settings.appearance.glassOpacity,
+      myShepherdFloatingButton:
+        local.settings.appearance.myShepherdFloatingButton,
     },
   };
 
@@ -1648,6 +1650,8 @@ export function mergeSnapshots(
       wallpaperMode: local.settings.appearance.wallpaperMode,
       glassSurfaces: local.settings.appearance.glassSurfaces,
       glassOpacity: local.settings.appearance.glassOpacity,
+      myShepherdFloatingButton:
+        local.settings.appearance.myShepherdFloatingButton,
     },
   };
   // Privacy-first exception to local-wins: consent must be explicit on BOTH

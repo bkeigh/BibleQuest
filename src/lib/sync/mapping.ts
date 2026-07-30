@@ -673,6 +673,8 @@ export function rowsToSettings(
       wallpaperMode: d.appearance.wallpaperMode,
       glassSurfaces: d.appearance.glassSurfaces,
       glassOpacity: d.appearance.glassOpacity,
+      myShepherdFloatingButton:
+        d.appearance.myShepherdFloatingButton,
     },
     notifications: {
       dailyVerse: notifications?.daily_verse_enabled ?? d.notifications.dailyVerse,

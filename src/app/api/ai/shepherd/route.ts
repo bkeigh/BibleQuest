@@ -1,7 +1,7 @@
 import {
   immediateSafetyAnswer,
   isImmediateSafetyQuestion,
-  parseMyShepherdQuestion,
+  parseMyShepherdRequest,
 } from "@/lib/ai/contracts";
 import { answerWithMyShepherd } from "@/lib/ai/anthropic.server";
 import { requireServerPlus } from "@/lib/billing/plus-entitlement.server";
@@ -34,17 +34,20 @@ export async function POST(request: Request) {
   } catch {
     return privateError("invalid_request", 400);
   }
-  const question = parseMyShepherdQuestion(input);
-  if (!question) return privateError("invalid_request", 400);
-  if (isImmediateSafetyQuestion(question)) {
+  const parsed = parseMyShepherdRequest(input);
+  if (!parsed) return privateError("invalid_request", 400);
+  if (isImmediateSafetyQuestion(parsed.question)) {
     return Response.json(immediateSafetyAnswer(), {
       headers: { "Cache-Control": "private, no-store" },
     });
   }
   try {
-    return Response.json(await answerWithMyShepherd(question), {
-      headers: { "Cache-Control": "private, no-store" },
-    });
+    return Response.json(
+      await answerWithMyShepherd(parsed.question, parsed.currentPath),
+      {
+        headers: { "Cache-Control": "private, no-store" },
+      },
+    );
   } catch {
     return privateError("provider_unavailable", 503);
   }

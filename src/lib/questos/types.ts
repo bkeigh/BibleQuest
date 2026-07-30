@@ -574,6 +574,8 @@ export interface AppearanceSettings {
   glassSurfaces: boolean;
   /** Visible material opacity percentage; clamped to 15–100 for legibility. */
   glassOpacity: number;
+  /** Device-local Plus preference for the app-wide MyShepherd launcher. */
+  myShepherdFloatingButton: boolean;
 }
 
 /**
@@ -639,6 +641,7 @@ export const DEFAULT_SETTINGS: Settings = {
     wallpaperMode: "still",
     glassSurfaces: true,
     glassOpacity: DEFAULT_GLASS_OPACITY,
+    myShepherdFloatingButton: false,
   },
   language: "en",
   preferredBibleTranslation: DEFAULT_BIBLE_TRANSLATION_KEY,

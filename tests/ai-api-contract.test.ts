@@ -30,6 +30,7 @@ describe("Plus AI API boundary", () => {
     expect(combined).not.toContain("@/lib/questos/store");
     expect(combined).not.toContain("journal");
     expect(combined).not.toContain("reflection");
-    expect(provider).toContain('messages: [{ role: "user"');
+    expect(provider).toContain("myShepherdPrompt(question, currentPath)");
+    expect(provider).not.toContain("conversationHistory");
   });
 });

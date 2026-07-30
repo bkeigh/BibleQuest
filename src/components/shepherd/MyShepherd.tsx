@@ -10,6 +10,7 @@ import { usePlus } from "@/lib/billing/usePlus";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
+import { MyShepherdResponse } from "@/components/shepherd/MyShepherdResponse";
 
 const STARTERS = [
   "What does grace mean in the Bible?",
@@ -44,7 +45,10 @@ export function MyShepherd() {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: trimmed }),
+        body: JSON.stringify({
+          question: trimmed,
+          currentPath: window.location.pathname,
+        }),
       });
       if (!response.ok) {
         setError(errorMessage(response.status));
@@ -170,45 +174,7 @@ export function MyShepherd() {
 
       {answer && (
         <PaperCard as="section" variant="paper" padding="lg" aria-live="polite">
-          <p className="text-caption font-medium uppercase tracking-[0.08em] text-accent">
-            Study companion response
-          </p>
-          <div className="mt-3 space-y-3 text-body leading-relaxed text-charcoal">
-            {answer.answer
-              .split(/\n{2,}/)
-              .filter(Boolean)
-              .map((paragraph) => (
-                <p key={paragraph}>{paragraph}</p>
-              ))}
-          </div>
-          {answer.scriptureReferences.length > 0 && (
-            <div className="mt-5">
-              <h2 className="text-small font-medium text-graphite">
-                Passages to open
-              </h2>
-              <ul className="mt-2 flex flex-wrap gap-2">
-                {answer.scriptureReferences.map((reference) => (
-                  <li
-                    key={reference}
-                    className="rounded-full bg-accent-surface px-3 py-1.5 text-caption text-accent-ink"
-                  >
-                    {reference}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <div className="mt-5 rounded-[var(--radius-button)] bg-linen px-4 py-3">
-            <p className="text-caption font-medium text-accent">A next step</p>
-            <p className="mt-1 text-small leading-relaxed text-charcoal">
-              {answer.nextStep}
-            </p>
-          </div>
-          {answer.safetyNote && (
-            <p className="mt-4 text-small leading-relaxed text-ash">
-              {answer.safetyNote}
-            </p>
-          )}
+          <MyShepherdResponse answer={answer} />
         </PaperCard>
       )}
 

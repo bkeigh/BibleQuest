@@ -2,7 +2,10 @@ import "server-only";
 
 import Anthropic from "@anthropic-ai/sdk";
 import { jsonSchemaOutputFormat } from "@anthropic-ai/sdk/helpers/json-schema";
-import type { MyShepherdAnswer } from "./contracts";
+import {
+  MY_SHEPHERD_DESTINATIONS,
+  type MyShepherdAnswer,
+} from "./contracts";
 import {
   MY_SHEPHERD_SYSTEM_PROMPT,
   myShepherdPrompt,
@@ -85,6 +88,7 @@ export async function selectReviewedQuestWithHaiku(
 /** Produces one non-persistent, structured study response within hard limits. */
 export async function answerWithMyShepherd(
   question: string,
+  currentPath: string | null = null,
 ): Promise<MyShepherdAnswer> {
   const { client: anthropic, model } = anthropicClient();
   const format = jsonSchemaOutputFormat({
@@ -103,12 +107,30 @@ export async function answerWithMyShepherd(
           { type: "null" },
         ],
       },
+      appAction: {
+        anyOf: [
+          {
+            type: "object",
+            properties: {
+              destination: {
+                type: "string",
+                enum: [...MY_SHEPHERD_DESTINATIONS],
+              },
+              label: { type: "string", minLength: 1, maxLength: 60 },
+            },
+            required: ["destination", "label"],
+            additionalProperties: false,
+          },
+          { type: "null" },
+        ],
+      },
     },
     required: [
       "answer",
       "scriptureReferences",
       "nextStep",
       "safetyNote",
+      "appAction",
     ],
     additionalProperties: false,
   });
@@ -116,7 +138,9 @@ export async function answerWithMyShepherd(
     model,
     max_tokens: 650,
     system: MY_SHEPHERD_SYSTEM_PROMPT,
-    messages: [{ role: "user", content: myShepherdPrompt(question) }],
+    messages: [
+      { role: "user", content: myShepherdPrompt(question, currentPath) },
+    ],
     output_config: { format },
   });
   const parsed = message.parsed_output as MyShepherdAnswer | null;
@@ -125,7 +149,12 @@ export async function answerWithMyShepherd(
     typeof parsed.answer !== "string" ||
     !Array.isArray(parsed.scriptureReferences) ||
     typeof parsed.nextStep !== "string" ||
-    (parsed.safetyNote !== null && typeof parsed.safetyNote !== "string")
+    (parsed.safetyNote !== null && typeof parsed.safetyNote !== "string") ||
+    (parsed.appAction !== null &&
+      (!MY_SHEPHERD_DESTINATIONS.includes(
+        parsed.appAction.destination,
+      ) ||
+        typeof parsed.appAction.label !== "string"))
   ) {
     throw new Error("Anthropic guide response was invalid.");
   }
@@ -138,5 +167,11 @@ export async function answerWithMyShepherd(
       .slice(0, 4),
     nextStep: parsed.nextStep.trim().slice(0, 240),
     safetyNote: parsed.safetyNote?.trim().slice(0, 300) || null,
+    appAction: parsed.appAction
+      ? {
+          destination: parsed.appAction.destination,
+          label: parsed.appAction.label.trim().slice(0, 60),
+        }
+      : null,
   };
 }

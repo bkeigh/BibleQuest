@@ -63,6 +63,7 @@ import { WallpaperPicker } from "@/components/settings/WallpaperPicker";
 import { ExplorePlusLink } from "@/components/plus/ExplorePlusLink";
 import { SupportLink } from "@/components/plus/SupportLink";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
+import { usePlus } from "@/lib/billing/usePlus";
 import {
   MAX_GLASS_OPACITY,
   MIN_GLASS_OPACITY,
@@ -736,6 +737,7 @@ function BibleTranslationPicker({
 function SettingsInner() {
   const router = useRouter();
   const { toast } = useToast();
+  const { isPlus } = usePlus();
   // Signed-in clears/restores must also purge the account copy, or the next
   // initial sync merges it straight back (see lib/sync/engine.ts).
   const { user, loading: sessionLoading } = useSession();
@@ -1177,6 +1179,28 @@ function SettingsInner() {
         <SectionTitle>Plus</SectionTitle>
         <div className="space-y-3">
           <ExplorePlusLink description="Discover every wallpaper and extra ways to deepen your daily practice." />
+          {isPlus && (
+            <PaperCard variant="paper" padding="none" className="px-4">
+              <div className="flex items-center justify-between gap-4 py-3.5">
+                <span className="min-w-0">
+                  <span className="block text-[0.9375rem] text-charcoal">
+                    Floating MyShepherd
+                  </span>
+                  <span className="mt-0.5 block text-caption leading-relaxed text-ash">
+                    Keep a small Scripture assistant available throughout the
+                    app.
+                  </span>
+                </span>
+                <Toggle
+                  label="Floating MyShepherd"
+                  on={appearance.myShepherdFloatingButton}
+                  onChange={(myShepherdFloatingButton) =>
+                    setAppearance({ myShepherdFloatingButton })
+                  }
+                />
+              </div>
+            </PaperCard>
+          )}
           <SupportLink />
         </div>
 

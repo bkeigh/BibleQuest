@@ -50,8 +50,27 @@ ${JSON.stringify(options)}`;
 }
 
 /** Clearly delimits untrusted user text beneath the fixed pastoral rules. */
-export function myShepherdPrompt(question: string): string {
-  return `Answer the question in 2–4 short paragraphs. Then give up to four Bible references and one gentle next step. Do not quote verses unless exact wording was supplied, and do not claim a reference proves God's private will.
+export function myShepherdPrompt(
+  question: string,
+  currentPath: string | null = null,
+): string {
+  return `Answer the question in 2–4 short paragraphs. Then give up to four Bible references and one gentle next step. Use full canonical book names in Bible references so BibleQuest can open them. Do not quote verses unless exact wording was supplied, and do not claim a reference proves God's private will.
+
+You may suggest at most one navigation action from this closed BibleQuest destination list:
+- home: daily overview
+- quests: browse practical formation quests
+- bible: browse or search Scripture
+- prayer: write a private prayer
+- reflections: review or write reflections
+- journey: see growth and milestones
+- games: play Scripture games
+- guided: open today's guided Scripture
+- pilgrimages: browse multi-day guided practices
+- rhythm: manage a weekly practice rhythm
+- settings: change app preferences
+
+Use appAction only when opening a destination directly supports the answer. Never claim access to private prayers, reflections, profile details, or app history.
+Current app route: ${JSON.stringify(currentPath ?? "unknown")}
 
 The untrusted user question is encoded as one JSON string:
 ${JSON.stringify(question)}`;
