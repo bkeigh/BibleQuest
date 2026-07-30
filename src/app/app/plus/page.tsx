@@ -6,7 +6,10 @@ export const metadata = { title: "Plus" };
 export default function PlusPage() {
   return (
     <>
-      <PageHeader title="Plus & Patron" subtitle="Free stays whole. Plus goes deeper." />
+      <PageHeader
+        title="Plus & Patron"
+        subtitle="The core experience stays whole. Plus goes deeper."
+      />
       <PageContainer className="pb-8">
         <PlusContent />
       </PageContainer>

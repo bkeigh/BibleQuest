@@ -7,7 +7,6 @@
  */
 import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
 import {
-  DEFAULT_WALLPAPER_ID,
   type WallpaperId,
 } from "@/lib/wallpapers/catalog";
 import { DEFAULT_GLASS_OPACITY } from "@/lib/glass-opacity";
@@ -636,7 +635,7 @@ export const DEFAULT_SETTINGS: Settings = {
     reducedMotion: false,
     textSize: "default",
     boldText: false,
-    wallpaperId: DEFAULT_WALLPAPER_ID,
+    wallpaperId: "none",
     wallpaperMode: "still",
     glassSurfaces: true,
     glassOpacity: DEFAULT_GLASS_OPACITY,

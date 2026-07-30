@@ -28,10 +28,10 @@ const PLUS_FEATURES = [
   "Additional reviewed guided pilgrimages",
   "The Scripture game archive and visual themes",
   "Up to three rhythms with a busy-day fallback",
-  "The full still and live wallpaper collection",
+  "Every still and live wallpaper",
   "Find a reviewed quest by focus, category, and time",
   "Private, on-device recommendations that never read your journals",
-  "Support continued free access for the whole community",
+  "Support continued access for the whole community",
 ];
 
 /**
@@ -48,13 +48,13 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
         variant="card"
         label={
           <span className="text-[0.8125rem] uppercase tracking-[0.14em] text-accent">
-            Included for free
+            Always included
           </span>
         }
       >
         <p className="text-[0.9375rem] leading-relaxed text-charcoal">
           Your relationship with God is never paywalled. Scripture, prayer,
-          reflection, quests, and your journey are free and complete.
+          reflection, quests, and your journey remain available and complete.
         </p>
         <ul className="mt-4 grid gap-2 sm:grid-cols-2">
           {FREE_INCLUDES.map((f) => (
@@ -80,7 +80,7 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
         </h3>
         <p className="mt-2 text-[0.9375rem] leading-relaxed text-charcoal">
           Plus adds more room for quests and rhythms, more guided pilgrimage
-          paths, the Scripture game archive, and the full wallpaper collection.
+          paths, the Scripture game archive, and every wallpaper.
           It deepens the experience — it never decides how close you are to
           God.
         </p>
@@ -104,7 +104,7 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
             Support the mission
           </h3>
           <p className="mt-2 text-[0.9375rem] leading-relaxed text-charcoal">
-            Some people just want to help keep BibleQuest free for everyone.
+            Some people just want to help keep BibleQuest growing for everyone.
             One-time supporters get our gratitude — no spiritual perks, ever.
           </p>
           <GentleLink

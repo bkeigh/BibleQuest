@@ -40,6 +40,7 @@ import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { questBySlug } from "@/data/seed/quests";
 import { usePlus } from "@/lib/billing/usePlus";
 import { ExplorePlusLink } from "@/components/plus/ExplorePlusLink";
+import { SupportLink } from "@/components/plus/SupportLink";
 import { NewsletterLink } from "@/components/newsletter/NewsletterLink";
 import { profileAvatarMarker } from "@/lib/utils/avatar";
 import { cn } from "@/lib/utils/cn";
@@ -356,13 +357,17 @@ function HomeInner() {
             />
           </div>
 
-          <ExplorePlusLink
-            className="mt-1"
-            description="See every live wallpaper and the complete Plus experience."
-          />
+          {!isPlus && (
+            <ExplorePlusLink
+              className="mt-1"
+              description="See every wallpaper and the complete Plus experience."
+            />
+          )}
 
           <NewsletterLink />
 
+          {/* One-time support remains separate from membership and sits last. */}
+          <SupportLink />
         </div>
       </PageContainer>
     </div>

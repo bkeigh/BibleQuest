@@ -40,7 +40,7 @@ export function GamesArchiveScreen() {
       <PageContainer className="pb-8 pt-4">
         <GentleLink href="/app/games" variant="text" size="sm">
           <IconArrowLeft size={17} />
-          Today&apos;s free game
+          Today&apos;s game
         </GentleLink>
         {!GREEN_FEATURES.games ? (
           <PaperCard variant="quiet" padding="lg" className="mt-4">

@@ -81,7 +81,7 @@ export function RhythmTodayCard({
               Build a gentle weekly rhythm
             </span>
             <span className="mt-0.5 block text-caption text-ash">
-              Free includes one plan. Missing a day never counts against you.
+              One plan is included. Missing a day never counts against you.
             </span>
           </span>
           <IconChevronRight className="shrink-0 text-fog" />

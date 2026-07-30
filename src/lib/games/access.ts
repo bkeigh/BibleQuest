@@ -18,7 +18,7 @@ export function getGameAccess(
     return {
       allowed: true,
       reason: "free-today",
-      message: "Today’s complete game and learning card are free.",
+      message: "Today’s complete game and learning card are included.",
     };
   }
   if (isPlus) {
@@ -36,7 +36,7 @@ export function getGameAccess(
     reason: "plus-optional",
     message:
       surface === "archive"
-        ? "Today’s game stays free. Plus includes an optional archive for revisiting earlier studies."
-        : "Today’s game stays free. Plus includes optional themed collections.",
+        ? "Today’s game remains available. Plus includes an optional archive for revisiting earlier studies."
+        : "Today’s game remains available. Plus includes optional themed collections.",
   };
 }

@@ -53,7 +53,7 @@ function PilgrimageDetailInner({
 
       <PaperCard variant="atmospheric" padding="lg" className="mt-5">
         <p className="font-pixel text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
-          {pilgrimage.access === "plus" ? "Plus Pilgrimage" : "Free Pilgrimage"}
+          {pilgrimage.access === "plus" ? "Plus Pilgrimage" : "Pilgrimage"}
         </p>
         <h1 className="mt-2 font-display text-[2rem] leading-tight text-graphite">
           {pilgrimage.title}
@@ -93,8 +93,8 @@ function PilgrimageDetailInner({
           </h2>
           <p className="mt-2 text-[0.875rem] leading-relaxed text-ash">
             Core Scripture, prayer, reflection, and the complete Learning to
-            Remain Pilgrimage stay free. Plus adds this additional reviewed path
-            and supports future guided content.
+            Remain Pilgrimage remain available. Plus adds this additional
+            reviewed path and supports future guided content.
           </p>
           <GentleLink
             href="/app/plus"

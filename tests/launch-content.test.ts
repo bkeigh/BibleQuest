@@ -104,6 +104,32 @@ describe("launch content catalog", () => {
     expect(home).not.toContain("subscription.status");
   });
 
+  it("keeps Home membership-aware and ends with voluntary support", () => {
+    const home = readFileSync(
+      path.join(process.cwd(), "src/components/home/HomeScreen.tsx"),
+      "utf8",
+    );
+
+    expect(home).toContain("!isPlus &&");
+    expect(home).toContain("<ExplorePlusLink");
+    expect(home.indexOf("<SupportLink")).toBeGreaterThan(
+      home.indexOf("<NewsletterLink"),
+    );
+  });
+
+  it("keeps the generated quest panel evenly inset from its disclosure", () => {
+    const browse = readFileSync(
+      path.join(process.cwd(), "src/components/quests/QuestBrowse.tsx"),
+      "utf8",
+    );
+    const generator = browse.slice(
+      browse.indexOf('label="Generate a quest"'),
+      browse.indexOf("{/* Filters"),
+    );
+
+    expect(generator).toContain('contentClassName="pt-4"');
+  });
+
   it("keeps Bible verse taps semantic and history aligned with the shown edition", () => {
     const reader = readFileSync(
       path.join(process.cwd(), "src/components/bible/ChapterReader.tsx"),
@@ -168,7 +194,7 @@ describe("launch content catalog", () => {
 
     expect(plusContent).toContain("Unlimited active quest windows");
     expect(plusContent).toContain("Unlimited daily verse refreshes");
-    expect(plusContent).toContain("The full still and live wallpaper collection");
+    expect(plusContent).toContain("Every still and live wallpaper");
     expect(plusContent).toContain("never read your journals");
     expect(plusCta).toContain("formatBillingAmount(plan)");
     expect(plusCta).toContain(

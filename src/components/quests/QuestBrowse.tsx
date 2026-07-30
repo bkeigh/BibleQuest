@@ -463,6 +463,7 @@ function QuestBrowseInner() {
             ) : undefined
           }
           className="mt-6"
+          contentClassName="pt-4"
         >
           <QuestGenerator isPlus={isPlus} onAdd={handleAdd} />
         </Disclosure>

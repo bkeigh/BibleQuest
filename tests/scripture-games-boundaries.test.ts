@@ -90,7 +90,8 @@ describe("Scripture game product boundaries", () => {
 
   it("labels daily and archive game surfaces honestly", () => {
     const source = readFileSync("src/components/games/GameShell.tsx", "utf8");
-    expect(source).toContain("Today’s game · Free");
+    expect(source).toContain('"Today’s game"');
+    expect(source).not.toContain("Today’s game · Free");
     expect(source).toContain("Archive study · Plus");
     expect(
       readFileSync("src/components/games/ArchiveGameScreen.tsx", "utf8"),

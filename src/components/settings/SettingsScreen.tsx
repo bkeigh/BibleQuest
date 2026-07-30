@@ -1176,7 +1176,7 @@ function SettingsInner() {
 
         <SectionTitle>Plus</SectionTitle>
         <div className="space-y-3">
-          <ExplorePlusLink description="Discover the full wallpaper collection and extra ways to deepen your daily practice." />
+          <ExplorePlusLink description="Discover every wallpaper and extra ways to deepen your daily practice." />
           <SupportLink />
         </div>
 

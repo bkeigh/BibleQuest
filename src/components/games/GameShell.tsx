@@ -17,7 +17,7 @@ export function GameShell({
       <PaperCard variant="atmospheric" padding="lg">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="font-pixel text-[0.9375rem] uppercase tracking-[0.06em] text-accent">
-            {context === "today" ? "Today’s game · Free" : "Archive study · Plus"}
+            {context === "today" ? "Today’s game" : "Archive study · Plus"}
           </p>
           <p className="inline-flex items-center gap-1.5 text-caption text-ash">
             <IconClock size={16} />

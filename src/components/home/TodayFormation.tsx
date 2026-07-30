@@ -17,7 +17,7 @@ import {
   IconClock,
 } from "@/components/design-system/icons";
 
-/** Gives today's complete free guide visual priority over the lighter game. */
+/** Gives today's complete guide visual priority over the lighter game. */
 export function TodayFormation({ dayKey }: { dayKey: string }) {
   const guide = useMemo(() => guidedScriptureForDate(dayKey), [dayKey]);
   const guideKey = useMemo(
@@ -81,7 +81,7 @@ export function TodayFormation({ dayKey }: { dayKey: string }) {
                 <PixelIcon name="open-book" size={4} />
                 <div className="min-w-0 flex-1">
                   <p className="text-caption uppercase tracking-[0.1em] text-accent">
-                    Guided Scripture · Free
+                    Guided Scripture
                   </p>
                   <h3 className="mt-1 font-display text-[1.25rem] leading-tight text-graphite">
                     {guide.title}
@@ -123,7 +123,7 @@ export function TodayFormation({ dayKey }: { dayKey: string }) {
                 />
                 <div className="min-w-0 flex-1">
                   <p className="text-caption uppercase tracking-[0.1em] text-accent">
-                    Today’s game · Free
+                    Today’s game
                   </p>
                   <h3 className="mt-1 font-display text-[1.25rem] leading-tight text-graphite">
                     {game.title}

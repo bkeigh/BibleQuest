@@ -1,9 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageContainer, PageHeader } from "@/components/app-shell/PageHeader";
-import { GentleLink } from "@/components/design-system/GentleButton";
+import {
+  GentleButton,
+  GentleLink,
+} from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
+import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
 import {
   IconArrowRight,
   IconCheck,
@@ -14,12 +19,15 @@ import {
   guidedProgressPercent,
   makeGuidedSessionKey,
 } from "@/lib/guided/progress";
+import { usePlus } from "@/lib/billing/usePlus";
 import { useQuestOS } from "@/lib/questos/store";
 import { GuidedProgressBar } from "./GuidedProgressBar";
 
 /** Shows reviewed paths with aggregate Start, Resume, and duration context. */
 function PilgrimageCatalogInner() {
   const progress = useQuestOS((state) => state.guidedProgress);
+  const plus = usePlus();
+  const [lockedPilgrimage, setLockedPilgrimage] = useState<string | null>(null);
 
   return (
     <>
@@ -58,7 +66,9 @@ function PilgrimageCatalogInner() {
             >
               <div className="flex items-center justify-between gap-3">
                 <p className="font-pixel text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
-                  {pilgrimage.access === "plus" ? "Plus Pilgrimage" : "Free Pilgrimage"}
+                  {pilgrimage.access === "plus"
+                    ? "Plus Pilgrimage"
+                    : "Pilgrimage"}
                 </p>
                 {complete && (
                   <span className="inline-flex items-center gap-1 text-[0.75rem] text-accent">
@@ -85,15 +95,40 @@ function PilgrimageCatalogInner() {
                   />
                 </div>
               )}
-              <GentleLink
-                href={`/app/pilgrimages/${pilgrimage.slug}`}
-                variant={pilgrimage.access === "plus" ? "gold" : "primary"}
-                fullWidth
-                className="mt-6"
-              >
-                {complete ? "Return to path" : started ? "Resume" : "View path"}
-                <IconArrowRight />
-              </GentleLink>
+              {pilgrimage.access === "plus" && plus.loading ? (
+                <GentleButton
+                  variant="gold"
+                  fullWidth
+                  className="mt-6"
+                  disabled
+                >
+                  Checking Plus access…
+                </GentleButton>
+              ) : pilgrimage.access === "plus" && !plus.isPlus ? (
+                <GentleButton
+                  variant="gold"
+                  fullWidth
+                  className="mt-6"
+                  onClick={() => setLockedPilgrimage(pilgrimage.title)}
+                >
+                  View path · Plus
+                  <IconArrowRight />
+                </GentleButton>
+              ) : (
+                <GentleLink
+                  href={`/app/pilgrimages/${pilgrimage.slug}`}
+                  variant={pilgrimage.access === "plus" ? "gold" : "primary"}
+                  fullWidth
+                  className="mt-6"
+                >
+                  {complete
+                    ? "Return to path"
+                    : started
+                      ? "Resume"
+                      : "View path"}
+                  <IconArrowRight />
+                </GentleLink>
+              )}
             </PaperCard>
           );
         })}
@@ -104,6 +139,16 @@ function PilgrimageCatalogInner() {
             your place until you are ready to continue.
           </p>
         </PaperCard>
+        <PlusFeatureDialog
+          open={lockedPilgrimage !== null}
+          onClose={() => setLockedPilgrimage(null)}
+          title={
+            lockedPilgrimage
+              ? `Walk ${lockedPilgrimage}`
+              : "Open a Plus pilgrimage"
+          }
+          description="This additional reviewed Guided Scripture path is included with BibleQuest Plus."
+        />
       </PageContainer>
     </>
   );

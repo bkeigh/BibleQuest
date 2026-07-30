@@ -1,19 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import {
   IconArrowLeft,
   IconArrowRight,
   IconCheck,
 } from "@/components/design-system/icons";
 import { useToast } from "@/components/design-system/Toast";
+import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
 import { usePlus } from "@/lib/billing/usePlus";
 import {
   WALLPAPER_CATALOG,
-  DEFAULT_WALLPAPER_ID,
   canAccessWallpaper,
   getWallpaperById,
   type WallpaperId,
@@ -30,10 +28,12 @@ interface WallpaperPickerProps {
 
 /** Horizontal, keyboard-navigable artwork selector with clear tier gating. */
 export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
-  const router = useRouter();
   const { toast } = useToast();
   const { isPlus, loading } = usePlus();
   const shouldReduceMotion = useShouldReduceMotion();
+  const [lockedWallpaperTitle, setLockedWallpaperTitle] = useState<
+    string | null
+  >(null);
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const choices = ["none", ...WALLPAPER_CATALOG.map(({ id }) => id)] as const;
@@ -43,20 +43,15 @@ export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
       requestedWallpaper &&
       !canAccessWallpaper(requestedWallpaper, isPlus)
   );
-  const effectiveValue = savedChoiceLocked ? DEFAULT_WALLPAPER_ID : value;
+  const effectiveValue = savedChoiceLocked ? "none" : value;
   const selectedIndex = Math.max(0, choices.indexOf(effectiveValue));
 
-  function explainLockedWallpaper() {
+  function explainLockedWallpaper(title: string) {
     if (loading) {
       toast("Checking your Plus access…");
       return;
     }
-    toast("That scene is included with BibleQuest Plus.", {
-      action: {
-        label: "Explore Plus",
-        onClick: () => router.push("/app/plus"),
-      },
-    });
+    setLockedWallpaperTitle(title);
   }
 
   // Gives mouse users an explicit way to page through the horizontal gallery.
@@ -87,8 +82,12 @@ export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
     event.preventDefault();
     const choice = choices[next];
     const wallpaper = getWallpaperById(choice);
-    if (choice === "none" || (wallpaper && canAccessWallpaper(wallpaper, isPlus))) {
+    if (choice === "none") {
       onChange(choice);
+    } else if (wallpaper && canAccessWallpaper(wallpaper, isPlus)) {
+      onChange(wallpaper.id);
+    } else if (wallpaper) {
+      explainLockedWallpaper(wallpaper.title);
     }
     refs.current[next]?.focus();
     refs.current[next]?.scrollIntoView({
@@ -125,7 +124,8 @@ export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
         </div>
       </div>
       <p className="mt-1.5 text-caption leading-relaxed text-ash">
-        Five scenes are included with Free. Plus unlocks the complete collection.
+        Every artwork scene is included with Plus. Parchment remains available
+        to everyone.
       </p>
 
       <div
@@ -166,9 +166,6 @@ export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
           <span className="mt-1.5 block truncate text-caption text-charcoal">
             Parchment
           </span>
-          <span className="block text-[0.6875rem] uppercase tracking-[0.08em] text-ash">
-            Free
-          </span>
         </button>
 
         {WALLPAPER_CATALOG.map((wallpaper, index) => {
@@ -184,13 +181,13 @@ export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
               type="button"
               role="radio"
               aria-checked={selected}
-              aria-disabled={!accessible}
-              aria-label={`${wallpaper.title}, ${wallpaper.tier === "free" ? "Free" : "Plus"}${!accessible ? ", locked" : ""}`}
+              aria-haspopup={!accessible ? "dialog" : undefined}
+              aria-label={`${wallpaper.title}, Plus${!accessible ? ", locked" : ""}`}
               tabIndex={selectedIndex === refIndex ? 0 : -1}
               onKeyDown={(event) => onKeyDown(event, refIndex)}
               onClick={() => {
                 if (accessible) onChange(wallpaper.id);
-                else explainLockedWallpaper();
+                else explainLockedWallpaper(wallpaper.title);
               }}
               className="group w-28 shrink-0 snap-center text-left rounded-[var(--radius-card)] focus-visible:outline-offset-2"
             >
@@ -228,7 +225,7 @@ export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
                 {wallpaper.title}
               </span>
               <span className="block text-[0.6875rem] uppercase tracking-[0.08em] text-ash">
-                {wallpaper.tier === "free" ? "Free" : "Plus"}
+                Plus
               </span>
             </button>
           );
@@ -237,22 +234,20 @@ export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
 
       {savedChoiceLocked && requestedWallpaper && (
         <p role="status" className="mt-2 text-caption leading-relaxed text-ash">
-          {requestedWallpaper.title} is saved for Plus. Galilee, Be Still is
-          showing for now.
+          {requestedWallpaper.title} is saved for Plus. Parchment is showing
+          for now.
         </p>
       )}
-
-      {!isPlus && !loading && (
-        <p className="mt-2 text-caption text-ash">
-          Want every scene?{" "}
-          <Link
-            href="/app/plus"
-            className="font-medium text-accent underline-offset-4 hover:underline"
-          >
-            Explore BibleQuest Plus
-          </Link>
-        </p>
-      )}
+      <PlusFeatureDialog
+        open={lockedWallpaperTitle !== null}
+        onClose={() => setLockedWallpaperTitle(null)}
+        title={
+          lockedWallpaperTitle
+            ? `Make ${lockedWallpaperTitle} your wallpaper`
+            : "Choose a Plus wallpaper"
+        }
+        description="Every still and live wallpaper is included with BibleQuest Plus. Parchment remains available without a membership."
+      />
     </fieldset>
   );
 }

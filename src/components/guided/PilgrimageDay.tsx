@@ -68,7 +68,7 @@ function PilgrimageDayInner({
           </h1>
           <p className="mt-3 text-[0.9375rem] leading-relaxed text-charcoal">
             This reviewed path is included with BibleQuest Plus. The complete
-            Learning to Remain path remains free.
+            Learning to Remain path remains available.
           </p>
           <GentleLink href="/app/plus" variant="gold" fullWidth className="mt-6">
             Explore Plus

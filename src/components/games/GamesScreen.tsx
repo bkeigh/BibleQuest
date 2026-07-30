@@ -7,6 +7,8 @@ import {
   GentleLink,
 } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
+import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
+import { usePlus } from "@/lib/billing/usePlus";
 import { GREEN_FEATURES } from "@/lib/features/green";
 import {
   dailyGameSessionKey,
@@ -44,10 +46,12 @@ function useLocalDayKey(): string | null {
   return dayKey;
 }
 
-/** Daily game hub: one complete free study, selected by local calendar day. */
+/** Daily game hub: one complete study, selected by local calendar day. */
 export function GamesScreen() {
   const dayKey = useLocalDayKey();
   const puzzle = dayKey ? selectDailyGame(dayKey, GREEN_FEATURES) : null;
+  const plus = usePlus();
+  const [plusDialogOpen, setPlusDialogOpen] = useState(false);
 
   return (
     <>
@@ -100,20 +104,46 @@ export function GamesScreen() {
         {GREEN_FEATURES.games && (
           <PaperCard variant="outlined" padding="sm" className="mt-5">
             <p className="text-small text-ash">
-              Today&apos;s game and every answer explanation are free. Optional
-              Plus archives and themed collections add variety, never
-              better answers or paid hints. Progress stays on this device.
+              Today&apos;s game includes every answer explanation. Plus archives
+              and themed collections add variety, never better answers or paid
+              hints. Progress stays on this device.
             </p>
-            <GentleLink
-              href="/app/games/archive"
-              variant="text"
-              size="sm"
-              className="mt-3"
-            >
-              Browse archive and themes
-            </GentleLink>
+            {plus.loading ? (
+              <GentleButton
+                variant="text"
+                size="sm"
+                className="mt-3"
+                disabled
+              >
+                Checking Plus access…
+              </GentleButton>
+            ) : plus.isPlus ? (
+              <GentleLink
+                href="/app/games/archive"
+                variant="text"
+                size="sm"
+                className="mt-3"
+              >
+                Browse archive and themes
+              </GentleLink>
+            ) : (
+              <GentleButton
+                variant="text"
+                size="sm"
+                className="mt-3"
+                onClick={() => setPlusDialogOpen(true)}
+              >
+                Browse archive and themes · Plus
+              </GentleButton>
+            )}
           </PaperCard>
         )}
+        <PlusFeatureDialog
+          open={plusDialogOpen}
+          onClose={() => setPlusDialogOpen(false)}
+          title="Revisit Scripture Games"
+          description="The game archive and themed collections are included with BibleQuest Plus. Today’s complete game remains available here."
+        />
       </PageContainer>
     </>
   );

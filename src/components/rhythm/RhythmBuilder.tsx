@@ -24,6 +24,7 @@ import { useToast } from "@/components/design-system/Toast";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
 import { track } from "@/lib/analytics/events";
 
 const DEFAULT_DAYS: RhythmDay[] = [1, 2, 3, 4, 5];
@@ -252,13 +253,14 @@ function RhythmEditor({
   );
 }
 
-/** Lets Free keep one rhythm and Plus keep several without touching journals. */
+/** Keeps one rhythm available and lets Plus members keep several. */
 export function RhythmBuilder() {
   const plus = usePlus();
   const state = useRhythmState();
   const { toast } = useToast();
   const [editing, setEditing] = useState<RhythmBlock | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [plusDialogOpen, setPlusDialogOpen] = useState(false);
   const limit = plus.isPlus
     ? PLUS_RHYTHM_BLOCK_LIMIT
     : FREE_RHYTHM_BLOCK_LIMIT;
@@ -432,15 +434,17 @@ export function RhythmBuilder() {
       ) : !plus.isPlus ? (
         <div className="mt-4 rounded-[var(--radius-card)] border border-gold-500/35 bg-gold-500/10 p-3.5">
           <p className="text-small leading-relaxed text-charcoal">
-            Your Free rhythm is complete. Plus can hold morning, evening, and
-            busy-day rhythms.
+            One rhythm is included. Plus can hold morning, evening, and busy-day
+            rhythms.
           </p>
-          <Link
-            href="/app/plus"
-            className="mt-2 inline-flex min-h-11 items-center text-small font-medium text-accent"
+          <GentleButton
+            variant="text"
+            size="sm"
+            className="mt-2"
+            onClick={() => setPlusDialogOpen(true)}
           >
-            Explore Plus
-          </Link>
+            Add another rhythm · Plus
+          </GentleButton>
         </div>
       ) : (
         <p className="mt-4 text-caption text-ash">
@@ -456,6 +460,12 @@ export function RhythmBuilder() {
         </Link>
         .
       </p>
+      <PlusFeatureDialog
+        open={plusDialogOpen}
+        onClose={() => setPlusDialogOpen(false)}
+        title="Add another rhythm"
+        description="Multiple daily rhythms and a busy-day alternative are included with BibleQuest Plus."
+      />
     </div>
   );
 }

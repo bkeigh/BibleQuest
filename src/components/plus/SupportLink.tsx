@@ -32,7 +32,7 @@ export function SupportLink({ className }: SupportLinkProps) {
           Support BibleQuest
         </span>
         <span className="mt-1 block text-caption text-[#fdfbf3]/70">
-          Help keep BibleQuest free and growing.
+          Make a voluntary one-time contribution.
         </span>
       </span>
       <IconArrowRight className="relative shrink-0 transition-transform duration-300 group-hover:translate-x-1" />

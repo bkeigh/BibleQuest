@@ -52,7 +52,7 @@ export function ArchiveGameScreen({ puzzle }: { puzzle: GamePuzzle }) {
         ) : !access.allowed ? (
           <PaperCard variant="atmospheric" padding="lg" className="mt-4">
             <h2 className="font-display text-subheading text-graphite">
-              Today&apos;s study is still free
+              Today&apos;s study is still available
             </h2>
             <p className="mt-2 text-body text-charcoal">{access.message}</p>
             <div className="mt-5 flex flex-wrap gap-3">

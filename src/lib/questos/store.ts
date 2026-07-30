@@ -76,7 +76,6 @@ import { uniqueValidGrowthEvents } from "./growth-engine";
 import { isQuestChecklistComplete } from "./quest-steps";
 import { canRefreshDailyVerse } from "./verse-engine";
 import {
-  DEFAULT_WALLPAPER_ID,
   isWallpaperId,
 } from "@/lib/wallpapers/catalog";
 import { normalizeGlassOpacity } from "@/lib/glass-opacity";
@@ -1805,7 +1804,7 @@ export const useQuestOS = create<QuestOSState>()(
         }
         if (version < 11) {
           // v11 adds device-local wallpaper and glass preferences. Invalid
-          // legacy/imported values resolve to the safe free still defaults.
+            // legacy/imported values resolve to the safe parchment default.
           const settings = state.settings as
             | { appearance?: unknown }
             | undefined;
@@ -1823,7 +1822,7 @@ export const useQuestOS = create<QuestOSState>()(
                 appearance.wallpaperId === "none" ||
                 isWallpaperId(appearance.wallpaperId)
                   ? appearance.wallpaperId
-                  : DEFAULT_WALLPAPER_ID,
+                  : "none",
               wallpaperMode:
                 appearance.wallpaperMode === "live" ? "live" : "still",
               glassSurfaces: appearance.glassSurfaces !== false,
