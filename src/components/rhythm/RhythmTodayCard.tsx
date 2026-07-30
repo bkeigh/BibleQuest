@@ -73,7 +73,7 @@ export function RhythmTodayCard({
           interactive
           variant="quiet"
           padding="sm"
-          className="flex items-center gap-3"
+          className="flex min-h-20 items-center gap-4"
         >
           <PixelIcon name="lantern" size={4} />
           <span className="min-w-0 flex-1">
@@ -108,7 +108,7 @@ export function RhythmTodayCard({
             </div>
             <Link
               href="/app/rhythm"
-              className="inline-flex min-h-11 items-center gap-1 text-caption font-medium text-accent"
+              className="inline-flex min-h-12 items-center gap-1 px-1 text-caption font-medium text-accent"
             >
               Adjust <IconChevronRight size={14} />
             </Link>
@@ -121,7 +121,7 @@ export function RhythmTodayCard({
                   <li key={practice}>
                     <Link
                       href={PRACTICE_HREF[practice]}
-                      className="inline-flex min-h-11 items-center rounded-full border border-mist bg-paper px-3 py-2 text-small text-charcoal transition-colors hover:border-accent/35 hover:text-accent"
+                      className="inline-flex min-h-12 items-center rounded-full border border-mist bg-paper px-4 py-2.5 text-small text-charcoal transition-colors hover:border-accent/35 hover:text-accent"
                     >
                       {RHYTHM_PRACTICE_LABELS[practice]}
                     </Link>

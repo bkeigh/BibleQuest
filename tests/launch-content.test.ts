@@ -104,7 +104,7 @@ describe("launch content catalog", () => {
     expect(home).not.toContain("subscription.status");
   });
 
-  it("keeps Home membership-aware and ends with voluntary support", () => {
+  it("keeps Home membership-aware with newsletter beneath voluntary support", () => {
     const home = readFileSync(
       path.join(process.cwd(), "src/components/home/HomeScreen.tsx"),
       "utf8",
@@ -112,8 +112,8 @@ describe("launch content catalog", () => {
 
     expect(home).toContain("!isPlus &&");
     expect(home).toContain("<ExplorePlusLink");
-    expect(home.indexOf("<SupportLink")).toBeGreaterThan(
-      home.indexOf("<NewsletterLink"),
+    expect(home.indexOf("<NewsletterLink")).toBeGreaterThan(
+      home.indexOf("<SupportLink"),
     );
   });
 

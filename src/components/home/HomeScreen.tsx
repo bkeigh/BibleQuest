@@ -208,7 +208,7 @@ function HomeInner() {
           </div>
         </header>
 
-        <div className="space-y-4 pb-4">
+        <div className="space-y-5 pb-5">
           {/* Scripture stays directly beneath the personal account surface,
               while the compact treatment leaves quests as Home's main work. */}
           <TodaysVerseLink />
@@ -219,23 +219,23 @@ function HomeInner() {
             aria-labelledby="for-today-home-title"
             className="scroll-mt-6"
           >
-            <div className="mb-2.5 px-1">
-              <p className="text-caption uppercase tracking-[0.12em] text-ash">
-                A gentle next step
-              </p>
+            <div className="mb-2.5 flex items-baseline gap-x-2 whitespace-nowrap px-1 sm:gap-x-3">
               <h2
                 id="for-today-home-title"
-                className="mt-0.5 font-pixel text-[1.25rem] uppercase tracking-[0.05em] text-accent"
+                className="font-pixel text-[1.25rem] uppercase tracking-[0.05em] text-accent"
               >
                 For Today
               </h2>
+              <p className="text-[0.625rem] uppercase tracking-[0.08em] text-ash sm:text-caption sm:tracking-[0.12em]">
+                Your Next Step
+              </p>
             </div>
             <Link href="/app/quests" className="block">
               <PaperCard
                 interactive
                 variant="paper"
                 padding="md"
-                className="flex items-center gap-4"
+                className="flex min-h-24 items-center gap-4"
               >
                 <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] bg-linen ring-1 ring-mist">
                   <PixelIcon
@@ -286,20 +286,20 @@ function HomeInner() {
             </Link>
           </section>
 
-          {/* Guided Scripture and games remain distinct formation choices. */}
-          <TodayFormation dayKey={dayKey} />
-
-          {/* An optional weekly rhythm follows the three daily sections. */}
+          {/* The optional weekly rhythm stays attached to the daily quest. */}
           <RhythmTodayCard dayKey={dayKey} now={now} />
 
+          {/* Guided Scripture remains a distinct daily formation choice. */}
+          <TodayFormation dayKey={dayKey} show="guide" />
+
           {/* Home shows only the larger tree sprite; the full living scene
-              remains on Journey where its accents have room to breathe. */}
+              remains on Journey, and growth precedes the lighter game. */}
           <Link href="/app/journey" className="block">
             <PaperCard
               interactive
               variant="linen"
               padding="md"
-              className="flex items-center gap-4"
+              className="flex min-h-28 items-center gap-4"
             >
               <GrowthTree
                 state={tree}
@@ -336,13 +336,16 @@ function HomeInner() {
             </PaperCard>
           </Link>
 
+          {/* Scripture Games follows growth as the lighter play surface. */}
+          <TodayFormation dayKey={dayKey} show="game" />
+
           {/* A gentle, once-per-context invitation to keep the journey
               safe across devices. Never a modal; easy to wave off. */}
           <AccountPrompt />
 
           {/* Snippet rows — prayer, reading, reflection. Each card names
               itself; no extra label chrome (the phone gives us enough). */}
-          <div className="space-y-3 pt-1">
+          <div className="space-y-4 pt-1">
             <QuickRow
               href="/app/prayer/new"
               sprite="candle"
@@ -382,6 +385,7 @@ function HomeInner() {
               title="Ask MyShepherd"
               subtitle="A humble AI companion for Scripture questions."
               badge="Plus"
+              tone="shepherd"
             />
           </div>
 
@@ -392,10 +396,11 @@ function HomeInner() {
             />
           )}
 
-          <NewsletterLink />
-
-          {/* One-time support remains separate from membership and sits last. */}
+          {/* One-time support remains separate from membership. */}
           <SupportLink />
+
+          {/* Newsletter updates remain available after voluntary support. */}
+          <NewsletterLink />
           <PlusFeatureDialog
             open={shepherdDialogOpen}
             onClose={() => setShepherdDialogOpen(false)}
@@ -413,7 +418,7 @@ function TodaysVerseLink() {
     <motion.div variants={riseIn} initial="hidden" animate="visible">
       <Link
         href="/app/bible"
-        className="group relative isolate flex min-h-16 items-center gap-3 overflow-hidden rounded-[var(--radius-card)] border border-evergreen-600 bg-evergreen-700 px-4 py-3 text-[#fdfbf3] paper-shadow-lg transition-all duration-300 [transition-timing-function:var(--ease-gentle)] hover:-translate-y-0.5 hover:bg-evergreen-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0"
+        className="group relative isolate flex min-h-20 items-center gap-3 overflow-hidden rounded-[var(--radius-card)] border border-evergreen-600 bg-evergreen-700 px-4 py-4 text-[#fdfbf3] paper-shadow-lg transition-all duration-300 [transition-timing-function:var(--ease-gentle)] hover:-translate-y-0.5 hover:bg-evergreen-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0"
       >
         <span
           aria-hidden="true"
@@ -443,6 +448,7 @@ function QuickRow({
   title,
   subtitle,
   badge,
+  tone = "default",
 }: {
   href?: string;
   onClick?: () => void;
@@ -450,29 +456,82 @@ function QuickRow({
   title: string;
   subtitle: string;
   badge?: string;
+  tone?: "default" | "shepherd";
 }) {
+  const isShepherd = tone === "shepherd";
   const content = (
-    <PaperCard interactive padding="sm" className="flex items-center gap-3.5">
-      <span className="rounded-[10px] bg-linen p-2 ring-1 ring-mist">
+    <PaperCard
+      interactive
+      variant={isShepherd ? "outlined" : "paper"}
+      padding="sm"
+      className="flex min-h-20 items-center gap-4"
+      style={
+        isShepherd
+          ? { backgroundColor: "#3F7EA3", borderColor: "#3F7EA3" }
+          : undefined
+      }
+    >
+      <span
+        className={cn(
+          "rounded-[10px] p-2 ring-1",
+          isShepherd
+            ? "bg-white/15 ring-white/30"
+            : "bg-linen ring-mist",
+        )}
+      >
         <PixelIcon name={sprite} size={5} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="flex items-center gap-2 text-body text-graphite">
+        <p
+          className={cn(
+            "flex items-center gap-2 text-body",
+            isShepherd ? "text-white" : "text-graphite",
+          )}
+        >
           {title}
           {badge && (
-            <span className="rounded-full bg-gold-500/15 px-2 py-0.5 text-caption font-medium text-gilt">
+            <span
+              className={cn(
+                "rounded-full px-2.5 py-1 text-caption font-medium",
+                isShepherd
+                  ? "bg-white/20 text-white"
+                  : "bg-gold-500/15 text-gilt",
+              )}
+            >
               {badge}
             </span>
           )}
         </p>
-        <p className="text-caption text-ash">{subtitle}</p>
+        <p
+          className={cn(
+            "mt-1 text-caption",
+            isShepherd ? "text-white/80" : "text-ash",
+          )}
+        >
+          {subtitle}
+        </p>
       </div>
-      <IconChevronRight className="text-fog" />
+      <IconChevronRight
+        className={isShepherd ? "text-white/75" : "text-fog"}
+      />
     </PaperCard>
   );
-  if (href) return <Link href={href} className="block">{content}</Link>;
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="block rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        {content}
+      </Link>
+    );
+  }
   return (
-    <button type="button" onClick={onClick} className="block w-full text-left">
+    <button
+      type="button"
+      onClick={onClick}
+      className="block w-full rounded-[var(--radius-card)] text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+    >
       {content}
     </button>
   );
