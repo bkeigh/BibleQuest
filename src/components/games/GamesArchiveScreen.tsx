@@ -1,10 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { PageContainer, PageHeader } from "@/components/app-shell/PageHeader";
-import { GentleLink } from "@/components/design-system/GentleButton";
+import {
+  GentleButton,
+  GentleLink,
+} from "@/components/design-system/GentleButton";
 import { IconArrowLeft, IconClock } from "@/components/design-system/icons";
 import { PaperCard } from "@/components/design-system/PaperCard";
+import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
 import { gamePuzzles } from "@/data/games";
 import { getGameAccess } from "@/lib/games/access";
 import { archivedGameHref } from "@/lib/games/links";
@@ -14,6 +18,7 @@ import { GREEN_FEATURES } from "@/lib/features/green";
 /** Optional Plus breadth is visible without interrupting the free daily study. */
 export function GamesArchiveScreen() {
   const plus = usePlus();
+  const [plusDialogOpen, setPlusDialogOpen] = useState(false);
   const access = getGameAccess("archive", plus.isPlus);
   const themes = useMemo(() => {
     const grouped = new Map<string, typeof gamePuzzles>();
@@ -67,9 +72,14 @@ export function GamesArchiveScreen() {
               </h2>
               <p className="mt-2 text-body text-charcoal">{access.message}</p>
               {!access.allowed && (
-                <GentleLink href="/app/plus" variant="outline" className="mt-5">
+                <GentleButton
+                  type="button"
+                  variant="outline"
+                  className="mt-5"
+                  onClick={() => setPlusDialogOpen(true)}
+                >
                   See what Plus supports
-                </GentleLink>
+                </GentleButton>
               )}
             </PaperCard>
 
@@ -115,9 +125,15 @@ export function GamesArchiveScreen() {
                             Revisit study
                           </GentleLink>
                         ) : (
-                          <p className="mt-4 text-caption font-medium text-gilt">
-                            Archive access is included with Plus.
-                          </p>
+                          <GentleButton
+                            type="button"
+                            variant="text"
+                            size="sm"
+                            className="mt-4"
+                            onClick={() => setPlusDialogOpen(true)}
+                          >
+                            Explore Plus
+                          </GentleButton>
                         )}
                       </PaperCard>
                     ))}
@@ -127,6 +143,12 @@ export function GamesArchiveScreen() {
             </div>
           </>
         )}
+        <PlusFeatureDialog
+          open={plusDialogOpen}
+          onClose={() => setPlusDialogOpen(false)}
+          title="Revisit Scripture Games"
+          description="The game archive and themed collections are included with BibleQuest Plus. Today’s complete game remains available."
+        />
       </PageContainer>
     </>
   );

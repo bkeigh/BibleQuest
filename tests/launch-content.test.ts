@@ -127,7 +127,57 @@ describe("launch content catalog", () => {
       browse.indexOf("{/* Filters"),
     );
 
+    expect(generator).toContain('variant="blue"');
+    expect(generator).toContain("bg-white/20");
     expect(generator).toContain('contentClassName="pt-4"');
+  });
+
+  it("uses the exact MyShepherd blue for AI-assisted entry points", () => {
+    const disclosure = readFileSync(
+      path.join(
+        process.cwd(),
+        "src/components/design-system/Disclosure.tsx",
+      ),
+      "utf8",
+    );
+    const home = readFileSync(
+      path.join(process.cwd(), "src/components/home/HomeScreen.tsx"),
+      "utf8",
+    );
+
+    expect(disclosure).toContain("bg-[#3F7EA3]");
+    expect(home).toContain('backgroundColor: "#3F7EA3"');
+  });
+
+  it("describes the external quest matcher without exposing private writing", () => {
+    const generator = readFileSync(
+      path.join(
+        process.cwd(),
+        "src/components/quests/QuestGenerator.tsx",
+      ),
+      "utf8",
+    );
+    const plus = readFileSync(
+      path.join(process.cwd(), "src/components/plus/PlusContent.tsx"),
+      "utf8",
+    );
+
+    expect(generator).toContain("human-reviewed");
+    expect(generator).toContain("asks Haiku");
+    expect(generator).toContain("never reads your profile");
+    expect(generator).not.toContain("It stays on this device");
+    expect(plus).toContain("Private Haiku matching");
+    expect(plus).not.toContain("on-device recommendations");
+  });
+
+  it("gives the rhythm screen page-specific browser metadata", () => {
+    const rhythmPage = readFileSync(
+      path.join(process.cwd(), "src/app/app/rhythm/page.tsx"),
+      "utf8",
+    );
+
+    expect(rhythmPage).toContain('title: "My Rhythm"');
+    expect(rhythmPage).toContain("gentle weekly formation plan");
   });
 
   it("keeps Bible verse taps semantic and history aligned with the shown edition", () => {
@@ -195,7 +245,7 @@ describe("launch content catalog", () => {
     expect(plusContent).toContain("Unlimited active quest windows");
     expect(plusContent).toContain("Unlimited daily verse refreshes");
     expect(plusContent).toContain("Every still and live wallpaper");
-    expect(plusContent).toContain("never read your journals");
+    expect(plusContent).toContain("never journals or personal writing");
     expect(plusCta).toContain("formatBillingAmount(plan)");
     expect(plusCta).toContain(
       "Monthly and annual Plus renew automatically until canceled",

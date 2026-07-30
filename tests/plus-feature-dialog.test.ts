@@ -21,6 +21,8 @@ describe("Plus feature invitation", () => {
   it("uses the dialog from primary paid feature entry points", () => {
     for (const path of [
       "src/components/settings/WallpaperPicker.tsx",
+      "src/components/games/GamesArchiveScreen.tsx",
+      "src/components/quests/QuestGenerator.tsx",
       "src/components/guided/PilgrimageCatalog.tsx",
       "src/components/games/GamesScreen.tsx",
       "src/components/rhythm/RhythmBuilder.tsx",

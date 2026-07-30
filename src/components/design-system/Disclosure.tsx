@@ -14,7 +14,7 @@ import { useCallback, useId, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { IconChevronRight } from "./icons";
 
-type DisclosureVariant = "plain" | "card" | "quiet";
+type DisclosureVariant = "plain" | "card" | "quiet" | "blue";
 
 const VARIANTS: Record<
   DisclosureVariant,
@@ -37,6 +37,12 @@ const VARIANTS: Record<
     root: "app-glass-surface app-glass-surface-quiet rounded-[var(--radius-card)] bg-linen",
     trigger: "px-5 py-3.5",
     content: "px-5 pb-4",
+  },
+  /** Exact MyShepherd blue for prominent AI-assisted surfaces. */
+  blue: {
+    root: "rounded-[var(--radius-card)] border border-[#3F7EA3] bg-[#3F7EA3] paper-shadow",
+    trigger: "px-5 py-4",
+    content: "px-5 pb-5",
   },
 };
 
@@ -109,18 +115,22 @@ export function Disclosure({
         aria-controls={contentId}
         onClick={handleToggle}
         className={cn(
-          "flex min-h-11 w-full items-center gap-3 text-left font-medium text-graphite",
+          "flex min-h-12 w-full items-center gap-3 text-left font-medium",
           "rounded-[var(--radius-button)]",
-          "transition-colors hover:bg-paper/55 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:bg-linen/70",
-          styles.trigger
+          "transition-colors focus-visible:outline-2 focus-visible:outline-offset-2",
+          variant === "blue"
+            ? "text-white hover:bg-white/10 focus-visible:outline-white active:bg-white/15"
+            : "text-graphite hover:bg-paper/55 focus-visible:outline-accent active:bg-linen/70",
+          styles.trigger,
         )}
       >
         <span className="min-w-0 flex-1">{label}</span>
         {rightSlot && <span className="shrink-0">{rightSlot}</span>}
         <IconChevronRight
           className={cn(
-            "shrink-0 rotate-90 text-ash transition-transform duration-300 [transition-timing-function:var(--ease-gentle)]",
-            open && "-rotate-90"
+            "shrink-0 rotate-90 transition-transform duration-300 [transition-timing-function:var(--ease-gentle)]",
+            variant === "blue" ? "text-white/75" : "text-ash",
+            open && "-rotate-90",
           )}
         />
       </button>

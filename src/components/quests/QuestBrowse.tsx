@@ -453,11 +453,11 @@ function QuestBrowseInner() {
 
         <Disclosure
           label="Generate a quest"
-          variant="card"
+          variant="blue"
           defaultOpen={false}
           summary={
             isPlus ? (
-              <span className="rounded-full bg-accent-surface px-2 py-0.5 text-caption text-accent">
+              <span className="rounded-full bg-white/20 px-2.5 py-1 text-caption text-white">
                 Plus
               </span>
             ) : undefined

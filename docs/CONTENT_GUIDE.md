@@ -72,18 +72,17 @@ translations without a license.
 
 ## Plus quest generation boundary
 
-At launch, “Generate a quest” is a device-local recommendation over the 150
-reviewed templates. It accepts structured filters only and sends no profile,
-prayer, reflection, journal, or free-form spiritual text to any provider. Its
-result must say that it came from the reviewed catalogue.
+“Generate a quest” sends only bounded focus, category, duration, and variation
+fields to the server. After same-origin, Plus-entitlement, and rate checks,
+Claude Haiku 4.5 may select one slug from a small list of reviewed templates.
+It cannot invent or rewrite quest content. No profile, prayer, reflection,
+journal, or free-form spiritual text enters the request.
 
-An OpenAI, Anthropic, or other adapter may implement the provider-neutral
-contract later, but it is not enabled merely by adding an API key. Before an
-external adapter ships it needs server-side Plus enforcement, strict
-structured-output validation, the complete safety checks above, rate and cost
-controls, privacy disclosure, audit-safe telemetry that excludes sacred text,
-and a human review/moderation path. Generated text must never claim to be God's
-voice or replace Scripture, clergy, counseling, or emergency support.
+If Haiku is unavailable, the reviewed local matcher selects from the same
+catalog on-device and clearly discloses the fallback. Copy must never describe
+the whole feature as on-device while the external path is enabled. Generated
+reason text must never claim to be God's voice or replace Scripture, clergy,
+counseling, or emergency support.
 
 ## Regenerating content
 

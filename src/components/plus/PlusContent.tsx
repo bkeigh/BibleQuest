@@ -30,7 +30,7 @@ const PLUS_FEATURES = [
   "Up to three rhythms with a busy-day fallback",
   "Every still and live wallpaper",
   "Find a reviewed quest by focus, category, and time",
-  "Private, on-device recommendations that never read your journals",
+  "Private Haiku matching uses structured choices — never journals or personal writing",
   "Support continued access for the whole community",
 ];
 

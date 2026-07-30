@@ -1,10 +1,9 @@
 /**
  * Provider-neutral quest-generation contract.
  *
- * Launch behavior uses the reviewed local catalog, so no journal, prayer, or
- * profile text leaves the device and generated recommendations are always
- * human-reviewed. A future server adapter may implement the same contract for
- * OpenAI, Anthropic, or another provider after entitlement and safety review.
+ * Both Haiku and the local fallback select only from the reviewed catalog.
+ * Requests accept bounded preference enums, never journal, prayer, reflection,
+ * profile, or other free-form spiritual text.
  */
 import type {
   EnergyLevel,
@@ -167,7 +166,7 @@ export class ReviewedCatalogQuestProvider implements QuestGenerationProvider {
   }
 }
 
-/** Future server adapters (OpenAI, Anthropic, etc.) implement this factory. */
+/** Creates the reviewed on-device fallback used when the server provider rests. */
 export function createReviewedQuestProvider(
   catalog: readonly QuestTemplate[]
 ): QuestGenerationProvider {
