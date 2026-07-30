@@ -213,13 +213,23 @@ function HomeInner() {
               while the compact treatment leaves quests as Home's main work. */}
           <TodaysVerseLink />
 
-          {/* One reviewed guide leads; the daily game and an optional rhythm
-              remain close without becoming a score-driven dashboard. */}
-          <TodayFormation dayKey={dayKey} />
-          <RhythmTodayCard dayKey={dayKey} now={now} />
-
-          {/* Home shows one next quest and sends all management to Quests. */}
-          <section id="quests" className="scroll-mt-6">
+          {/* For Today begins with the person's concrete quest, while all
+              lifecycle management remains on the Quests screen. */}
+          <section id="quests"
+            aria-labelledby="for-today-home-title"
+            className="scroll-mt-6"
+          >
+            <div className="mb-2.5 px-1">
+              <p className="text-caption uppercase tracking-[0.12em] text-ash">
+                A gentle next step
+              </p>
+              <h2
+                id="for-today-home-title"
+                className="mt-0.5 font-pixel text-[1.25rem] uppercase tracking-[0.05em] text-accent"
+              >
+                For Today
+              </h2>
+            </div>
             <Link href="/app/quests" className="block">
               <PaperCard
                 interactive
@@ -275,6 +285,12 @@ function HomeInner() {
               </PaperCard>
             </Link>
           </section>
+
+          {/* Guided Scripture and games remain distinct formation choices. */}
+          <TodayFormation dayKey={dayKey} />
+
+          {/* An optional weekly rhythm follows the three daily sections. */}
+          <RhythmTodayCard dayKey={dayKey} now={now} />
 
           {/* Home shows only the larger tree sprite; the full living scene
               remains on Journey where its accents have room to breathe. */}

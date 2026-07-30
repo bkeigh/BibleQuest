@@ -17,7 +17,7 @@ import {
   IconClock,
 } from "@/components/design-system/icons";
 
-/** Gives today's complete guide visual priority over the lighter game. */
+/** Separates today's guide and game into two calm, independently labelled sections. */
 export function TodayFormation({ dayKey }: { dayKey: string }) {
   const guide = useMemo(() => guidedScriptureForDate(dayKey), [dayKey]);
   const guideKey = useMemo(
@@ -45,31 +45,30 @@ export function TodayFormation({ dayKey }: { dayKey: string }) {
   const gameAction = gameSnapshot.actionLabel;
 
   return (
-    <section aria-labelledby="today-formation-title">
-      <div className="mb-2.5 flex items-end justify-between gap-3 px-1">
-        <div>
-          <p className="text-caption uppercase tracking-[0.12em] text-ash">
-            A gentle next step
-          </p>
-          <h2
-            id="today-formation-title"
-            className="mt-0.5 font-pixel text-[1.25rem] uppercase tracking-[0.05em] text-accent"
-          >
-            For today
-          </h2>
-        </div>
-        {GREEN_FEATURES.pilgrimages && (
-          <Link
-            href="/app/pilgrimages"
-            className="inline-flex min-h-11 items-center text-caption font-medium text-accent"
-          >
-            Pilgrimages
-          </Link>
-        )}
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        {GREEN_FEATURES.guidedScripture && (
+    <>
+      {GREEN_FEATURES.guidedScripture && (
+        <section aria-labelledby="guided-scripture-home-title">
+          <div className="mb-2.5 flex items-end justify-between gap-3 px-1">
+            <div>
+              <p className="text-caption uppercase tracking-[0.12em] text-ash">
+                Read slowly
+              </p>
+              <h2
+                id="guided-scripture-home-title"
+                className="mt-0.5 font-pixel text-[1.25rem] uppercase tracking-[0.05em] text-accent"
+              >
+                Guided Scripture
+              </h2>
+            </div>
+            {GREEN_FEATURES.pilgrimages && (
+              <Link
+                href="/app/pilgrimages"
+                className="inline-flex min-h-11 items-center text-caption font-medium text-accent"
+              >
+                Pilgrimages
+              </Link>
+            )}
+          </div>
           <Link href="/app/guided/daily" className="block">
             <PaperCard
               interactive
@@ -81,7 +80,7 @@ export function TodayFormation({ dayKey }: { dayKey: string }) {
                 <PixelIcon name="open-book" size={4} />
                 <div className="min-w-0 flex-1">
                   <p className="text-caption uppercase tracking-[0.1em] text-accent">
-                    Guided Scripture
+                    Today’s guide
                   </p>
                   <h3 className="mt-1 font-display text-[1.25rem] leading-tight text-graphite">
                     {guide.title}
@@ -106,9 +105,22 @@ export function TodayFormation({ dayKey }: { dayKey: string }) {
               </div>
             </PaperCard>
           </Link>
-        )}
+        </section>
+      )}
 
-        {game && (
+      {game && (
+        <section aria-labelledby="scripture-games-home-title">
+          <div className="mb-2.5 px-1">
+            <p className="text-caption uppercase tracking-[0.12em] text-ash">
+              Learn by playing
+            </p>
+            <h2
+              id="scripture-games-home-title"
+              className="mt-0.5 font-pixel text-[1.25rem] uppercase tracking-[0.05em] text-accent"
+            >
+              Scripture Games
+            </h2>
+          </div>
           <Link href="/app/games" className="block">
             <PaperCard
               interactive
@@ -142,8 +154,8 @@ export function TodayFormation({ dayKey }: { dayKey: string }) {
               </div>
             </PaperCard>
           </Link>
-        )}
-      </div>
-    </section>
+        </section>
+      )}
+    </>
   );
 }
