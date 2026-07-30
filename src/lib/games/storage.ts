@@ -6,7 +6,7 @@ import type {
 } from "./types";
 
 export const GAME_STORAGE_KEY = "biblequest:scripture-games:v1";
-export const GAME_STORAGE_VERSION = 1;
+export const GAME_STORAGE_VERSION = 2;
 export const MAX_STORED_GAME_SESSIONS = 14;
 const MAX_GAME_CLOCK_SKEW_MS = 5 * 60 * 1000;
 
@@ -118,23 +118,27 @@ function sanitizeProgress(
     !isStringArray(entry.itemOrder, 4) ||
     entry.itemOrder.length !== 4 ||
     new Set(entry.itemOrder).size !== 4 ||
+    !isStringArray(entry.selectedItemIds, 4) ||
+    new Set(entry.selectedItemIds).size !== entry.selectedItemIds.length ||
     value.misses > 3 ||
     (value.status === "playing" && value.misses >= 3) ||
-    (value.status === "completed" && value.misses >= 3)
+    (value.status === "playing" && entry.selectedItemIds.length >= 4) ||
+    (value.status === "completed" &&
+      (value.misses >= 3 || entry.selectedItemIds.length !== 4)) ||
+    (value.status === "revealed" && entry.selectedItemIds.length !== 4)
   ) {
     return null;
   }
   if (puzzle?.kind === "timeline") {
     const correctOrder = puzzle.items.map((item) => item.id);
-    const isCorrect = entry.itemOrder.every(
+    const selectedAreCorrect = entry.selectedItemIds.every(
       (id, index) => id === correctOrder[index],
     );
     if (
       entry.itemOrder.some(
         (id) => !puzzle.items.some((item) => item.id === id),
       ) ||
-      ((value.status === "completed" || value.status === "revealed") &&
-        !isCorrect)
+      !selectedAreCorrect
     ) {
       return null;
     }

@@ -89,6 +89,8 @@ export interface ConnectionsProgress extends GameProgressBase {
 export interface TimelineProgress extends GameProgressBase {
   kind: "timeline";
   itemOrder: string[];
+  /** Correct moments already chosen, always stored as a narrative prefix. */
+  selectedItemIds: string[];
 }
 
 export type GameProgress = ConnectionsProgress | TimelineProgress;

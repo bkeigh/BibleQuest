@@ -7,7 +7,7 @@ import type {
   TimelinePuzzle,
 } from "./types";
 
-export const CONNECTIONS_REVEAL_AFTER = 4;
+export const CONNECTIONS_REVEAL_AFTER = 3;
 export const TIMELINE_REVEAL_AFTER = 3;
 
 function shuffled<T>(values: readonly T[], seed: string): T[] {
@@ -166,6 +166,59 @@ export function createTimelineProgress(
     learningEventRecorded: false,
     updatedAt: nowTimestamp(now),
     itemOrder,
+    selectedItemIds: [],
+  };
+}
+
+/** Advances one simple "what happened next" choice without card movement. */
+export function chooseTimelineItem(
+  puzzle: TimelinePuzzle,
+  progress: TimelineProgress,
+  itemId: string,
+  now?: number,
+): GameSubmission<TimelineProgress> {
+  if (
+    progress.status !== "playing" ||
+    progress.selectedItemIds.includes(itemId)
+  ) {
+    return { progress, announcement: "" };
+  }
+  const expected = puzzle.items[progress.selectedItemIds.length];
+  if (expected?.id === itemId) {
+    const selectedItemIds = [...progress.selectedItemIds, itemId];
+    const completed = selectedItemIds.length === puzzle.items.length;
+    return {
+      progress: {
+        ...progress,
+        selectedItemIds,
+        status: completed ? "completed" : "playing",
+        updatedAt: nowTimestamp(now),
+      },
+      announcement: completed
+        ? "You built the whole story in order."
+        : "Yes. Now choose what happened next.",
+    };
+  }
+  const misses = progress.misses + 1;
+  const revealed = misses >= TIMELINE_REVEAL_AFTER;
+  return {
+    progress: {
+      ...progress,
+      misses,
+      status: revealed ? "revealed" : "playing",
+      itemOrder: revealed
+        ? puzzle.items.map((item) => item.id)
+        : progress.itemOrder,
+      selectedItemIds: revealed
+        ? puzzle.items.map((item) => item.id)
+        : progress.selectedItemIds,
+      updatedAt: nowTimestamp(now),
+    },
+    announcement: revealed
+      ? "Here is the story in order. Open the passages to learn more."
+      : misses === TIMELINE_REVEAL_AFTER - 1
+        ? `Almost. Hint: look for “${expected?.label ?? "the earliest moment"}.”`
+        : "Not that one yet. Try a different moment.",
   };
 }
 
@@ -202,6 +255,7 @@ export function submitTimeline(
       progress: {
         ...progress,
         status: "completed",
+        selectedItemIds: puzzle.items.map((item) => item.id),
         updatedAt: nowTimestamp(now),
       },
       announcement: "The story is in order. Explore how each moment connects.",
@@ -215,6 +269,9 @@ export function submitTimeline(
       misses,
       status: revealed ? "revealed" : "playing",
       itemOrder: revealed ? puzzle.items.map((item) => item.id) : progress.itemOrder,
+      selectedItemIds: revealed
+        ? puzzle.items.map((item) => item.id)
+        : progress.selectedItemIds,
       updatedAt: nowTimestamp(now),
     },
     announcement: revealed
@@ -234,6 +291,7 @@ export function revealTimeline(
     ...progress,
     status: "revealed",
     itemOrder: puzzle.items.map((item) => item.id),
+    selectedItemIds: puzzle.items.map((item) => item.id),
     updatedAt: nowTimestamp(now),
   };
 }

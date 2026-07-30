@@ -22,6 +22,7 @@ import { GentleButton } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { QuestSlip, CATEGORY_LABEL, formatDuration } from "./QuestSlip";
 import { IconPlus } from "@/components/design-system/icons";
+import { apiFetch } from "@/lib/platform/api";
 
 const DURATIONS: QuestDuration[] = [5, 10, 15, 30, 60, 240, 480];
 const provider = createReviewedQuestProvider(seedQuests);
@@ -68,18 +69,27 @@ export function QuestGenerator({
     setWorking(true);
     setError(null);
     variation.current += 1;
+    const request = {
+      category: category || undefined,
+      duration: duration || undefined,
+      focus: focus || undefined,
+      variation: variation.current,
+    };
     try {
-      const next = await provider.generate({
-        category: category || undefined,
-        duration: duration || undefined,
-        focus: focus || undefined,
-        variation: variation.current,
+      const response = await apiFetch("/api/ai/quest", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
       });
+      if (!response.ok) throw new Error("provider");
+      const next = (await response.json()) as QuestGenerationResult;
       setResult(next);
     } catch {
-      setError(
-        "We couldn’t build a quest just now. Your catalog is still available below."
-      );
+      // The reviewed local matcher preserves the feature when AI is unavailable.
+      const next = await provider.generate(request);
+      setResult(next);
+      setError("Haiku is resting, so BibleQuest used its reviewed on-device matcher.");
     } finally {
       setWorking(false);
     }
@@ -219,6 +229,12 @@ export function QuestGenerator({
           <p role="status" className="mt-2 text-caption text-ash">
             {result.notice}
           </p>
+          {result.reason && (
+            <p className="mt-2 text-small leading-relaxed text-charcoal">
+              <span className="font-medium">Why this match: </span>
+              {result.reason}
+            </p>
+          )}
         </div>
       )}
     </PaperCard>

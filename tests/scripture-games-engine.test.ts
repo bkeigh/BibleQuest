@@ -3,6 +3,7 @@ import { connectionPuzzles, timelinePuzzles } from "@/data/games";
 import {
   CONNECTIONS_REVEAL_AFTER,
   TIMELINE_REVEAL_AFTER,
+  chooseTimelineItem,
   createConnectionsProgress,
   createTimelineProgress,
   moveTimelineItem,
@@ -71,6 +72,39 @@ describe("Scripture game engines", () => {
 
     expect(moved.itemOrder[0]).toBe(itemId);
     expect(initial.itemOrder[1]).toBe(itemId);
+  });
+
+  it("lets a young reader build the story one correct tap at a time", () => {
+    const puzzle = timelinePuzzles[0];
+    let progress = createTimelineProgress(puzzle, "simple-taps", 1);
+
+    for (const item of puzzle.items) {
+      const result = chooseTimelineItem(puzzle, progress, item.id, 2);
+      progress = result.progress;
+    }
+
+    expect(progress.selectedItemIds).toEqual(
+      puzzle.items.map((item) => item.id),
+    );
+    expect(progress.status).toBe("completed");
+  });
+
+  it("gives a direct hint and reveals after three wrong taps", () => {
+    const puzzle = timelinePuzzles[0];
+    let progress = createTimelineProgress(puzzle, "gentle-hints", 1);
+    const wrong = puzzle.items[1].id;
+
+    const first = chooseTimelineItem(puzzle, progress, wrong, 2);
+    expect(first.announcement).toContain("Try a different");
+    const second = chooseTimelineItem(puzzle, first.progress, wrong, 3);
+    expect(second.announcement).toContain("Hint:");
+    const third = chooseTimelineItem(puzzle, second.progress, wrong, 4);
+    progress = third.progress;
+
+    expect(progress.status).toBe("revealed");
+    expect(progress.selectedItemIds).toEqual(
+      puzzle.items.map((item) => item.id),
+    );
   });
 
   it("completes correct narrative order and reveals after three checks", () => {

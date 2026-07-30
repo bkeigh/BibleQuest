@@ -46,6 +46,7 @@ import { profileAvatarMarker } from "@/lib/utils/avatar";
 import { cn } from "@/lib/utils/cn";
 import { TodayFormation } from "@/components/home/TodayFormation";
 import { RhythmTodayCard } from "@/components/rhythm/RhythmTodayCard";
+import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
 
 function HomeInner() {
   const profile = useQuestOS((s) => s.profile);
@@ -53,6 +54,7 @@ function HomeInner() {
   const readingPosition = useQuestOS((s) => s.readingPosition);
   const assignments = useQuestOS((s) => s.assignments);
   const { isPlus } = usePlus();
+  const [shepherdDialogOpen, setShepherdDialogOpen] = useState(false);
   // The candle. Stable ref — the stored object itself.
   const streak = useQuestOS(selectStreak);
   // Keep day-scoped quest suggestions and rolling countdowns fresh when a
@@ -355,6 +357,16 @@ function HomeInner() {
               title={t.titles.reflections}
               subtitle={t.home.reflectionHint}
             />
+            <QuickRow
+              href={isPlus ? "/app/shepherd" : undefined}
+              onClick={
+                isPlus ? undefined : () => setShepherdDialogOpen(true)
+              }
+              sprite="star"
+              title="Ask MyShepherd"
+              subtitle="A humble AI companion for Scripture questions."
+              badge="Plus"
+            />
           </div>
 
           {!isPlus && (
@@ -368,6 +380,12 @@ function HomeInner() {
 
           {/* One-time support remains separate from membership and sits last. */}
           <SupportLink />
+          <PlusFeatureDialog
+            open={shepherdDialogOpen}
+            onClose={() => setShepherdDialogOpen(false)}
+            title="Ask MyShepherd"
+            description="MyShepherd’s bounded AI study companion is included with BibleQuest Plus."
+          />
         </div>
       </PageContainer>
     </div>
@@ -404,28 +422,43 @@ function TodaysVerseLink() {
 
 function QuickRow({
   href,
+  onClick,
   sprite,
   title,
   subtitle,
+  badge,
 }: {
-  href: string;
+  href?: string;
+  onClick?: () => void;
   sprite: Parameters<typeof PixelIcon>[0]["name"];
   title: string;
   subtitle: string;
+  badge?: string;
 }) {
+  const content = (
+    <PaperCard interactive padding="sm" className="flex items-center gap-3.5">
+      <span className="rounded-[10px] bg-linen p-2 ring-1 ring-mist">
+        <PixelIcon name={sprite} size={5} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-2 text-body text-graphite">
+          {title}
+          {badge && (
+            <span className="rounded-full bg-gold-500/15 px-2 py-0.5 text-caption font-medium text-gilt">
+              {badge}
+            </span>
+          )}
+        </p>
+        <p className="text-caption text-ash">{subtitle}</p>
+      </div>
+      <IconChevronRight className="text-fog" />
+    </PaperCard>
+  );
+  if (href) return <Link href={href} className="block">{content}</Link>;
   return (
-    <Link href={href} className="block">
-      <PaperCard interactive padding="sm" className="flex items-center gap-3.5">
-        <span className="rounded-[10px] bg-linen p-2 ring-1 ring-mist">
-          <PixelIcon name={sprite} size={5} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-body text-graphite">{title}</p>
-          <p className="text-caption text-ash">{subtitle}</p>
-        </div>
-        <IconChevronRight className="text-fog" />
-      </PaperCard>
-    </Link>
+    <button type="button" onClick={onClick} className="block w-full text-left">
+      {content}
+    </button>
   );
 }
 

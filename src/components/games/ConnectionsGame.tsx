@@ -155,6 +155,21 @@ export function ConnectionsGame({
     );
   }
 
+  function clearChoices() {
+    commitProgress({
+      ...progress,
+      selectedTerms: [],
+      updatedAt: Date.now(),
+    });
+    setAnnouncement("Choices cleared. Pick four words that belong together.");
+  }
+
+  function playAgain() {
+    resultWasFocused.current = false;
+    commitProgress(createConnectionsProgress(puzzle, sessionKey));
+    setAnnouncement("Pick four words that belong together.");
+  }
+
   return (
     <>
       <PaperCard as="section" aria-label="Scripture Connections" padding="md">
@@ -191,8 +206,8 @@ export function ConnectionsGame({
         {!finished && (
           <>
             <p className="mt-4 text-small font-medium text-charcoal">
-              {progress.solvedGroupIds.length} of {puzzle.groups.length}{" "}
-              connections gathered
+              Pick 4 words that belong together ·{" "}
+              {progress.selectedTerms.length} picked
             </p>
             <div
               className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3"
@@ -237,27 +252,47 @@ export function ConnectionsGame({
                 Check these four
               </GentleButton>
               <GentleButton variant="ghost" fullWidth onClick={showConnections}>
-                Show the connections
+                Show all answers
               </GentleButton>
             </div>
+            {progress.selectedTerms.length > 0 && (
+              <GentleButton
+                variant="text"
+                fullWidth
+                className="mt-2"
+                onClick={clearChoices}
+              >
+                Clear my picks
+              </GentleButton>
+            )}
             <p className="mt-3 text-center text-caption text-ash">
               {progress.misses === 0
-                ? "After four unformed groups, the connections appear for study."
+                ? "After three tries, the answers open for study."
                 : `${progress.misses} of ${CONNECTIONS_REVEAL_AFTER} unformed groups checked.`}
             </p>
           </>
         )}
 
         {finished && (
-          <h3
-            ref={resultHeadingRef}
-            tabIndex={-1}
-            className="mt-5 text-center text-small font-medium text-charcoal focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-          >
-            {progress.status === "completed"
-              ? "You gathered all three connections."
-              : "The connections are open for study. There is no penalty for revealing them."}
-          </h3>
+          <>
+            <h3
+              ref={resultHeadingRef}
+              tabIndex={-1}
+              className="mt-5 text-center font-display text-[1.125rem] text-graphite focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+            >
+              {progress.status === "completed"
+                ? "You found every connection!"
+                : "Here are all three connections."}
+            </h3>
+            <GentleButton
+              variant="outline"
+              fullWidth
+              className="mt-4"
+              onClick={playAgain}
+            >
+              Play again
+            </GentleButton>
+          </>
         )}
       </PaperCard>
       {finished && <GameLearningCard puzzle={puzzle} />}

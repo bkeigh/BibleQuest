@@ -44,6 +44,7 @@ export interface QuestGenerationResult {
   source: "reviewed_catalog" | "external_provider";
   provider: string;
   notice: string;
+  reason?: string;
 }
 
 export interface QuestGenerationProvider {
@@ -88,6 +89,57 @@ function matches(quest: QuestTemplate, request: QuestGenerationRequest): boolean
 }
 
 /**
+ * Builds a small, stable shortlist from reviewed content for local or server
+ * matching. Filters relax in the same honest order as the original provider.
+ */
+export function reviewedQuestCandidates(
+  catalog: readonly QuestTemplate[],
+  request: QuestGenerationRequest,
+  limit = Number.POSITIVE_INFINITY,
+): { candidates: QuestTemplate[]; relaxed: boolean } {
+  const freeCatalog = catalog.filter((quest) => !quest.isPremium);
+  if (!freeCatalog.length) {
+    throw new Error("The reviewed quest catalog is empty.");
+  }
+  let candidates = freeCatalog.filter((quest) => matches(quest, request));
+  let relaxed = false;
+  if (!candidates.length && request.focus) {
+    candidates = freeCatalog.filter((quest) =>
+      matches(quest, { ...request, focus: undefined }),
+    );
+    relaxed = true;
+  }
+  if (!candidates.length && request.duration) {
+    candidates = freeCatalog.filter((quest) =>
+      matches(quest, {
+        ...request,
+        focus: undefined,
+        duration: undefined,
+      }),
+    );
+    relaxed = true;
+  }
+  if (!candidates.length) {
+    candidates = freeCatalog;
+    relaxed = true;
+  }
+  const { variation, ...preferences } = request;
+  const step = Number.isFinite(variation)
+    ? Math.max(0, Math.trunc(variation))
+    : 0;
+  const start =
+    (hashString(JSON.stringify(preferences)) + step) % candidates.length;
+  const ordered = [
+    ...candidates.slice(start),
+    ...candidates.slice(0, start),
+  ];
+  return {
+    candidates: ordered.slice(0, Math.max(1, Math.trunc(limit))),
+    relaxed,
+  };
+}
+
+/**
  * Safe launch provider: composes a recommendation from the 150 reviewed,
  * locally bundled quests. Strict filters are relaxed one layer at a time so
  * the button always returns an honest option instead of inventing content.
@@ -99,38 +151,13 @@ export class ReviewedCatalogQuestProvider implements QuestGenerationProvider {
   constructor(private readonly catalog: readonly QuestTemplate[]) {}
 
   async generate(request: QuestGenerationRequest): Promise<QuestGenerationResult> {
-    const freeCatalog = this.catalog.filter((quest) => !quest.isPremium);
-    if (!freeCatalog.length) {
-      throw new Error("The reviewed quest catalog is empty.");
-    }
-
-    let candidates = freeCatalog.filter((quest) => matches(quest, request));
-    let relaxed = false;
-    if (!candidates.length && request.focus) {
-      candidates = freeCatalog.filter((quest) =>
-        matches(quest, { ...request, focus: undefined })
-      );
-      relaxed = true;
-    }
-    if (!candidates.length && request.duration) {
-      candidates = freeCatalog.filter((quest) =>
-        matches(quest, { ...request, focus: undefined, duration: undefined })
-      );
-      relaxed = true;
-    }
-    if (!candidates.length) {
-      candidates = freeCatalog;
-      relaxed = true;
-    }
-
-    const { variation, ...preferences } = request;
-    const step = Number.isFinite(variation)
-      ? Math.max(0, Math.trunc(variation))
-      : 0;
-    const index =
-      (hashString(JSON.stringify(preferences)) + step) % candidates.length;
+    const { candidates, relaxed } = reviewedQuestCandidates(
+      this.catalog,
+      request,
+      1,
+    );
     return {
-      quest: candidates[index],
+      quest: candidates[0],
       source: "reviewed_catalog",
       provider: this.id,
       notice: relaxed

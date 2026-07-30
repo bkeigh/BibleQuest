@@ -191,8 +191,8 @@ function DailyGameEntry({
         </h3>
         <p className="mt-2 text-body text-charcoal">
           {puzzle.kind === "connections"
-            ? "Gather three groups of four. Answers and Scripture sources appear at the end."
-            : "Arrange four moments in narrative order. Every moment opens back into its passage."}
+            ? "Tap four words that belong together. You can show every answer at any time."
+            : "Tap what happened first, then what happened next. No moving cards."}
         </p>
         <GentleButton
           variant="primary"

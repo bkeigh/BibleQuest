@@ -5,10 +5,9 @@ import { GentleButton } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import {
   TIMELINE_REVEAL_AFTER,
+  chooseTimelineItem,
   createTimelineProgress,
-  moveTimelineItem,
   revealTimeline,
-  submitTimeline,
 } from "@/lib/games/engine";
 import { scriptureSourceHref } from "@/lib/games/links";
 import {
@@ -19,7 +18,7 @@ import type { TimelineProgress, TimelinePuzzle } from "@/lib/games/types";
 import { track } from "@/lib/analytics/events";
 import { GameLearningCard } from "./GameLearningCard";
 
-/** Accessible timeline surface uses explicit controls rather than dragging. */
+/** One-tap narrative sequence designed for young and first-time readers. */
 export function TimelineGame({
   puzzle,
   sessionKey,
@@ -35,17 +34,19 @@ export function TimelineGame({
     return createTimelineProgress(puzzle, sessionKey);
   });
   const [announcement, setAnnouncement] = useState(
-    "Use the move buttons to place the moments from first to last.",
+    "Tap the moment that happened first.",
   );
   const [resumeAvailable, setResumeAvailable] = useState(true);
   const resultHeadingRef = useRef<HTMLHeadingElement>(null);
   const resultWasFocused = useRef(false);
 
   const finished = progress.status !== "playing";
-  const orderedItems = progress.itemOrder.flatMap((id) => {
+  const availableItems = progress.itemOrder.flatMap((id) => {
+    if (progress.selectedItemIds.includes(id)) return [];
     const item = puzzle.items.find((candidate) => candidate.id === id);
     return item ? [item] : [];
   });
+  const chosenItems = puzzle.items.slice(0, progress.selectedItemIds.length);
 
   // Move focus to the result once so keyboard and screen-reader users do not
   // remain on a control that disappeared after completion or reveal.
@@ -61,16 +62,8 @@ export function TimelineGame({
     setProgress(next);
   }
 
-  function move(itemId: string, direction: "up" | "down") {
-    commitProgress(moveTimelineItem(progress, itemId, direction));
-    const item = puzzle.items.find((candidate) => candidate.id === itemId);
-    setAnnouncement(
-      `${item?.label ?? "The moment"} moved ${direction === "up" ? "earlier" : "later"}.`,
-    );
-  }
-
-  function checkOrder() {
-    const result = submitTimeline(puzzle, progress);
+  function choose(itemId: string) {
+    const result = chooseTimelineItem(puzzle, progress, itemId);
     const opensLearning = result.progress.status !== "playing";
     if (opensLearning && !result.progress.learningEventRecorded) {
       track("scripture_game_completed", { kind: "timeline" });
@@ -99,6 +92,12 @@ export function TimelineGame({
     );
   }
 
+  function playAgain() {
+    resultWasFocused.current = false;
+    commitProgress(createTimelineProgress(puzzle, sessionKey));
+    setAnnouncement("Tap the moment that happened first.");
+  }
+
   return (
     <>
       <PaperCard as="section" aria-label="Bible Timeline" padding="md">
@@ -118,95 +117,111 @@ export function TimelineGame({
             Leaving this page may restart the study.
           </p>
         )}
-        <ol className="mt-5 grid gap-3" aria-label="Timeline from first to last">
-          {orderedItems.map((item, index) => (
-            <li key={item.id}>
-              <PaperCard
-                variant={finished ? "quiet" : "linen"}
-                padding="sm"
-                className="flex gap-3"
+        {!finished && (
+          <>
+            <div className="mt-5 flex items-center justify-between gap-3">
+              <h2 className="font-display text-[1.125rem] text-graphite">
+                {progress.selectedItemIds.length === 0
+                  ? "What happened first?"
+                  : "What happened next?"}
+              </h2>
+              <p className="text-caption text-ash">
+                Step {Math.min(progress.selectedItemIds.length + 1, 4)} of 4
+              </p>
+            </div>
+            {chosenItems.length > 0 && (
+              <ol
+                className="mt-3 grid gap-2"
+                aria-label="Moments already placed"
               >
-                <span
-                  aria-hidden="true"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-accent/40 bg-accent-surface text-small font-semibold text-accent"
-                >
-                  {index + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-body font-medium text-graphite">
-                    <span className="sr-only">Position {index + 1}: </span>
+                {chosenItems.map((item, index) => (
+                  <li
+                    key={item.id}
+                    className="flex items-center gap-3 rounded-[var(--radius-button)] bg-accent-surface px-3 py-2.5 text-small text-accent-ink"
+                  >
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-paper font-semibold text-accent">
+                      {index + 1}
+                    </span>
                     {item.label}
-                  </p>
-                  {finished && (
-                    <>
-                      <p className="mt-2 text-small text-ash">
+                  </li>
+                ))}
+              </ol>
+            )}
+            <div
+              className="mt-3 grid gap-3"
+              aria-label="Choose the next moment"
+            >
+              {availableItems.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => choose(item.id)}
+                  className="min-h-16 rounded-[var(--radius-card)] border border-mist bg-linen px-4 py-3 text-left text-body font-medium text-graphite transition-colors hover:border-accent/45 hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <GentleButton
+              variant="ghost"
+              fullWidth
+              className="mt-4"
+              onClick={showOrder}
+            >
+              Show the whole story
+            </GentleButton>
+            {progress.misses > 0 && (
+              <p className="mt-3 text-center text-caption text-ash">
+                {progress.misses} of {TIMELINE_REVEAL_AFTER} gentle tries used.
+              </p>
+            )}
+          </>
+        )}
+        {finished && (
+          <>
+            <h3
+              ref={resultHeadingRef}
+              tabIndex={-1}
+              className="mt-5 text-center font-display text-[1.125rem] text-graphite focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+            >
+              {progress.status === "completed"
+                ? "You built the story!"
+                : "Here is the whole story."}
+            </h3>
+            <ol className="mt-4 grid gap-3" aria-label="Story from first to last">
+              {puzzle.items.map((item, index) => (
+                <li key={item.id}>
+                  <PaperCard variant="quiet" padding="sm" className="flex gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-surface text-small font-semibold text-accent">
+                      {index + 1}
+                    </span>
+                    <div>
+                      <p className="text-body font-medium text-graphite">
+                        {item.label}
+                      </p>
+                      <p className="mt-1 text-small text-ash">
                         {item.explanation}
                       </p>
                       <a
                         href={scriptureSourceHref(item.source)}
                         className="mt-2 inline-block text-caption font-medium text-accent underline decoration-accent/35 underline-offset-4"
                       >
-                        {item.source.reference}
+                        Open {item.source.reference}
                       </a>
-                    </>
-                  )}
-                  {!finished && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        disabled={index === 0}
-                        onClick={() => move(item.id, "up")}
-                        aria-label={`Move ${item.label} earlier`}
-                        className="min-h-11 rounded-[var(--radius-button)] border border-mist bg-paper px-3 text-small font-medium text-charcoal disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                      >
-                        ↑ Move earlier
-                      </button>
-                      <button
-                        type="button"
-                        disabled={index === orderedItems.length - 1}
-                        onClick={() => move(item.id, "down")}
-                        aria-label={`Move ${item.label} later`}
-                        className="min-h-11 rounded-[var(--radius-button)] border border-mist bg-paper px-3 text-small font-medium text-charcoal disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                      >
-                        ↓ Move later
-                      </button>
                     </div>
-                  )}
-                </div>
-              </PaperCard>
-            </li>
-          ))}
-        </ol>
-        {!finished && (
-          <>
-            <p className="mt-4 text-center text-small font-medium text-charcoal">
-              Four moments · first to last
-            </p>
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-              <GentleButton variant="primary" fullWidth onClick={checkOrder}>
-                Check the order
-              </GentleButton>
-              <GentleButton variant="ghost" fullWidth onClick={showOrder}>
-                Show the narrative order
-              </GentleButton>
-            </div>
-            <p className="mt-3 text-center text-caption text-ash">
-              {progress.misses === 0
-                ? "After three checks, the narrative order appears for study."
-                : `${progress.misses} of ${TIMELINE_REVEAL_AFTER} orders checked.`}
-            </p>
+                  </PaperCard>
+                </li>
+              ))}
+            </ol>
+            <GentleButton
+              variant="outline"
+              fullWidth
+              className="mt-4"
+              onClick={playAgain}
+            >
+              Play again
+            </GentleButton>
           </>
-        )}
-        {finished && (
-          <h3
-            ref={resultHeadingRef}
-            tabIndex={-1}
-            className="mt-5 text-center text-small font-medium text-charcoal focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-          >
-            {progress.status === "completed"
-              ? "The moments are in narrative order."
-              : "The order is open for study. There is no penalty for revealing it."}
-          </h3>
         )}
       </PaperCard>
       {finished && <GameLearningCard puzzle={puzzle} />}

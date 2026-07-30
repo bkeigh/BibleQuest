@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { seedQuests } from "@/data/seed/quests";
-import { createReviewedQuestProvider } from "@/lib/quest-generation/provider";
+import {
+  createReviewedQuestProvider,
+  reviewedQuestCandidates,
+} from "@/lib/quest-generation/provider";
 import type { QuestDuration } from "@/lib/questos/types";
 
 describe("reviewed quest generation", () => {
@@ -42,5 +45,17 @@ describe("reviewed quest generation", () => {
     await expect(provider.generate({ variation: 1 })).rejects.toThrow(
       "reviewed quest catalog is empty"
     );
+  });
+
+  it("builds a small reviewed shortlist for server-side AI matching", () => {
+    const result = reviewedQuestCandidates(
+      seedQuests,
+      { focus: "service", variation: 1 },
+      10,
+    );
+
+    expect(result.candidates).toHaveLength(10);
+    expect(result.candidates.every((quest) => !quest.isPremium)).toBe(true);
+    expect(new Set(result.candidates.map((quest) => quest.slug)).size).toBe(10);
   });
 });
