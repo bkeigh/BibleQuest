@@ -443,6 +443,7 @@ export async function runSyntheticHealth({
   const fetchOptions = { fetchImpl, timeoutMs, retries, sleep };
   const checks = [];
   let releaseSha = null;
+  let expectedReleaseSha = null;
 
   checks.push(
     await inspectResponse(
@@ -475,6 +476,7 @@ export async function runSyntheticHealth({
     const expectedBillingSupport =
       env.BIBLEQUEST_MONITOR_EXPECTED_BILLING_SUPPORT_ENABLED === "true";
     const expectedSha = env.BIBLEQUEST_MONITOR_EXPECTED_SHA?.trim().toLowerCase();
+    expectedReleaseSha = expectedSha && SHA.test(expectedSha) ? expectedSha : null;
     // Pin deploy-owned contracts separately from the newer checkout on main.
     const expectedSchema =
       env.BIBLEQUEST_MONITOR_EXPECTED_SCHEMA_CONTRACT?.trim() ||
@@ -489,26 +491,57 @@ export async function runSyntheticHealth({
       typeof health?.release_sha === "string" && SHA.test(health.release_sha)
         ? health.release_sha
         : null;
+    // Each contract is evaluated separately so a failure names the field that
+    // drifted. A single bundled verdict reported only
+    // "release_contract_mismatch", which is true of a stale deploy, a billing
+    // flag, and a schema bump alike — and therefore actionable for none of them.
+    const releaseShaPinned = Boolean(expectedSha) && SHA.test(expectedSha);
+    const mismatches = [];
+    if (health?.status !== "ok") mismatches.push("status");
+    if (health?.app !== "biblequest") mismatches.push("app");
+    if (health?.contract !== expectations.contract) mismatches.push("contract");
+    if (health?.canonical_origin !== canonicalOrigin) {
+      mismatches.push("canonical_origin");
+    }
+    if (health?.canonical_origin_matches !== true) {
+      mismatches.push("canonical_origin_matches");
+    }
+    if (health?.schema_contract !== expectedSchema) {
+      mismatches.push("schema_contract");
+    }
+    if (health?.content_contract !== expectedContent) {
+      mismatches.push("content_contract");
+    }
+    if (health?.service_worker_version !== expectedServiceWorker) {
+      mismatches.push("service_worker_version");
+    }
+    if (health?.billing_mode !== expectedBilling) mismatches.push("billing_mode");
+    if (health?.billing_purchases_enabled !== expectedBillingPurchases) {
+      mismatches.push("billing_purchases_enabled");
+    }
+    if (health?.billing_support_enabled !== expectedBillingSupport) {
+      mismatches.push("billing_support_enabled");
+    }
+    if (
+      health?.auth_posture !==
+      (env.BIBLEQUEST_MONITOR_EXPECTED_AUTH_POSTURE?.trim() || "configured")
+    ) {
+      mismatches.push("auth_posture");
+    }
+    // Deploy drift is called out by name: production serving a commit other
+    // than the one the monitor runs from means a promotion did not land.
+    if (releaseSha === null) {
+      mismatches.push("release_sha_missing");
+    } else if (!releaseShaPinned) {
+      mismatches.push("release_sha_unpinned");
+    } else if (releaseSha !== expectedSha) {
+      mismatches.push("release_sha_drift");
+    }
+
     const ok =
       result.response.status === 200 &&
       result.elapsedMs <= 2_500 &&
-      health?.status === "ok" &&
-      health?.app === "biblequest" &&
-      health?.contract === expectations.contract &&
-      health?.canonical_origin === canonicalOrigin &&
-      health?.canonical_origin_matches === true &&
-      health?.schema_contract === expectedSchema &&
-      health?.content_contract === expectedContent &&
-      health?.service_worker_version === expectedServiceWorker &&
-      health?.billing_mode === expectedBilling &&
-      health?.billing_purchases_enabled === expectedBillingPurchases &&
-      health?.billing_support_enabled === expectedBillingSupport &&
-      health?.auth_posture ===
-        (env.BIBLEQUEST_MONITOR_EXPECTED_AUTH_POSTURE?.trim() || "configured") &&
-      releaseSha !== null &&
-      Boolean(expectedSha) &&
-      SHA.test(expectedSha) &&
-      releaseSha === expectedSha;
+      mismatches.length === 0;
     checks.push(
       check("release_health", ok, {
         status: result.response.status,
@@ -519,7 +552,7 @@ export async function runSyntheticHealth({
             ? "latency_exceeded"
             : ok
               ? "ok"
-              : "release_contract_mismatch",
+              : `release_contract_mismatch:${mismatches.join(",")}`,
       }),
     );
   } catch (error) {
@@ -648,6 +681,7 @@ export async function runSyntheticHealth({
     target: "production",
     ok: failed.length === 0,
     release_sha: releaseSha,
+    expected_release_sha: expectedReleaseSha,
     summary: {
       total: checks.length,
       passed: checks.length - failed.length,
@@ -711,6 +745,7 @@ export function syntheticIncidentBody(report) {
     "",
     `Last run: \`${report.generated_at}\``,
     `Release: \`${report.release_sha ?? "unavailable"}\``,
+    `Expected release: \`${report.expected_release_sha ?? "unpinned"}\``,
     "",
     ...failures.map(
       (item) =>

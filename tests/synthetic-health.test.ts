@@ -203,6 +203,58 @@ describe("daily synthetic health", () => {
     );
   });
 
+  it("names deploy drift when production serves a different commit", async () => {
+    // The exact failure that went undiagnosed for three days: every contract
+    // matched except the commit, because the production alias stayed on an
+    // older deployment while newer builds went READY.
+    const stale = "b".repeat(40); // deliberately not RELEASE
+    const routes = healthyRoutes();
+    routes.set(
+      `${CANONICAL}/api/health`,
+      response(health({ release_sha: stale })),
+    );
+    const report = await runSyntheticHealth({
+      env: environment(),
+      fetchImpl: fixtureFetch(routes),
+      retries: 0,
+    });
+
+    expect(report.ok).toBe(false);
+    expect(report.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "release_health",
+          ok: false,
+          detail: "release_contract_mismatch:release_sha_drift",
+        }),
+      ]),
+    );
+    // Both commits reach the incident issue, so drift is readable without a lookup.
+    expect(report.release_sha).toBe(stale);
+    expect(report.expected_release_sha).toBe(RELEASE);
+  });
+
+  it("flags an unpinned release expectation instead of passing silently", async () => {
+    const env = environment();
+    delete env.BIBLEQUEST_MONITOR_EXPECTED_SHA;
+    const report = await runSyntheticHealth({
+      env,
+      fetchImpl: fixtureFetch(healthyRoutes()),
+      retries: 0,
+    });
+
+    expect(report.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "release_health",
+          ok: false,
+          detail: "release_contract_mismatch:release_sha_unpinned",
+        }),
+      ]),
+    );
+    expect(report.expected_release_sha).toBeNull();
+  });
+
   it("fails simulated bad schema and canonical metadata", async () => {
     const routes = healthyRoutes();
     routes.set(
@@ -222,7 +274,8 @@ describe("daily synthetic health", () => {
         expect.objectContaining({
           id: "release_health",
           ok: false,
-          detail: "release_contract_mismatch",
+          // The detail names the field that drifted, not just that something did.
+          detail: "release_contract_mismatch:schema_contract",
         }),
         expect.objectContaining({
           id: "public_home",
