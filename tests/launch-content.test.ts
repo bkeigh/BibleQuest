@@ -163,11 +163,15 @@ describe("launch content catalog", () => {
     );
 
     expect(generator).toContain("human-reviewed");
-    expect(generator).toContain("asks Haiku");
     expect(generator).toContain("never reads your profile");
     expect(generator).not.toContain("It stays on this device");
-    expect(plus).toContain("Private Haiku matching");
+    expect(plus).toContain("Private matching");
     expect(plus).not.toContain("on-device recommendations");
+    // The guarantee is what the matcher can see, not which model runs it.
+    // Readers have no context for a vendor model name, so it stays out of
+    // every user-facing string.
+    expect(generator).not.toContain("Haiku");
+    expect(plus).not.toContain("Haiku");
   });
 
   it("gives the rhythm screen page-specific browser metadata", () => {

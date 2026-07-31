@@ -177,9 +177,15 @@ export function TodayFormation({
             title="Scripture Games"
             subtitle="Learn by playing"
             action={
-              <span className="hidden text-caption font-medium text-ash sm:inline">
-                Scroll to explore →
-              </span>
+              // Games have no nav tab by design, so this rail is the entry to
+              // the whole surface. A real link beats a "scroll to explore"
+              // hint that was also hidden on the phones most readers use.
+              <Link
+                href="/app/games"
+                className="-m-2 inline-flex min-h-11 items-center gap-1 rounded-[var(--radius-button)] p-2 text-caption font-medium text-accent transition-colors hover:text-graphite focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                All games <IconArrowRight size={14} />
+              </Link>
             }
           />
           <div className="relative">
