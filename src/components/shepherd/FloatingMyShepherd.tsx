@@ -12,6 +12,7 @@ import {
   type MyShepherdAnswer,
 } from "@/lib/ai/contracts";
 import { apiFetch } from "@/lib/platform/api";
+import { useKeyboardInset } from "@/lib/platform/keyboard-inset";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import {
   IconClose,
@@ -41,6 +42,7 @@ function floatingErrorMessage(status: number): string {
 /** Provides a session-only, non-modal MyShepherd conversation above the app shell. */
 export function FloatingMyShepherd() {
   const pathname = usePathname();
+  const keyboardInset = useKeyboardInset();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -115,19 +117,47 @@ export function FloatingMyShepherd() {
   const horizontalOffset =
     "max(1rem, calc((100vw - 48rem) / 2))";
 
+  // Above the keyboard when it is open; above the bottom nav when it is not.
+  // The keyboard already covers the nav, so the two offsets never stack.
+  const dockedBottom = keyboardInset
+    ? `${keyboardInset}px`
+    : "var(--app-bottom-nav-height, 4.5rem)";
+
   return (
     <>
+      {/* A scrim only on phones, where the sheet owns the screen. It sits above
+          the bottom nav so the two do not read as competing bottom bars. */}
+      {open && (
+        <button
+          type="button"
+          aria-label="Close MyShepherd"
+          tabIndex={-1}
+          onClick={() => setOpen(false)}
+          className="fixed inset-0 z-[45] cursor-default bg-graphite/25 backdrop-blur-[2px] sm:hidden"
+        />
+      )}
+
       {open && (
         <section
           id="floating-my-shepherd"
           role="dialog"
+          aria-modal="true"
           aria-label="Ask MyShepherd"
-          className="app-glass-surface fixed z-50 flex w-[min(25rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-[22px] border border-mist bg-paper/95 paper-shadow-lg backdrop-blur-xl"
+          className={[
+            "app-glass-surface fixed z-50 flex flex-col overflow-hidden",
+            "border border-mist bg-paper/95 paper-shadow-lg backdrop-blur-xl",
+            // Phone: a bottom sheet spanning the screen, square at the bottom
+            // edge so it reads as docked rather than floating over content.
+            "inset-x-0 rounded-t-[22px]",
+            // Desktop: the original floating card, anchored bottom-right.
+            "sm:inset-x-auto sm:right-[var(--shepherd-right)]",
+            "sm:w-[min(25rem,calc(100vw-2rem))] sm:rounded-[22px]",
+          ].join(" ")}
           style={{
-            right: horizontalOffset,
-            bottom:
-              "calc(var(--app-bottom-nav-height, 4.5rem) + 5.25rem)",
-            maxHeight: "min(68dvh, 42rem)",
+            bottom: dockedBottom,
+            // Leave room for the keyboard so the panel never grows underneath it.
+            maxHeight: `min(72dvh, calc(100dvh - ${keyboardInset}px - 5rem), 42rem)`,
+            ["--shepherd-right" as string]: horizontalOffset,
           }}
         >
           <header className="flex items-center gap-3 border-b border-mist/70 bg-[#3F7EA3] px-4 py-3 text-white">
@@ -182,20 +212,39 @@ export function FloatingMyShepherd() {
                 <p className="ml-auto w-fit max-w-[88%] rounded-[16px_16px_4px_16px] bg-[#3F7EA3] px-3.5 py-2.5 text-small leading-relaxed text-white">
                   {turn.question}
                 </p>
-                <div className="rounded-[16px_16px_16px_4px] border border-mist bg-paper px-4 py-4">
-                  <MyShepherdResponse
-                    answer={turn.answer}
-                    compact
-                    onNavigate={() => setOpen(false)}
-                  />
+                {/* The same sparkle that marks MyShepherd in the header and on
+                    the send button, so an answer is attributable at a glance
+                    once the conversation scrolls past the header. */}
+                <div className="flex gap-2.5">
+                  <span
+                    aria-hidden="true"
+                    className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#3F7EA3]/12 text-[#3F7EA3] ring-1 ring-[#3F7EA3]/20"
+                  >
+                    <IconSparkle size={15} />
+                  </span>
+                  <div className="min-w-0 flex-1 rounded-[16px_16px_16px_4px] border border-mist bg-paper px-4 py-4">
+                    <MyShepherdResponse
+                      answer={turn.answer}
+                      compact
+                      onNavigate={() => setOpen(false)}
+                    />
+                  </div>
                 </div>
               </div>
             ))}
 
             {working && (
-              <p role="status" className="text-small text-ash">
-                Thinking gently…
-              </p>
+              <div className="flex items-center gap-2.5">
+                <span
+                  aria-hidden="true"
+                  className="flex h-7 w-7 shrink-0 animate-pulse items-center justify-center rounded-full bg-[#3F7EA3]/12 text-[#3F7EA3] ring-1 ring-[#3F7EA3]/20"
+                >
+                  <IconSparkle size={15} />
+                </span>
+                <p role="status" className="text-small text-ash">
+                  Thinking gently…
+                </p>
+              </div>
             )}
             {error && (
               <p role="alert" className="text-small text-rose-700">
@@ -205,7 +254,10 @@ export function FloatingMyShepherd() {
           </div>
 
           <form
-            className="border-t border-mist/70 bg-paper px-3 py-3"
+            // pb-safe only matters when the keyboard is closed and the sheet
+            // sits on the home-indicator edge; with the keyboard open the inset
+            // offset above already clears it.
+            className="border-t border-mist/70 bg-paper px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3"
             onSubmit={(event) => {
               event.preventDefault();
               void ask();
@@ -241,8 +293,9 @@ export function FloatingMyShepherd() {
 
       <button
         type="button"
-        onClick={() => setOpen((current) => !current)}
-        aria-label={open ? "Close MyShepherd" : "Ask MyShepherd"}
+        hidden={open}
+        onClick={() => setOpen(true)}
+        aria-label="Ask MyShepherd"
         aria-expanded={open}
         aria-controls="floating-my-shepherd"
         className="fixed z-50 flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-[#3F7EA3] text-white shadow-[0_10px_28px_rgba(32,70,94,0.32)] transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0"
@@ -252,7 +305,7 @@ export function FloatingMyShepherd() {
             "calc(var(--app-bottom-nav-height, 4.5rem) + 1rem)",
         }}
       >
-        {open ? <IconClose size={20} /> : <PixelIcon name="star" size={4} />}
+        <PixelIcon name="star" size={4} />
       </button>
     </>
   );

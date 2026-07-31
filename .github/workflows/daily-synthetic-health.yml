@@ -22,14 +22,17 @@ jobs:
     env:
       BIBLEQUEST_MONITOR_SUPABASE_URL: ${{ secrets.BIBLEQUEST_MONITOR_SUPABASE_URL }}
       BIBLEQUEST_MONITOR_SUPABASE_ANON_KEY: ${{ secrets.BIBLEQUEST_MONITOR_SUPABASE_ANON_KEY }}
-      # Defaults to the commit this monitor is running from. On the scheduled
-      # run that is main's tip, so production serving anything else is deploy
-      # drift — a promotion that never landed, or an active rollback. Set the
-      # repository variable only to pin production behind main deliberately.
-      BIBLEQUEST_MONITOR_EXPECTED_SHA: ${{ vars.BIBLEQUEST_MONITOR_EXPECTED_SHA || github.sha }}
-      BIBLEQUEST_MONITOR_EXPECTED_SCHEMA_CONTRACT: ${{ vars.BIBLEQUEST_MONITOR_EXPECTED_SCHEMA_CONTRACT }}
-      BIBLEQUEST_MONITOR_EXPECTED_CONTENT_CONTRACT: ${{ vars.BIBLEQUEST_MONITOR_EXPECTED_CONTENT_CONTRACT }}
-      BIBLEQUEST_MONITOR_EXPECTED_SERVICE_WORKER_VERSION: ${{ vars.BIBLEQUEST_MONITOR_EXPECTED_SERVICE_WORKER_VERSION }}
+      # Every expectation is derived from this checkout, never from repository
+      # variables. Those variables were pinned by hand on 2026-07-27 and then
+      # went stale, so the monitor spent days comparing production against a
+      # months-old release and reporting a failure nobody could act on. A
+      # monitor whose expectations need manual upkeep stops being a monitor.
+      #
+      # The SHA is the commit being tested — on the scheduled run, main's tip —
+      # so production serving anything else is deploy drift by definition. The
+      # contract versions fall back to config/observability.json, which is
+      # version-controlled and moves with the code that changes them.
+      BIBLEQUEST_MONITOR_EXPECTED_SHA: ${{ github.sha }}
       BIBLEQUEST_MONITOR_EXPECTED_AUTH_POSTURE: configured
       # Stripe Live shipped in #54/#55, so the monitor now guards the launched
       # posture. These stay explicit rather than defaulted: a silent flip back

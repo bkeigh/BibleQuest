@@ -415,4 +415,15 @@ describe("synthetic incident deduplication", () => {
     expect(workflow).toContain("continue-on-error: true");
     expect(workflow).not.toMatch(/echo[^\\n]*(TOKEN|KEY|SECRET)/i);
   });
+
+  it("derives release expectations from the checkout, never a repository variable", async () => {
+    const workflow = await import("node:fs/promises").then(({ readFile }) =>
+      readFile(".github/workflows/daily-synthetic-health.yml", "utf8"),
+    );
+    // Hand-pinned variables went stale on 2026-07-27 and left the monitor
+    // comparing production against a months-old release for days. Expectations
+    // must track the commit under test and config/observability.json instead.
+    expect(workflow).toContain("BIBLEQUEST_MONITOR_EXPECTED_SHA: ${{ github.sha }}");
+    expect(workflow).not.toContain("vars.BIBLEQUEST_MONITOR_EXPECTED");
+  });
 });
