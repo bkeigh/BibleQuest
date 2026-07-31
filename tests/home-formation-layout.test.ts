@@ -58,7 +58,7 @@ describe("Home formation layout", () => {
     expect(formation).toContain("font-pixel text-[2rem]");
     expect(formation).toContain("snap-mandatory");
     expect(formation.match(/role=\"listitem\"/g)).toHaveLength(3);
-    expect(formation).toContain("flex min-h-[17rem] w-full flex-col");
+    expect(formation).toContain("flex h-full min-h-[17rem] w-full flex-col");
     expect(formation).toContain("mt-auto pt-8");
     expect(formation).toContain("absolute -left-5");
     expect(formation).toContain("absolute -right-5");
@@ -68,6 +68,19 @@ describe("Home formation layout", () => {
     expect(formation).toContain("Seven Days Match");
     expect(formation).toContain("7 chapters · 7 levels each");
     expect(formation).toContain("Genesis 1:1");
+  });
+
+  it("sizes every Scripture game card identically", () => {
+    // Each rail item must share one width class and stretch to a common
+    // height; per-card widths previously made the cards visibly mismatched.
+    const items = formation.match(/role="listitem" className=\{([^}]+)\}/g);
+    expect(items).toHaveLength(3);
+    expect(new Set(items)).toHaveLength(1);
+    expect(formation).toContain(
+      'const GAME_RAIL_ITEM = "w-[86%] shrink-0 snap-start sm:w-[70%]"',
+    );
+    expect(formation).toContain("group block h-full rounded-");
+    expect(formation).toContain("flex h-full min-h-[17rem] overflow-hidden");
   });
 
   it("places the three shortcuts between support and newsletter", () => {

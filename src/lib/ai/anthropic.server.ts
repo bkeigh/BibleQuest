@@ -15,6 +15,48 @@ import type { QuestGenerationRequest } from "@/lib/quest-generation/provider";
 import type { QuestTemplate } from "@/lib/questos/types";
 
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
+
+/**
+ * Reviewed model identifiers. The bare alias and the dated release resolve to
+ * the same model, so both are accepted — otherwise an operator who sets the
+ * alias in the deployment environment disables every AI surface with an opaque
+ * 503 rather than a configuration error anyone can see.
+ */
+const APPROVED_MODELS: readonly string[] = [
+  "claude-haiku-4-5",
+  DEFAULT_MODEL,
+];
+
+/** Distinguishes "BibleQuest is misconfigured" from "the provider failed". */
+export class AiConfigurationError extends Error {
+  readonly reason: "missing_api_key" | "unapproved_model";
+
+  constructor(reason: AiConfigurationError["reason"]) {
+    super(`Anthropic configuration unavailable: ${reason}.`);
+    this.name = "AiConfigurationError";
+    this.reason = reason;
+  }
+}
+
+/**
+ * Records why an AI surface failed, without the question, the answer, or the
+ * provider's own message. Uses the single-JSON-line shape the client signal
+ * route already writes so both land in the same deployment log stream.
+ */
+export function recordAiFailure(
+  surface: "shepherd" | "quest",
+  error: unknown,
+): void {
+  console.error(
+    JSON.stringify({
+      kind: "ai_failure",
+      surface,
+      reason:
+        error instanceof AiConfigurationError ? error.reason : "provider_error",
+    }),
+  );
+}
+
 let client: Anthropic | null = null;
 
 /** Keeps the API key and pinned model available only in the Node server runtime. */
@@ -22,10 +64,10 @@ function anthropicConfiguration() {
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   const model = process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODEL;
   if (!apiKey || apiKey.length < 20) {
-    throw new Error("Anthropic configuration unavailable.");
+    throw new AiConfigurationError("missing_api_key");
   }
-  if (model !== DEFAULT_MODEL) {
-    throw new Error("Anthropic model is not approved for BibleQuest.");
+  if (!APPROVED_MODELS.includes(model)) {
+    throw new AiConfigurationError("unapproved_model");
   }
   return { apiKey, model };
 }

@@ -29,6 +29,10 @@ const GAME_ART = {
   comingTwo: "/art/scripture-games-coming-2.webp",
 } as const;
 
+// Every rail item shares one width so the cards read as a single set, and
+// `h-full` lets each card stretch to the tallest card in the row.
+const GAME_RAIL_ITEM = "w-[86%] shrink-0 snap-start sm:w-[70%]";
+
 /** Renders the requested daily formation sections without changing their progress model. */
 export function TodayFormation({
   dayKey,
@@ -187,13 +191,10 @@ export function TodayFormation({
               onScroll={updateGameRailEdges}
               className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
-              <div
-                role="listitem"
-                className="w-[88%] shrink-0 snap-start sm:w-[72%]"
-              >
+              <div role="listitem" className={GAME_RAIL_ITEM}>
                 <Link
                   href="/app/games"
-                  className="group block rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  className="group block h-full rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
                   <ScriptureGameCard
                     image={GAME_ART.today}
@@ -215,10 +216,7 @@ export function TodayFormation({
                   />
                 </Link>
               </div>
-              <div
-                role="listitem"
-                className="w-[82%] shrink-0 snap-start sm:w-[66%]"
-              >
+              <div role="listitem" className={GAME_RAIL_ITEM}>
                 <ScriptureGameCard
                   image={GAME_ART.comingOne}
                   eyebrow="Game preview"
@@ -236,10 +234,7 @@ export function TodayFormation({
                   muted
                 />
               </div>
-              <div
-                role="listitem"
-                className="w-[82%] shrink-0 snap-start sm:w-[66%]"
-              >
+              <div role="listitem" className={GAME_RAIL_ITEM}>
                 <ScriptureGameCard
                   image={GAME_ART.comingTwo}
                   eyebrow="Game preview"
@@ -307,13 +302,13 @@ function ScriptureGameCard({
       interactive={!muted}
       variant="paper"
       padding="none"
-      className="relative isolate flex min-h-[17rem] overflow-hidden"
+      className="relative isolate flex h-full min-h-[17rem] overflow-hidden"
     >
       <Image
         src={image}
         alt=""
         fill
-        sizes="(max-width: 640px) 88vw, 34rem"
+        sizes="(max-width: 640px) 86vw, 34rem"
         className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
       />
       <span
@@ -327,7 +322,7 @@ function ScriptureGameCard({
         />
       )}
       {/* Keeps the identity pinned to the top-left while the game details settle at the bottom. */}
-      <div className="relative z-10 flex min-h-[17rem] w-full flex-col p-5 text-white sm:p-6">
+      <div className="relative z-10 flex h-full min-h-[17rem] w-full flex-col p-5 text-white sm:p-6">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white/12 ring-1 ring-white/25 backdrop-blur-sm">
             <PixelIcon name={icon} size={4} />

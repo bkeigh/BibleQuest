@@ -40,9 +40,14 @@ yarn-error.log*
 # vercel
 .vercel
 
-# local Codex worktrees and generated wallpaper source renders
+# Local Codex worktrees and generated media renders. These are large binary
+# intermediates that .vercelignore already keeps out of deployments, so they
+# must not re-enter history from another clone either — keep the rules here
+# rather than in .git/info/exclude, which is local to a single machine.
 /.codex-worktrees/
 /output/live-wallpapers/
+/output/instagram-square-v1/
+/launch-evidence-*.local.md
 
 # typescript
 *.tsbuildinfo

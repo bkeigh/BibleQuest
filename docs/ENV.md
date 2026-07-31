@@ -59,6 +59,14 @@ template in [`../.env.example`](../.env.example).
 - `BIBLEQUEST_ROLLBACK_SHA` is evidence, not an automatic rollback control. Set
   it only after the rollback authority approves the target; changing it does not
   move traffic or undo database changes.
+- `BIBLEQUEST_STAGING_PROJECT_REF` names the Supabase staging project used by
+  the staging reconciliation scripts. It is a local operator value — never set
+  it in Production.
+- `ANTHROPIC_API_KEY` powers MyShepherd and Haiku quest matching. Both surfaces
+  fail closed with a `503` when it is missing, so `pnpm
+  check:production-readiness` verifies it. `ANTHROPIC_MODEL` is optional; when
+  set it must be an approved model (`claude-haiku-4-5` or
+  `claude-haiku-4-5-20251001`) or every AI request fails closed.
 - Supabase Auth email is provider-side configuration. Follow
   [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md); do not add a
   `RESEND_API_KEY` to Vercel or `.env.local` for SMTP. Lifecycle email, external
