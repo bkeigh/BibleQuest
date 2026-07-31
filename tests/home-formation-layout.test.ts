@@ -64,7 +64,12 @@ describe("Home formation layout", () => {
     expect(formation).toContain("/art/scripture-games-today.webp");
     expect(formation).toContain("/art/scripture-games-coming-1.webp");
     expect(formation).toContain("/art/scripture-games-coming-2.webp");
-    expect(formation).toContain("font-pixel text-[2rem]");
+    // Pixel is the app's label face (0.875rem badges and section headings).
+    // Card titles use the display face everywhere, including the guide card in
+    // this same file — a 2rem pixel title was the lone exception and competed
+    // with the pixel section heading directly above it.
+    expect(formation).toContain('font-display text-[1.75rem]');
+    expect(formation).not.toContain("font-pixel text-[2rem]");
     expect(formation).toContain("snap-mandatory");
     expect(formation.match(/role=\"listitem\"/g)).toHaveLength(3);
     expect(formation).toContain("flex h-full min-h-[17rem] w-full flex-col");

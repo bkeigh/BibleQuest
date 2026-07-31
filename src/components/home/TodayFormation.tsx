@@ -338,7 +338,11 @@ function ScriptureGameCard({
           </p>
         </div>
         <div className="mt-auto pt-8">
-          <h3 className="max-w-[18ch] font-pixel text-[2rem] leading-[0.95] tracking-[0.03em] text-white min-[390px]:text-[2.125rem]">
+          {/* Every other card title in the app uses the display face; pixel is
+              reserved for small labels and badges at 0.875rem. A 2rem pixel
+              title also wrapped long game names across two hard-to-read lines
+              and competed with the pixel section heading directly above it. */}
+          <h3 className="max-w-[20ch] font-display text-[1.75rem] leading-tight text-white min-[390px]:text-[1.875rem]">
             {title}
           </h3>
           <p className="mt-2 max-w-[42ch] text-small leading-relaxed text-white/80">
