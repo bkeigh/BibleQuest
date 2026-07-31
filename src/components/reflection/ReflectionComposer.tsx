@@ -231,7 +231,7 @@ function ReflectionComposerInner() {
           rows={14}
           placeholder="Start wherever you are…"
           autoFocus
-          className="mt-4 min-h-[44vh] w-full resize-y bg-transparent text-[1.0625rem] leading-[1.8] text-graphite outline-none placeholder:text-fog"
+          className="mt-4 min-h-[44vh] w-full resize-y bg-transparent text-[1.0625rem] leading-[1.8] text-graphite outline-none placeholder:text-quill"
         />
         <JournalEditorToolbar
           textareaRef={textareaRef}

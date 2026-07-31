@@ -249,7 +249,7 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
             )}
             <cite className="mt-2 block text-[0.875rem] not-italic text-ash">
               — {quest.scriptureReference}
-              <span className="text-fog"> · World English Bible</span>
+              <span className="text-quill"> · World English Bible</span>
             </cite>
           </PaperCard>
 

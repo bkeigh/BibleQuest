@@ -213,8 +213,10 @@ describe("launch content catalog", () => {
     expect(reader).not.toContain('role="button"');
     expect(reader).toContain('aria-pressed={isSel}');
     expect(reader).toContain('data-selected={isSel ? "true" : undefined}');
-    expect(reader).toContain('"box-decoration-clone');
-    expect(reader).toContain('isSel && "bg-gold-500/20"');
+    expect(reader).toContain("box-decoration-clone");
+    // The mark moved from a Tailwind alpha wash to theme-aware verse-mark
+    // tokens; what this guards is that a tapped verse still shows one.
+    expect(reader).toContain('isSel && "verse-mark-selected"');
     expect(globalStyles).toContain(':focus-visible:not([id^="verse-"])');
     expect(reader).toContain("persistableVerseText(i)");
     expect(bibleIndex).toContain("onPresentedText={recordPresentedVerse}");

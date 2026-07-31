@@ -214,7 +214,7 @@ function PrayerScreenInner() {
               <div className="relative mt-3">
                 <IconSearch
                   size={18}
-                  className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-fog"
+                  className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-quill"
                 />
                 <label htmlFor="journal-search" className="sr-only">
                   Search prayers and reflections
@@ -227,7 +227,7 @@ function PrayerScreenInner() {
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search your journal"
                   autoComplete="off"
-                  className="h-12 w-full rounded-[var(--radius-button)] border border-mist bg-paper pl-10 pr-12 text-[0.9375rem] text-graphite outline-none placeholder:text-fog focus:border-accent"
+                  className="h-12 w-full rounded-[var(--radius-button)] border border-mist bg-paper pl-10 pr-12 text-[0.9375rem] text-graphite outline-none placeholder:text-quill focus:border-accent"
                 />
                 <SearchClearButton
                   inputId="journal-search"

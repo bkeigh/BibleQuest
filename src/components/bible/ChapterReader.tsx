@@ -447,22 +447,16 @@ function ReaderInner({
                 }
               }}
               className={cn(
-                "group inline scroll-mt-28 appearance-none border-0 bg-transparent p-0 text-left focus-visible:outline-none",
+                "inline scroll-mt-28 appearance-none border-0 bg-transparent p-0 text-left focus-visible:outline-none",
                 resolved.loading ? "cursor-wait" : "cursor-pointer",
               )}
             >
               <span
                 className={cn(
-                  "box-decoration-clone rounded-[0.2em] px-[0.08em] pt-[0.04em] pb-[0.08em] transition-colors",
-                  !isSel &&
-                    !isTargeted &&
-                    !isSaved &&
-                    "group-focus-visible:bg-gold-500/10",
-                  isSel && "bg-gold-500/20",
-                  isTargeted &&
-                    !isSel &&
-                    "bg-gold-500/15 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--color-gold-500)_35%,transparent)]",
-                  isSaved && !isSel && !isTargeted && "bg-gold-500/10",
+                  "verse-mark box-decoration-clone rounded-[0.2em] px-[0.14em] pt-[0.06em] pb-[0.1em] transition-colors",
+                  isSel && "verse-mark-selected",
+                  isTargeted && !isSel && "verse-mark-targeted",
+                  isSaved && !isSel && !isTargeted && "verse-mark-saved",
                 )}
               >
                 <span className="verse-number">{num}</span>
