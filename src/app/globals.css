@@ -21,6 +21,11 @@
      wallpaper. At #6b655a a dark scene dropped it to 2.2:1; this reads 4.6:1
      over the darkest wallpaper and 6.6:1 on plain paper. */
   --color-ash: #615b51;       /* helper text, captions */
+  /* Prompts and placeholders are meant to be *read* — a prayer prompt is an
+     invitation, not chrome. At fog they washed into the card they sat in
+     (2.3:1). This holds 5.2:1 on paper while staying a clear step quieter
+     than entered text, so a prompt is never mistaken for the reader's words. */
+  --color-quill: #6f6a5e;     /* placeholders, suggested text */
   --color-fog: #b0a996;       /* disabled, quiet dividers */
   --color-mist: #e4dcc6;      /* hairline borders — the signature edge */
   --color-twilight: #1e3329;  /* dark outlines, icon strokes — deep green */
@@ -200,6 +205,7 @@ html.theme-dark {
   --color-graphite: #e9e4d3;
   --color-charcoal: #d1ccba;
   --color-ash: #a8a394;
+  --color-quill: #9b9585;
   --color-fog: #6b6b5f;
   --color-mist: #2e3a31;
   --color-accent: #8ecbaa;
@@ -432,6 +438,13 @@ html.theme-dark .milestone-glass-surface[data-milestone-state="reached"] {
   color: var(--color-graphite);
 }
 
+/* Every field inherits the readable prompt colour, so a composer added later
+   cannot quietly reintroduce the washed-out placeholder this replaced. */
+::placeholder {
+  color: var(--color-quill);
+  opacity: 1; /* Firefox dims placeholders by default; the token decides. */
+}
+
 /* Calm, visible focus — verse buttons place theirs on the wrapped text. */
 :focus-visible:not([id^="verse-"]) {
   outline: 2px solid var(--color-accent);
@@ -590,10 +603,62 @@ html.theme-dark .milestone-glass-surface[data-milestone-state="reached"] {
   font-family: var(--font-sans);
   font-size: 0.6875rem;
   font-weight: 500;
-  color: var(--color-fog);
+  /* Still plainly subordinate to Scripture, but a reference is looked *for* —
+     at fog these all but disappeared over a wallpaper, and in candle mode
+     they were gone entirely. */
+  color: var(--color-quill);
   vertical-align: super;
   margin-right: 0.3em;
   user-select: none;
+}
+
+/* ---- Verse marks ----
+   Scripture is read over the chosen wallpaper, not over a card, so a highlight
+   drawn as a thin wash of gold (10–20% alpha) all but vanished on busy or dark
+   scenes — a shared link would land on a verse with nothing to show for it.
+   These marks mix toward paper instead of toward the wallpaper, so the band
+   stays the same warm gold whatever is behind it, and each state is a visible
+   step above the last: saved is a quiet keepsake, targeted is "here is the
+   verse you followed", selected is what your thumb is on right now. */
+.verse-mark {
+  --verse-mark-fill: transparent;
+  --verse-mark-edge: transparent;
+  background-color: var(--verse-mark-fill);
+  box-shadow: inset 0 0 0 1px var(--verse-mark-edge);
+}
+/* Arrow-key travel needs a trace of where you are without claiming the verse
+   is saved. Kept below the state marks in specificity so a focused keepsake
+   still reads as a keepsake. */
+button:focus-visible > :where(.verse-mark) {
+  --verse-mark-fill: color-mix(in srgb, var(--color-gold-300) 30%, transparent);
+}
+.verse-mark.verse-mark-saved {
+  --verse-mark-fill: color-mix(in srgb, var(--color-gold-300) 46%, transparent);
+}
+.verse-mark.verse-mark-targeted {
+  --verse-mark-fill: color-mix(in srgb, var(--color-gold-300) 68%, transparent);
+  /* Light enough to define the band without ruling a box around every line. */
+  --verse-mark-edge: color-mix(in srgb, var(--color-gold-600) 26%, transparent);
+}
+.verse-mark.verse-mark-selected {
+  --verse-mark-fill: color-mix(in srgb, var(--color-gold-500) 82%, transparent);
+  --verse-mark-edge: color-mix(in srgb, var(--color-gold-700) 38%, transparent);
+}
+/* Candlelight: the same three steps, lifted so they read on a dark page
+   without turning Scripture into a light-on-light smear. */
+html.theme-dark button:focus-visible > :where(.verse-mark) {
+  --verse-mark-fill: color-mix(in srgb, var(--color-gold-700) 40%, transparent);
+}
+html.theme-dark .verse-mark.verse-mark-saved {
+  --verse-mark-fill: color-mix(in srgb, var(--color-gold-700) 46%, transparent);
+}
+html.theme-dark .verse-mark.verse-mark-targeted {
+  --verse-mark-fill: color-mix(in srgb, var(--color-gold-700) 86%, transparent);
+  --verse-mark-edge: color-mix(in srgb, var(--color-gold-300) 52%, transparent);
+}
+html.theme-dark .verse-mark.verse-mark-selected {
+  --verse-mark-fill: color-mix(in srgb, var(--color-gold-600) 78%, transparent);
+  --verse-mark-edge: color-mix(in srgb, var(--color-gold-300) 62%, transparent);
 }
 
 /* ============================================================

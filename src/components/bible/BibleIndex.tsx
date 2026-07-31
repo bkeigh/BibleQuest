@@ -360,7 +360,7 @@ function BibleIndexInner() {
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search Genesis, John, Psalms…"
               autoComplete="off"
-              className="min-h-12 w-full rounded-[var(--radius-card)] border border-mist bg-paper pl-11 pr-12 text-small text-graphite outline-none paper-shadow transition-colors placeholder:text-fog focus:border-accent/50"
+              className="min-h-12 w-full rounded-[var(--radius-card)] border border-mist bg-paper pl-11 pr-12 text-small text-graphite outline-none paper-shadow transition-colors placeholder:text-quill focus:border-accent/50"
             />
             <SearchClearButton
               inputId="bible-book-search"

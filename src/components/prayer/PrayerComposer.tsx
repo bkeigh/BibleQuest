@@ -217,7 +217,7 @@ function PrayerComposerInner() {
           value={value.title}
           onChange={(event) => setField("title", event.target.value)}
           placeholder="Title (optional)"
-          className="w-full border-b border-mist bg-transparent pb-3 font-display text-[1.25rem] text-graphite outline-none placeholder:font-sans placeholder:text-fog focus:border-accent"
+          className="w-full border-b border-mist bg-transparent pb-3 font-display text-[1.25rem] text-graphite outline-none placeholder:font-sans placeholder:text-quill focus:border-accent"
         />
         <label htmlFor="prayer-body" className="sr-only">
           Your prayer
@@ -235,7 +235,7 @@ function PrayerComposerInner() {
           }}
           rows={14}
           placeholder={prompt.text}
-          className="mt-4 min-h-[44vh] w-full resize-y bg-transparent text-[1.0625rem] leading-[1.8] text-graphite outline-none placeholder:text-fog"
+          className="mt-4 min-h-[44vh] w-full resize-y bg-transparent text-[1.0625rem] leading-[1.8] text-graphite outline-none placeholder:text-quill"
           autoFocus
         />
         <JournalEditorToolbar

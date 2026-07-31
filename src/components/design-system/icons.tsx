@@ -84,6 +84,13 @@ export const IconArrowLeft = (p: IconProps) => (
   </Svg>
 );
 
+/** Send. The upward arrow every messaging surface has taught readers to expect. */
+export const IconArrowUp = (p: IconProps) => (
+  <Svg {...p} size={p.size ?? 18} strokeWidth={p.strokeWidth ?? 2}>
+    <path d="M12 19V6M6 12l6-6 6 6" />
+  </Svg>
+);
+
 export const IconCheck = (p: IconProps) => (
   <Svg {...p}>
     <path d="M5 12.5 10 17 19 7" />
