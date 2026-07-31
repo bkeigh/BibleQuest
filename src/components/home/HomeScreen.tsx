@@ -128,7 +128,7 @@ function HomeInner() {
           data-paper-variant="paper"
           data-plus-nameplate={isPlus ? "active" : "free"}
           className={cn(
-            "app-glass-surface sacred-frame relative mt-4 mb-4 overflow-hidden bg-paper/90 px-5 py-4 max-[360px]:px-4 sm:mt-5 sm:px-6 sm:py-5",
+            "app-glass-surface sacred-frame relative mt-4 mb-4 overflow-hidden bg-paper/90 px-5 py-4 max-[380px]:px-4 max-[340px]:px-3 sm:mt-5 sm:px-6 sm:py-5",
             isPlus &&
               "border-[#b88528]/70 bg-[linear-gradient(135deg,rgba(255,248,218,0.94),rgba(246,225,159,0.9)_48%,rgba(255,249,224,0.94))] shadow-[0_12px_34px_rgba(126,85,24,0.2)] ring-1 ring-[#e2bd62]/65",
           )}
@@ -152,7 +152,7 @@ function HomeInner() {
               </span>
             </>
           )}
-          <div className="relative z-10 flex min-w-0 items-center gap-3 max-[360px]:gap-2">
+          <div className="relative z-10 flex min-w-0 items-center gap-3 max-[380px]:gap-2 max-[340px]:gap-1.5">
             <Link
               href="/app/settings"
               aria-label={t.home.openSettings}
@@ -162,7 +162,7 @@ function HomeInner() {
                 name={profile?.displayName}
                 marker={profileAvatarMarker(profile)}
                 size="lg"
-                className="ring-1 ring-paper/70 shadow-[0_8px_24px_rgb(18_33_27_/_0.14)] max-[360px]:h-[4.5rem] max-[360px]:w-[4.5rem]"
+                className="ring-1 ring-paper/70 shadow-[0_8px_24px_rgb(18_33_27_/_0.14)] max-[380px]:h-[4.5rem] max-[380px]:w-[4.5rem] max-[340px]:h-16 max-[340px]:w-16"
               />
               <span
                 aria-hidden="true"
@@ -171,20 +171,21 @@ function HomeInner() {
                 <IconSettings size={14} />
               </span>
             </Link>
-            <div className="min-w-0 flex-1">
+            <div className="@container min-w-0 flex-1">
               {isPlus && (
-                <p
-                  aria-label="BibleQuest Plus member"
-                  className="mb-1 flex items-center gap-1.5 whitespace-nowrap text-[0.625rem] font-semibold uppercase tracking-[0.2em] text-[#8a5a12] max-[360px]:gap-1 max-[360px]:tracking-[0.14em]"
-                >
-                  <span aria-hidden="true">✦</span>
-                  <span>
-                    BibleQuest{" "}
-                    <strong className="font-black" aria-hidden="true">
-                      +
-                    </strong>
+                <p className="mb-1">
+                  <span className="sr-only">BibleQuest Plus member</span>
+                  <span
+                    aria-hidden="true"
+                    className="flex items-center gap-1.5 whitespace-nowrap text-[0.625rem] font-semibold uppercase tracking-[0.2em] text-[#8a5a12] @max-[8rem]:gap-1 @max-[8rem]:tracking-[0.1em]"
+                  >
+                    <span className="@max-[8rem]:hidden">✦</span>
+                    <span>
+                      BibleQuest{" "}
+                      <strong className="font-black leading-none">+</strong>
+                    </span>
+                    <span className="@max-[8rem]:hidden">✦</span>
                   </span>
-                  <span aria-hidden="true">✦</span>
                 </p>
               )}
               <p className="font-display text-[1rem] leading-tight text-accent max-[360px]:text-[0.875rem]">
@@ -205,7 +206,11 @@ function HomeInner() {
                 </p>
               )}
             </div>
-            <StreakCard streak={streak} dayKey={dayKey} />
+            <StreakCard
+              streak={streak}
+              dayKey={dayKey}
+              className="max-[340px]:w-12"
+            />
           </div>
         </header>
 

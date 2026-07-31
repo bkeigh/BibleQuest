@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   INSTALL_DISMISS_TTL_MS,
   detectInstallPlatform,
@@ -27,7 +27,12 @@ describe("PWA install guidance", () => {
     expect(isStandaloneWebApp(appWindow(true))).toBe(true);
     expect(isStandaloneWebApp(appWindow(false, true))).toBe(true);
     expect(isStandaloneWebApp(appWindow(false))).toBe(false);
-    expect(isStandaloneWebApp(undefined)).toBe(false);
+    expect(isStandaloneWebApp({})).toBe(false);
+  });
+
+  it("defaults safely when server rendering has no window", () => {
+    vi.stubGlobal("window", undefined);
+    expect(isStandaloneWebApp()).toBe(false);
   });
 
   it("recognizes iOS browsers and iPadOS desktop-style user agents", () => {
