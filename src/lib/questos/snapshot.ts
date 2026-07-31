@@ -36,5 +36,6 @@ export function createExportSnapshot(source: QuestOSSnapshot): QuestOSSnapshot {
     lastVisitDateKey: source.lastVisitDateKey,
     streak: source.streak,
     accountNudge: source.accountNudge,
+    guidedProgress: source.guidedProgress ?? {},
   };
 }

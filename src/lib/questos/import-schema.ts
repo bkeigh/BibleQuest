@@ -34,6 +34,7 @@ import {
 } from "./history-integrity";
 import { isValidDateKey } from "@/lib/utils/dates";
 import { normalizeGlassOpacity } from "@/lib/glass-opacity";
+import { sanitizeGuidedProgress } from "@/lib/guided/progress";
 
 function isObj(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -158,6 +159,7 @@ const ALL_KEYS: string[] = [
   "lastVisitDateKey",
   "streak",
   "accountNudge",
+  "guidedProgress",
 ];
 
 export type ParseResult =
@@ -217,7 +219,7 @@ export function parseSnapshot(rawText: string): ParseResult {
       return { ok: false, error: IMPORT_TOO_LARGE_ERROR };
     }
   }
-  for (const key of ["assignments", "myQuests"]) {
+  for (const key of ["assignments", "myQuests", "guidedProgress"]) {
     const value = src[key];
     if (
       isObj(value) &&
@@ -309,6 +311,11 @@ export function parseSnapshot(rawText: string): ParseResult {
       if (typeof appearance.glassSurfaces !== "boolean") {
         delete appearance.glassSurfaces;
       }
+      if (
+        typeof appearance.myShepherdFloatingButton !== "boolean"
+      ) {
+        delete appearance.myShepherdFloatingButton;
+      }
       // Keep valid backup preferences, but never let an imported file bypass
       // the same readability floor enforced by the Settings slider.
       if ("glassOpacity" in appearance) {
@@ -382,6 +389,9 @@ export function parseSnapshot(rawText: string): ParseResult {
   if (isStreak(src.streak)) out.streak = src.streak;
   if (isReadingPosition(src.readingPosition)) out.readingPosition = src.readingPosition;
   if (isAccountNudge(src.accountNudge)) out.accountNudge = src.accountNudge;
+  if (isObj(src.guidedProgress)) {
+    out.guidedProgress = sanitizeGuidedProgress(src.guidedProgress);
+  }
   if (str(src.lastVisitDateKey) || src.lastVisitDateKey === null) {
     out.lastVisitDateKey = src.lastVisitDateKey;
   }

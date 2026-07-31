@@ -2,6 +2,7 @@ import Link from "next/link";
 import { IconArrowRight } from "@/components/design-system/icons";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { cn } from "@/lib/utils/cn";
+import { webCommerceAvailable } from "@/lib/platform/purchases";
 
 interface SupportLinkProps {
   className?: string;
@@ -9,11 +10,13 @@ interface SupportLinkProps {
 
 /** Gives the one-time support path the same prominent treatment as Home's verse card. */
 export function SupportLink({ className }: SupportLinkProps) {
+  if (!webCommerceAvailable()) return null;
+
   return (
     <Link
       href="/support"
       className={cn(
-        "group relative isolate flex min-h-16 items-center gap-3 overflow-hidden rounded-[var(--radius-card)] border border-evergreen-600 bg-evergreen-700 px-4 py-3 text-[#fdfbf3] paper-shadow-lg transition-all duration-300 [transition-timing-function:var(--ease-gentle)] hover:-translate-y-0.5 hover:bg-evergreen-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0",
+        "group relative isolate flex min-h-20 items-center gap-3 overflow-hidden rounded-[var(--radius-card)] border border-evergreen-600 bg-evergreen-700 px-4 py-4 text-[#fdfbf3] paper-shadow-lg transition-all duration-300 [transition-timing-function:var(--ease-gentle)] hover:-translate-y-0.5 hover:bg-evergreen-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0",
         className,
       )}
     >
@@ -29,7 +32,7 @@ export function SupportLink({ className }: SupportLinkProps) {
           Support BibleQuest
         </span>
         <span className="mt-1 block text-caption text-[#fdfbf3]/70">
-          Help keep BibleQuest free and growing.
+          Make a voluntary one-time contribution.
         </span>
       </span>
       <IconArrowRight className="relative shrink-0 transition-transform duration-300 group-hover:translate-x-1" />

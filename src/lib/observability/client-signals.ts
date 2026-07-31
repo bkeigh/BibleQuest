@@ -1,3 +1,5 @@
+import { apiFetch } from "@/lib/platform/api";
+
 export const CLIENT_SIGNAL_SURFACES = [
   "auth",
   "sync",
@@ -228,7 +230,7 @@ function writeSignalQueue(queue: ClientSignal[]): void {
 /** Sends one validated signal without cookies or referrer information. */
 async function sendClientSignal(signal: ClientSignal): Promise<boolean> {
   try {
-    const response = await fetch("/api/observability/client", {
+    const response = await apiFetch("/api/observability/client", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(signal),

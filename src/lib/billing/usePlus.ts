@@ -12,6 +12,8 @@ import {
 import { track } from "@/lib/analytics/events";
 import { useSession } from "@/lib/supabase/useSession";
 import type { PlanKey } from "@/lib/questos/types";
+import { apiFetch } from "@/lib/platform/api";
+import { purchaseAdapter } from "@/lib/platform/purchases";
 import type { BillingInterval, BillingPlan } from "./validation";
 
 export type PlusStatus =
@@ -112,12 +114,15 @@ async function billingFetch(
   path: string,
   init?: RequestInit,
 ): Promise<Response> {
-  return fetch(path, {
+  return apiFetch(path, {
     credentials: "same-origin",
     cache: "no-store",
     ...init,
   });
 }
+
+// Native billing remains unavailable until a separately audited adapter is supplied.
+const purchases = purchaseAdapter();
 
 function safeReturnNotice(): StoredPlusState["returnNotice"] {
   if (typeof window === "undefined") return null;
@@ -320,13 +325,11 @@ function usePlusCoordinator(): PlusState {
 
   const refresh = useCallback(async () => {
     if (session.user) {
-      const response = await billingFetch("/api/billing/refresh", {
-        method: "POST",
-      });
-      if (!response.ok && response.status !== 429) {
+      const outcome = await purchases.restore();
+      if (outcome === "failed" || outcome === "unavailable") {
         throw new Error("refresh failed");
       }
-      if (response.ok) track("plus_billing_refreshed");
+      if (outcome === "restored") track("plus_billing_refreshed");
     }
     await load();
   }, [load, session.user]);
@@ -356,18 +359,9 @@ function usePlusCoordinator(): PlusState {
       ) {
         return false;
       }
-      const response = await billingFetch("/api/billing/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ interval }),
-      });
-      if (!response.ok) return false;
-      const payload = (await response.json()) as { url?: unknown };
-      if (typeof payload.url !== "string") return false;
-      const destination = new URL(payload.url);
-      if (destination.origin !== "https://checkout.stripe.com") return false;
+      const outcome = await purchases.purchase(interval);
+      if (outcome !== "redirected") return false;
       track("plus_checkout_opened", { interval });
-      window.location.assign(destination.toString());
       return true;
     },
     [session.user, visible.plans, visible.purchasesEnabled],
@@ -375,16 +369,9 @@ function usePlusCoordinator(): PlusState {
 
   const openCustomerPortal = useCallback(async () => {
     if (!session.user || !visible.hasCustomer) return false;
-    const response = await billingFetch("/api/billing/portal", {
-      method: "POST",
-    });
-    if (!response.ok) return false;
-    const payload = (await response.json()) as { url?: unknown };
-    if (typeof payload.url !== "string") return false;
-    const destination = new URL(payload.url);
-    if (destination.origin !== "https://billing.stripe.com") return false;
+    const outcome = await purchases.manage();
+    if (outcome !== "redirected") return false;
     track("plus_billing_portal_opened");
-    window.location.assign(destination.toString());
     return true;
   }, [session.user, visible.hasCustomer]);
 
@@ -398,6 +385,7 @@ function usePlusCoordinator(): PlusState {
     entitlementSource: visible.entitlementSource,
     canPurchase:
       Boolean(session.user) &&
+      purchases.available &&
       visible.purchasesEnabled &&
       visible.plans.length === 3 &&
       !visible.isPlus,

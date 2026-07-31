@@ -14,7 +14,7 @@ export const WALLPAPER_CATALOG = [
   {
     id: "galilee-be-still",
     title: "Galilee, Be Still",
-    tier: "free",
+    tier: "plus",
     posterUrl: "/wallpapers/galilee-be-still/poster.webp",
     thumbnailUrl: "/wallpapers/galilee-be-still/thumbnail.webp",
     videoUrl: "/wallpapers/galilee-be-still/loop.mp4",
@@ -22,7 +22,7 @@ export const WALLPAPER_CATALOG = [
   {
     id: "the-olive-grove",
     title: "The Olive Grove",
-    tier: "free",
+    tier: "plus",
     posterUrl: "/wallpapers/the-olive-grove/poster.webp",
     thumbnailUrl: "/wallpapers/the-olive-grove/thumbnail.webp",
     videoUrl: "/wallpapers/the-olive-grove/loop.mp4",
@@ -30,7 +30,7 @@ export const WALLPAPER_CATALOG = [
   {
     id: "01-let-there-be-light",
     title: "Let There Be Light",
-    tier: "free",
+    tier: "plus",
     posterUrl: "/wallpapers/01-let-there-be-light/poster.webp",
     thumbnailUrl: "/wallpapers/01-let-there-be-light/thumbnail.webp",
     videoUrl: "/wallpapers/01-let-there-be-light/loop.mp4",
@@ -38,7 +38,7 @@ export const WALLPAPER_CATALOG = [
   {
     id: "12-baptism-in-the-jordan",
     title: "Baptism in the Jordan",
-    tier: "free",
+    tier: "plus",
     posterUrl: "/wallpapers/12-baptism-in-the-jordan/poster.webp",
     thumbnailUrl: "/wallpapers/12-baptism-in-the-jordan/thumbnail.webp",
     videoUrl: "/wallpapers/12-baptism-in-the-jordan/loop.mp4",
@@ -46,7 +46,7 @@ export const WALLPAPER_CATALOG = [
   {
     id: "20-empty-tomb-at-dawn",
     title: "Empty Tomb at Dawn",
-    tier: "free",
+    tier: "plus",
     posterUrl: "/wallpapers/20-empty-tomb-at-dawn/poster.webp",
     thumbnailUrl: "/wallpapers/20-empty-tomb-at-dawn/thumbnail.webp",
     videoUrl: "/wallpapers/20-empty-tomb-at-dawn/loop.mp4",
@@ -128,16 +128,9 @@ export const WALLPAPER_CATALOG = [
 export type Wallpaper = (typeof WALLPAPER_CATALOG)[number];
 export type WallpaperId = Wallpaper["id"];
 
-// Gives new and invalid selections a guaranteed free wallpaper fallback.
-export const DEFAULT_WALLPAPER_ID = "galilee-be-still" satisfies WallpaperId;
-
-// Provides tier-specific lists without duplicating catalog entries.
-export const FREE_WALLPAPERS = WALLPAPER_CATALOG.filter(
-  (wallpaper) => wallpaper.tier === "free",
-);
-export const PLUS_WALLPAPERS = WALLPAPER_CATALOG.filter(
-  (wallpaper) => wallpaper.tier === "plus",
-);
+// Parchment is the only non-Plus canvas; every catalogued artwork is paid.
+export const FREE_WALLPAPERS: readonly Wallpaper[] = [];
+export const PLUS_WALLPAPERS = WALLPAPER_CATALOG;
 
 const WALLPAPERS_BY_ID = new Map<WallpaperId, Wallpaper>(
   WALLPAPER_CATALOG.map((wallpaper) => [wallpaper.id, wallpaper]),
@@ -155,21 +148,21 @@ export function getWallpaperById(value: unknown): Wallpaper | undefined {
 
 // Enforces the catalog's free/Plus boundary for a known wallpaper.
 export function canAccessWallpaper(
-  wallpaper: Wallpaper,
+  _wallpaper: Wallpaper,
   hasPlusAccess: boolean,
 ): boolean {
-  return wallpaper.tier === "free" || hasPlusAccess;
+  return hasPlusAccess;
 }
 
-// Resolves stale, invalid, or no-longer-entitled selections to the free default.
+// Resolves stale, invalid, or no-longer-entitled selections to parchment.
 export function resolveWallpaper(
   value: unknown,
   hasPlusAccess: boolean,
-): Wallpaper {
+): Wallpaper | null {
   const wallpaper = getWallpaperById(value);
   if (wallpaper && canAccessWallpaper(wallpaper, hasPlusAccess)) {
     return wallpaper;
   }
 
-  return WALLPAPERS_BY_ID.get(DEFAULT_WALLPAPER_ID)!;
+  return null;
 }

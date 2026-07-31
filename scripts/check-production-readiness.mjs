@@ -109,6 +109,11 @@ const REQUIRED_SCHEMA = [
     select: "assigned_date,revision",
     migration: "0015",
   },
+  {
+    table: "user_guided_movements",
+    select: "session_key,content_id,movement_key,occurred_at",
+    migration: "0033",
+  },
 ];
 
 // Each public RPC returns exactly one fixed identity plus an authorization
@@ -143,6 +148,12 @@ const POSTURE_CONTRACTS = [
     contract: "biblequest_operator_plus_grant_v1",
     migration: "0030",
     label: "operator Plus grant posture",
+  },
+  {
+    rpc: "guided_progress_sync_contract",
+    contract: "biblequest_guided_progress_sync_v1",
+    migration: "0033",
+    label: "guided progress sync posture",
   },
 ];
 
@@ -182,6 +193,24 @@ const appUrl = configuredUrl(appUrlValue, "BIBLEQUEST_READINESS_APP_URL");
 
 if (!publishableKey) {
   failures.push("NEXT_PUBLIC_SUPABASE_ANON_KEY is not configured");
+}
+
+// MyShepherd and Haiku quest matching fail closed with a 503 when the provider
+// is misconfigured, so the deployment check has to catch it before users do.
+const APPROVED_ANTHROPIC_MODELS = [
+  "claude-haiku-4-5",
+  "claude-haiku-4-5-20251001",
+];
+const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
+const anthropicModel = process.env.ANTHROPIC_MODEL?.trim();
+
+if (!anthropicKey || anthropicKey.length < 20) {
+  failures.push("ANTHROPIC_API_KEY is not configured");
+}
+if (anthropicModel && !APPROVED_ANTHROPIC_MODELS.includes(anthropicModel)) {
+  failures.push(
+    `ANTHROPIC_MODEL is not an approved model (expected one of ${APPROVED_ANTHROPIC_MODELS.join(", ")})`,
+  );
 }
 
 function result(ok, label, detail) {
@@ -224,7 +253,7 @@ function safeHealthBody(value) {
     typeof candidate.canonical_origin_matches !== "boolean" ||
     !["configured", "guest-only", "invalid"].includes(candidate.auth_posture) ||
     !["configured", "disabled", "invalid"].includes(candidate.analytics_posture) ||
-    candidate.schema_contract !== "0032" ||
+    candidate.schema_contract !== "0033" ||
     candidate.content_contract !== "seed-manifest-v1" ||
     !/^biblequest-v\d{1,4}$/.test(candidate.service_worker_version) ||
     !["coming-soon", "test", "live", "invalid"].includes(

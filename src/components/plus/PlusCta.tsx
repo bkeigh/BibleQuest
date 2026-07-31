@@ -74,7 +74,7 @@ export function PlusCta() {
   if (plus.status === "coming-soon") {
     return (
       <p className="mt-5 text-[0.8125rem] text-ash">
-        Plus is still being prepared. Production checkout is off, and the free
+        Plus is still being prepared. Production checkout is off, and the core
         app stays complete either way.
       </p>
     );
@@ -187,7 +187,7 @@ export function PlusCta() {
   if (!plus.canPurchase || plus.plans.length !== 3) {
     return (
       <p className="mt-5 text-[0.8125rem] text-ash">
-        Membership purchase is unavailable. The free app stays complete while
+        Membership purchase is unavailable. The core app stays complete while
         setup remains closed.
       </p>
     );
@@ -249,7 +249,7 @@ export function PlusCta() {
           {SUPPORT_EMAIL}
         </a>
         . Core Scripture, prayer, reflection, and daily faith formation remain
-        free.
+        available.
       </p>
       {plus.hasCustomer && (
         <GentleButton

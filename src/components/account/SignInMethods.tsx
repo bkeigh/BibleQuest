@@ -14,7 +14,7 @@ import {
   classifyOperationalError,
   reportClientSignal,
 } from "@/lib/observability/client-signals";
-import { authCallbackPath } from "@/lib/auth/redirect";
+import { resolveAuthCallbackUrl } from "@/lib/platform/auth";
 import {
   emailOtpFailure,
   emailRequestFailure,
@@ -95,7 +95,7 @@ export function SignInMethods({
     typeof navigator === "undefined" || navigator.onLine !== false;
 
   function callbackUrl() {
-    return new URL(authCallbackPath(nextPath), window.location.origin).toString();
+    return resolveAuthCallbackUrl(nextPath);
   }
 
   function showFailure(failure: AuthRequestFailure) {

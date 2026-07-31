@@ -7,6 +7,11 @@ import { IconClose, IconShare } from "@/components/design-system/icons";
 import { useToast } from "@/components/design-system/Toast";
 import { useStrings } from "@/lib/i18n";
 import { track } from "@/lib/analytics/events";
+import {
+  copyTextToClipboard,
+  shareContent,
+  systemShareSupported,
+} from "@/lib/platform/share";
 
 interface VerseShareSheetProps {
   open: boolean;
@@ -16,35 +21,6 @@ interface VerseShareSheetProps {
   /** Explains when the share-safe WEB wording differs from the edition shown. */
   notice?: string;
   onClose: () => void;
-}
-
-/** Clipboard API first, with a small legacy fallback for restricted webviews. */
-async function copyText(value: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(value);
-      return true;
-    }
-  } catch {
-    // Continue to the selection fallback below.
-  }
-
-  const field = document.createElement("textarea");
-  field.value = value;
-  field.readOnly = true;
-  field.style.position = "fixed";
-  field.style.opacity = "0";
-  document.body.appendChild(field);
-  field.select();
-  let copied = false;
-  try {
-    copied = document.execCommand("copy");
-  } catch {
-    copied = false;
-  } finally {
-    field.remove();
-  }
-  return copied;
 }
 
 /**
@@ -117,7 +93,7 @@ export function VerseShareSheet({
   const smsHref = `sms:?&body=${encodeURIComponent(sharedBody)}`;
 
   async function copy(value: string, successMessage: string) {
-    if (await copyText(value)) {
+    if (await copyTextToClipboard(value)) {
       toast(successMessage, { variant: "success" });
       track("verse_shared");
       onClose();
@@ -127,14 +103,18 @@ export function VerseShareSheet({
   }
 
   async function shareNatively() {
-    if (nativeSharing || typeof navigator.share !== "function") return;
+    if (nativeSharing || !systemShareSupported()) return;
     setNativeSharing(true);
+    const outcome = await shareContent({ title, text, url });
     try {
-      await navigator.share({ title, text, url });
-      track("verse_shared");
-      onClose();
-    } catch (error) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) {
+      if (outcome === "shared") {
+        track("verse_shared");
+        onClose();
+      } else if (outcome === "copied") {
+        toast("Share text copied instead.", { variant: "success" });
+        track("verse_shared");
+        onClose();
+      } else if (outcome === "unavailable") {
         toast("We couldn’t open your device’s share options. Try one below.");
       }
     } finally {
@@ -188,7 +168,7 @@ export function VerseShareSheet({
           {text}
         </p>
 
-        {typeof navigator.share === "function" && (
+        {systemShareSupported() && (
           <GentleButton
             variant="primary"
             size="md"

@@ -94,6 +94,10 @@ class MemoryCache {
   async put(input: RequestInfo | URL, value: Response) {
     this.entries.set(this.key(input), value.clone());
   }
+
+  async delete(input: RequestInfo | URL) {
+    return this.entries.delete(this.key(input));
+  }
 }
 
 class MemoryCacheStorage {
@@ -233,6 +237,13 @@ describe("service-worker cache policy", () => {
       "/app/bible/john",
       "/app/bible/john/3",
       "/app/settings",
+      "/app/guided",
+      "/app/guided/daily",
+      "/app/pilgrimages",
+      "/app/pilgrimages/learning-to-remain",
+      "/app/pilgrimages/learning-to-remain/1",
+      "/app/games",
+      "/app/rhythm",
     ];
     for (const pathname of allowed) {
       expect(
@@ -241,7 +252,14 @@ describe("service-worker cache policy", () => {
       ).toBe(true);
     }
 
-    for (const pathname of ["/", "/about", "/app/plus", "/app/unknown"]) {
+    for (const pathname of [
+      "/",
+      "/about",
+      "/app/plus",
+      "/app/unknown",
+      "/app/games/archive",
+      "/app/games/archive/connections-books-rivers-soils",
+    ]) {
       expect(
         policy.isOfflineSafeNavigationRequest(makeRequest(pathname)),
         pathname
@@ -258,6 +276,7 @@ describe("service-worker cache policy", () => {
       makeRequest("/app/account/security"),
       makeRequest("/api/health"),
       makeRequest("/app?qa=1"),
+      makeRequest("/app/games?view=archive"),
       makeRequest("/app", { method: "POST" }),
       makeRequest("https://example.com/app"),
     ];
@@ -266,6 +285,15 @@ describe("service-worker cache policy", () => {
         false
       );
     }
+  });
+
+  it("runtime-caches gated Green routes without precaching disabled 404s", () => {
+    const { policy } = loadWorker();
+
+    expect(policy.PRECACHE_PATHS).not.toContain("/app/guided");
+    expect(policy.PRECACHE_PATHS).not.toContain("/app/pilgrimages");
+    expect(policy.PRECACHE_PATHS).not.toContain("/app/games");
+    expect(policy.PRECACHE_PATHS).not.toContain("/app/rhythm");
   });
 
   it("uses static caching only for queryless same-origin hashed build assets", () => {
@@ -383,7 +411,7 @@ describe("service-worker fetch behavior", () => {
     expect(runtime.entries.size).toBe(0);
   });
 
-  it("keeps online navigation errors visible instead of falling back", async () => {
+  it("keeps online errors visible and retires their stale offline copy", async () => {
     const harness = loadWorker(async () =>
       makeResponse("server error", { status: 500 })
     );
@@ -393,9 +421,7 @@ describe("service-worker fetch behavior", () => {
     const result = await dispatchFetch(harness, makeRequest("/app"));
     expect(result?.status).toBe(500);
     expect(await result?.text()).toBe("server error");
-    expect(await (await runtime.match(`${ORIGIN}/app`))?.text()).toBe(
-      "stale app"
-    );
+    expect(await runtime.match(`${ORIGIN}/app`)).toBeUndefined();
   });
 
   it("uses exact cached navigation before the offline page on fetch failure", async () => {

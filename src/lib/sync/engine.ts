@@ -52,6 +52,7 @@ import {
   chapterReadToRow,
   completionToRow,
   growthEventToRow,
+  guidedProgressToRows,
   journeyEventToRow,
   milestoneToRow,
   myQuestToRow,
@@ -67,6 +68,7 @@ import {
   rowToChapterRead,
   rowToCompletion,
   rowToGrowthEvent,
+  rowsToGuidedProgress,
   rowToJourneyEvent,
   rowToMilestone,
   rowToMyQuest,
@@ -76,6 +78,7 @@ import {
   rowToRecentVerse,
   rowToReflection,
 } from "./mapping";
+import { mergeGuidedProgressRecords } from "@/lib/guided/progress";
 import {
   configureDailyQuestSyncContext,
   createDailyQuestSyncContext,
@@ -140,7 +143,8 @@ type SyncedField =
   | "bookmarks"
   | "readingPosition"
   | "chaptersRead"
-  | "recentVerses";
+  | "recentVerses"
+  | "guidedProgress";
 
 const SYNCED_FIELDS: SyncedField[] = [
   "profile",
@@ -157,6 +161,7 @@ const SYNCED_FIELDS: SyncedField[] = [
   "readingPosition",
   "chaptersRead",
   "recentVerses",
+  "guidedProgress",
 ];
 
 const PUSH_DEBOUNCE_MS = 2_500;
@@ -865,6 +870,7 @@ function snapshotFromStore(): QuestOSSnapshot {
     // Same deal: device-local nudge bookkeeping must survive merge-apply
     // or every signed-in launch would forget past dismissals.
     accountNudge: s.accountNudge,
+    guidedProgress: s.guidedProgress,
   };
 }
 
@@ -898,6 +904,11 @@ export function serverAuthoritativeBaseline(
     lastVisitDateKey: local.lastVisitDateKey,
     streak: local.streak,
     accountNudge: local.accountNudge,
+    guidedProgress: Object.fromEntries(
+      Object.entries(local.guidedProgress ?? {}).filter(
+        ([, progress]) => progress.kind === "daily",
+      ),
+    ),
   };
 }
 
@@ -1082,6 +1093,7 @@ async function pullAll(
     readingRes,
     chaptersRes,
     recentVersesRes,
+    guidedMovementsRes,
     journeyRes,
     growthRes,
     milestonesRes,
@@ -1166,6 +1178,17 @@ async function pullAll(
     ),
     pullAccountRows(
       supabase,
+      "user_guided_movements",
+      "*",
+      [
+        { column: "occurred_at" },
+        { column: "session_key" },
+        { column: "movement_key" },
+      ],
+      userId,
+    ),
+    pullAccountRows(
+      supabase,
       "journey_events",
       "*",
       [{ column: "occurred_at" }, { column: "id" }],
@@ -1209,6 +1232,7 @@ async function pullAll(
     journeyRes,
     growthRes,
     milestonesRes,
+    guidedMovementsRes,
   ];
   for (const res of all) {
     if (res.error) throw res.error;
@@ -1295,6 +1319,9 @@ async function pullAll(
       ),
       earnedMilestones: (milestonesRes.data ?? []).map((row) =>
         rowToMilestone(row as never),
+      ),
+      guidedProgress: rowsToGuidedProgress(
+        (guidedMovementsRes.data ?? []) as never,
       ),
     },
   };
@@ -1449,6 +1476,8 @@ async function reconcileRevisionedMutableSnapshot(
       wallpaperMode: local.settings.appearance.wallpaperMode,
       glassSurfaces: local.settings.appearance.glassSurfaces,
       glassOpacity: local.settings.appearance.glassOpacity,
+      myShepherdFloatingButton:
+        local.settings.appearance.myShepherdFloatingButton,
     },
   };
 
@@ -1621,6 +1650,8 @@ export function mergeSnapshots(
       wallpaperMode: local.settings.appearance.wallpaperMode,
       glassSurfaces: local.settings.appearance.glassSurfaces,
       glassOpacity: local.settings.appearance.glassOpacity,
+      myShepherdFloatingButton:
+        local.settings.appearance.myShepherdFloatingButton,
     },
   };
   // Privacy-first exception to local-wins: consent must be explicit on BOTH
@@ -1752,6 +1783,10 @@ export function mergeSnapshots(
     lastVisitDateKey: local.lastVisitDateKey,
     streak: local.streak,
     accountNudge: local.accountNudge,
+    guidedProgress: mergeGuidedProgressRecords(
+      local.guidedProgress ?? {},
+      remote.guidedProgress,
+    ),
   };
 }
 
@@ -2191,6 +2226,20 @@ async function pushFields(
         verses.map((verse) => recentVerseToRow(uid, verse)),
       ),
     );
+  }
+  if (fields.has("guidedProgress")) {
+    const rows = guidedProgressToRows(uid, snap.guidedProgress);
+    if (rows.length) {
+      jobs.push(
+        () =>
+          run(
+            supabase.from("user_guided_movements").upsert(rows, {
+              onConflict: "user_id,session_key,movement_key",
+              ignoreDuplicates: true,
+            }),
+          ),
+      );
+    }
   }
 
   // Serialize writes so a failure or auth/lifecycle transition cannot leave

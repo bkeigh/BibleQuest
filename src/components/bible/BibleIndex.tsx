@@ -41,6 +41,7 @@ import {
 import { usePlus } from "@/lib/billing/usePlus";
 import { useSession } from "@/lib/supabase/useSession";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
+import { TodayFormation } from "@/components/home/TodayFormation";
 
 type Testament = "new" | "old";
 
@@ -266,6 +267,12 @@ function BibleIndexInner() {
             </span>
           </Link>
         </section>
+
+        {/* The guided reading follows the reader's own place in Scripture: this
+            tab's first job is getting back into the text. Games stay on Home. */}
+        <div className="mt-6">
+          <TodayFormation dayKey={dayKey} show="guide" />
+        </div>
 
         {previousVerses.length > 0 && (
           <section

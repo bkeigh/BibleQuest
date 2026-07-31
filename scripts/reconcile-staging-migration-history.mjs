@@ -1,6 +1,6 @@
 /**
- * Proves staging matches the frozen 31-file manifest, then records one honest
- * forward-only attestation without backfilling the three absent history rows.
+ * Proves staging matches the frozen 32-file manifest, then records one honest
+ * forward migration without backfilling four absent short-version rows.
  */
 
 import { createHash } from "node:crypto";
@@ -21,14 +21,15 @@ import { spawnSync } from "node:child_process";
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const STAGING_PROJECT_NAME = "BibleQuest-Account-Sync-Staging";
 const PRODUCTION_PROJECT_NAME = "BibleQuest";
-const PACKET_VERSION = "20260729110000";
-const PACKET_NAME = "reconcile_31_file_manifest";
+const PRIOR_PACKET_VERSION = "20260729110000";
+const PACKET_VERSION = "20260729190000";
+const PACKET_NAME = "reconcile_32_file_manifest";
 const PACKET_FILENAME = `${PACKET_VERSION}_${PACKET_NAME}.sql`;
 const EXPECTED_MANIFEST_SHA256 =
-  "1c920b04e155ce593cea485f97a6bf1466a97a6df3750a4eb4bb635926802e28";
+  "36f15c8c64b4e39c81f6f21ebc0e160bce9217aaba301dd9d7f5bfd5db462f43";
 const EXPECTED_PACKET_SHA256 =
-  "571d5f09006c60c4475f74f168a0311525e39ba34a6dc5ffb7c466c54d2e29f4";
-const APPLY_CONFIRMATION = "apply staging 31-file reconciliation";
+  "1cd4da3b7b65ec52c7f2a78c2dad9e2acf88fe0020fa750fe734aed1f3e51931";
+const APPLY_CONFIRMATION = "apply staging 32-file reconciliation";
 
 const EXPECTED_VERSIONS = [
   "0001",
@@ -62,18 +63,20 @@ const EXPECTED_VERSIONS = [
   "0030",
   "0031",
   "0032",
+  "0033",
 ];
-const UNRECORDED_VERSIONS = ["0029", "0030", "0032"];
+const UNRECORDED_VERSIONS = ["0029", "0030", "0032", "0033"];
 const REVIEWED_HISTORY = EXPECTED_VERSIONS.filter(
   (version) => !UNRECORDED_VERSIONS.includes(version),
 );
 const SAFE_PACKET_FAILURES = [
-  "staging migration prehistory is not the reviewed 28-row state",
+  "staging migration prehistory is not a reviewed 0032 state",
   "staging schema contract posture is invalid",
   "staging 0029 row-size posture is invalid",
   "staging 0030 operator Plus posture is invalid",
   "staging 0031 subscription conflict posture is invalid",
   "staging 0032 dispute signal posture is invalid",
+  "staging 0033 guided progress posture is invalid",
 ];
 
 /** Fails with a bounded message that never reflects identifiers or SQL. */
@@ -158,7 +161,7 @@ async function verifyManifest() {
   const manifestPath = join(migrationsDir, "manifest.sha256");
   const manifest = await readFile(manifestPath);
   if (sha256(manifest) !== EXPECTED_MANIFEST_SHA256) {
-    fail("Frozen 31-file manifest checksum changed");
+    fail("Frozen 32-file manifest checksum changed");
   }
 
   const lines = manifest
@@ -220,11 +223,12 @@ async function writeConfig(workdir, suffix) {
   );
 }
 
-/** Creates a clean 31-file lane used only for read-only schema comparison. */
-async function prepareSchemaWorkdir(entries) {
+/** Creates an exact pre-0033 or final schema lane for read-only comparison. */
+async function prepareSchemaWorkdir(entries, includeGuidedProgress) {
   const workdir = await mkdtemp(join(tmpdir(), "biblequest-staging-schema-"));
   await writeConfig(workdir, "schema");
   for (const entry of entries) {
+    if (!includeGuidedProgress && entry.version === "0033") continue;
     await copyFile(
       join(ROOT, "supabase", "migrations", entry.filename),
       join(workdir, "supabase", "migrations", entry.filename),
@@ -234,7 +238,7 @@ async function prepareSchemaWorkdir(entries) {
 }
 
 /** Creates the reviewed-history lane containing only one forward proposal. */
-async function prepareHistoryWorkdir(entries) {
+async function prepareHistoryWorkdir(entries, historyPosture) {
   const workdir = await mkdtemp(join(tmpdir(), "biblequest-staging-history-"));
   await writeConfig(workdir, "history");
   for (const version of REVIEWED_HISTORY) {
@@ -243,6 +247,20 @@ async function prepareHistoryWorkdir(entries) {
     await writeFile(
       join(workdir, "supabase", "migrations", entry.filename),
       `-- Existing immutable staging history marker: ${version}.\n`,
+    );
+  }
+  if (
+    historyPosture === "prior_attested" ||
+    historyPosture === "applied_after_prior"
+  ) {
+    await writeFile(
+      join(
+        workdir,
+        "supabase",
+        "migrations",
+        `${PRIOR_PACKET_VERSION}_reconcile_31_file_manifest.sql`,
+      ),
+      `-- Existing reviewed staging attestation: ${PRIOR_PACKET_VERSION}.\n`,
     );
   }
 
@@ -260,6 +278,13 @@ async function prepareHistoryWorkdir(entries) {
     join(workdir, "supabase", "migrations", PACKET_FILENAME),
     packet,
   );
+  return workdir;
+}
+
+/** Creates a no-migration lane used only to inspect exact remote history. */
+async function prepareHistoryProbeWorkdir() {
+  const workdir = await mkdtemp(join(tmpdir(), "biblequest-staging-probe-"));
+  await writeConfig(workdir, "probe");
   return workdir;
 }
 
@@ -298,10 +323,16 @@ function remoteHistory(workdir) {
     .map((migration) => String(migration.remote));
 }
 
-/** Accepts only the exact reviewed prehistory or its one-marker successor. */
+/** Accepts only reviewed prehistory and the two known forward attestations. */
 function historyState(actual) {
   if (JSON.stringify(actual) === JSON.stringify(REVIEWED_HISTORY)) {
     return "reviewed";
+  }
+  if (
+    JSON.stringify(actual) ===
+    JSON.stringify([...REVIEWED_HISTORY, PRIOR_PACKET_VERSION])
+  ) {
+    return "prior_attested";
   }
   if (
     JSON.stringify(actual) ===
@@ -309,11 +340,21 @@ function historyState(actual) {
   ) {
     return "applied";
   }
+  if (
+    JSON.stringify(actual) ===
+    JSON.stringify([
+      ...REVIEWED_HISTORY,
+      PRIOR_PACKET_VERSION,
+      PACKET_VERSION,
+    ])
+  ) {
+    return "applied_after_prior";
+  }
   fail("Staging migration history differs from the reviewed state");
 }
 
-/** Proves the remote public schema equals a clean build of all 31 files. */
-function requireEmptySchemaDiff(workdir) {
+/** Proves the remote schema equals the selected frozen manifest posture. */
+function requireEmptySchemaDiff(workdir, includeGuidedProgress) {
   const result = parseJson(
     runSupabase(
       [
@@ -340,7 +381,11 @@ function requireEmptySchemaDiff(workdir) {
     result?.diff?.trim() !== "" ||
     JSON.stringify(result?.schemas) !== JSON.stringify(["public"])
   ) {
-    fail("Staging public schema differs from the frozen 31-file build");
+    fail(
+      includeGuidedProgress
+        ? "Staging public schema differs from the frozen 32-file build"
+        : "Staging public schema differs from the frozen 31-file pre-0033 build",
+    );
   }
 }
 
@@ -398,33 +443,58 @@ if (
   fail("Staging apply confirmation is missing");
 }
 
+let historyProbeWorkdir;
 let schemaWorkdir;
 let historyWorkdir;
 try {
   const entries = await verifyManifest();
   const { stagingRef } = resolveTargets();
-  schemaWorkdir = await prepareSchemaWorkdir(entries);
-  historyWorkdir = await prepareHistoryWorkdir(entries);
+  historyProbeWorkdir = await prepareHistoryProbeWorkdir();
+  linkStaging(historyProbeWorkdir, stagingRef);
+  const initialHistoryState = historyState(
+    remoteHistory(historyProbeWorkdir),
+  );
+  const alreadyApplied =
+    initialHistoryState === "applied" ||
+    initialHistoryState === "applied_after_prior";
+  schemaWorkdir = await prepareSchemaWorkdir(entries, alreadyApplied);
+  historyWorkdir = await prepareHistoryWorkdir(
+    entries,
+    initialHistoryState,
+  );
   linkStaging(schemaWorkdir, stagingRef);
   linkStaging(historyWorkdir, stagingRef);
 
-  requireEmptySchemaDiff(schemaWorkdir);
-  const initialHistoryState = historyState(remoteHistory(historyWorkdir));
+  requireEmptySchemaDiff(schemaWorkdir, alreadyApplied);
   let proposed = [];
-  if (initialHistoryState === "reviewed") {
+  if (!alreadyApplied) {
     proposed = dryRun(historyWorkdir);
   } else if (mode === "apply") {
     fail("Reviewed staging reconciliation packet is already applied");
   }
 
-  if (mode === "apply" && initialHistoryState === "reviewed") {
+  if (mode === "apply" && !alreadyApplied) {
     applyPacket(historyWorkdir);
-    if (historyState(remoteHistory(historyWorkdir)) !== "applied") {
+    const expectedState =
+      initialHistoryState === "prior_attested"
+        ? "applied_after_prior"
+        : "applied";
+    if (historyState(remoteHistory(historyWorkdir)) !== expectedState) {
       fail("Reviewed staging reconciliation packet was not recorded");
     }
-    requireEmptySchemaDiff(schemaWorkdir);
+    const finalSchemaWorkdir = await prepareSchemaWorkdir(entries, true);
+    try {
+      linkStaging(finalSchemaWorkdir, stagingRef);
+      requireEmptySchemaDiff(finalSchemaWorkdir, true);
+    } finally {
+      await rm(finalSchemaWorkdir, { recursive: true, force: true });
+    }
   }
 
+  const willBeApplied = alreadyApplied || mode === "apply";
+  const priorAttestation =
+    initialHistoryState === "prior_attested" ||
+    initialHistoryState === "applied_after_prior";
   console.log(
     JSON.stringify({
       status: "pass",
@@ -435,17 +505,24 @@ try {
       schema_diff_empty: true,
       prehistory_rows: REVIEWED_HISTORY.length,
       unrecorded_manifest_versions: UNRECORDED_VERSIONS,
+      prior_attestation: priorAttestation,
       packet: PACKET_FILENAME,
       proposed,
-      applied: initialHistoryState === "applied" || mode === "apply",
+      applied: willBeApplied,
       posthistory_rows:
-        initialHistoryState === "applied" || mode === "apply" ? 29 : 28,
+        REVIEWED_HISTORY.length +
+        (priorAttestation ? 1 : 0) +
+        (willBeApplied ? 1 : 0),
       production_apply: false,
       history_repair: false,
     }),
   );
 } finally {
-  for (const workdir of [schemaWorkdir, historyWorkdir]) {
+  for (const workdir of [
+    historyProbeWorkdir,
+    schemaWorkdir,
+    historyWorkdir,
+  ]) {
     if (workdir) {
       await rm(workdir, { recursive: true, force: true });
     }

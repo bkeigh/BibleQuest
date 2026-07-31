@@ -25,6 +25,13 @@ describe("account sync runtime contracts", () => {
             data: { contract: "biblequest_account_sync_v4", ok: true },
             error: null,
           },
+          guided_progress_sync_contract: {
+            data: {
+              contract: "biblequest_guided_progress_sync_v1",
+              ok: true,
+            },
+            error: null,
+          },
         }),
       ),
     ).resolves.toBeUndefined();
@@ -50,6 +57,13 @@ describe("account sync runtime contracts", () => {
               error: null,
             },
             account_sync_contract: { data: candidate, error: null },
+            guided_progress_sync_contract: {
+              data: {
+                contract: "biblequest_guided_progress_sync_v1",
+                ok: true,
+              },
+              error: null,
+            },
           }),
         ),
       ).rejects.toBeInstanceOf(AccountSyncContractError);

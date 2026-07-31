@@ -23,6 +23,7 @@
     "check:production-user-row-hardening": "node scripts/reconcile-production-user-row-hardening.mjs --dry-run",
     "check:production-operator-plus": "node scripts/reconcile-production-operator-plus-grants.mjs --dry-run",
     "check:production-stripe-corrections": "node scripts/reconcile-production-stripe-corrections.mjs --dry-run",
+    "check:production-guided-progress": "node scripts/reconcile-production-guided-progress.mjs --dry-run",
     "check:staging-migration-history": "node scripts/reconcile-staging-migration-history.mjs --dry-run",
     "check:staging-isolation": "node --env-file-if-exists=.env.staging.local scripts/check-staging-two-user-isolation.mjs",
     "evidence:launch": "node --env-file-if-exists=.env.local scripts/collect-launch-evidence.mjs",
@@ -32,6 +33,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.0",
     "framer-motion": "^12.42.2",
@@ -46,7 +48,7 @@
   "devDependencies": {
     "@swc/helpers": "^0.5.15",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^24.13.3",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/web-push": "3.6.4",

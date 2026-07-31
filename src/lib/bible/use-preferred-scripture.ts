@@ -20,6 +20,7 @@ import {
   type BibleTranslation,
   type ResolvedBiblePassage,
 } from "./translations";
+import { apiFetch } from "@/lib/platform/api";
 
 type FallbackReason = NonNullable<ResolvedBiblePassage["fallbackReason"]>;
 
@@ -98,7 +99,7 @@ export function usePreferredBiblePassage(
       end: String(passage.verseEnd),
     });
 
-    void fetch(`/api/bible/passage?${query}`, {
+    void apiFetch(`/api/bible/passage?${query}`, {
       signal: controller.signal,
       cache: "no-store",
     })
@@ -206,7 +207,7 @@ export function usePreferredBibleChapter(
       book: chapter.bookSlug,
       chapter: String(chapter.chapter),
     });
-    void fetch(`/api/bible/chapter?${query}`, {
+    void apiFetch(`/api/bible/chapter?${query}`, {
       signal: controller.signal,
       cache: "no-store",
     })

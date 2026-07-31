@@ -1,9 +1,9 @@
 {
   "contract": "biblequest_observability_v1",
   "canonicalOrigin": "https://www.biblequest.co",
-  "schemaContract": "0032",
+  "schemaContract": "0033",
   "contentContract": "seed-manifest-v1",
-  "serviceWorkerVersion": "biblequest-v22",
+  "serviceWorkerVersion": "biblequest-v23",
   "thresholds": {
     "minimumAttempts": 5,
     "warningFailureCount": 3,

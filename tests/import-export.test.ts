@@ -125,6 +125,34 @@ describe("journey import and export", () => {
     );
   });
 
+  it("accepts only a boolean floating MyShepherd preference", () => {
+    const enabled = parseSnapshot(
+      JSON.stringify({
+        settings: {
+          appearance: { myShepherdFloatingButton: true },
+        },
+      }),
+    );
+    expect(enabled.ok).toBe(true);
+    if (!enabled.ok) return;
+    expect(
+      enabled.data.settings?.appearance?.myShepherdFloatingButton,
+    ).toBe(true);
+
+    const malformed = parseSnapshot(
+      JSON.stringify({
+        settings: {
+          appearance: { myShepherdFloatingButton: "always" },
+        },
+      }),
+    );
+    expect(malformed.ok).toBe(true);
+    if (!malformed.ok) return;
+    expect(malformed.data.settings?.appearance).not.toHaveProperty(
+      "myShepherdFloatingButton",
+    );
+  });
+
   it("drops malformed nested settings before they can crash restore", () => {
     const result = parseSnapshot(
       JSON.stringify({

@@ -4,6 +4,7 @@ import {
   isSafeAvatarMarker,
   MAX_AVATAR_OUTPUT_BYTES,
 } from "./validation";
+import { apiFetch } from "@/lib/platform/api";
 
 export interface RemoteAvatar {
   blob: Blob;
@@ -50,7 +51,7 @@ export async function uploadRemoteAvatar(
 ): Promise<RemoteAvatar> {
   const body = new FormData();
   body.set("avatar", file);
-  const response = await fetch("/api/profile/avatar", {
+  const response = await apiFetch("/api/profile/avatar", {
     method: "POST",
     body,
     cache: "no-store",
@@ -64,7 +65,7 @@ export async function uploadRemoteAvatar(
 export async function downloadRemoteAvatar(
   signal?: AbortSignal,
 ): Promise<RemoteAvatar | null> {
-  const response = await fetch("/api/profile/avatar", {
+  const response = await apiFetch("/api/profile/avatar", {
     cache: "no-store",
     credentials: "same-origin",
     signal,
@@ -78,7 +79,7 @@ export async function deleteRemoteAvatar(
   allOwnedObjects = false,
   signal?: AbortSignal,
 ): Promise<void> {
-  const response = await fetch("/api/profile/avatar", {
+  const response = await apiFetch("/api/profile/avatar", {
     method: "DELETE",
     cache: "no-store",
     credentials: "same-origin",

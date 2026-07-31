@@ -7,7 +7,6 @@
  */
 import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
 import {
-  DEFAULT_WALLPAPER_ID,
   type WallpaperId,
 } from "@/lib/wallpapers/catalog";
 import { DEFAULT_GLASS_OPACITY } from "@/lib/glass-opacity";
@@ -263,6 +262,40 @@ export interface RecentVerse {
   reference: string;
   text: string;
   viewedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Guided Scripture & Pilgrimages
+// ---------------------------------------------------------------------------
+
+/** The six movements shared by every reviewed guided practice. */
+export const GUIDED_MOVEMENT_KEYS = [
+  "arrive",
+  "read",
+  "notice",
+  "reflect",
+  "respond",
+  "pray",
+] as const;
+export type GuidedMovementKey = (typeof GUIDED_MOVEMENT_KEYS)[number];
+
+export type GuidedSessionKind = "daily" | "pilgrimage_day";
+
+/**
+ * Device-local progress for one versioned guided practice.
+ *
+ * Guide completion is intentionally separate from Journey and growth ledgers.
+ * Scripture, reflection, prayer, and quest actions keep using their existing
+ * records, so moving through a guide can never double-count spiritual growth.
+ */
+export interface GuidedSessionProgress {
+  sessionKey: string;
+  contentId: string;
+  kind: GuidedSessionKind;
+  completedMovements: GuidedMovementKey[];
+  startedAt: string;
+  updatedAt: string;
+  completedAt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -541,6 +574,8 @@ export interface AppearanceSettings {
   glassSurfaces: boolean;
   /** Visible material opacity percentage; clamped to 15–100 for legibility. */
   glassOpacity: number;
+  /** Device-local Plus preference for the app-wide MyShepherd launcher. */
+  myShepherdFloatingButton: boolean;
 }
 
 /**
@@ -602,10 +637,11 @@ export const DEFAULT_SETTINGS: Settings = {
     reducedMotion: false,
     textSize: "default",
     boldText: false,
-    wallpaperId: DEFAULT_WALLPAPER_ID,
+    wallpaperId: "none",
     wallpaperMode: "still",
     glassSurfaces: true,
     glassOpacity: DEFAULT_GLASS_OPACITY,
+    myShepherdFloatingButton: false,
   },
   language: "en",
   preferredBibleTranslation: DEFAULT_BIBLE_TRANSLATION_KEY,
@@ -709,6 +745,11 @@ export interface QuestOSSnapshot {
   streak?: StreakState;
   /** Optional & device-local — rides through restores like the streak. */
   accountNudge?: AccountNudgeState;
+  /**
+   * Optional for pre-guides exports. Progress is device-local but portable in
+   * an explicit backup and preserved across account-sync merge applies.
+   */
+  guidedProgress?: Record<string, GuidedSessionProgress>;
 }
 
 export function emptyStreak(): StreakState {

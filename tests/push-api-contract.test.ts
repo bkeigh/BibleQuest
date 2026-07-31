@@ -62,14 +62,17 @@ describe("private push API boundary", () => {
 
   it("never requests notification permission during passive setup", () => {
     const client = source("src/lib/push/client.ts");
+    const platform = source("src/lib/platform/notifications.ts");
     const settings = source(
       "src/components/settings/ReminderSettings.tsx",
     );
 
-    expect(client.match(/Notification\.requestPermission\(\)/g)).toHaveLength(
+    expect(platform.match(/Notification\.requestPermission\(\)/g)).toHaveLength(
       1,
     );
-    expect(client.indexOf("Notification.requestPermission()")).toBeGreaterThan(
+    expect(
+      client.indexOf("notificationCapability().requestPermission()"),
+    ).toBeGreaterThan(
       client.indexOf("export async function enablePushReminders"),
     );
     expect(settings).not.toContain("Notification.requestPermission");

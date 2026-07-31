@@ -23,6 +23,7 @@ import {
   isRedistributableBibleTranslation,
   LOCAL_WEB_TRANSLATION_KEY,
 } from "@/lib/bible/translations";
+import { buildPublicUrl } from "@/lib/platform/api";
 
 /**
  * VerseCard — today's verse as a devotional card / margin note.
@@ -103,8 +104,7 @@ export function VerseCard({
   const chapterPath = `/app/bible/${verse.bookSlug}/${verse.chapter}?verse=${verseSegment}#verse-${verse.verseStart}`;
 
   function shareVerse() {
-    const url = new URL(sharePath, window.location.origin).toString();
-    setShareUrl(url);
+    setShareUrl(buildPublicUrl(sharePath));
     setShareSheetOpen(true);
   }
 

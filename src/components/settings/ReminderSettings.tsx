@@ -6,6 +6,7 @@ import { GentleButton } from "@/components/design-system/GentleButton";
 import { useToast } from "@/components/design-system/Toast";
 import {
   currentPushSubscription,
+  currentNotificationPermission,
   disablePushReminders,
   enablePushReminders,
   fetchPushConfig,
@@ -132,7 +133,7 @@ export function ReminderSettings() {
       toast("Gentle reminders are on.", { variant: "success" });
     } catch {
       toast(
-        Notification.permission === "denied"
+        currentNotificationPermission() === "denied"
           ? "Notifications are blocked in browser settings."
           : "Reminders couldn’t be enabled. Nothing was changed.",
       );
@@ -378,8 +379,7 @@ export function ReminderSettings() {
           </>
         )}
       </div>
-      {typeof Notification !== "undefined" &&
-        Notification.permission === "denied" && (
+      {currentNotificationPermission() === "denied" && (
           <p role="alert" className="mt-3 text-caption text-rose-700">
             Notifications are blocked. Re-enable them in browser or system
             settings; BibleQuest will not keep asking.

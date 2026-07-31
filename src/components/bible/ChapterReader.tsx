@@ -33,6 +33,7 @@ import {
 import { VerseShareSheet } from "@/components/bible/VerseShareSheet";
 import { formatVerseShareText } from "@/lib/utils/scripture";
 import { track } from "@/lib/analytics/events";
+import { buildPublicUrl } from "@/lib/platform/api";
 
 interface VerseRange {
   start: number;
@@ -279,7 +280,7 @@ function ReaderInner({
 
   function shareSelectedVerse() {
     if (!selected || !selectedVerseText) return;
-    setShareUrl(new URL(selectedSharePath, window.location.origin).toString());
+    setShareUrl(buildPublicUrl(selectedSharePath));
     setShareSheetOpen(true);
   }
 

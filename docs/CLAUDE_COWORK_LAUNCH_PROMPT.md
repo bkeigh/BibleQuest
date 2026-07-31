@@ -59,9 +59,10 @@ Read these files completely before changing any provider state:
 4. `docs/OBSERVABILITY.md`
 5. `docs/QA.md`
 6. `docs/DEPLOYMENT.md`
-7. `docs/REVENUECAT.md`
-8. `docs/ENV.md`
-9. `SECURITY.md`
+7. `docs/STRIPE_TEST_BILLING.md`
+8. `docs/STRIPE_ONE_TIME_SUPPORT.md`
+9. `docs/ENV.md`
+10. `SECURITY.md`
 
 Treat those files as the authority. If this prompt and a runbook disagree,
 stop and follow the safer runbook rule. Do not mark the launch ready merely
@@ -288,8 +289,9 @@ Perform read-only inspection first, then request approval for any change.
    `https://www.biblequest.co`.
 3. Confirm Supabase browser URL and publishable key are paired. Never display
    either value in evidence.
-4. Confirm `NEXT_PUBLIC_REVENUECAT_BILLING_MODE` is unset or exactly
-   `coming-soon`, and `NEXT_PUBLIC_REVENUECAT_PUBLIC_KEY` is absent in
+4. Confirm `STRIPE_BILLING_MODE` is unset or exactly `coming-soon`, and that
+   `BIBLEQUEST_STRIPE_PURCHASES_ENABLED`, `BIBLEQUEST_STRIPE_SUPPORT_ENABLED`,
+   and `STRIPE_LIVE_BILLING_APPROVED` are each absent or exactly `false` in
    Production. Do not open or create live products.
 5. Confirm Vercel system Git variables are enabled so the health endpoint can
    report the deployment SHA.

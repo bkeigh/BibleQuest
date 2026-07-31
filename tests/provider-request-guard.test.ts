@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST as reportBibleView } from "@/app/api/bible/view/route";
 import {
+  guardIdentifiedRequest,
   guardProviderRequest,
   rateLimitProviderRequest,
 } from "@/lib/bible/provider-request-guard";
@@ -65,6 +66,35 @@ describe("licensed Scripture request guard", () => {
     expect(limited?.status).toBe(429);
     expect(limited?.headers.get("retry-after")).toBe("1");
     expect(guardProviderRequest(make(), scope, policy, 11_001)).toBeNull();
+  });
+
+  it("keeps an identified caller's budget across a network change", () => {
+    // Same account, different IP each call: a metered provider budget must not
+    // reset when a phone moves between wifi and cellular.
+    // Scope prefixes must be literal and distinct per test: tests/setup.ts
+    // reseeds crypto.randomUUID() before each test, so the first UUID in every
+    // test is identical and cannot separate two scopes on its own.
+    const scope = `ai-roaming:user-${crypto.randomUUID()}`;
+    const policy = { limit: 2, windowMs: 60_000 };
+    const make = () =>
+      request("/api/ai/shepherd", { "x-forwarded-for": crypto.randomUUID() });
+
+    expect(guardIdentifiedRequest(make(), scope, policy, 10_000)).toBeNull();
+    expect(guardIdentifiedRequest(make(), scope, policy, 10_100)).toBeNull();
+    expect(guardIdentifiedRequest(make(), scope, policy, 10_200)?.status).toBe(
+      429,
+    );
+  });
+
+  it("still separates distinct accounts", () => {
+    const policy = { limit: 1, windowMs: 60_000 };
+    const make = () => request("/api/ai/shepherd");
+    const a = `ai-accounts-a:user-${crypto.randomUUID()}`;
+    const b = `ai-accounts-b:user-${crypto.randomUUID()}`;
+
+    expect(guardIdentifiedRequest(make(), a, policy, 10_000)).toBeNull();
+    expect(guardIdentifiedRequest(make(), b, policy, 10_000)).toBeNull();
+    expect(guardIdentifiedRequest(make(), a, policy, 10_100)?.status).toBe(429);
   });
 
   it("allows top-level public share navigation while still rate limiting it", () => {

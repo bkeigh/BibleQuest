@@ -1,5 +1,7 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { BottomNav } from "./BottomNav";
 import { InstallPrompt } from "./InstallPrompt";
@@ -11,6 +13,15 @@ import {
   subscribeToAnalyticsConsent,
 } from "@/lib/analytics/events";
 import { WallpaperBackdrop } from "./WallpaperBackdrop";
+import { usePlus } from "@/lib/billing/usePlus";
+
+const FloatingMyShepherd = dynamic(
+  () =>
+    import("@/components/shepherd/FloatingMyShepherd").then(
+      (module) => module.FloatingMyShepherd,
+    ),
+  { ssr: false },
+);
 
 /**
  * AppShell — container for the installed/private app experience.
@@ -20,6 +31,16 @@ import { WallpaperBackdrop } from "./WallpaperBackdrop";
  * default fallback is the ShellSkeleton, so <main> renders immediately.
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const { isPlus } = usePlus();
+  const floatingMyShepherd = useQuestOS(
+    (state) => state.settings.appearance.myShepherdFloatingButton === true,
+  );
+  const hidesFloatingTools =
+    pathname === "/app/shepherd" ||
+    pathname === "/app/prayer/new" ||
+    pathname === "/app/prayer/reflection/new";
+
   useEffect(() => {
     // Analytics events queued while offline flush when the shell mounts
     // and whenever the connection returns. Both are no-ops when analytics
@@ -61,6 +82,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main id="app-main" tabIndex={-1} className="relative z-10 flex-1 pb-28">
           {children}
         </main>
+        {/* Plus members can opt into a lightweight assistant on safe app routes. */}
+        {isPlus && floatingMyShepherd && !hidesFloatingTools && (
+          <FloatingMyShepherd />
+        )}
         <BottomNav />
         <InstallPrompt />
       </div>
