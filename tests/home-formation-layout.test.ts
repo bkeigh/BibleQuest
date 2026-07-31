@@ -58,6 +58,13 @@ describe("Home formation layout", () => {
     expect(formation).toContain("font-pixel text-[2rem]");
     expect(formation).toContain("snap-mandatory");
     expect(formation.match(/role=\"listitem\"/g)).toHaveLength(3);
+    expect(formation).toContain("flex min-h-[17rem] w-full flex-col");
+    expect(formation).toContain("mt-auto pt-8");
+    expect(formation).toContain("absolute -left-5");
+    expect(formation).toContain("absolute -right-5");
+    expect(formation).toContain("sm:-left-8");
+    expect(formation).toContain("sm:-right-8");
+    expect(formation).toContain("const edgeTolerance = 24");
     expect(formation).toContain("Seven Days Match");
     expect(formation).toContain("7 chapters · 7 levels each");
     expect(formation).toContain("Genesis 1:1");

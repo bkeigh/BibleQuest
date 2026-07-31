@@ -87,10 +87,13 @@ export function TodayFormation({
   function updateGameRailEdges() {
     const rail = gameRailRef.current;
     if (!rail) return;
+    // Includes the rail's inset padding so the first snap point stays disabled.
+    const edgeTolerance = 24;
     const next = {
-      atStart: rail.scrollLeft <= 2,
+      atStart: rail.scrollLeft <= edgeTolerance,
       atEnd:
-        rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 2,
+        rail.scrollLeft + rail.clientWidth >=
+        rail.scrollWidth - edgeTolerance,
     };
     setGameRailEdges((current) =>
       current.atStart === next.atStart &&
@@ -261,7 +264,7 @@ export function TodayFormation({
               onClick={() => scrollGameRail(-1)}
               disabled={gameRailEdges.atStart}
               aria-label="Previous Scripture game"
-              className="absolute -left-3 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-paper/90 text-accent paper-shadow backdrop-blur-md transition-opacity disabled:pointer-events-none disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:-left-5"
+              className="absolute -left-5 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-paper/90 text-accent paper-shadow backdrop-blur-md transition-opacity disabled:pointer-events-none disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:-left-8"
             >
               <IconArrowLeft size={17} />
             </button>
@@ -270,7 +273,7 @@ export function TodayFormation({
               onClick={() => scrollGameRail(1)}
               disabled={gameRailEdges.atEnd}
               aria-label="Next Scripture game"
-              className="absolute -right-3 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-paper/90 text-accent paper-shadow backdrop-blur-md transition-opacity disabled:pointer-events-none disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:-right-5"
+              className="absolute -right-5 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-paper/90 text-accent paper-shadow backdrop-blur-md transition-opacity disabled:pointer-events-none disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:-right-8"
             >
               <IconArrowRight size={17} />
             </button>
@@ -323,8 +326,9 @@ function ScriptureGameCard({
           className="absolute inset-0 bg-graphite/15"
         />
       )}
-      <div className="relative z-10 mt-auto w-full p-5 text-white">
-        <div className="flex items-center gap-2">
+      {/* Keeps the identity pinned to the top-left while the game details settle at the bottom. */}
+      <div className="relative z-10 flex min-h-[17rem] w-full flex-col p-5 text-white sm:p-6">
+        <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white/12 ring-1 ring-white/25 backdrop-blur-sm">
             <PixelIcon name={icon} size={4} />
           </span>
@@ -332,17 +336,19 @@ function ScriptureGameCard({
             {eyebrow}
           </p>
         </div>
-        <h3 className="mt-3 max-w-[18ch] font-pixel text-[2rem] leading-[0.95] tracking-[0.03em] text-white min-[390px]:text-[2.125rem]">
-          {title}
-        </h3>
-        <p className="mt-2 max-w-[42ch] text-small leading-relaxed text-white/80">
-          {description}
-        </p>
-        {footer && (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-caption text-white/75">
-            {footer}
-          </div>
-        )}
+        <div className="mt-auto pt-8">
+          <h3 className="max-w-[18ch] font-pixel text-[2rem] leading-[0.95] tracking-[0.03em] text-white min-[390px]:text-[2.125rem]">
+            {title}
+          </h3>
+          <p className="mt-2 max-w-[42ch] text-small leading-relaxed text-white/80">
+            {description}
+          </p>
+          {footer && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-caption text-white/75">
+              {footer}
+            </div>
+          )}
+        </div>
       </div>
     </PaperCard>
   );
