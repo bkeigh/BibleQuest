@@ -208,9 +208,10 @@ function BibleIndexInner() {
           onClose={closeRefreshLimitDialog}
         />
 
-        {/* Scripture can move directly into a reviewed guide or learning game. */}
+        {/* Scripture moves directly into the reviewed guide. Games live on Home
+            and their own tab — the Bible tab stays a reading surface. */}
         <div className="mt-6">
-          <TodayFormation dayKey={dayKey} />
+          <TodayFormation dayKey={dayKey} show="guide" />
         </div>
 
         <section
