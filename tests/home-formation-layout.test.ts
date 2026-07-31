@@ -7,6 +7,15 @@ describe("Home formation layout", () => {
     "src/components/home/TodayFormation.tsx",
     "utf8",
   );
+  const bible = readFileSync("src/components/bible/BibleIndex.tsx", "utf8");
+
+  it("keeps Scripture Games off the Bible tab", () => {
+    // The Bible tab is a reading surface: it may offer the guided reading, but
+    // games belong on Home and their own tab. Omitting `show` here would
+    // default to "all" and pull the games rail back in.
+    expect(bible).toContain('<TodayFormation dayKey={dayKey} show="guide" />');
+    expect(bible).not.toContain("<TodayFormation dayKey={dayKey} />");
+  });
 
   it("places the quest component directly under For Today", () => {
     const forToday = home.indexOf('id="for-today-home-title"');
