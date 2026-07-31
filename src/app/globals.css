@@ -17,7 +17,10 @@
   --color-ink: #1c1a16;       /* highest-contrast text only */
   --color-graphite: #2d2a24;  /* headings */
   --color-charcoal: #47423a;  /* body text */
-  --color-ash: #6b655a;       /* helper text, captions */
+  /* Helper text sits on 54%-opaque glass, so its effective background is part
+     wallpaper. At #6b655a a dark scene dropped it to 2.2:1; this reads 4.6:1
+     over the darkest wallpaper and 6.6:1 on plain paper. */
+  --color-ash: #615b51;       /* helper text, captions */
   --color-fog: #b0a996;       /* disabled, quiet dividers */
   --color-mist: #e4dcc6;      /* hairline borders — the signature edge */
   --color-twilight: #1e3329;  /* dark outlines, icon strokes — deep green */
@@ -307,7 +310,10 @@ body {
   background-image: linear-gradient(
     to bottom,
     color-mix(in srgb, var(--color-parchment) 50%, transparent),
-    color-mix(in srgb, var(--color-parchment) 28%, transparent) 42%,
+    /* Was 28%. The mid-screen dip sat exactly where cards land, so the veil
+       was thinnest under the densest text. Levelling it with the 50/54 stops
+       keeps the scene visible while holding reading contrast. */
+    color-mix(in srgb, var(--color-parchment) 45%, transparent) 42%,
     color-mix(in srgb, var(--color-parchment) 54%, transparent)
   );
 }
