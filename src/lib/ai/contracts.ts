@@ -114,11 +114,6 @@ export function parseMyShepherdRequest(
   return { question: trimmed, currentPath };
 }
 
-/** Preserves the original one-question parser for existing clients and tests. */
-export function parseMyShepherdQuestion(value: unknown): string | null {
-  return parseMyShepherdRequest(value)?.question ?? null;
-}
-
 /** Stops immediate danger and self-harm requests before any model is called. */
 export function isImmediateSafetyQuestion(question: string): boolean {
   const normalized = question.toLocaleLowerCase();

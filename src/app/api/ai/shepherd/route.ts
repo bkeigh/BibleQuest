@@ -3,7 +3,10 @@ import {
   isImmediateSafetyQuestion,
   parseMyShepherdRequest,
 } from "@/lib/ai/contracts";
-import { answerWithMyShepherd } from "@/lib/ai/anthropic.server";
+import {
+  answerWithMyShepherd,
+  recordAiFailure,
+} from "@/lib/ai/anthropic.server";
 import { requireServerPlus } from "@/lib/billing/plus-entitlement.server";
 import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
 import { hasSameOrigin, privateError } from "@/lib/http/request";
@@ -48,7 +51,8 @@ export async function POST(request: Request) {
         headers: { "Cache-Control": "private, no-store" },
       },
     );
-  } catch {
+  } catch (error) {
+    recordAiFailure("shepherd", error);
     return privateError("provider_unavailable", 503);
   }
 }

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   immediateSafetyAnswer,
   isImmediateSafetyQuestion,
-  parseMyShepherdQuestion,
   parseMyShepherdRequest,
   parseQuestGenerationInput,
 } from "@/lib/ai/contracts";
@@ -36,10 +35,10 @@ describe("Plus AI contracts", () => {
   });
 
   it("bounds MyShepherd questions and keeps user text below fixed rules", () => {
-    expect(parseMyShepherdQuestion({ question: "  What is grace?  " })).toBe(
-      "What is grace?",
-    );
-    expect(parseMyShepherdQuestion({ question: "x".repeat(401) })).toBeNull();
+    expect(
+      parseMyShepherdRequest({ question: "  What is grace?  " })?.question,
+    ).toBe("What is grace?");
+    expect(parseMyShepherdRequest({ question: "x".repeat(401) })).toBeNull();
     expect(
       parseMyShepherdRequest({
         question: "Where should I read?",

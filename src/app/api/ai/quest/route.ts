@@ -1,6 +1,9 @@
 import { seedQuests } from "@/data/seed/quests";
 import { parseQuestGenerationInput } from "@/lib/ai/contracts";
-import { selectReviewedQuestWithHaiku } from "@/lib/ai/anthropic.server";
+import {
+  recordAiFailure,
+  selectReviewedQuestWithHaiku,
+} from "@/lib/ai/anthropic.server";
 import { requireServerPlus } from "@/lib/billing/plus-entitlement.server";
 import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
 import { hasSameOrigin, privateError } from "@/lib/http/request";
@@ -55,7 +58,8 @@ export async function POST(request: Request) {
       },
       { headers: { "Cache-Control": "private, no-store" } },
     );
-  } catch {
+  } catch (error) {
+    recordAiFailure("quest", error);
     return privateError("provider_unavailable", 503);
   }
 }
