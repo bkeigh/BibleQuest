@@ -22,12 +22,21 @@ jobs:
     env:
       BIBLEQUEST_MONITOR_SUPABASE_URL: ${{ secrets.BIBLEQUEST_MONITOR_SUPABASE_URL }}
       BIBLEQUEST_MONITOR_SUPABASE_ANON_KEY: ${{ secrets.BIBLEQUEST_MONITOR_SUPABASE_ANON_KEY }}
-      BIBLEQUEST_MONITOR_EXPECTED_SHA: ${{ vars.BIBLEQUEST_MONITOR_EXPECTED_SHA }}
+      # Defaults to the commit this monitor is running from. On the scheduled
+      # run that is main's tip, so production serving anything else is deploy
+      # drift — a promotion that never landed, or an active rollback. Set the
+      # repository variable only to pin production behind main deliberately.
+      BIBLEQUEST_MONITOR_EXPECTED_SHA: ${{ vars.BIBLEQUEST_MONITOR_EXPECTED_SHA || github.sha }}
       BIBLEQUEST_MONITOR_EXPECTED_SCHEMA_CONTRACT: ${{ vars.BIBLEQUEST_MONITOR_EXPECTED_SCHEMA_CONTRACT }}
       BIBLEQUEST_MONITOR_EXPECTED_CONTENT_CONTRACT: ${{ vars.BIBLEQUEST_MONITOR_EXPECTED_CONTENT_CONTRACT }}
       BIBLEQUEST_MONITOR_EXPECTED_SERVICE_WORKER_VERSION: ${{ vars.BIBLEQUEST_MONITOR_EXPECTED_SERVICE_WORKER_VERSION }}
       BIBLEQUEST_MONITOR_EXPECTED_AUTH_POSTURE: configured
-      BIBLEQUEST_MONITOR_EXPECTED_BILLING_MODE: coming-soon
+      # Stripe Live shipped in #54/#55, so the monitor now guards the launched
+      # posture. These stay explicit rather than defaulted: a silent flip back
+      # to coming-soon, or purchases switching off, must fail this check.
+      BIBLEQUEST_MONITOR_EXPECTED_BILLING_MODE: live
+      BIBLEQUEST_MONITOR_EXPECTED_BILLING_PURCHASES_ENABLED: "true"
+      BIBLEQUEST_MONITOR_EXPECTED_BILLING_SUPPORT_ENABLED: "true"
       BIBLEQUEST_MONITOR_VERCEL_PROJECT_ID: ${{ secrets.BIBLEQUEST_MONITOR_VERCEL_PROJECT_ID }}
       BIBLEQUEST_MONITOR_VERCEL_TEAM_ID: ${{ secrets.BIBLEQUEST_MONITOR_VERCEL_TEAM_ID }}
       BIBLEQUEST_MONITOR_VERCEL_TOKEN: ${{ secrets.BIBLEQUEST_MONITOR_VERCEL_TOKEN }}
