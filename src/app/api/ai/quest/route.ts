@@ -5,7 +5,7 @@ import {
   selectReviewedQuestWithHaiku,
 } from "@/lib/ai/anthropic.server";
 import { requireServerPlus } from "@/lib/billing/plus-entitlement.server";
-import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
+import { guardIdentifiedRequest } from "@/lib/bible/provider-request-guard";
 import { hasSameOrigin, privateError } from "@/lib/http/request";
 import { reviewedQuestCandidates } from "@/lib/quest-generation/provider";
 
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
   const entitlement = await requireServerPlus();
   if (entitlement instanceof Response) return entitlement;
-  const blocked = guardProviderRequest(
+  const blocked = guardIdentifiedRequest(
     request,
     `ai-quest:${entitlement.userId}`,
     RATE_POLICIES,
