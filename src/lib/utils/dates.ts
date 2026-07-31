@@ -23,6 +23,15 @@ export function isValidDateKey(value: unknown): value is string {
   );
 }
 
+/** Converts one validated local-calendar key into timezone-neutral day arithmetic. */
+export function dateKeyOrdinal(dateKey: string): number {
+  if (!isValidDateKey(dateKey)) {
+    throw new Error(`Invalid local date key: ${dateKey}`);
+  }
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86_400_000);
+}
+
 /** Accept only complete ISO timestamps with an explicit timezone. */
 export function isValidZonedTimestamp(value: unknown): value is string {
   if (typeof value !== "string") return false;

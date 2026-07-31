@@ -58,10 +58,12 @@ import {
   type BibleTranslation,
 } from "@/lib/bible/translations";
 import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
+import { apiFetch } from "@/lib/platform/api";
 import { WallpaperPicker } from "@/components/settings/WallpaperPicker";
 import { ExplorePlusLink } from "@/components/plus/ExplorePlusLink";
 import { SupportLink } from "@/components/plus/SupportLink";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
+import { usePlus } from "@/lib/billing/usePlus";
 import {
   MAX_GLASS_OPACITY,
   MIN_GLASS_OPACITY,
@@ -69,6 +71,24 @@ import {
 } from "@/lib/glass-opacity";
 import { SUPPORT_EMAIL, SUPPORT_EMAIL_HREF } from "@/lib/brand";
 import { ReminderSettings } from "@/components/settings/ReminderSettings";
+import { GREEN_FEATURES } from "@/lib/features/green";
+import {
+  clearRhythmState,
+  readRhythmState,
+  replaceRhythmState,
+} from "@/lib/rhythm/client";
+import {
+  createDeviceBackupExtras,
+  DEVICE_BACKUP_KEY,
+  parseDeviceBackupExtras,
+  type DeviceBackupExtras,
+} from "@/lib/backup/device-extras";
+import { clearGameProgress } from "@/lib/games/storage";
+
+interface PendingJourneyImport {
+  journey: Partial<QuestOSSnapshot>;
+  device: DeviceBackupExtras | null;
+}
 
 function Row({
   label,
@@ -495,7 +515,7 @@ function BibleTranslationPicker({
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch("/api/bible/translations", {
+    void apiFetch("/api/bible/translations", {
       signal: controller.signal,
       cache: "no-store",
     })
@@ -717,6 +737,7 @@ function BibleTranslationPicker({
 function SettingsInner() {
   const router = useRouter();
   const { toast } = useToast();
+  const { isPlus } = usePlus();
   // Signed-in clears/restores must also purge the account copy, or the next
   // initial sync merges it straight back (see lib/sync/engine.ts).
   const { user, loading: sessionLoading } = useSession();
@@ -738,7 +759,7 @@ function SettingsInner() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [pendingImport, setPendingImport] =
-    useState<Partial<QuestOSSnapshot> | null>(null);
+    useState<PendingJourneyImport | null>(null);
 
   const photoInputRef = useRef<HTMLInputElement>(null);
   const photoUploadControllerRef = useRef<AbortController | null>(null);
@@ -863,7 +884,10 @@ function SettingsInner() {
   }
 
   function exportData() {
-    const data = createExportSnapshot(store.getState());
+    const data = {
+      ...createExportSnapshot(store.getState()),
+      [DEVICE_BACKUP_KEY]: createDeviceBackupExtras(readRhythmState()),
+    };
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: "application/json",
     });
@@ -897,26 +921,39 @@ function SettingsInner() {
       setImportError(result.error);
       return;
     }
-    setPendingImport(result.data); // arm the confirm step
+    const device = parseDeviceBackupExtras(text);
+    if (!device.ok) {
+      setImportError(device.error);
+      return;
+    }
+    setPendingImport({ journey: result.data, device: device.data });
   }
 
   function confirmImport() {
     if (!pendingImport) return;
     importData(
-      pendingImport,
+      pendingImport.journey,
       user ? { purgeAccount: user.id } : undefined
     );
+    const rhythmRestored = pendingImport.device
+      ? replaceRhythmState(pendingImport.device.rhythm)
+      : clearRhythmState();
     // A restore whose profile carries no photo marker must not resurrect a
     // stale on-device photo blob for the incoming profile.
     if (
-      !pendingImport.profile?.avatarVersion &&
-      !pendingImport.profile?.avatarUpdatedAt
+      !pendingImport.journey.profile?.avatarVersion &&
+      !pendingImport.journey.profile?.avatarUpdatedAt
     ) {
       void clearAvatar();
     }
     setPendingImport(null);
     applyAppearance(store.getState().settings.appearance);
-    toast("Restored.", { variant: "success" });
+    toast(
+      rhythmRestored
+        ? "Restored."
+        : "Journey restored, but this device could not update its rhythm.",
+      { variant: rhythmRestored ? "success" : "default" },
+    );
   }
 
   // Server deletion must succeed before any irreplaceable device data is removed.
@@ -948,6 +985,8 @@ function SettingsInner() {
     clearStoredAccountSyncGenerations();
     clearStoredDailyQuestSyncContext();
     clearStoredMutableRevisionContext();
+    clearRhythmState();
+    clearGameProgress();
     await clearAvatar();
     toast("Your account and saved journey were deleted.", {
       variant: "success",
@@ -963,6 +1002,8 @@ function SettingsInner() {
       if (user) await deleteRemoteAvatar(true);
       clearAllData(user ? { purgeAccount: user.id } : undefined);
       clearAllDeviceLocalJournalDrafts();
+      clearRhythmState();
+      clearGameProgress();
       await clearAvatar();
       clearLastSyncedUserId();
       router.replace("/onboarding");
@@ -1137,7 +1178,29 @@ function SettingsInner() {
 
         <SectionTitle>Plus</SectionTitle>
         <div className="space-y-3">
-          <ExplorePlusLink description="Discover the full wallpaper collection and extra ways to deepen your daily practice." />
+          <ExplorePlusLink description="Discover every wallpaper and extra ways to deepen your daily practice." />
+          {isPlus && (
+            <PaperCard variant="paper" padding="none" className="px-4">
+              <div className="flex items-center justify-between gap-4 py-3.5">
+                <span className="min-w-0">
+                  <span className="block text-[0.9375rem] text-charcoal">
+                    Floating MyShepherd
+                  </span>
+                  <span className="mt-0.5 block text-caption leading-relaxed text-ash">
+                    Keep a small Scripture assistant available throughout the
+                    app.
+                  </span>
+                </span>
+                <Toggle
+                  label="Floating MyShepherd"
+                  on={appearance.myShepherdFloatingButton}
+                  onChange={(myShepherdFloatingButton) =>
+                    setAppearance({ myShepherdFloatingButton })
+                  }
+                />
+              </div>
+            </PaperCard>
+          )}
           <SupportLink />
         </div>
 
@@ -1251,6 +1314,30 @@ function SettingsInner() {
               }
             />
           </Disclosure>
+
+          {/* Rhythm stays a small formation preference, not a second dashboard. */}
+          {GREEN_FEATURES.rhythmBuilder && (
+            <Disclosure
+              variant="card"
+              label="My rhythm"
+              summary={
+                <span className="text-[0.8125rem] text-ash">
+                  One gentle plan · never a score
+                </span>
+              }
+            >
+              <p className="text-[0.9375rem] leading-relaxed text-charcoal">
+                Choose a few ways to return during the week. Missing a day
+                changes nothing.
+              </p>
+              <Link
+                href="/app/rhythm"
+                className="mt-3 inline-flex min-h-11 items-center gap-1 text-small font-medium text-accent"
+              >
+                Open Rhythm Builder <IconChevronRight size={15} />
+              </Link>
+            </Disclosure>
+          )}
 
           <Disclosure
             variant="card"

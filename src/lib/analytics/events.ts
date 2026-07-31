@@ -33,6 +33,8 @@ type SignInMethod = "apple" | "magic_link" | "google";
 type SignInSource = "account" | "onboarding";
 type SyncStatus = "initial" | "push";
 type BillingInterval = "monthly" | "annual" | "lifetime";
+type GuidedPracticeKind = "daily" | "pilgrimage";
+type ScriptureGameKind = "connections" | "timeline";
 
 /** Compile-time event/property allowlist. No arbitrary strings are accepted. */
 export interface AnalyticsEventProps {
@@ -58,6 +60,11 @@ export interface AnalyticsEventProps {
   bible_chapter_opened: undefined;
   verse_bookmarked: undefined;
   verse_shared: undefined;
+  guided_practice_started: { kind: GuidedPracticeKind };
+  guided_practice_completed: { kind: GuidedPracticeKind };
+  scripture_game_started: { kind: ScriptureGameKind };
+  scripture_game_completed: { kind: ScriptureGameKind };
+  rhythm_saved: undefined;
   streak_milestone: { count: number };
   account_prompt_viewed: { context: AccountContext };
   account_prompt_dismissed: { context: AccountContext };
@@ -148,6 +155,19 @@ const EVENT_RULES = {
   bible_chapter_opened: noProps,
   verse_bookmarked: noProps,
   verse_shared: noProps,
+  guided_practice_started: {
+    props: { kind: { kind: "enum", values: ["daily", "pilgrimage"] } },
+  },
+  guided_practice_completed: {
+    props: { kind: { kind: "enum", values: ["daily", "pilgrimage"] } },
+  },
+  scripture_game_started: {
+    props: { kind: { kind: "enum", values: ["connections", "timeline"] } },
+  },
+  scripture_game_completed: {
+    props: { kind: { kind: "enum", values: ["connections", "timeline"] } },
+  },
+  rhythm_saved: noProps,
   streak_milestone: {
     props: { count: { kind: "number", min: 1, max: 365 } },
   },
@@ -310,7 +330,12 @@ const SAFE_STATIC_PATHS = new Set([
   "/app/account",
   "/app/bible",
   "/app/bible/saved",
+  "/app/games",
+  "/app/games/archive",
+  "/app/guided",
+  "/app/guided/daily",
   "/app/journey",
+  "/app/pilgrimages",
   "/app/plus",
   "/app/prayer",
   "/app/prayer/new",
@@ -319,6 +344,7 @@ const SAFE_STATIC_PATHS = new Set([
   "/app/quests",
   "/app/reflection",
   "/app/reflection/new",
+  "/app/rhythm",
   "/app/settings",
 ]);
 
@@ -331,6 +357,15 @@ function safePathname(pathname: string): string {
     return "/app/bible/[book]/[chapter]";
   }
   if (/^\/app\/bible\/[^/]+$/.test(path)) return "/app/bible/[book]";
+  if (/^\/app\/games\/archive\/[^/]+$/.test(path)) {
+    return "/app/games/archive/[game]";
+  }
+  if (/^\/app\/pilgrimages\/[^/]+\/[^/]+$/.test(path)) {
+    return "/app/pilgrimages/[pilgrimage]/[day]";
+  }
+  if (/^\/app\/pilgrimages\/[^/]+$/.test(path)) {
+    return "/app/pilgrimages/[pilgrimage]";
+  }
   return "/";
 }
 

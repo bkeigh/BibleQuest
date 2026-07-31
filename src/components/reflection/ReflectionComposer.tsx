@@ -13,11 +13,12 @@ import { MoodPicker } from "@/components/reflection/MoodPicker";
 import { JournalEditorToolbar } from "@/components/journal/JournalEditorToolbar";
 import { JournalPrivacyBoundary } from "@/components/journal/JournalPrivacyBoundary";
 import { IconArrowLeft } from "@/components/design-system/icons";
-import { reflectionPrompts } from "@/data/seed/reflection-prompts";
 import { hashString, toDateKey } from "@/lib/utils/dates";
 import { useDeviceLocalJournalDraft } from "@/lib/questos/journal-drafts";
 import type { ReflectionMood } from "@/lib/questos/types";
 import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
+import { selectReflectionPrompts } from "@/lib/journal/reflection-prompts";
+import { guidedJournalHandoff } from "@/lib/guided/journal-handoff";
 
 type ReflectionDraft = {
   body: string;
@@ -42,19 +43,21 @@ function ReflectionComposerInner() {
       : undefined,
   );
   const isEdit = Boolean(existing);
-  const verseRef = existing?.relatedVerseReference ?? params.get("verse") ?? undefined;
-
-  const promptPool = useMemo(() => {
-    if (!verseRef) return reflectionPrompts;
-    const scripturePrompts = reflectionPrompts.filter(
-      (prompt) => prompt.context === "after_scripture",
-    );
-    return scripturePrompts.length ? scripturePrompts : reflectionPrompts;
-  }, [verseRef]);
-  const requestedPrompt = useMemo(() => {
-    const id = params.get("prompt");
-    return id ? promptPool.find((prompt) => prompt.id === id) : undefined;
-  }, [params, promptPool]);
+  const guidedHandoff = useMemo(
+    () => (editId ? null : guidedJournalHandoff(params.get("guided"))),
+    [editId, params],
+  );
+  const exitHref = guidedHandoff?.returnPath ?? "/app/prayer";
+  const verseRef =
+    existing?.relatedVerseReference ??
+    guidedHandoff?.verseReference ??
+    params.get("verse") ??
+    undefined;
+  const requestedPromptId = params.get("prompt") ?? undefined;
+  const { promptPool, requestedPrompt } = useMemo(
+    () => selectReflectionPrompts(verseRef, requestedPromptId),
+    [requestedPromptId, verseRef],
+  );
   const dailyPromptIndex = useMemo(
     () => hashString(toDateKey() + (verseRef ?? "")) % promptPool.length,
     [promptPool.length, verseRef],
@@ -72,7 +75,11 @@ function ReflectionComposerInner() {
   const initialValue: ReflectionDraft = {
     body: existing?.body ?? "",
     mood: existing?.mood ?? "",
-    prompt: existing?.prompt ?? requestedPrompt?.text ?? currentPrompt.text,
+    prompt:
+      existing?.prompt ??
+      guidedHandoff?.reflectionPrompt ??
+      requestedPrompt?.text ??
+      currentPrompt.text,
   };
   const {
     value,
@@ -83,7 +90,7 @@ function ReflectionComposerInner() {
     clearDraft,
   } = useDeviceLocalJournalDraft<ReflectionDraft>({
     kind: "reflection",
-    entryId: editId,
+    entryId: editId ?? guidedHandoff?.draftScopeId,
     initialValue,
     isEmpty: reflectionDraftIsEmpty,
     clearedValue: { body: "", mood: "", prompt: "" },
@@ -116,12 +123,12 @@ function ReflectionComposerInner() {
       toast("Reflection saved.", { variant: "success" });
     }
     clearDraft();
-    router.replace("/app/prayer");
+    router.replace(exitHref);
   }
 
   function discard() {
     clearDraft();
-    router.replace("/app/prayer");
+    router.replace(exitHref);
   }
 
   if (editId && !existing) {
@@ -152,7 +159,7 @@ function ReflectionComposerInner() {
     <PageContainer className="pt-safe pb-10">
       <div className="flex min-h-16 items-center justify-between gap-3 pt-3">
         <Link
-          href="/app/prayer"
+          href={exitHref}
           onClick={saveDraft}
           className="inline-flex min-h-11 items-center px-1 text-[0.9375rem] text-ash transition-colors hover:text-charcoal"
         >
@@ -160,7 +167,7 @@ function ReflectionComposerInner() {
         </Link>
         <div className="min-w-0 text-center">
           <p className="text-[0.75rem] uppercase tracking-[0.12em] text-ash">
-            Prayer Journal
+            {guidedHandoff ? "Guided Scripture" : "Prayer Journal"}
           </p>
           <h1 className="truncate font-display text-[1.0625rem] text-graphite">
             {isEdit ? "Edit reflection" : "New reflection"}

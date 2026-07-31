@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { apiFetch } from "@/lib/platform/api";
 
 const DEVICE_KEY = "biblequest:scripture-device";
 const SESSION_KEY = "biblequest:scripture-session";
@@ -36,7 +37,7 @@ export function ApiBibleViewTracker({ token }: { token?: string }) {
     void (async () => {
       for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
         try {
-          const response = await fetch("/api/bible/view", {
+          const response = await apiFetch("/api/bible/view", {
             method: "POST",
             cache: "no-store",
             keepalive: true,

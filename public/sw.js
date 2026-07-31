@@ -4,7 +4,7 @@
  * validated build assets. Prayers, reflections, and other user data continue
  * to live in the persisted Zustand store; this worker never handles that data.
  */
-const CACHE_VERSION = "biblequest-v22";
+const CACHE_VERSION = "biblequest-v23";
 const CACHE_OWNER_PREFIX = "biblequest-";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
@@ -101,12 +101,19 @@ const OFFLINE_SAFE_NAVIGATION_PATHS = new Set([
   "/app/bible",
   "/app/bible/saved",
   "/app/settings",
+  "/app/guided",
+  "/app/guided/daily",
+  "/app/pilgrimages",
+  "/app/games",
+  "/app/rhythm",
 ]);
 
 const OFFLINE_SAFE_NAVIGATION_PATTERNS = [
   /^\/app\/quests\/[^/]+$/,
   /^\/app\/bible\/[^/]+$/,
   /^\/app\/bible\/[^/]+\/[1-9]\d*$/,
+  /^\/app\/pilgrimages\/[^/]+$/,
+  /^\/app\/pilgrimages\/[^/]+\/[1-9]\d*$/,
 ];
 
 function isPathWithin(pathname, root) {
@@ -262,14 +269,20 @@ async function handleNavigation(request) {
 
   // A resolved 4xx/5xx or redirect is returned as-is. Cache fallback is only
   // for an actual fetch failure, so the worker cannot hide live server errors.
-  if (mayCache && isResponseCacheable(response)) {
+  if (mayCache) {
     try {
       const runtime = await caches.open(RUNTIME_CACHE);
-      // Query-bearing requests never reach this point, so this exact request
-      // key cannot alias a sensitive query to a queryless URL.
-      await runtime.put(request, response.clone());
+      if (isResponseCacheable(response)) {
+        // Query-bearing requests never reach this point, so this exact request
+        // key cannot alias a sensitive query to a queryless URL.
+        await runtime.put(request, response.clone());
+      } else {
+        // A live rollback, private response, or route error invalidates any
+        // older offline copy instead of leaving a retired feature available.
+        await runtime.delete(request);
+      }
     } catch {
-      // Cache writes are best-effort and must not replace a valid network reply.
+      // Cache updates are best-effort and must not replace a network reply.
     }
   }
 

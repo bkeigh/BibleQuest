@@ -331,6 +331,15 @@ function fakeClient(
           error: null,
         };
       }
+      if (name === "guided_progress_sync_contract") {
+        return {
+          data: {
+            contract: "biblequest_guided_progress_sync_v1",
+            ok: true,
+          },
+          error: null,
+        };
+      }
       if (name === "account_sync_generation") {
         return { data: { generation: 0 }, error: null };
       }

@@ -41,6 +41,7 @@ import {
 import { usePlus } from "@/lib/billing/usePlus";
 import { useSession } from "@/lib/supabase/useSession";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
+import { TodayFormation } from "@/components/home/TodayFormation";
 
 type Testament = "new" | "old";
 
@@ -206,6 +207,11 @@ function BibleIndexInner() {
           open={refreshLimitOpen}
           onClose={closeRefreshLimitDialog}
         />
+
+        {/* Scripture can move directly into a reviewed guide or learning game. */}
+        <div className="mt-6">
+          <TodayFormation dayKey={dayKey} />
+        </div>
 
         <section
           aria-labelledby="reading-shortcuts"

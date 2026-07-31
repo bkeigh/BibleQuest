@@ -105,9 +105,11 @@ describe("direct Stripe API boundary", () => {
     const checkout = source("src/app/api/billing/checkout/route.ts");
     const portal = source("src/app/api/billing/portal/route.ts");
     const client = source("src/lib/billing/usePlus.ts");
+    const purchases = source("src/lib/platform/purchases.ts");
     expect(checkout).toContain('"https://checkout.stripe.com"');
     expect(portal).toContain('"https://billing.stripe.com"');
-    expect(client).toContain('"https://checkout.stripe.com"');
-    expect(client).toContain('"https://billing.stripe.com"');
+    expect(client).toContain("purchaseAdapter()");
+    expect(purchases).toContain('"https://checkout.stripe.com"');
+    expect(purchases).toContain('"https://billing.stripe.com"');
   });
 });

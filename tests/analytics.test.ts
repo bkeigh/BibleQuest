@@ -145,6 +145,30 @@ describe("privacy-first analytics", () => {
     expect(JSON.stringify(body)).not.toMatch(/private-reference|draft|\?|#/);
   });
 
+  it("measures Green formation types without retaining content identifiers", async () => {
+    installBrowser(
+      "https://biblequest.test/app/pilgrimages/private-path/3?session=private#movement",
+    );
+    localStorage.setItem(CONSENT_KEY, "1");
+    const fetchMock = vi.fn().mockResolvedValue(response());
+    vi.stubGlobal("fetch", fetchMock);
+    const { track } = await loadAnalytics();
+
+    track("guided_practice_completed", { kind: "pilgrimage" });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      name: "guided_practice_completed",
+      url: "https://biblequest.test/app/pilgrimages/[pilgrimage]/[day]",
+      props: { kind: "pilgrimage" },
+    });
+    expect(JSON.stringify(body)).not.toMatch(
+      /private-path|session|movement|\?|#/,
+    );
+  });
+
   it("silently denies disabled, incomplete, and malformed configurations", async () => {
     const states = [
       { enabled: "false", domain: "biblequest.test" },
@@ -213,6 +237,10 @@ describe("privacy-first analytics", () => {
     untypedTrack("streak_milestone", { count: 1.5 });
     untypedTrack("streak_milestone", { count: 366 });
     untypedTrack("sync_completed", { status: "push" });
+    untypedTrack("scripture_game_completed", {
+      kind: "connections",
+      puzzleId: "private-puzzle",
+    });
     untypedTrack("sign_in_started", {
       method: "phone_otp",
       source: "account",

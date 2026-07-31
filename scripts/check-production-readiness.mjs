@@ -109,6 +109,11 @@ const REQUIRED_SCHEMA = [
     select: "assigned_date,revision",
     migration: "0015",
   },
+  {
+    table: "user_guided_movements",
+    select: "session_key,content_id,movement_key,occurred_at",
+    migration: "0033",
+  },
 ];
 
 // Each public RPC returns exactly one fixed identity plus an authorization
@@ -143,6 +148,12 @@ const POSTURE_CONTRACTS = [
     contract: "biblequest_operator_plus_grant_v1",
     migration: "0030",
     label: "operator Plus grant posture",
+  },
+  {
+    rpc: "guided_progress_sync_contract",
+    contract: "biblequest_guided_progress_sync_v1",
+    migration: "0033",
+    label: "guided progress sync posture",
   },
 ];
 
@@ -224,7 +235,7 @@ function safeHealthBody(value) {
     typeof candidate.canonical_origin_matches !== "boolean" ||
     !["configured", "guest-only", "invalid"].includes(candidate.auth_posture) ||
     !["configured", "disabled", "invalid"].includes(candidate.analytics_posture) ||
-    candidate.schema_contract !== "0032" ||
+    candidate.schema_contract !== "0033" ||
     candidate.content_contract !== "seed-manifest-v1" ||
     !/^biblequest-v\d{1,4}$/.test(candidate.service_worker_version) ||
     !["coming-soon", "test", "live", "invalid"].includes(

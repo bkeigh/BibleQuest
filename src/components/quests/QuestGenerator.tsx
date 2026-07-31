@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
 import { seedQuests } from "@/data/seed/quests";
 import {
   createReviewedQuestProvider,
@@ -20,8 +19,10 @@ import { selectMyQuests, useQuestOS } from "@/lib/questos/store";
 import { toDateKey } from "@/lib/utils/dates";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
+import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
 import { QuestSlip, CATEGORY_LABEL, formatDuration } from "./QuestSlip";
 import { IconPlus } from "@/components/design-system/icons";
+import { apiFetch } from "@/lib/platform/api";
 
 const DURATIONS: QuestDuration[] = [5, 10, 15, 30, 60, 240, 480];
 const provider = createReviewedQuestProvider(seedQuests);
@@ -39,6 +40,7 @@ export function QuestGenerator({
   const [result, setResult] = useState<QuestGenerationResult | null>(null);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [plusDialogOpen, setPlusDialogOpen] = useState(false);
   const variation = useRef(0);
   const assignments = useQuestOS((state) => state.assignments);
   const completions = useQuestOS((state) => state.completions);
@@ -46,21 +48,33 @@ export function QuestGenerator({
 
   if (!isPlus) {
     return (
-      <PaperCard variant="quiet" padding="md">
-        <p className="font-display text-[1.125rem] text-graphite">
-          Generate a reviewed quest
-        </p>
-        <p className="mt-1 text-small leading-relaxed text-ash">
-          BibleQuest Plus can build a recommendation around your time and
-          focus. It stays on this device and uses the human-reviewed catalog.
-        </p>
-        <Link
-          href="/app/plus"
-          className="mt-3 inline-flex min-h-11 items-center text-small font-medium text-accent hover:underline"
-        >
-          Explore BibleQuest Plus
-        </Link>
-      </PaperCard>
+      <>
+        <PaperCard variant="quiet" padding="md">
+          <p className="font-display text-[1.125rem] text-graphite">
+            Generate a reviewed quest
+          </p>
+          <p className="mt-1 text-small leading-relaxed text-ash">
+            BibleQuest Plus asks Haiku to match your time and focus to the
+            human-reviewed catalog. It never reads your profile, prayers,
+            reflections, or journals.
+          </p>
+          <GentleButton
+            type="button"
+            variant="text"
+            size="sm"
+            className="mt-3"
+            onClick={() => setPlusDialogOpen(true)}
+          >
+            Explore BibleQuest Plus
+          </GentleButton>
+        </PaperCard>
+        <PlusFeatureDialog
+          open={plusDialogOpen}
+          onClose={() => setPlusDialogOpen(false)}
+          title="Generate a quest"
+          description="Haiku-assisted matching from BibleQuest’s reviewed quest catalog is included with BibleQuest Plus."
+        />
+      </>
     );
   }
 
@@ -68,18 +82,27 @@ export function QuestGenerator({
     setWorking(true);
     setError(null);
     variation.current += 1;
+    const request = {
+      category: category || undefined,
+      duration: duration || undefined,
+      focus: focus || undefined,
+      variation: variation.current,
+    };
     try {
-      const next = await provider.generate({
-        category: category || undefined,
-        duration: duration || undefined,
-        focus: focus || undefined,
-        variation: variation.current,
+      const response = await apiFetch("/api/ai/quest", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
       });
+      if (!response.ok) throw new Error("provider");
+      const next = (await response.json()) as QuestGenerationResult;
       setResult(next);
     } catch {
-      setError(
-        "We couldn’t build a quest just now. Your catalog is still available below."
-      );
+      // The reviewed local matcher preserves the feature when AI is unavailable.
+      const next = await provider.generate(request);
+      setResult(next);
+      setError("Haiku is resting, so BibleQuest used its reviewed on-device matcher.");
     } finally {
       setWorking(false);
     }
@@ -219,6 +242,12 @@ export function QuestGenerator({
           <p role="status" className="mt-2 text-caption text-ash">
             {result.notice}
           </p>
+          {result.reason && (
+            <p className="mt-2 text-small leading-relaxed text-charcoal">
+              <span className="font-medium">Why this match: </span>
+              {result.reason}
+            </p>
+          )}
         </div>
       )}
     </PaperCard>

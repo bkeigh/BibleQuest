@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const DAILY_QUEST_SYNC_CONTRACT = "biblequest_daily_quest_sync_v1";
 export const ACCOUNT_SYNC_CONTRACT = "biblequest_account_sync_v4";
+export const GUIDED_PROGRESS_SYNC_CONTRACT =
+  "biblequest_guided_progress_sync_v1";
 
 /** Report a missing or malformed server boundary without attempting writes. */
 export class AccountSyncContractError extends Error {
@@ -22,17 +24,20 @@ function isReadyContract(value: unknown, expected: string): boolean {
   );
 }
 
-/** Prove both write protocols before the engine reads or writes user data. */
+/** Prove every write protocol before the engine reads or writes user data. */
 export async function assertAccountSyncContracts(supabase: SupabaseClient) {
-  const [daily, account] = await Promise.all([
+  const [daily, account, guided] = await Promise.all([
     supabase.rpc("daily_quest_sync_contract"),
     supabase.rpc("account_sync_contract"),
+    supabase.rpc("guided_progress_sync_contract"),
   ]);
   if (
     daily.error ||
     account.error ||
+    guided.error ||
     !isReadyContract(daily.data, DAILY_QUEST_SYNC_CONTRACT) ||
-    !isReadyContract(account.data, ACCOUNT_SYNC_CONTRACT)
+    !isReadyContract(account.data, ACCOUNT_SYNC_CONTRACT) ||
+    !isReadyContract(guided.data, GUIDED_PROGRESS_SYNC_CONTRACT)
   ) {
     throw new AccountSyncContractError();
   }

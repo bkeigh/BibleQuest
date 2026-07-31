@@ -13,7 +13,7 @@ export function NewsletterLink({ className }: NewsletterLinkProps) {
     <Link
       href="/#newsletter"
       className={cn(
-        "group relative isolate flex min-h-[4.75rem] w-full items-center gap-3 overflow-hidden rounded-[var(--radius-card)] border border-olive-300 bg-paper px-4 py-3 text-left text-graphite paper-shadow transition-all duration-300 [transition-timing-function:var(--ease-gentle)] hover:-translate-y-0.5 hover:border-accent/45 hover:bg-linen focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0",
+        "group relative isolate flex min-h-20 w-full items-center gap-3 overflow-hidden rounded-[var(--radius-card)] border border-olive-300 bg-paper px-4 py-4 text-left text-graphite paper-shadow transition-all duration-300 [transition-timing-function:var(--ease-gentle)] hover:-translate-y-0.5 hover:border-accent/45 hover:bg-linen focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0",
         className,
       )}
     >

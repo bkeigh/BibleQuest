@@ -171,6 +171,32 @@ Migration `0030` uses the next isolated forward-only packet described in
 fresh physical backup, then apply only with the pinned confirmation string.
 Never substitute normal linked `db push`, `--include-all`, or migration repair.
 
+### Production 0033 guided progress packet
+
+After the reviewed `0031` and `0032` Stripe corrections are applied, migration
+`0033` uses the next isolated forward-only packet. Its preflight requires the
+exact production history and complete `0032` schema, rejects partial guided
+progress state, pins the 32-file manifest and `0033` source checksums, and
+requires a completed physical backup less than 30 hours old.
+
+The read-only dry run must propose exactly one packet:
+
+```bash
+pnpm check:production-guided-progress
+```
+
+Apply only after reviewing that output and the named backup:
+
+```bash
+BIBLEQUEST_PRODUCTION_MIGRATION_CONFIRM='apply 20260731011500 to iacnjqnssovaaojswjoh' \
+  node scripts/reconcile-production-guided-progress.mjs --apply
+```
+
+The apply must report `"applied":true` and `"schema_diff_empty":true`. Rerun
+the dry run, production readiness, the RLS report, and the two-user guided
+progress proof. Never substitute normal linked `db push`, `--include-all`, or
+migration repair.
+
 ## Complete public-table inventory
 
 | Classification | Tables | Intended access |

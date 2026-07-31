@@ -39,6 +39,7 @@ const EXPECTED_MIGRATIONS = [
   "0030_operator_plus_grants.sql",
   "0031_stripe_subscription_conflict_key.sql",
   "0032_stripe_dispute_signal_prefix.sql",
+  "0033_guided_pilgrimage_progress.sql",
 ];
 
 /** Hash a migration exactly as the release manifest does. */
@@ -117,7 +118,8 @@ describe("release migration contracts", () => {
     const expectedTables = report.match(/    \('[a-z_]+', '[^']+'\)/g) ?? [];
     const worker = readFileSync(join(ROOT, "public", "sw.js"), "utf8");
 
-    expect(expectedTables).toHaveLength(40);
+    expect(expectedTables).toHaveLength(41);
+    expect(report).toContain("('user_guided_movements', 'user-owned')");
     expect(report).toContain("('user_daily_quest_days', 'user-owned')");
     expect(report).toContain(
       "('user_sync_state', 'retained user-owned state')",
@@ -125,6 +127,7 @@ describe("release migration contracts", () => {
     expect(report).toContain("'mutable_account_sync_contract'");
     expect(report).toContain("'account_sync_generation'");
     expect(report).toContain("'account_sync_contract'");
+    expect(report).toContain("'guided_progress_sync_contract'");
     expect(report).toContain("'advance_account_sync_revision'");
     expect(report).toContain("'delete_own_account'");
     expect(report).toContain("'account_deletion_contract'");
@@ -175,6 +178,9 @@ describe("release migration contracts", () => {
     );
     expect(report).toContain(
       "select public.account_sync_contract() as account_sync_contract;",
+    );
+    expect(report).toContain(
+      "select public.guided_progress_sync_contract() as guided_progress_sync_contract;",
     );
     expect(worker).toContain(
       `const CACHE_VERSION = "${observability.serviceWorkerVersion}";`,
