@@ -53,8 +53,8 @@ export async function POST(request: Request) {
         provider: "anthropic-haiku-4.5",
         reason: selected.reason,
         notice: relaxed
-          ? "Haiku used the closest available match from BibleQuest’s human-reviewed catalog."
-          : "Haiku matched your choices to a human-reviewed BibleQuest quest.",
+          ? "BibleQuest used the closest match from its human-reviewed catalog."
+          : "Matched to a human-reviewed BibleQuest quest.",
       },
       { headers: { "Cache-Control": "private, no-store" } },
     );

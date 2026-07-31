@@ -208,12 +208,6 @@ function BibleIndexInner() {
           onClose={closeRefreshLimitDialog}
         />
 
-        {/* Scripture moves directly into the reviewed guide. Games live on Home
-            and their own tab — the Bible tab stays a reading surface. */}
-        <div className="mt-6">
-          <TodayFormation dayKey={dayKey} show="guide" />
-        </div>
-
         <section
           aria-labelledby="reading-shortcuts"
           className="mt-6"
@@ -273,6 +267,12 @@ function BibleIndexInner() {
             </span>
           </Link>
         </section>
+
+        {/* The guided reading follows the reader's own place in Scripture: this
+            tab's first job is getting back into the text. Games stay on Home. */}
+        <div className="mt-6">
+          <TodayFormation dayKey={dayKey} show="guide" />
+        </div>
 
         {previousVerses.length > 0 && (
           <section

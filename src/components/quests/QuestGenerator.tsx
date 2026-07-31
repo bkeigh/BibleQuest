@@ -18,6 +18,7 @@ import { activeQuestAssignments } from "@/lib/questos/quest-engine";
 import { selectMyQuests, useQuestOS } from "@/lib/questos/store";
 import { toDateKey } from "@/lib/utils/dates";
 import { GentleButton } from "@/components/design-system/GentleButton";
+import { InfoHint } from "@/components/design-system/InfoHint";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
 import { QuestSlip, CATEGORY_LABEL, formatDuration } from "./QuestSlip";
@@ -54,10 +55,13 @@ export function QuestGenerator({
             Generate a reviewed quest
           </p>
           <p className="mt-1 text-small leading-relaxed text-ash">
-            BibleQuest Plus asks Haiku to match your time and focus to the
-            human-reviewed catalog. It never reads your profile, prayers,
-            reflections, or journals.
+            Plus matches your time and focus to the human-reviewed catalog.
           </p>
+          <InfoHint label="What it can see" className="mt-2">
+            Matching reads only the choices you make here — time, focus, and
+            category. It never reads your profile, prayers, reflections, or
+            journals.
+          </InfoHint>
           <GentleButton
             type="button"
             variant="text"
@@ -72,7 +76,7 @@ export function QuestGenerator({
           open={plusDialogOpen}
           onClose={() => setPlusDialogOpen(false)}
           title="Generate a quest"
-          description="Haiku-assisted matching from BibleQuest’s reviewed quest catalog is included with BibleQuest Plus."
+          description="Assisted matching from BibleQuest’s reviewed quest catalog is included with BibleQuest Plus."
         />
       </>
     );
@@ -99,10 +103,16 @@ export function QuestGenerator({
       const next = (await response.json()) as QuestGenerationResult;
       setResult(next);
     } catch {
-      // The reviewed local matcher preserves the feature when AI is unavailable.
-      const next = await provider.generate(request);
-      setResult(next);
-      setError("Haiku is resting, so BibleQuest used its reviewed on-device matcher.");
+      // The reviewed local matcher preserves the feature when the server
+      // provider is unavailable. That is a success, not an error: the result
+      // carries its own `notice` explaining the provenance, so nothing is
+      // announced as a failure here. `error` is reserved for the case where
+      // even the on-device catalog cannot produce a quest.
+      try {
+        setResult(await provider.generate(request));
+      } catch {
+        setError("BibleQuest couldn’t choose a quest just now. Please try again.");
+      }
     } finally {
       setWorking(false);
     }

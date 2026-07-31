@@ -8,6 +8,7 @@ import {
 import { apiFetch } from "@/lib/platform/api";
 import { usePlus } from "@/lib/billing/usePlus";
 import { GentleButton } from "@/components/design-system/GentleButton";
+import { InfoHint } from "@/components/design-system/InfoHint";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
 import { MyShepherdResponse } from "@/components/shepherd/MyShepherdResponse";
@@ -23,7 +24,9 @@ function errorMessage(status: number): string {
   if (status === 401) return "Sign in again so BibleQuest can verify your account.";
   if (status === 403) return "MyShepherd is included with BibleQuest Plus.";
   if (status === 429) return "MyShepherd needs a short rest. Please try again later.";
-  return "MyShepherd couldn’t answer just now. No credits were used for a failed request.";
+  // Deliberately no mention of credits: BibleQuest has no credit or quota
+  // concept, so reassuring the reader about one only raises the question.
+  return "MyShepherd couldn’t answer just now. Please try again in a moment.";
 }
 
 /** One-question study companion with no transcript or journal persistence. */
@@ -105,32 +108,57 @@ export function MyShepherd() {
   return (
     <div className="space-y-4">
       <PaperCard as="section" variant="paper" padding="lg">
-        <p className="text-small leading-relaxed text-ash">
-          Ask about Scripture or Christian practice. Do not paste private
-          prayers, journal entries, names, or identifying details.
-        </p>
         <label
           htmlFor="my-shepherd-question"
-          className="mt-5 block text-small font-medium text-charcoal"
+          className="block text-small font-medium text-charcoal"
         >
           What would you like to understand?
         </label>
         <textarea
           id="my-shepherd-question"
-          rows={5}
+          rows={4}
           maxLength={MY_SHEPHERD_MAX_QUESTION_LENGTH}
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
           placeholder="Example: What does grace mean in the Bible?"
           className="mt-2 w-full resize-y rounded-[var(--radius-card)] border border-mist bg-linen px-4 py-3 text-body leading-relaxed text-graphite outline-none focus:border-accent/50"
         />
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <p className="text-caption text-ash">
-            This question is not saved by BibleQuest.
-          </p>
-          <p className="shrink-0 text-caption text-ash">
-            {question.length}/{MY_SHEPHERD_MAX_QUESTION_LENGTH}
-          </p>
+
+        {/* Starters sit with the field they fill, and step aside once the
+            reader has words of their own. */}
+        {!question.trim() && (
+          <div className="mt-3">
+            <p className="text-caption text-ash">Or start with one of these</p>
+            <div className="mt-2 grid gap-2">
+              {STARTERS.map((starter) => (
+                <button
+                  key={starter}
+                  type="button"
+                  onClick={() => {
+                    setQuestion(starter);
+                    setError(null);
+                  }}
+                  className="min-h-11 rounded-[var(--radius-button)] border border-mist bg-paper px-3 py-2.5 text-left text-small text-charcoal hover:border-accent/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  {starter}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-3 flex items-start justify-between gap-3">
+          <InfoHint label="How your question is handled">
+            Ask about Scripture or Christian practice. Your question is sent to
+            be answered but is not saved by BibleQuest, and no reply is kept.
+            Please leave out private prayers, journal entries, names, and other
+            identifying details.
+          </InfoHint>
+          {question.length > MY_SHEPHERD_MAX_QUESTION_LENGTH - 80 && (
+            <p className="shrink-0 pt-2 text-caption text-ash">
+              {question.length}/{MY_SHEPHERD_MAX_QUESTION_LENGTH}
+            </p>
+          )}
         </div>
         <GentleButton
           variant="primary"
@@ -148,29 +176,6 @@ export function MyShepherd() {
           </p>
         )}
       </PaperCard>
-
-      {!answer && (
-        <PaperCard as="section" variant="quiet" padding="md">
-          <h2 className="font-display text-[1.125rem] text-graphite">
-            Simple places to begin
-          </h2>
-          <div className="mt-3 grid gap-2">
-            {STARTERS.map((starter) => (
-              <button
-                key={starter}
-                type="button"
-                onClick={() => {
-                  setQuestion(starter);
-                  setError(null);
-                }}
-                className="min-h-11 rounded-[var(--radius-button)] border border-mist bg-paper px-3 py-2.5 text-left text-small text-charcoal hover:border-accent/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                {starter}
-              </button>
-            ))}
-          </div>
-        </PaperCard>
-      )}
 
       {answer && (
         <PaperCard as="section" variant="paper" padding="lg" aria-live="polite">

@@ -188,3 +188,11 @@ export const IconSliders = (p: IconProps) => (
     <circle cx="9" cy="17" r="2" />
   </Svg>
 );
+
+export const IconInfo = (p: IconProps) => (
+  <Svg {...p} size={p.size ?? 16}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 11v5.5" />
+    <path d="M12 7.75v.01" />
+  </Svg>
+);
