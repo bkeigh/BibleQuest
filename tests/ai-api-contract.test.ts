@@ -13,7 +13,9 @@ describe("Plus AI API boundary", () => {
     for (const route of [questRoute, shepherdRoute]) {
       expect(route).toContain("hasSameOrigin(request)");
       expect(route).toContain("requireServerPlus()");
-      expect(route).toContain("guardProviderRequest(");
+      // Identity-scoped: a metered provider budget belongs to the account, so
+      // the bucket must not reset when the caller's IP changes.
+      expect(route).toContain("guardIdentifiedRequest(");
       expect(route).toContain('"Cache-Control": "private, no-store"');
     }
   });

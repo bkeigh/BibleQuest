@@ -8,7 +8,7 @@ import {
   recordAiFailure,
 } from "@/lib/ai/anthropic.server";
 import { requireServerPlus } from "@/lib/billing/plus-entitlement.server";
-import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
+import { guardIdentifiedRequest } from "@/lib/bible/provider-request-guard";
 import { hasSameOrigin, privateError } from "@/lib/http/request";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
   const entitlement = await requireServerPlus();
   if (entitlement instanceof Response) return entitlement;
-  const blocked = guardProviderRequest(
+  const blocked = guardIdentifiedRequest(
     request,
     `ai-shepherd:${entitlement.userId}`,
     RATE_POLICIES,

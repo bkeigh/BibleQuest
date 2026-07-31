@@ -114,6 +114,27 @@ export function guardProviderRequest(
 }
 
 /**
+ * Guards a route whose scope already names the authenticated account.
+ *
+ * The bucket key deliberately omits the request IP: for a metered paid
+ * provider the budget belongs to the account, and mixing the IP in lets one
+ * caller reset their own ceiling just by changing networks. Guest routes keep
+ * using `guardProviderRequest`, where the IP is the only identity available.
+ */
+export function guardIdentifiedRequest(
+  request: Request,
+  scope: string,
+  policy: ProviderGuardPolicy | readonly ProviderGuardPolicy[],
+  now = Date.now(),
+): Response | null {
+  if (crossSiteBrowserRequest(request)) {
+    return noStoreJson({ error: "forbidden" }, { status: 403 });
+  }
+
+  return rateLimitProviderRequest(request, scope, policy, now, false);
+}
+
+/**
  * Apply only the bounded per-IP windows. Public Scripture share pages must
  * allow top-level cross-site navigation, so their proxy cannot use the Fetch
  * Metadata rejection that protects same-origin JSON endpoints.
@@ -123,10 +144,11 @@ export function rateLimitProviderRequest(
   scope: string,
   policy: ProviderGuardPolicy | readonly ProviderGuardPolicy[],
   now = Date.now(),
+  bucketByIp = true,
 ): Response | null {
   const state = store();
   sweepExpiredWindows(state, now);
-  const ip = requestIp(request);
+  const ip = bucketByIp ? requestIp(request) : "identified";
   const policies = Array.isArray(policy) ? policy : [policy];
   for (const [index, currentPolicy] of policies.entries()) {
     const key = `${scope}:${index}:${ip}`;
