@@ -83,6 +83,27 @@ export const ARCADE_PRODUCTS: readonly ArcadeProduct[] = [
 export const ARCADE_STORE_CHECKOUT_READY =
   process.env.NEXT_PUBLIC_ARCADE_STORE_ENABLED === "true";
 
+/**
+ * What still has to exist before that latch may be flipped.
+ *
+ * The latch only changes a label and a `disabled` attribute. On its own it
+ * turns "Not on sale yet" into a live-looking **Buy** button with nothing
+ * behind it — a worse lie than the one it replaces, and a silent one, because
+ * a button that does nothing looks exactly like a button that is slow.
+ *
+ * Each product needs a Stripe price, a one-time checkout session (the pattern
+ * is already in `app/api/support/checkout`, which runs `mode: "payment"`), and
+ * webhook fulfilment that grants the boosts or unlocks the pack — bundles pay
+ * out through `grantBoost`, packs need their days registered. Until a checkout
+ * handler is wired, `tests/seven-days-match.test.ts` fails the build if this
+ * latch is turned on, so the dead button cannot ship quietly.
+ */
+export const ARCADE_STORE_CHECKOUT_PREREQUISITES = [
+  "stripe-price-per-product",
+  "one-time-checkout-session",
+  "webhook-fulfilment",
+] as const;
+
 /** Words that would mean the arcade had started selling its way past reading. */
 const FORBIDDEN_IN_A_PRODUCT = [
   "skip",
