@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const css = readFileSync("src/app/globals.css", "utf8");
-const bootstrap = readFileSync("src/lib/appearance-bootstrap.ts", "utf8");
+const bootstrap = readFileSync("src/lib/appearance/bootstrap.ts", "utf8");
 const backdrop = readFileSync(
   "src/components/app-shell/WallpaperBackdrop.tsx",
   "utf8",

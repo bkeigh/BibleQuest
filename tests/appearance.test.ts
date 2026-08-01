@@ -3,7 +3,7 @@ import {
   DEFAULT_GLASS_OPACITY,
   glassOpacityVariables,
   normalizeGlassOpacity,
-} from "@/lib/glass-opacity";
+} from "@/lib/appearance/glass-opacity";
 
 describe("glass opacity", () => {
   it("defaults malformed values and clamps finite values to 15–100", () => {

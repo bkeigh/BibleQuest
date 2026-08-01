@@ -17,7 +17,7 @@ import { GentleButton } from "@/components/design-system/GentleButton";
 import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosure";
 import { SearchClearButton } from "@/components/design-system/SearchClearButton";
 import { Avatar } from "@/components/profile/Avatar";
-import { applyAppearance } from "@/lib/theme";
+import { applyAppearance } from "@/lib/appearance/theme";
 import {
   clearAvatar,
   clearLegacyAvatar,
@@ -50,7 +50,7 @@ import type { QuestOSSnapshot } from "@/lib/questos/types";
 import { useStrings, LANGUAGES, languageMeta, fmt } from "@/lib/i18n";
 import { IconCheck, IconChevronRight } from "@/components/design-system/icons";
 import { cn } from "@/lib/utils/cn";
-import { THEME_CHOICES, type ThemeId } from "@/lib/appearance-theme";
+import { THEME_CHOICES, type ThemeId } from "@/lib/appearance/themes";
 import {
   FEATURED_TRANSLATIONS,
   featuredBibleTranslationOptions,
@@ -69,7 +69,7 @@ import {
   MAX_GLASS_OPACITY,
   MIN_GLASS_OPACITY,
   normalizeGlassOpacity,
-} from "@/lib/glass-opacity";
+} from "@/lib/appearance/glass-opacity";
 import { SUPPORT_EMAIL, SUPPORT_EMAIL_HREF } from "@/lib/brand";
 import { ReminderSettings } from "@/components/settings/ReminderSettings";
 import { GREEN_FEATURES } from "@/lib/features/green";
@@ -1498,9 +1498,12 @@ function SettingsInner() {
               >
                 {t.settings.importData}
               </GentleButton>
+              {/* Sits in a row beside Export and Import, so it matches their
+                  touch height. An inline link inside a sentence is the
+                  exception to that rule; a link standing among buttons is not. */}
               <Link
                 href="/privacy"
-                className="inline-flex items-center px-1 text-[0.875rem] text-accent hover:text-accent/80"
+                className="inline-flex min-h-11 items-center px-1 text-[0.875rem] text-accent hover:text-accent/80"
               >
                 Privacy policy
               </Link>

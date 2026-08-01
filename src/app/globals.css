@@ -429,6 +429,70 @@ body {
   line-height: 1.5;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  /* Rotating a phone otherwise inflates body copy on its own, which undoes the
+     reading size a reader chose in Settings. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* ============================================================
+   Wrapped-webview behaviour
+   ============================================================
+   BibleQuest runs as an installed app as well as a page, and a few browser
+   defaults read as bugs once there is no address bar to explain them. Each
+   rule below is scoped so that the two things this app exists for — reading
+   Scripture and writing your own words — keep every affordance they have.
+   ============================================================ */
+
+/* The grey flash iOS paints over any tapped element. The app has its own
+   pressed and focus-visible states, so this only ever removed feedback it
+   was already giving more carefully. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Rubber-band scrolling past the end reveals whatever is behind the webview,
+   which in a wrapped app is nothing at all. `contain` keeps the bounce inside
+   the document instead of showing the seam. */
+html,
+body {
+  overscroll-behavior-y: contain;
+}
+
+/* Long-pressing artwork pops the iOS "Save Image" sheet. Sprites, mascots and
+   wallpapers are chrome, not content a reader wants to lift out — but the
+   callout stays on for everything else, because a long-press on Scripture is
+   how you copy a verse. */
+.pixelated,
+[data-wallpaper-art],
+[aria-hidden="true"] > img {
+  -webkit-touch-callout: none;
+}
+
+/* Selection off on the chrome only. A long-press that selects the word inside
+   a button reads as a misfire; the same gesture on a verse, a prayer, or a
+   journal entry is someone taking their own words with them, so those are
+   listed back in explicitly below rather than left to inheritance. */
+button,
+[role="button"],
+[role="radio"],
+[role="switch"],
+[role="tab"],
+nav a,
+label {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.verse-text,
+blockquote,
+article,
+p,
+input,
+textarea,
+[contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /* The artwork stays visible without competing with reading contrast. The

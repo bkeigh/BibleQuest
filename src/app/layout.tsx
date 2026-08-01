@@ -4,7 +4,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { ServiceWorkerRegistrar } from "@/components/app-shell/ServiceWorkerRegistrar";
 import { JournalDraftJanitor } from "@/components/journal/JournalDraftJanitor";
-import { APPEARANCE_BOOTSTRAP_SCRIPT } from "@/lib/appearance-bootstrap";
+import { APPEARANCE_BOOTSTRAP_SCRIPT } from "@/lib/appearance/bootstrap";
 import { deploymentLabel } from "@/lib/deployment-label";
 
 const fraunces = Fraunces({

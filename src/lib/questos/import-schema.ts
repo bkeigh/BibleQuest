@@ -33,7 +33,7 @@ import {
   uniqueValidQuestCompletions,
 } from "./history-integrity";
 import { isValidDateKey } from "@/lib/utils/dates";
-import { normalizeGlassOpacity } from "@/lib/glass-opacity";
+import { normalizeGlassOpacity } from "@/lib/appearance/glass-opacity";
 import { sanitizeGuidedProgress } from "@/lib/guided/progress";
 
 function isObj(v: unknown): v is Record<string, unknown> {

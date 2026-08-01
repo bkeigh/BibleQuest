@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useQuestOS } from "@/lib/questos/store";
-import { applyAppearance, watchSystemTheme } from "@/lib/theme";
+import { applyAppearance, watchSystemTheme } from "@/lib/appearance/theme";
 
 /**
  * Applies persisted appearance on mount and whenever it changes. While the
