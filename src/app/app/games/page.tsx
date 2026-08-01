@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { GamesScreen } from "@/components/games/GamesScreen";
 
 export const metadata: Metadata = {
-  title: "Scripture Games",
+  title: "BibleQuest Arcade",
   description:
-    "A calm daily Scripture Connections or Bible Timeline study with sourced explanations.",
+    "Play through Scripture in BibleQuest Arcade: a match-three journey, a daily study, and sourced explanations for every answer.",
 };
 
 /** Route stays thin; deterministic selection and play live in the game modules. */

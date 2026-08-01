@@ -103,7 +103,7 @@ function SevenDaysMatchInner() {
           remain ready.
         </p>
         <GentleLink href="/app/games" variant="outline" className="mt-5">
-          Back to Scripture Games
+          Back to the arcade
         </GentleLink>
       </PaperCard>
     );

@@ -28,7 +28,7 @@ export default function SevenDaysMatchPage() {
           href="/app/games"
           className="inline-flex min-h-11 items-center gap-1.5 px-1 text-small text-ash transition-colors hover:text-charcoal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
-          <IconArrowLeft size={16} /> Scripture Games
+          <IconArrowLeft size={16} /> Arcade
         </Link>
         <p className="font-pixel text-caption uppercase tracking-[0.08em] text-gilt">
           Seven Days Match

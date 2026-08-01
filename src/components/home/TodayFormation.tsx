@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
 import { guidedScriptureForDate } from "@/data/guided/content";
 import { getDailyGameSnapshot } from "@/lib/games/daily-status";
@@ -14,6 +13,10 @@ import { useQuestOS } from "@/lib/questos/store";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import {
+  ARCADE_ART,
+  ArcadeGameCard,
+} from "@/components/games/ArcadeGameCard";
+import {
   IconArrowLeft,
   IconArrowRight,
   IconClock,
@@ -22,12 +25,6 @@ import { HomeSectionHeading } from "@/components/home/HomeSectionHeading";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 
 type FormationSection = "all" | "guide" | "game";
-
-const GAME_ART = {
-  today: "/art/scripture-games-today.webp",
-  comingOne: "/art/scripture-games-coming-1.webp",
-  comingTwo: "/art/scripture-games-coming-2.webp",
-} as const;
 
 // Every rail item shares one width so the cards read as a single set, and
 // `h-full` lets each card stretch to the tallest card in the row.
@@ -171,10 +168,10 @@ export function TodayFormation({
       )}
 
       {showGame && game && (
-        <section aria-labelledby="scripture-games-home-title">
+        <section aria-labelledby="arcade-home-title">
           <HomeSectionHeading
-            id="scripture-games-home-title"
-            title="Scripture Games"
+            id="arcade-home-title"
+            title="BibleQuest Arcade"
             subtitle="Learn by playing"
             action={
               // Games have no nav tab by design, so this rail is the entry to
@@ -193,7 +190,7 @@ export function TodayFormation({
             <div
               ref={gameRailRef}
               role="list"
-              aria-label="Scripture games"
+              aria-label="BibleQuest Arcade games"
               onScroll={updateGameRailEdges}
               className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
@@ -203,8 +200,8 @@ export function TodayFormation({
                     href="/app/games/seven-days"
                     className="group block h-full rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   >
-                    <ScriptureGameCard
-                      image={GAME_ART.comingOne}
+                    <ArcadeGameCard
+                      image={ARCADE_ART.sevenDays}
                       eyebrow="Play any time"
                       title="Seven Days Match"
                       description="Match three, answer a Bible question, and open the next level across creation’s seven-day story."
@@ -226,8 +223,8 @@ export function TodayFormation({
                   href="/app/games"
                   className="group block h-full rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
-                  <ScriptureGameCard
-                    image={GAME_ART.today}
+                  <ArcadeGameCard
+                    image={ARCADE_ART.today}
                     eyebrow="Today’s game"
                     title={game.title}
                     description={game.description}
@@ -247,8 +244,8 @@ export function TodayFormation({
                 </Link>
               </div>
               <div role="listitem" className={GAME_RAIL_ITEM}>
-                <ScriptureGameCard
-                  image={GAME_ART.comingTwo}
+                <ArcadeGameCard
+                  image={ARCADE_ART.archive}
                   eyebrow="Game preview"
                   title="Miracle Journey"
                   description="Place Gospel moments in order and follow the disciples through seven story scenes."
@@ -270,7 +267,7 @@ export function TodayFormation({
               type="button"
               onClick={() => scrollGameRail(-1)}
               disabled={gameRailEdges.atStart}
-              aria-label="Previous Scripture game"
+              aria-label="Previous arcade game"
               className="absolute -left-5 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-paper/90 text-accent paper-shadow backdrop-blur-md transition-opacity disabled:pointer-events-none disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:-left-8"
             >
               <IconArrowLeft size={17} />
@@ -279,7 +276,7 @@ export function TodayFormation({
               type="button"
               onClick={() => scrollGameRail(1)}
               disabled={gameRailEdges.atEnd}
-              aria-label="Next Scripture game"
+              aria-label="Next arcade game"
               className="absolute -right-5 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-paper/90 text-accent paper-shadow backdrop-blur-md transition-opacity disabled:pointer-events-none disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:-right-8"
             >
               <IconArrowRight size={17} />
@@ -288,79 +285,5 @@ export function TodayFormation({
         </section>
       )}
     </>
-  );
-}
-
-/** Layers readable game information over one scene from the Instagram art set. */
-function ScriptureGameCard({
-  image,
-  eyebrow,
-  title,
-  description,
-  icon,
-  footer,
-  muted = false,
-}: {
-  image: string;
-  eyebrow: string;
-  title: string;
-  description: string;
-  icon: Parameters<typeof PixelIcon>[0]["name"];
-  footer?: React.ReactNode;
-  muted?: boolean;
-}) {
-  return (
-    <PaperCard
-      interactive={!muted}
-      variant="paper"
-      padding="none"
-      className="relative isolate flex h-full min-h-[17rem] overflow-hidden"
-    >
-      <Image
-        src={image}
-        alt=""
-        fill
-        sizes="(max-width: 640px) 86vw, 34rem"
-        className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-      />
-      <span
-        aria-hidden="true"
-        className="absolute inset-0 bg-gradient-to-t from-[#071813]/95 via-[#102b22]/70 to-black/10"
-      />
-      {muted && (
-        <span
-          aria-hidden="true"
-          className="absolute inset-0 bg-graphite/15"
-        />
-      )}
-      {/* Keeps the identity pinned to the top-left while the game details settle at the bottom. */}
-      <div className="relative z-10 flex h-full min-h-[17rem] w-full flex-col p-5 text-white sm:p-6">
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white/12 ring-1 ring-white/25 backdrop-blur-sm">
-            <PixelIcon name={icon} size={4} />
-          </span>
-          <p className="text-caption font-medium uppercase tracking-[0.12em] text-white/80">
-            {eyebrow}
-          </p>
-        </div>
-        <div className="mt-auto pt-8">
-          {/* Every other card title in the app uses the display face; pixel is
-              reserved for small labels and badges at 0.875rem. A 2rem pixel
-              title also wrapped long game names across two hard-to-read lines
-              and competed with the pixel section heading directly above it. */}
-          <h3 className="max-w-[20ch] font-display text-[1.75rem] leading-tight text-white min-[390px]:text-[1.875rem]">
-            {title}
-          </h3>
-          <p className="mt-2 max-w-[42ch] text-small leading-relaxed text-white/80">
-            {description}
-          </p>
-          {footer && (
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-caption text-white/75">
-              {footer}
-            </div>
-          )}
-        </div>
-      </div>
-    </PaperCard>
   );
 }

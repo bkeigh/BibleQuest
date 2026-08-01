@@ -8,8 +8,14 @@ describe("Home formation layout", () => {
     "utf8",
   );
   const bible = readFileSync("src/components/bible/BibleIndex.tsx", "utf8");
+  // The card itself now lives beside the arcade, so Home and the arcade page
+  // draw the same one instead of two that drift apart.
+  const card = readFileSync(
+    "src/components/games/ArcadeGameCard.tsx",
+    "utf8",
+  );
 
-  it("keeps Scripture Games off the Bible tab", () => {
+  it("keeps the arcade off the Bible tab", () => {
     // The Bible tab is a reading surface: it may offer the guided reading, but
     // games belong on Home and their own tab. Omitting `show` here would
     // default to "all" and pull the games rail back in.
@@ -41,11 +47,9 @@ describe("Home formation layout", () => {
     expect(formation).toContain(
       'aria-labelledby="guided-scripture-home-title"',
     );
-    expect(formation).toContain(
-      'aria-labelledby="scripture-games-home-title"',
-    );
+    expect(formation).toContain('aria-labelledby="arcade-home-title"');
     expect(formation).toContain("Guided Scripture");
-    expect(formation).toContain("Scripture Games");
+    expect(formation).toContain("BibleQuest Arcade");
     expect(formation).toContain("<HomeSectionHeading");
     expect(formation).toContain(
       '{afterGuide && <div className="mt-4">{afterGuide}</div>}',
@@ -61,19 +65,19 @@ describe("Home formation layout", () => {
   });
 
   it("uses Instagram artwork and prominent Ithaca type for games", () => {
-    expect(formation).toContain("/art/scripture-games-today.webp");
-    expect(formation).toContain("/art/scripture-games-coming-1.webp");
-    expect(formation).toContain("/art/scripture-games-coming-2.webp");
+    expect(card).toContain("/art/scripture-games-today.webp");
+    expect(card).toContain("/art/scripture-games-coming-1.webp");
+    expect(card).toContain("/art/scripture-games-coming-2.webp");
     // Pixel is the app's label face (0.875rem badges and section headings).
     // Card titles use the display face everywhere, including the guide card in
     // this same file — a 2rem pixel title was the lone exception and competed
     // with the pixel section heading directly above it.
-    expect(formation).toContain('font-display text-[1.75rem]');
-    expect(formation).not.toContain("font-pixel text-[2rem]");
+    expect(card).toContain('font-display text-[1.75rem]');
+    expect(card).not.toContain("font-pixel text-[2rem]");
     expect(formation).toContain("snap-mandatory");
     expect(formation.match(/role=\"listitem\"/g)).toHaveLength(3);
-    expect(formation).toContain("flex h-full min-h-[17rem] w-full flex-col");
-    expect(formation).toContain("mt-auto pt-8");
+    expect(card).toContain("flex h-full min-h-[17rem] w-full flex-col");
+    expect(card).toContain("mt-auto pt-8");
     expect(formation).toContain("absolute -left-5");
     expect(formation).toContain("absolute -right-5");
     expect(formation).toContain("sm:-left-8");
@@ -89,7 +93,7 @@ describe("Home formation layout", () => {
     );
   });
 
-  it("sizes every Scripture game card identically", () => {
+  it("sizes every arcade card identically", () => {
     // Each rail item must share one width class and stretch to a common
     // height; per-card widths previously made the cards visibly mismatched.
     const items = formation.match(/role="listitem" className=\{([^}]+)\}/g);
@@ -99,7 +103,7 @@ describe("Home formation layout", () => {
       'const GAME_RAIL_ITEM = "w-[86%] shrink-0 snap-start sm:w-[70%]"',
     );
     expect(formation).toContain("group block h-full rounded-");
-    expect(formation).toContain("flex h-full min-h-[17rem] overflow-hidden");
+    expect(card).toContain("flex h-full min-h-[17rem] overflow-hidden");
   });
 
   it("places the three shortcuts between support and newsletter", () => {
