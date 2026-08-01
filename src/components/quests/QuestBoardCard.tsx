@@ -247,6 +247,21 @@ export function QuestBoardCard({
 
         <div className="flex flex-wrap items-center gap-2.5 px-4 pb-4 pt-3 sm:px-5">
           {primaryAction}
+          {/* A quest whose window has closed is finished with, one way or the
+              other. Putting the only way to clear it inside Details meant
+              opening a card you had already decided about. */}
+          {state === "active" && expired && (
+            <GentleButton
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                removeQuest(quest.slug, isPlus);
+                toast("Quest removed.");
+              }}
+            >
+              Remove
+            </GentleButton>
+          )}
           <button
             type="button"
             aria-expanded={open}

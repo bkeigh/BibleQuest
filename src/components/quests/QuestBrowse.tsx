@@ -32,6 +32,13 @@ import {
   CATEGORY_LABEL,
 } from "@/components/quests/QuestSlip";
 import { QuestBoardCard } from "@/components/quests/QuestBoardCard";
+import {
+  QuestLayoutToggle,
+  QuestShelf,
+  readQuestLayout,
+  writeQuestLayout,
+  type QuestLayout,
+} from "@/components/quests/QuestShelf";
 import { QuestBoardSection } from "@/components/quests/QuestBoardSection";
 import { QuestCompletionSheet } from "@/components/quests/QuestCompletionSheet";
 import { Disclosure } from "@/components/design-system/Disclosure";
@@ -56,14 +63,6 @@ const ENERGY_LEVELS: { value: EnergyLevel; label: string }[] = [
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" },
 ];
-
-function ShelfTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
-      {children}
-    </h2>
-  );
-}
 
 function QuestBrowseInner() {
   const { toast } = useToast();
@@ -98,11 +97,19 @@ function QuestBrowseInner() {
 
   const [duration, setDuration] = useState<QuestDuration | null>(null);
   const [category, setCategory] = useState<QuestCategory | null>(null);
+  // Rows first: the shelf is the point of the page, and a reader who wants the
+  // whole column can say so once and have it remembered.
+  const [layout, setLayout] = useState<QuestLayout>(() => readQuestLayout());
   const [energy, setEnergy] = useState<EnergyLevel | null>(null);
   const [company, setCompany] = useState<"solo" | "social" | null>(null);
   const [setting, setSetting] = useState<"indoor" | "outdoor" | null>(null);
   const [search, setSearch] = useState("");
   const resultKey = [duration, category, energy, company, setting, search].join("|");
+
+  function chooseLayout(next: QuestLayout) {
+    setLayout(next);
+    writeQuestLayout(next);
+  }
   const [pagination, setPagination] = useState({ key: resultKey, count: 24 });
   const visibleCount = pagination.key === resultKey ? pagination.count : 24;
 
@@ -174,6 +181,24 @@ function QuestBrowseInner() {
       ),
     [duration, category, energy, company, setting, search]
   );
+
+  const groupedResults = useMemo(() => {
+    const byCategory = new Map<QuestCategory, QuestTemplate[]>();
+    for (const quest of results) {
+      const bucket = byCategory.get(quest.category);
+      if (bucket) bucket.push(quest);
+      else byCategory.set(quest.category, [quest]);
+    }
+    // Follow the catalogue's own category order so the shelves keep a stable
+    // sequence between visits rather than reordering with the data.
+    return QUEST_CATEGORIES.flatMap((category) => {
+      const quests = byCategory.get(category);
+      return quests && quests.length > 0
+        ? ([[category, quests]] as [QuestCategory, QuestTemplate[]][])
+        : [];
+    });
+  }, [results]);
+
 
   const suggested = useMemo(
     () =>
@@ -339,7 +364,9 @@ function QuestBrowseInner() {
         {/* The board is the one canonical lifecycle surface above discovery. */}
         <section aria-label="Your quest board">
           <div className="flex items-baseline justify-between">
-            <ShelfTitle>Your quests</ShelfTitle>
+            <h2 className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
+              Your quests
+            </h2>
             <p aria-live="polite" className="text-caption text-ash">
               {todayStatusSummary}
             </p>
@@ -595,30 +622,31 @@ function QuestBrowseInner() {
         {/* Suggested for today — the old daily scorer, now an offer.
             Compact slips: the shelf invites, the quest page tells the story. */}
         {!hasFilters && suggested.length > 0 && (
-          <section className="mt-6" aria-label={t.quests.suggested}>
-            <ShelfTitle>{t.quests.suggested}</ShelfTitle>
-            <div className="mt-2 space-y-3">
-              {suggested.map((quest) => browseSlip(quest, true))}
-            </div>
-          </section>
+          <QuestShelf
+            title={t.quests.suggested}
+            layout={layout}
+            action={<QuestLayoutToggle layout={layout} onChange={chooseLayout} />}
+          >
+            {suggested.map((quest) => browseSlip(quest, layout === "rail"))}
+          </QuestShelf>
         )}
 
         {/* Seasonal shelf */}
         {seasonal.length > 0 && !hasFilters && (
-          <section className="mt-6" aria-label={`For ${season.label}`}>
-            <ShelfTitle>For {season.label}</ShelfTitle>
-            <div className="mt-2 space-y-3">
-              {seasonal.map((quest) => browseSlip(quest))}
-            </div>
-          </section>
+          <QuestShelf title={`For ${season.label}`} layout={layout}>
+            {seasonal.map((quest) => browseSlip(quest, layout === "rail"))}
+          </QuestShelf>
         )}
 
-        {/* Results */}
-        <section className="mt-6" aria-label="All quests">
-          <p className="mb-3 text-small text-ash" aria-live="polite">
-            {results.length} {results.length === 1 ? "quest" : "quests"}
-          </p>
-          {results.length === 0 ? (
+        {/* Results.
+
+            Unfiltered, the collection is grouped by category and each category
+            gets its own shelf — the flat list ran to hundreds of cards in one
+            column, so the only way to learn that Service quests existed was to
+            scroll past every Prayer one. Filtering collapses back to a single
+            shelf, because a filtered result is already the group. */}
+        {results.length === 0 ? (
+          <section className="mt-6" aria-label="All quests">
             <PaperCard variant="quiet" padding="lg" className="text-center">
               <p className="font-display text-[1.125rem] text-graphite">
                 No quests match yet
@@ -637,23 +665,47 @@ function QuestBrowseInner() {
                 Clear all filters
               </GentleButton>
             </PaperCard>
-          ) : (
-            <div className="space-y-3 pb-6">
-              {results.slice(0, visibleCount).map((quest) => browseSlip(quest))}
-              {visibleCount < results.length && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPagination({ key: resultKey, count: visibleCount + 24 })
-                  }
-                  className="mx-auto block min-h-11 rounded-full border border-mist bg-paper px-5 py-2.5 text-small font-medium text-accent transition-colors hover:border-accent/40 hover:bg-accent-surface"
-                >
-                  Show 24 more · {results.length - visibleCount} remaining
-                </button>
-              )}
-            </div>
-          )}
-        </section>
+          </section>
+        ) : hasFilters ? (
+          <QuestShelf
+            title="Matching quests"
+            count={results.length}
+            layout={layout}
+            action={<QuestLayoutToggle layout={layout} onChange={chooseLayout} />}
+          >
+            {results.slice(0, visibleCount).map((quest) =>
+              browseSlip(quest, layout === "rail"),
+            )}
+          </QuestShelf>
+        ) : (
+          <>
+            {groupedResults.map(([groupCategory, quests]) => (
+              <QuestShelf
+                key={groupCategory}
+                title={CATEGORY_LABEL[groupCategory]}
+                count={quests.length}
+                layout={layout}
+              >
+                {quests
+                  .slice(0, visibleCount)
+                  .map((quest) => browseSlip(quest, layout === "rail"))}
+              </QuestShelf>
+            ))}
+          </>
+        )}
+
+        {results.length > 0 && visibleCount < results.length && (
+          <button
+            type="button"
+            onClick={() =>
+              setPagination({ key: resultKey, count: visibleCount + 24 })
+            }
+            className="mx-auto mt-6 block min-h-11 rounded-full border border-mist bg-paper px-5 py-2.5 text-small font-medium text-accent transition-colors hover:border-accent/40 hover:bg-accent-surface"
+          >
+            Show 24 more per shelf
+          </button>
+        )}
+        <div className="pb-6" />
       </PageContainer>
       <QuestCompletionSheet
         quest={completedQuest}
