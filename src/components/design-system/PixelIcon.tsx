@@ -8,7 +8,11 @@
  * storybook, never retro-arcade.
  */
 import { cn } from "@/lib/utils/cn";
-import { PIXEL_SPRITES, type PixelSpriteName } from "./pixel-assets";
+import {
+  PIXEL_ART_WEIGHT,
+  PIXEL_SPRITES,
+  type PixelSpriteName,
+} from "./pixel-assets";
 
 export { PIXEL_SPRITE_NAMES } from "./pixel-assets";
 export type { PixelSpriteName } from "./pixel-assets";
@@ -61,8 +65,12 @@ export function PixelIcon({
   if (!asset) return null;
 
   // Aspect comes from the art grid so a non-square sprite is never stretched.
-  const renderedWidth = Math.round(size);
-  const renderedHeight = Math.round(size * (asset.rows / asset.cols));
+  // The weight correction makes one `size` mean one visual weight across
+  // sprites whose art fills very different amounts of the same canvas — see
+  // PIXEL_ART_WEIGHT.
+  const weighted = size * (PIXEL_ART_WEIGHT[name] ?? 1);
+  const renderedWidth = Math.round(weighted);
+  const renderedHeight = Math.round(weighted * (asset.rows / asset.cols));
   const box = { width: renderedWidth, height: renderedHeight };
 
   const frame = (src: string, extra?: string) => (

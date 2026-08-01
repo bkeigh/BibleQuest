@@ -271,17 +271,23 @@ export function SevenDaysBoard({
               "outline-none focus-visible:ring-2 focus-visible:ring-accent",
             )}
           >
-            {/* A board cell is a grid fraction, not a fixed size — seven
-                columns on a 375px screen leaves about 37px each, and a fixed
-                48px sprite spilled over its neighbours. `max-*-full` is a
-                constraint rather than a width, so it wins against the inline
-                size on a narrow screen and lets the art reach full size on a
-                wide one. */}
-            <PixelIcon
-              name={art.sprite}
-              size={56}
-              className="max-h-full max-w-full"
-            />
+            {/* The sprite is taken out of flow entirely.
+                A board cell is a grid fraction — about 41px across on a phone —
+                while the sprite asks for 56. Left in flow, the cell's height
+                came from its content and its width from the column, so
+                `aspect-square` was resolving against a box the sprite was
+                still arguing with: square in Chromium, a tall rectangle
+                wherever the engine sizes an aspect-ratio box from content
+                first. Absolute positioning means the art can never contribute
+                a dimension, so the cell is square because the grid says so and
+                for no other reason. */}
+            <span className="pointer-events-none absolute inset-0 grid place-items-center">
+              <PixelIcon
+                name={art.sprite}
+                size={56}
+                className="max-h-full max-w-full"
+              />
+            </span>
           </motion.button>
         );
       })}

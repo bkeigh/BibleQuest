@@ -9,9 +9,19 @@ export interface SevenDaysTileArt {
   readonly sprite: PixelSpriteName;
   /**
    * Tile chips carry both a colour and a distinct silhouette, so a board is
-   * still readable when colour alone is not. The fills mix toward paper rather
-   * than toward transparency: a board drawn in washes of the wallpaper reads as
-   * one beige field, and a match-three board has to be scannable at a glance.
+   * still readable when colour alone is not.
+   *
+   * The fills are translucent, like every other surface in the app. They mixed
+   * toward paper before, on the reasoning that washes of wallpaper would read
+   * as one beige field — but the board already sits on its own blurred panel,
+   * so a tile is glass over glass rather than glass over a photograph, and the
+   * hues stay separable. What keeps them scannable at a translucent fill is the
+   * ring: each is its own colour at full strength, so the edge carries the
+   * identity even where the fill borrows from the scene.
+   *
+   * Deliberately no `backdrop-filter` here. Twenty-five blurring tiles on a
+   * board that animates every move is the one place in the app that cost would
+   * actually be felt, and the panel beneath has already blurred the scene.
    */
   readonly chipClassName: string;
   readonly goalClassName: string;
@@ -32,7 +42,7 @@ export const SEVEN_DAYS_TILES: Readonly<
     label: "Light",
     sprite: "sun",
     chipClassName:
-      "bg-[color-mix(in_srgb,var(--color-gold-300)_92%,var(--color-paper))] ring-[color-mix(in_srgb,var(--color-gold-600)_62%,transparent)]",
+      "bg-[color-mix(in_srgb,var(--color-gold-300)_58%,transparent)] ring-[color-mix(in_srgb,var(--color-gold-600)_78%,transparent)]",
     goalClassName: "text-gilt",
   },
   waters: {
@@ -40,7 +50,7 @@ export const SEVEN_DAYS_TILES: Readonly<
     label: "Waters",
     sprite: "fountain",
     chipClassName:
-      "bg-[color-mix(in_srgb,var(--color-marian-300)_92%,var(--color-paper))] ring-[color-mix(in_srgb,var(--color-marian-700)_52%,transparent)]",
+      "bg-[color-mix(in_srgb,var(--color-marian-300)_56%,transparent)] ring-[color-mix(in_srgb,var(--color-marian-700)_70%,transparent)]",
     goalClassName: "text-marian-700",
   },
   land: {
@@ -48,7 +58,7 @@ export const SEVEN_DAYS_TILES: Readonly<
     label: "Land",
     sprite: "mountain",
     chipClassName:
-      "bg-[color-mix(in_srgb,var(--color-rose-300)_88%,var(--color-paper))] ring-[color-mix(in_srgb,var(--color-rose-700)_50%,transparent)]",
+      "bg-[color-mix(in_srgb,var(--color-rose-300)_54%,transparent)] ring-[color-mix(in_srgb,var(--color-rose-700)_68%,transparent)]",
     goalClassName: "text-rose-700",
   },
   seed: {
@@ -56,7 +66,7 @@ export const SEVEN_DAYS_TILES: Readonly<
     label: "Seed",
     sprite: "leaf",
     chipClassName:
-      "bg-[color-mix(in_srgb,var(--color-olive-300)_94%,var(--color-paper))] ring-[color-mix(in_srgb,var(--color-olive-700)_50%,transparent)]",
+      "bg-[color-mix(in_srgb,var(--color-olive-300)_58%,transparent)] ring-[color-mix(in_srgb,var(--color-olive-700)_68%,transparent)]",
     goalClassName: "text-olive-700",
   },
   wing: {
@@ -64,7 +74,7 @@ export const SEVEN_DAYS_TILES: Readonly<
     label: "Wing",
     sprite: "dove",
     chipClassName:
-      "bg-[color-mix(in_srgb,var(--color-violet-300)_92%,var(--color-paper))] ring-[color-mix(in_srgb,var(--color-violet-700)_50%,transparent)]",
+      "bg-[color-mix(in_srgb,var(--color-violet-300)_56%,transparent)] ring-[color-mix(in_srgb,var(--color-violet-700)_68%,transparent)]",
     goalClassName: "text-violet-700",
   },
 };

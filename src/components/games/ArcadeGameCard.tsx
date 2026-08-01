@@ -63,12 +63,20 @@ export function ArcadeGameCard({
           {/* A 40px glass chip was clipping a 56px sprite, and its
               `backdrop-blur` bought a compositing layer per card. A drop
               shadow does the separating instead, which is what the art
-              needs over a photograph anyway. */}
-          <span className="flex shrink-0 items-center justify-center">
+              needs over a photograph anyway.
+
+              The art is anchored to a fixed 4rem square and allowed to spill
+              out of it. Different games use different sprites, and the weight
+              correction sizes each one's box by how much of its canvas the art
+              fills — chain links get a box two thirds larger than a crown's to
+              draw the same-looking mark. Letting the box drive layout meant
+              picking a game changed where the eyebrow sat; what spills here is
+              transparent padding, so nothing shows for it. */}
+          <span className="relative flex h-16 w-16 shrink-0 items-center justify-center">
             <PixelIcon
               name={icon}
-              size={68}
-              className="[filter:drop-shadow(0_2px_5px_rgb(0_0_0/0.45))]"
+              size={92}
+              className="absolute [filter:drop-shadow(0_2px_5px_rgb(0_0_0/0.45))]"
             />
           </span>
           <p className="text-caption font-medium uppercase tracking-[0.12em] text-white/80">
