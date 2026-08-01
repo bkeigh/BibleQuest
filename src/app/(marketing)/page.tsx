@@ -71,7 +71,7 @@ const RHYTHM = [
   { sprite: "book", title: "Read", body: "One verse, chosen for today. Slow enough to actually land." },
   { sprite: "candle", title: "Pray", body: "A private-by-default place to speak honestly and remember." },
   { sprite: "sun", title: "Reflect", body: "One short question that helps the day land." },
-  { sprite: "heart", title: "Act", body: "Pick up to three small quests that take faith into your actual day." },
+  { sprite: "service-basket", title: "Act", body: "Pick up to three small quests that take faith into your actual day." },
 ] as const;
 
 const FAQ = [

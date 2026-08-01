@@ -560,7 +560,7 @@ export function FloatingMyShepherd() {
           bottom: `calc(${RESTING_GUTTER} + 1rem)`,
         }}
       >
-        <PixelIcon name="star" size={4} />
+        <PixelIcon name="myshepherd" size={4} />
       </button>
     </>
   );

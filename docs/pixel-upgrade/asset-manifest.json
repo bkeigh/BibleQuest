@@ -1,8 +1,8 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "project": "BibleQuest",
   "status": "required production contract",
-  "totalFiles": 63,
+  "totalFiles": 58,
   "sourcesOfTruth": {
     "registry": "src/components/design-system/pixel-assets.ts",
     "categoryMap": "src/components/design-system/PixelIcon.tsx",
@@ -14,14 +14,20 @@
   "pipeline": {
     "sourceArt": "Reference-conditioned ImageGen staging using the approved PixelArtReferenceSheet and UI subject anchors",
     "promotionRule": "Never place unreviewed generated output directly in public/pixel",
-    "normalization": "Deterministic reconstruction on one native 128x128 art grid, source-faithful capped indexed palettes, binary alpha, transparent padding, and nearest-neighbor-only source fitting",
+    "normalization": "Deterministic reconstruction on declared authored grids, source-faithful capped indexed palettes, binary alpha, transparent padding, and nearest-neighbor-only enlargement",
     "runtimeGeneration": false,
     "buildCredentialRequired": false
   },
   "qualityContract": {
-    "nativeCanvas": { "width": 128, "height": 128 },
-    "physicalCanvasRule": "Every one of the 63 production PNGs uses this exact physical canvas; family logical grids remain runtime layout metadata only",
-    "alphaValues": [0, 255],
+    "nativeCanvas": {
+      "width": 128,
+      "height": 128
+    },
+    "physicalCanvasRule": "Every production PNG uses this exact physical canvas; the dove, key, scroll, sprout, lantern and map files are shared by the sprite and mascot registries, so 58 files back 65 registry entries",
+    "alphaValues": [
+      0,
+      255
+    ],
     "dithering": false,
     "antialiasing": false,
     "outline": "one continuous exact-black (#000000) pixel outline",
@@ -39,10 +45,19 @@
   "families": [
     {
       "id": "small-sprites",
-      "count": 30,
-      "physicalPixels": { "width": 128, "height": 128 },
-      "logicalGrid": { "columns": 32, "rows": 32 },
-      "nativeArtGrid": { "columns": 128, "rows": 128 },
+      "count": 32,
+      "physicalPixels": {
+        "width": 128,
+        "height": 128
+      },
+      "logicalGrid": {
+        "columns": 32,
+        "rows": 32
+      },
+      "nativeArtGrid": {
+        "columns": 128,
+        "rows": 128
+      },
       "cellScale": 0.2,
       "files": [
         "bird.png",
@@ -80,9 +95,18 @@
     {
       "id": "streak-candles",
       "count": 5,
-      "physicalPixels": { "width": 128, "height": 128 },
-      "logicalGrid": { "columns": 16, "rows": 16 },
-      "nativeArtGrid": { "columns": 128, "rows": 128 },
+      "physicalPixels": {
+        "width": 128,
+        "height": 128
+      },
+      "logicalGrid": {
+        "columns": 16,
+        "rows": 16
+      },
+      "nativeArtGrid": {
+        "columns": 128,
+        "rows": 128
+      },
       "cellScale": 0.75,
       "files": [
         "candle-unlit.png",
@@ -96,9 +120,18 @@
     {
       "id": "tree-stages",
       "count": 20,
-      "physicalPixels": { "width": 128, "height": 128 },
-      "logicalGrid": { "columns": 32, "rows": 32 },
-      "nativeArtGrid": { "columns": 128, "rows": 128 },
+      "physicalPixels": {
+        "width": 128,
+        "height": 128
+      },
+      "logicalGrid": {
+        "columns": 32,
+        "rows": 32
+      },
+      "nativeArtGrid": {
+        "columns": 128,
+        "rows": 128
+      },
       "cellScale": 1,
       "filePattern": "tree-stage-{0..19}.png",
       "orderedStages": [
@@ -128,13 +161,25 @@
     {
       "id": "feature-mascots",
       "count": 8,
-      "physicalPixels": { "width": 128, "height": 128 },
-      "logicalGrid": { "columns": 32, "rows": 32 },
-      "nativeArtGrid": { "columns": 128, "rows": 128 },
+      "registeredMascotKeys": 8,
+      "sharedFiles": [
+        "dove.png"
+      ],
+      "physicalPixels": {
+        "width": 128,
+        "height": 128
+      },
+      "logicalGrid": {
+        "columns": 32,
+        "rows": 32
+      },
+      "nativeArtGrid": {
+        "columns": 128,
+        "rows": 128
+      },
       "cellScale": 0.625,
       "files": [
         "mascot-campfire.png",
-        "mascot-dove.png",
         "mascot-key.png",
         "mascot-lamb.png",
         "mascot-lantern.png",
@@ -145,7 +190,7 @@
     }
   ],
   "promotionChecks": [
-    "Verify all 63 physical PNGs are exactly 128x128 before promotion",
+    "Verify every physical PNG are exactly 128x128 before promotion",
     "Review at native size and rendered size on parchment, linen, and candle surfaces",
     "Run pixel-assets, service-worker, and growth tests",
     "Run lint, TypeScript, the full test suite, and production build",
