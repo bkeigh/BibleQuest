@@ -78,8 +78,8 @@ import { canRefreshDailyVerse } from "./verse-engine";
 import {
   isWallpaperId,
 } from "@/lib/wallpapers/catalog";
-import { migrateLegacyTheme } from "@/lib/appearance-theme";
-import { normalizeGlassOpacity } from "@/lib/glass-opacity";
+import { migrateLegacyTheme } from "@/lib/appearance/themes";
+import { normalizeGlassOpacity } from "@/lib/appearance/glass-opacity";
 import {
   advanceGuidedSession,
   beginGuidedSession,

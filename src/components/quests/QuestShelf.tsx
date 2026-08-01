@@ -226,7 +226,9 @@ export function QuestLayoutToggle({
           aria-pressed={layout === option}
           onClick={() => onChange(option)}
           className={cn(
-            "min-h-9 rounded-full px-3 text-caption font-medium transition-colors duration-300",
+            // 44px, like every other control. A segment inside a pill still
+            // has to be reachable by a thumb.
+            "min-h-11 rounded-full px-3.5 text-caption font-medium transition-colors duration-300",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
             layout === option
               ? "bg-paper text-accent paper-shadow"

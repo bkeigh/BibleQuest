@@ -9,8 +9,8 @@ import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
 import {
   type WallpaperId,
 } from "@/lib/wallpapers/catalog";
-import { DEFAULT_GLASS_OPACITY } from "@/lib/glass-opacity";
-import type { ThemeId } from "@/lib/appearance-theme";
+import { DEFAULT_GLASS_OPACITY } from "@/lib/appearance/glass-opacity";
+import type { ThemeId } from "@/lib/appearance/themes";
 
 // ---------------------------------------------------------------------------
 // Quests

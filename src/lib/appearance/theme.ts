@@ -1,6 +1,6 @@
 import type { AppearanceSettings } from "@/lib/questos/types";
-import { glassOpacityVariables } from "@/lib/glass-opacity";
-import { resolveTheme } from "@/lib/appearance-theme";
+import { glassOpacityVariables } from "./glass-opacity";
+import { resolveTheme } from "./themes";
 
 /**
  * Applies appearance settings to <html> via classes that globals.css reacts to.

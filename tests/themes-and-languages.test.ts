@@ -5,13 +5,13 @@ import {
   THEME_IDS,
   migrateLegacyTheme,
   resolveTheme,
-} from "@/lib/appearance-theme";
+} from "@/lib/appearance/themes";
 import { LANGUAGES } from "@/lib/i18n/languages";
 import { en } from "@/lib/i18n/en";
 import { DEFAULT_SETTINGS } from "@/lib/questos/types";
 
 const css = readFileSync("src/app/globals.css", "utf8");
-const bootstrap = readFileSync("src/lib/appearance-bootstrap.ts", "utf8");
+const bootstrap = readFileSync("src/lib/appearance/bootstrap.ts", "utf8");
 const store = readFileSync("src/lib/questos/store.ts", "utf8");
 const onboarding = readFileSync(
   "src/components/onboarding/OnboardingFlow.tsx",

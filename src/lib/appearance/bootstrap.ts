@@ -3,7 +3,7 @@ import {
   GLASS_OPACITY_LAYER_OFFSETS,
   MAX_GLASS_OPACITY,
   MIN_GLASS_OPACITY,
-} from "@/lib/glass-opacity";
+} from "./glass-opacity";
 
 /**
  * Applies persisted appearance classes before React hydrates. The global CSP

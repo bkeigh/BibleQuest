@@ -53,11 +53,18 @@ const SIZES: Record<Size, string> = {
   lg: "min-h-11 text-[1.0625rem] px-6 py-3",
 };
 
-/* The text variant keeps the font size of its Size but never the padding. */
+/* The text variant keeps the font size of its Size but never the padding.
+ *
+ * It keeps the touch height, though. Dropping the padding dropped `min-h-11`
+ * along with it, which left every text button in the app a 23px target — fine
+ * for a mouse, under half of Apple's 44pt minimum for a thumb, and worth
+ * fixing before any of this is wrapped for iOS. `inline-flex items-center`
+ * grows the hit area around the label without moving the label itself, so
+ * nothing shifts on screen. */
 const TEXT_SIZES: Record<Size, string> = {
-  sm: "text-[0.9375rem]",
-  md: "text-[1rem]",
-  lg: "text-[1.0625rem]",
+  sm: "min-h-11 text-[0.9375rem]",
+  md: "min-h-11 text-[1rem]",
+  lg: "min-h-11 text-[1.0625rem]",
 };
 
 interface CommonProps {
