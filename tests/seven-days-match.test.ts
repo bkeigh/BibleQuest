@@ -547,6 +547,26 @@ describe("Seven Days Match product boundaries", () => {
     }
   });
 
+  it("cannot put a live Buy button on a shelf that cannot charge", () => {
+    // The latch only swaps a label and a `disabled` attribute. Flipped without
+    // a checkout handler behind it, "Not on sale yet" becomes a Buy button
+    // that does nothing when tapped — and a button that does nothing is
+    // indistinguishable from one that is merely slow, so nobody would report
+    // it. This fails the build in exactly that state.
+    const storeScreen = readFileSync(
+      "src/components/games/ArcadeStore.tsx",
+      "utf8",
+    );
+    const wired = /onClick=|onSubmit=|formAction=/.test(storeScreen);
+    const enabled = process.env.NEXT_PUBLIC_ARCADE_STORE_ENABLED === "true";
+    expect(
+      !enabled || wired,
+      "NEXT_PUBLIC_ARCADE_STORE_ENABLED is on but no product has a checkout handler",
+    ).toBe(true);
+    // And the prerequisites stay written down next to the latch itself.
+    expect(storeSource).toContain("ARCADE_STORE_CHECKOUT_PREREQUISITES");
+  });
+
   it("keeps helps on the board and off the Scripture", () => {
     for (const id of BOOST_IDS) {
       const boost = BOOSTS[id];
