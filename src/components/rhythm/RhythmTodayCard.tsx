@@ -75,7 +75,7 @@ export function RhythmTodayCard({
           padding="sm"
           className="flex min-h-20 items-center gap-4"
         >
-          <PixelIcon name="lantern" size={44} />
+          <PixelIcon name="lantern" size={56} />
           <span className="min-w-0 flex-1">
             <span className="block font-display text-[1.0625rem] text-graphite">
               Build a gentle weekly rhythm
@@ -95,7 +95,7 @@ export function RhythmTodayCard({
   return (
     <PaperCard variant="quiet" padding="md">
       <div className="flex items-start gap-3">
-        <PixelIcon name="lantern" size={44} />
+        <PixelIcon name="lantern" size={56} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <div>

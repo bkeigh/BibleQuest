@@ -597,30 +597,30 @@ export function FloatingMyShepherd() {
         aria-expanded={open}
         aria-controls="floating-my-shepherd"
         className={cn(
-          "fixed z-50 grid h-16 w-16 place-items-center overflow-hidden rounded-full border border-white/30 text-white",
+          "fixed z-50 grid place-items-center rounded-full",
           "transition-transform hover:-translate-y-0.5 active:translate-y-0",
-          // The focus ring is a box-shadow, never `outline`. An outline with
+          // No plate behind it. The sprite is drawn with its own transparency
+          // and reads as a character standing on the page; a blue disc around
+          // it turned that character into a small mark inside a button.
+          //
+          // The focus ring is a box-shadow, never `outline` — an outline with
           // an offset is drawn as a rectangle by some engines regardless of
-          // border-radius, which is what turned this button into a square with
-          // a green box around it the moment it took focus — most visibly
-          // right after the sheet closed and put focus back on it.
-          "shadow-[0_10px_28px_rgba(32,70,94,0.32)] outline-none",
-          "focus-visible:shadow-[0_0_0_2px_var(--color-paper),0_0_0_4px_var(--color-accent),0_10px_28px_rgba(32,70,94,0.32)]",
-          SHEPHERD_INK,
+          // border-radius, which is what squared this off whenever it took
+          // focus, most visibly right after the sheet closed and handed focus
+          // back to it.
+          "outline-none focus-visible:shadow-[0_0_0_3px_var(--color-paper),0_0_0_5px_var(--color-accent)]",
         )}
         style={{
           insetInlineEnd: horizontalOffset,
           bottom: `calc(${RESTING_GUTTER} + 1rem)`,
         }}
       >
-        {/* Deliberately larger than the button's inner box and anchored to the
-            bottom, so the shepherd stands in the circle rather than floating as
-            a small mark in the middle of it. `overflow-hidden` keeps the
-            silhouette round. */}
+        {/* A soft drop shadow does the separating a plate used to, so the
+            shepherd stays legible over parchment, a wallpaper, or a card. */}
         <PixelIcon
           name="myshepherd"
-          size={58}
-          className="translate-y-[3px]"
+          size={92}
+          className="[filter:drop-shadow(0_3px_6px_rgb(32_70_94/0.34))]"
         />
       </button>
     </>

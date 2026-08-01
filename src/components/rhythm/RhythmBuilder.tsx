@@ -328,7 +328,7 @@ export function RhythmBuilder() {
           return (
             <PaperCard key={block.id} variant="quiet" padding="md">
               <div className="flex items-start gap-3">
-                <PixelIcon name="lantern" size={44} />
+                <PixelIcon name="lantern" size={56} />
                 <div className="min-w-0 flex-1">
                   <h2 className="font-display text-[1.125rem] text-graphite">
                     {block.label}

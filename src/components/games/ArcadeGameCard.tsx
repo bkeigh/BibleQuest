@@ -60,8 +60,16 @@ export function ArcadeGameCard({
       {/* Keeps the identity pinned to the top-left while the game details settle at the bottom. */}
       <div className="relative z-10 flex h-full min-h-[17rem] w-full flex-col p-5 text-white sm:p-6">
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white/12 ring-1 ring-white/25 backdrop-blur-sm">
-            <PixelIcon name={icon} size={44} />
+          {/* A 40px glass chip was clipping a 56px sprite, and its
+              `backdrop-blur` bought a compositing layer per card. A drop
+              shadow does the separating instead, which is what the art
+              needs over a photograph anyway. */}
+          <span className="flex shrink-0 items-center justify-center">
+            <PixelIcon
+              name={icon}
+              size={56}
+              className="[filter:drop-shadow(0_2px_5px_rgb(0_0_0/0.45))]"
+            />
           </span>
           <p className="text-caption font-medium uppercase tracking-[0.12em] text-white/80">
             {eyebrow}

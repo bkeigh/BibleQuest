@@ -154,7 +154,7 @@ export function InstallPrompt() {
           className="app-glass-surface fixed inset-x-4 bottom-[calc(var(--app-bottom-nav-height,5rem)+1rem)] z-40 mx-auto max-w-md rounded-[var(--radius-card-lg)] border border-mist bg-paper p-4 paper-shadow-lg"
         >
           <div className="flex items-start gap-3">
-            <PixelIcon name="chapel" size={52} />
+            <PixelIcon name="chapel" size={68} />
             <div className="min-w-0 flex-1">
               <p className="text-[1rem] text-graphite">
                 Use BibleQuest like an app

@@ -67,8 +67,8 @@ export function HomeQuestDisclosure({
           onClick={() => setOpen((current) => !current)}
           className="app-glass-surface group flex min-h-[4.75rem] w-full items-center gap-3 rounded-[var(--radius-card)] border border-mist bg-linen px-4 py-3 text-left paper-shadow transition-colors duration-300 hover:border-accent/40 hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:bg-linen sm:px-5"
         >
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-paper ring-1 ring-mist">
-            <PixelIcon name="scroll" size={52} />
+          <span className="flex shrink-0 items-center justify-center">
+            <PixelIcon name="scroll" size={68} />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block font-pixel text-[1.25rem] uppercase leading-tight tracking-[0.05em] text-accent min-[380px]:text-[1.5rem]">

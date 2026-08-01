@@ -138,11 +138,21 @@
 /* ============================================================
    Keyframes — motion with meaning, never spectacle
    ============================================================ */
+/*
+ * The stand-in for a hand-drawn flame GIF.
+ *
+ * Opacity alone dimmed the whole candle — wax, holder and all — which reads as
+ * the picture fading rather than a flame moving. Brightness carries most of it
+ * now: the flame is by far the brightest thing in the sprite, so raising and
+ * lowering light lands there and leaves the dark holder about where it was.
+ * Only `candle-small` still needs this; every other lit stage has real frames.
+ */
 @keyframes flicker {
-  0%, 100% { opacity: 1; }
-  38% { opacity: 0.86; }
-  55% { opacity: 0.96; }
-  72% { opacity: 0.9; }
+  0%, 100% { opacity: 1; filter: brightness(1); }
+  22% { opacity: 0.97; filter: brightness(1.09); }
+  41% { opacity: 0.93; filter: brightness(0.94); }
+  58% { opacity: 0.99; filter: brightness(1.06); }
+  76% { opacity: 0.95; filter: brightness(0.97); }
 }
 @keyframes sway {
   0%, 100% { transform: rotate(-1.6deg); }

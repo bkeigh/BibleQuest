@@ -210,10 +210,10 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
 
         <div className="pb-8">
           <div className="mt-5 flex items-center gap-3">
-            <span className="rounded-[12px] bg-linen p-2.5 ring-1 ring-mist">
+            <span className="shrink-0">
               <PixelIcon
                 name={CATEGORY_SPRITE[quest.category] ?? "leaf"}
-                size={60}
+                size={80}
               />
             </span>
             <span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-ash">

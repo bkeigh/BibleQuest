@@ -237,14 +237,14 @@ function HomeInner() {
                 padding="md"
                 className="flex min-h-24 items-center gap-4"
               >
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] bg-linen ring-1 ring-mist">
+                <span className="flex shrink-0 items-center justify-center">
                   <PixelIcon
                     name={
                       featuredQuest
                         ? CATEGORY_SPRITE[featuredQuest.category] ?? "scroll"
                         : "scroll"
                     }
-                    size={52}
+                    size={68}
                   />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -427,7 +427,7 @@ function TodaysVerseLink() {
           className="ambient absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gold-300/15 blur-2xl [animation:var(--animate-twinkle)]"
         />
         <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-[#fdfbf3]/10 ring-1 ring-[#fdfbf3]/20">
-          <PixelIcon name="open-book" size={44} animate />
+          <PixelIcon name="open-book" size={56} animate />
         </span>
         <span className="relative min-w-0 flex-1">
           <span className="block font-display text-[1.125rem] leading-tight">
@@ -459,7 +459,7 @@ function ShepherdCallout({
       style={{ backgroundColor: "#3F7EA3", borderColor: "#3F7EA3" }}
     >
       <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[14px] bg-white/15 ring-1 ring-white/30">
-        <PixelIcon name="star" size={52} />
+        <PixelIcon name="star" size={68} />
       </span>
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-2 font-display text-[1.25rem] leading-tight text-white">
@@ -524,8 +524,8 @@ function QuickActionTile({
       >
         {/* The chip has to be larger than the sprite it holds. At 44px around a
             44px icon the art was flush to all four edges and read as clipped. */}
-        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[12px] bg-linen ring-1 ring-mist transition-transform duration-300 group-hover:-translate-y-0.5">
-          <PixelIcon name={sprite} size={44} animate={animate} />
+        <span className="flex shrink-0 items-center justify-center transition-transform duration-300 group-hover:-translate-y-0.5">
+          <PixelIcon name={sprite} size={56} animate={animate} />
         </span>
         <span className="text-[0.75rem] font-medium leading-snug text-graphite min-[390px]:text-[0.8125rem] sm:text-small">
           {title}

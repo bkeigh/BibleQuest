@@ -95,6 +95,17 @@ describe("reading surfaces", () => {
       expect(launcher).not.toContain("focus-visible:outline-2");
     });
 
+    it("is the pixel character itself, not a button holding one", () => {
+      // The sprite is drawn with its own transparency and its own edges. A
+      // filled disc with a border around it turned the character into a small
+      // mark inside a control; separation comes from a drop shadow instead.
+      const launcher = floating.slice(floating.lastIndexOf("<button"));
+      expect(launcher).toContain("drop-shadow");
+      expect(launcher).not.toContain("border border-");
+      expect(launcher).not.toMatch(/\bbg-(marian|paper|white|accent)/);
+      expect(launcher).not.toContain("SHEPHERD_INK");
+    });
+
     it("is a card on every edge rather than a half-docked sheet", () => {
       // Full-bleed sides belong to a sheet anchored to the bottom of the
       // screen. This one stops above the tab bar, so the square side edges
