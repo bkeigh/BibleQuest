@@ -161,4 +161,58 @@ describe("reading surfaces", () => {
       expect(darkBlock.slice(0, 1200)).toContain("--color-quill:");
     });
   });
+
+  describe("quest shelves", () => {
+    const shelf = readFileSync(
+      "src/components/quests/QuestShelf.tsx",
+      "utf8",
+    );
+    const browse = readFileSync(
+      "src/components/quests/QuestBrowse.tsx",
+      "utf8",
+    );
+    const boardCard = readFileSync(
+      "src/components/quests/QuestBoardCard.tsx",
+      "utf8",
+    );
+
+    it("groups the collection by category instead of one long column", () => {
+      // Hundreds of cards in one column meant the only way to learn Service
+      // quests existed was to scroll past every Prayer one.
+      expect(browse).toContain("groupedResults");
+      expect(browse).toContain("QUEST_CATEGORIES.flatMap");
+      expect(browse).toContain("CATEGORY_LABEL[groupCategory]");
+    });
+
+    it("opens on rows and remembers the reader's choice", () => {
+      expect(browse).toContain("readQuestLayout()");
+      expect(shelf).toContain('=== "list" ? "list" : "rail"');
+      expect(shelf).toContain("writeQuestLayout");
+    });
+
+    it("keeps both layouts a real choice", () => {
+      // A rail is worse for comparing options or for a braille display, so the
+      // column has to render the same cards rather than a reduced set.
+      expect(shelf).toContain('layout === "list" ?');
+      expect(shelf).toContain("{children}");
+    });
+
+    it("lets a rail slot size its card", () => {
+      // `h-full` on the slot resolves against an auto-height rail and cancels
+      // the stretch it was meant to help; a one-cell grid does the job.
+      expect(shelf).toContain("grid w-[82%]");
+      expect(shelf).toContain("[&>*]:h-full");
+      expect(shelf).toContain("items-stretch");
+    });
+
+    it("clears an expired quest without opening Details", () => {
+      // Remove used to live inside the collapsed panel, so clearing a quest
+      // meant opening a card you had already decided about.
+      const actionRow = boardCard.slice(
+        boardCard.indexOf("{primaryAction}"),
+        boardCard.indexOf("aria-expanded={open}"),
+      );
+      expect(actionRow).toContain("removeQuest(quest.slug, isPlus)");
+    });
+  });
 });
