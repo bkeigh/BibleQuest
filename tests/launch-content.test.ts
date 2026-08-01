@@ -153,7 +153,16 @@ describe("launch content catalog", () => {
     );
 
     expect(disclosure).toContain("bg-[#3F7EA3]");
-    expect(home).toContain('backgroundColor: "#3F7EA3"');
+    // The home callout carries the blue in `.app-glass-shepherd` now rather
+    // than an inline style, because an inline background out-ranks the glass
+    // rule that has to tint it. Same colour, one level further out.
+    expect(home).toContain("app-glass-shepherd");
+    const css = readFileSync(
+      path.join(process.cwd(), "src/app/globals.css"),
+      "utf8",
+    );
+    const rule = css.slice(css.indexOf("[data-app-shell] .app-glass-shepherd"));
+    expect(rule.slice(0, 200).toLowerCase()).toContain("#3f7ea3");
   });
 
   it("describes the external quest matcher without exposing private writing", () => {

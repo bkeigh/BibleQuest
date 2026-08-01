@@ -218,6 +218,10 @@ export interface UIStrings {
     theme: string;
     themeLight: string;
     themeDark: string;
+    /** The parchment theme — BibleQuest's own look. */
+    themePaper: string;
+    /** The plain near-black theme, as distinct from Candlelight. */
+    themePlainDark: string;
     themeSystem: string;
     textSize: string;
     textSizeDefault: string;

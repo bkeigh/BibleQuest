@@ -55,7 +55,7 @@ export function MarketingGrowthLoop() {
             exit={reduceMotion ? undefined : { opacity: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.85, ease: "easeInOut" }}
           >
-            <PixelIcon name={stage.sprite} size={88} className="mx-auto" />
+            <PixelIcon name={stage.sprite} size={104} className="mx-auto" />
           </motion.div>
         </AnimatePresence>
       </div>

@@ -156,6 +156,8 @@ export const pl: UIStrings = {
     theme: "Motyw",
     themeLight: "Jasny",
     themeDark: "Blask świecy",
+    themePaper: "Papier",
+    themePlainDark: "Ciemny",
     themeSystem: "Jak w urządzeniu",
     textSize: "Rozmiar tekstu",
     textSizeDefault: "Domyślny",

@@ -537,6 +537,10 @@ describe("BibleQuest pixel art system", () => {
     }
   });
 
+  // Decodes and downsamples every sprite in the registry — around seventy
+  // PNGs in one test. On the default five seconds it passed alone and failed
+  // in a full parallel run, which is the worst way for a test to behave: it
+  // reads as a real regression and teaches people to re-run until green.
   it("keeps silhouettes stable at the smallest declared rendered grid", async () => {
     for (const [name, asset] of Object.entries(PIXEL_SPRITES)) {
       await expectRenderedSizeQa(name, asset);
@@ -544,7 +548,7 @@ describe("BibleQuest pixel art system", () => {
     for (const [name, asset] of Object.entries(PIXEL_MASCOTS)) {
       await expectRenderedSizeQa(`mascot-${name}`, asset);
     }
-  });
+  }, 30_000);
 
   it("keeps animated mascot bodies and palettes stable between frames", async () => {
     await expectStableGif(

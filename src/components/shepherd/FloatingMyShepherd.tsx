@@ -619,7 +619,7 @@ export function FloatingMyShepherd() {
             shepherd stays legible over parchment, a wallpaper, or a card. */}
         <PixelIcon
           name="myshepherd"
-          size={92}
+          size={108}
           className="[filter:drop-shadow(0_3px_6px_rgb(32_70_94/0.34))]"
         />
       </button>

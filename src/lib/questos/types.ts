@@ -10,6 +10,7 @@ import {
   type WallpaperId,
 } from "@/lib/wallpapers/catalog";
 import { DEFAULT_GLASS_OPACITY } from "@/lib/glass-opacity";
+import type { ThemeId } from "@/lib/appearance-theme";
 
 // ---------------------------------------------------------------------------
 // Quests
@@ -561,7 +562,8 @@ export interface Profile {
 }
 
 export interface AppearanceSettings {
-  theme: "light" | "dark" | "system";
+  /** See lib/appearance-theme.ts — "light"/"dark" now mean the plain themes. */
+  theme: ThemeId;
   reducedMotion: boolean;
   textSize: "default" | "large";
   /** Accessibility: heavier weights across the UI (html.text-bold). */
@@ -633,7 +635,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   appearance: {
-    theme: "light",
+    theme: "paper",
     reducedMotion: false,
     textSize: "default",
     boldText: false,

@@ -125,7 +125,7 @@ export function BookChapterPicker({ book }: { book: BookSummary }) {
             className="flex items-center gap-4"
           >
             <span className="flex shrink-0 items-center justify-center">
-              <PixelIcon name="open-book" size={68} animate />
+              <PixelIcon name="open-book" size={80} animate />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-caption uppercase tracking-[0.14em] text-accent">

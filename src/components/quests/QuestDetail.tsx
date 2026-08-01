@@ -213,7 +213,7 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
             <span className="shrink-0">
               <PixelIcon
                 name={CATEGORY_SPRITE[quest.category] ?? "leaf"}
-                size={80}
+                size={92}
               />
             </span>
             <span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-ash">

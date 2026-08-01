@@ -29,7 +29,7 @@ export default function WritingPage() {
       <div className="not-prose space-y-3">
         {PLANNED.map((title) => (
           <PaperCard key={title} variant="quiet" padding="md" className="flex items-center gap-3">
-            <PixelIcon name="book" size={56} />
+            <PixelIcon name="book" size={68} />
             <span className="text-[1rem] text-charcoal">{title}</span>
           </PaperCard>
         ))}

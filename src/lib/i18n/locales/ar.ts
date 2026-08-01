@@ -186,6 +186,8 @@ export const ar: UIStrings = {
     theme: "السمة",
     themeLight: "فاتح",
     themeDark: "ضوء الشموع",
+    themePaper: "ورق",
+    themePlainDark: "داكن",
     themeSystem: "حسب الجهاز",
     textSize: "حجم الخط",
     textSizeDefault: "افتراضي",

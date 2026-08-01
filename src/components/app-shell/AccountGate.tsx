@@ -63,7 +63,7 @@ function AccountGateInner({
     <PageContainer className="pb-8 pt-6">
       <PaperCard variant="atmospheric" padding="lg">
         <span aria-hidden="true" className="inline-block">
-          <PixelIcon name="key" size={48} />
+          <PixelIcon name="key" size={56} />
         </span>
         <h1 className="mt-3 font-display text-[1.75rem] leading-tight text-graphite">
           {copy.title}

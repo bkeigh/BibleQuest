@@ -131,7 +131,7 @@ export function TodayFormation({
               className="h-full min-h-48"
             >
               <div className="flex items-start gap-3">
-                <PixelIcon name="open-book" size={56} />
+                <PixelIcon name="open-book" size={68} />
                 <div className="min-w-0 flex-1">
                   <p className="text-caption uppercase tracking-[0.1em] text-accent">
                     Today’s guide

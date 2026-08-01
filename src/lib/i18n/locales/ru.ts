@@ -159,6 +159,8 @@ export const ru: UIStrings = {
     theme: "Тема",
     themeLight: "Светлая",
     themeDark: "При свечах",
+    themePaper: "Бумага",
+    themePlainDark: "Тёмная",
     themeSystem: "Как на устройстве",
     textSize: "Размер текста",
     textSizeDefault: "Обычный",

@@ -15,28 +15,38 @@ export interface LanguageMeta {
   endonym: string;
   english: string;
   dir: "ltr" | "rtl";
+  /**
+   * Flags a reader recognises the language by, most-associated first.
+   *
+   * A language is not a country, so this is a wayfinding aid rather than a
+   * claim: two for English because both readings are common, two for Swahili
+   * because it belongs to no single one, and the Vatican for ecclesiastical
+   * Latin. The endonym is still what the picker reads out — the flag only
+   * helps a reader find their line faster.
+   */
+  flags: string[];
 }
 
 export const LANGUAGES: LanguageMeta[] = [
-  { code: "en", endonym: "English", english: "English", dir: "ltr" },
-  { code: "es", endonym: "Español", english: "Spanish", dir: "ltr" },
-  { code: "pt", endonym: "Português (Brasil)", english: "Portuguese", dir: "ltr" },
-  { code: "fr", endonym: "Français", english: "French", dir: "ltr" },
-  { code: "it", endonym: "Italiano", english: "Italian", dir: "ltr" },
-  { code: "de", endonym: "Deutsch", english: "German", dir: "ltr" },
-  { code: "pl", endonym: "Polski", english: "Polish", dir: "ltr" },
-  { code: "ru", endonym: "Русский", english: "Russian", dir: "ltr" },
-  { code: "el", endonym: "Ελληνικά", english: "Greek", dir: "ltr" },
-  { code: "ro", endonym: "Română", english: "Romanian", dir: "ltr" },
-  { code: "fil", endonym: "Filipino", english: "Filipino", dir: "ltr" },
-  { code: "vi", endonym: "Tiếng Việt", english: "Vietnamese", dir: "ltr" },
-  { code: "ko", endonym: "한국어", english: "Korean", dir: "ltr" },
-  { code: "zh", endonym: "中文（简体）", english: "Chinese (Simplified)", dir: "ltr" },
-  { code: "hi", endonym: "हिन्दी", english: "Hindi", dir: "ltr" },
-  { code: "id", endonym: "Bahasa Indonesia", english: "Indonesian", dir: "ltr" },
-  { code: "sw", endonym: "Kiswahili", english: "Swahili", dir: "ltr" },
-  { code: "ar", endonym: "العربية", english: "Arabic", dir: "rtl" },
-  { code: "la", endonym: "Lingua Latina", english: "Latin", dir: "ltr" },
+  { code: "en", endonym: "English", english: "English", dir: "ltr", flags: ["🇺🇸", "🇬🇧"] },
+  { code: "es", endonym: "Español", english: "Spanish", dir: "ltr", flags: ["🇪🇸"] },
+  { code: "pt", endonym: "Português (Brasil)", english: "Portuguese", dir: "ltr", flags: ["🇧🇷"] },
+  { code: "fr", endonym: "Français", english: "French", dir: "ltr", flags: ["🇫🇷"] },
+  { code: "it", endonym: "Italiano", english: "Italian", dir: "ltr", flags: ["🇮🇹"] },
+  { code: "de", endonym: "Deutsch", english: "German", dir: "ltr", flags: ["🇩🇪"] },
+  { code: "pl", endonym: "Polski", english: "Polish", dir: "ltr", flags: ["🇵🇱"] },
+  { code: "ru", endonym: "Русский", english: "Russian", dir: "ltr", flags: ["🇷🇺"] },
+  { code: "el", endonym: "Ελληνικά", english: "Greek", dir: "ltr", flags: ["🇬🇷"] },
+  { code: "ro", endonym: "Română", english: "Romanian", dir: "ltr", flags: ["🇷🇴"] },
+  { code: "fil", endonym: "Filipino", english: "Filipino", dir: "ltr", flags: ["🇵🇭"] },
+  { code: "vi", endonym: "Tiếng Việt", english: "Vietnamese", dir: "ltr", flags: ["🇻🇳"] },
+  { code: "ko", endonym: "한국어", english: "Korean", dir: "ltr", flags: ["🇰🇷"] },
+  { code: "zh", endonym: "中文（简体）", english: "Chinese (Simplified)", dir: "ltr", flags: ["🇨🇳"] },
+  { code: "hi", endonym: "हिन्दी", english: "Hindi", dir: "ltr", flags: ["🇮🇳"] },
+  { code: "id", endonym: "Bahasa Indonesia", english: "Indonesian", dir: "ltr", flags: ["🇮🇩"] },
+  { code: "sw", endonym: "Kiswahili", english: "Swahili", dir: "ltr", flags: ["🇰🇪", "🇹🇿"] },
+  { code: "ar", endonym: "العربية", english: "Arabic", dir: "rtl", flags: ["🇸🇦"] },
+  { code: "la", endonym: "Lingua Latina", english: "Latin", dir: "ltr", flags: ["🇻🇦"] },
 ];
 
 export const LANGUAGE_CODES = LANGUAGES.map((l) => l.code);

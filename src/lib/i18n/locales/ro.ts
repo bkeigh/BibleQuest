@@ -156,6 +156,8 @@ export const ro: UIStrings = {
     theme: "Temă",
     themeLight: "Luminoasă",
     themeDark: "Candelă",
+    themePaper: "Hârtie",
+    themePlainDark: "Întunecat",
     themeSystem: "După dispozitiv",
     textSize: "Mărimea textului",
     textSizeDefault: "Implicită",

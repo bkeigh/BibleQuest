@@ -50,6 +50,7 @@ import type { QuestOSSnapshot } from "@/lib/questos/types";
 import { useStrings, LANGUAGES, languageMeta, fmt } from "@/lib/i18n";
 import { IconCheck, IconChevronRight } from "@/components/design-system/icons";
 import { cn } from "@/lib/utils/cn";
+import { THEME_CHOICES, type ThemeId } from "@/lib/appearance-theme";
 import {
   FEATURED_TRANSLATIONS,
   featuredBibleTranslationOptions,
@@ -104,6 +105,91 @@ function Row({
     </div>
   );
 }
+
+/**
+ * The four themes, as swatches rather than a segmented control.
+ *
+ * Five values (four themes plus "match device") will not fit across a phone as
+ * segments, and a theme is one of the few settings where showing the thing
+ * beats naming it — the difference between Paper and Light is exactly the
+ * colours in the swatch. "Match device" sits underneath as its own row because
+ * it is a different kind of answer: not a fifth look, but a deferral to the OS.
+ */
+function ThemePicker({
+  label,
+  systemLabel,
+  names,
+  value,
+  onChange,
+}: {
+  label: string;
+  systemLabel: string;
+  names: Record<Exclude<ThemeId, "system">, string>;
+  value: ThemeId;
+  onChange: (theme: ThemeId) => void;
+}) {
+  return (
+    <div className="py-3.5">
+      <span className="block text-[0.9375rem] text-charcoal">{label}</span>
+      <div
+        role="radiogroup"
+        aria-label={label}
+        className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4"
+      >
+        {THEME_CHOICES.map((choice) => {
+          const active = value === choice.id;
+          return (
+            <button
+              key={choice.id}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => onChange(choice.id)}
+              className={cn(
+                "rounded-[var(--radius-button)] border p-2 text-start transition-colors duration-300",
+                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                active
+                  ? "border-accent bg-accent-surface"
+                  : "border-mist bg-paper hover:border-accent/45",
+              )}
+            >
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "flex h-10 w-full items-end gap-1 rounded-[8px] p-1.5 ring-1",
+                  THEME_SWATCH[choice.id],
+                )}
+              >
+                <span className="h-full w-1/2 rounded-[3px] bg-current opacity-90" />
+                <span className="h-1/2 w-1/4 self-end rounded-[3px] bg-current opacity-45" />
+              </span>
+              <span className="mt-1.5 block text-caption font-medium text-graphite">
+                {names[choice.id]}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <label className="mt-3 flex items-center justify-between gap-4">
+        <span className="text-[0.9375rem] text-charcoal">{systemLabel}</span>
+        <Toggle
+          label={systemLabel}
+          on={value === "system"}
+          // Turning it off has to land somewhere, and Paper is the app's own.
+          onChange={(on) => onChange(on ? "system" : "paper")}
+        />
+      </label>
+    </div>
+  );
+}
+
+/** Canvas, card and text colours of each theme, drawn from its own palette. */
+const THEME_SWATCH: Record<Exclude<ThemeId, "system">, string> = {
+  paper: "bg-[#faf6ec] text-[#2d2a24] ring-[#e4dcc6]",
+  candlelight: "bg-[#101814] text-[#e9e4d3] ring-[#2e3a31]",
+  light: "bg-[#f6f7f8] text-[#16181c] ring-[#dde1e6]",
+  dark: "bg-[#0e0f11] text-[#f2f4f6] ring-[#2c3137]",
+};
 
 function Segmented<T extends string>({
   label,
@@ -1247,18 +1333,18 @@ function SettingsInner() {
                 }
                 onCommit={(glassOpacity) => setAppearance({ glassOpacity })}
               />
-              <Row label={t.settings.theme}>
-                <Segmented
-                  label={t.settings.theme}
-                  value={appearance.theme}
-                  onChange={(theme) => setAppearance({ theme })}
-                  options={[
-                    { value: "light", label: t.settings.themeLight },
-                    { value: "dark", label: t.settings.themeDark },
-                    { value: "system", label: t.settings.themeSystem },
-                  ]}
-                />
-              </Row>
+              <ThemePicker
+                label={t.settings.theme}
+                systemLabel={t.settings.themeSystem}
+                names={{
+                  paper: t.settings.themePaper,
+                  candlelight: t.settings.themeDark,
+                  light: t.settings.themeLight,
+                  dark: t.settings.themePlainDark,
+                }}
+                value={appearance.theme}
+                onChange={(theme) => setAppearance({ theme })}
+              />
               <Row label={t.settings.textSize}>
                 <Segmented
                   label={t.settings.textSize}

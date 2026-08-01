@@ -186,6 +186,8 @@ export const en: UIStrings = {
     theme: "Theme",
     themeLight: "Light",
     themeDark: "Candlelight",
+    themePaper: "Paper",
+    themePlainDark: "Dark",
     themeSystem: "Match device",
     textSize: "Text size",
     textSizeDefault: "Default",

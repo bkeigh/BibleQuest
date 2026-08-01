@@ -244,7 +244,7 @@ function HomeInner() {
                         ? CATEGORY_SPRITE[featuredQuest.category] ?? "scroll"
                         : "scroll"
                     }
-                    size={68}
+                    size={80}
                   />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -427,7 +427,7 @@ function TodaysVerseLink() {
           className="ambient absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gold-300/15 blur-2xl [animation:var(--animate-twinkle)]"
         />
         <span className="relative flex shrink-0 items-center justify-center">
-          <PixelIcon name="open-book" size={56} animate />
+          <PixelIcon name="open-book" size={68} animate />
         </span>
         <span className="relative min-w-0 flex-1">
           <span className="block font-display text-[1.125rem] leading-tight">
@@ -455,18 +455,29 @@ function ShepherdCallout({
       interactive
       variant="outlined"
       padding="md"
-      className="flex min-h-24 items-center gap-4"
-      style={{ backgroundColor: "#3F7EA3", borderColor: "#3F7EA3" }}
+      // Glass like the rest of the app, but the most opaque surface in it —
+      // see `.app-glass-shepherd`. The flat inline fill it replaces sat outside
+      // the material system entirely, which is why this card read as pasted on,
+      // and an inline style would have out-ranked the class anyway.
+      className="app-glass-shepherd flex min-h-24 items-center gap-4"
     >
       <span className="relative flex shrink-0 items-center justify-center">
-        <PixelIcon name="star" size={68} />
+        {/* Its own character, the same one the floating launcher uses. */}
+        <PixelIcon
+          name="myshepherd"
+          size={68}
+          className="[filter:drop-shadow(0_2px_4px_rgb(15_40_54/0.35))]"
+        />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="flex flex-wrap items-center gap-2 font-display text-[1.25rem] leading-tight text-white">
+        {/* The badge leads rather than trailing the title. Sharing a wrapping
+            line with it, "Plus" kept being pushed onto a line of its own,
+            which read as a heading instead of a label. */}
+        <span className="inline-flex rounded-full bg-white/20 px-2 py-0.5 text-caption font-medium text-white">
+          Plus
+        </span>
+        <p className="mt-1 font-display text-[1.1875rem] leading-tight text-white">
           Ask MyShepherd AI
-          <span className="rounded-full bg-white/20 px-2.5 py-1 text-caption font-medium text-white">
-            Plus
-          </span>
         </p>
         <p className="mt-1 text-caption leading-relaxed text-white/80">
           Explore Scripture and find your next place in BibleQuest.
@@ -525,7 +536,7 @@ function QuickActionTile({
         {/* The chip has to be larger than the sprite it holds. At 44px around a
             44px icon the art was flush to all four edges and read as clipped. */}
         <span className="flex shrink-0 items-center justify-center transition-transform duration-300 group-hover:-translate-y-0.5">
-          <PixelIcon name={sprite} size={56} animate={animate} />
+          <PixelIcon name={sprite} size={68} animate={animate} />
         </span>
         <span className="text-[0.75rem] font-medium leading-snug text-graphite min-[390px]:text-[0.8125rem] sm:text-small">
           {title}

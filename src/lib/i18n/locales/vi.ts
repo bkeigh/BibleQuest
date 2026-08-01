@@ -156,6 +156,8 @@ export const vi: UIStrings = {
     theme: "Chủ đề màu",
     themeLight: "Sáng",
     themeDark: "Ánh nến",
+    themePaper: "Giấy",
+    themePlainDark: "Tối",
     themeSystem: "Theo thiết bị",
     textSize: "Cỡ chữ",
     textSizeDefault: "Mặc định",

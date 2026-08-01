@@ -19,8 +19,14 @@ export const APPEARANCE_BOOTSTRAP_SCRIPT = `
     if (!appearance) return;
     var root = document.documentElement;
     var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    var dark = appearance.theme === "dark" || (appearance.theme === "system" && prefersDark);
+    // Mirrors resolveTheme() in lib/appearance-theme.ts. This script is inlined
+    // into <head> before any bundle loads, so it cannot import — the shapes are
+    // held together by a test rather than by the module system.
+    var theme = appearance.theme;
+    var dark = theme === "candlelight" || theme === "dark" || (theme === "system" && prefersDark);
+    var plain = theme === "light" || theme === "dark";
     root.classList.toggle("theme-dark", dark);
+    root.classList.toggle("theme-plain", plain);
     root.classList.toggle("text-large", appearance.textSize === "large");
     root.classList.toggle("text-bold", appearance.boldText === true);
     root.classList.toggle("force-reduce-motion", appearance.reducedMotion === true);

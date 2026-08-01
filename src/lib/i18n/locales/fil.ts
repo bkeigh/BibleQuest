@@ -156,6 +156,8 @@ export const fil: UIStrings = {
     theme: "Tema",
     themeLight: "Maliwanag",
     themeDark: "Ilaw ng kandila",
+    themePaper: "Papel",
+    themePlainDark: "Madilim",
     themeSystem: "Ayon sa device",
     textSize: "Laki ng teksto",
     textSizeDefault: "Karaniwan",

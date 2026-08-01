@@ -94,7 +94,7 @@ export function AccountPrompt() {
     <PaperCard variant="linen" padding="md" role="note" aria-label={t.accountPrompt.title}>
       <div className="flex items-start gap-3.5">
         <span className="-mt-1 shrink-0">
-          <PixelIcon name="lantern" size={68} />
+          <PixelIcon name="lantern" size={80} />
         </span>
         <div className="min-w-0 flex-1">
           <h3 className="font-display text-subheading text-graphite">
