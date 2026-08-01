@@ -124,13 +124,9 @@ function HeroAction({
           className="ambient absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gold-300/15 blur-2xl [animation:var(--animate-twinkle)]"
         />
       )}
-      <span
-        className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] ring-1 lg:h-12 lg:w-12 ${
-          primary
-            ? "bg-[#fdfbf3]/10 ring-[#fdfbf3]/20"
-            : "bg-evergreen-50 ring-evergreen-600/15"
-        }`}
-      >
+      {/* The plate is gone, so the light/dark variants it carried go with it —
+          the sprite is drawn transparent and reads on either background. */}
+      <span className="relative flex shrink-0 items-center justify-center">
         <PixelIcon name={icon} size={56} />
       </span>
       <span className="relative min-w-0 flex-1">
@@ -305,7 +301,7 @@ export default function LandingPage() {
           {RHYTHM.map((r, i) => (
             <Reveal key={r.title} delay={i * 0.06}>
               <PaperCard variant="paper" padding="lg" className="h-full text-center">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-linen ring-1 ring-mist">
+                <div className="mx-auto mb-4 flex items-center justify-center">
                   <PixelIcon name={r.sprite} size={68} />
                 </div>
                 <h3 className="font-display text-[1.25rem] text-graphite">{r.title}</h3>
@@ -399,7 +395,7 @@ export default function LandingPage() {
       <EditorialSection className="bg-linen" spacing="compact">
         <Reveal>
           <PaperCard variant="paper" padding="lg" className="mx-auto max-w-2xl text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-accent-surface">
+            <div className="mx-auto mb-4 flex items-center justify-center">
               <PixelIcon name="chapel" size={68} />
             </div>
             <h2 className="font-display text-editorial text-graphite">
