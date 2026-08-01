@@ -271,7 +271,17 @@ export function SevenDaysBoard({
               "outline-none focus-visible:ring-2 focus-visible:ring-accent",
             )}
           >
-            <PixelIcon name={art.sprite} size={48} />
+            {/* A board cell is a grid fraction, not a fixed size — seven
+                columns on a 375px screen leaves about 37px each, and a fixed
+                48px sprite spilled over its neighbours. `max-*-full` is a
+                constraint rather than a width, so it wins against the inline
+                size on a narrow screen and lets the art reach full size on a
+                wide one. */}
+            <PixelIcon
+              name={art.sprite}
+              size={48}
+              className="max-h-full max-w-full"
+            />
           </motion.button>
         );
       })}
