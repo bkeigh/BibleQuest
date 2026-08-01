@@ -445,8 +445,14 @@ html.theme-dark .milestone-glass-surface[data-milestone-state="reached"] {
   opacity: 1; /* Firefox dims placeholders by default; the token decides. */
 }
 
-/* Calm, visible focus — verse buttons place theirs on the wrapped text. */
-:focus-visible:not([id^="verse-"]) {
+/* Calm, visible focus — verse buttons place theirs on the wrapped text.
+   A dialog is exempt because it is not a control: sheets take focus on open so
+   a screen reader lands inside them, and Safari treats that programmatic focus
+   as focus-visible. The reader then met a two-pixel ring drawn around the whole
+   panel — square-cornered, because this rule also forces a 4px radius.
+   Utilities cannot opt out of this rule: it is unlayered and they are not, so
+   an `outline-none` class on the panel loses no matter its specificity. */
+:focus-visible:not([id^="verse-"]):not([role="dialog"]) {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
   border-radius: 4px;
