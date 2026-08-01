@@ -12,8 +12,10 @@ import {
 } from "./board";
 
 import type {
+  SevenDaysBoard,
   SevenDaysLevel,
   SevenDaysLevelState,
+  SevenDaysStep,
   SevenDaysTileId,
 } from "./types";
 
@@ -30,6 +32,16 @@ export interface SevenDaysMoveResult {
   /** True when the swap did not form a run and the tiles snapped back. */
   readonly rejected: boolean;
   readonly reshuffled: boolean;
+  /**
+   * The board with the two tiles traded, before anything is matched — the
+   * frame a reader needs to see to understand that their swap is what caused
+   * everything after it.
+   */
+  readonly swapped?: SevenDaysBoard;
+  /** The cascade, wave by wave, for a surface that plays it out. */
+  readonly steps: readonly SevenDaysStep[];
+  /** Where the board settles if it had to be rearranged after the cascade. */
+  readonly reshuffledBoard?: SevenDaysBoard;
 }
 
 function goalsMet(
@@ -111,6 +123,7 @@ export function trySwap(
     announcement: "",
     rejected: false,
     reshuffled: false,
+    steps: [],
   };
   if (state.status !== "playing") return unchanged;
   if (!areAdjacent(state.board, a, b)) return unchanged;
@@ -122,6 +135,8 @@ export function trySwap(
       announcement: "Those two do not gather anything. No move was spent.",
       rejected: true,
       reshuffled: false,
+      swapped,
+      steps: [],
     };
   }
 
@@ -161,6 +176,9 @@ export function trySwap(
     announcement: describeMove(resolution.cascades, status, reshuffled),
     rejected: false,
     reshuffled,
+    swapped,
+    steps: resolution.steps,
+    ...(reshuffled ? { reshuffledBoard: board } : {}),
   };
 }
 

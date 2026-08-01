@@ -21,7 +21,10 @@ import {
   type SevenDaysSession,
 } from "@/lib/games/seven-days/play";
 import { SEVEN_DAYS_TILES } from "@/lib/games/seven-days/tiles";
-import type { SevenDaysLevel } from "@/lib/games/seven-days/types";
+import type {
+  SevenDaysBoard as SevenDaysBoardShape,
+  SevenDaysLevel,
+} from "@/lib/games/seven-days/types";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 import { cn } from "@/lib/utils/cn";
 import { SevenDaysBoard } from "./SevenDaysBoard";
@@ -34,6 +37,9 @@ import { SevenDaysVerseStrip } from "./SevenDaysVerseStrip";
  * already says. Deriving them keeps one source of truth for "is this level
  * over" rather than a stage that has to be nudged into agreement.
  */
+const wait = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
 type Stage = "intro" | "play";
 type Phase = Stage | "cleared" | "spent";
 
@@ -66,6 +72,14 @@ export function SevenDaysLevelSession({
   );
   const [announcement, setAnnouncement] = useState("");
   const [paused, setPaused] = useState(false);
+  // While a cascade plays, the board shown is a frame from the engine rather
+  // than the committed state; input waits so a second tap cannot outrun it.
+  const [preview, setPreview] = useState<{
+    board: SevenDaysBoardShape;
+    clearing: ReadonlySet<number> | null;
+  } | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [combo, setCombo] = useState<number | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   const { state } = session;
@@ -103,9 +117,64 @@ export function SevenDaysLevelSession({
     setPaused(false);
   }
 
-  function handleSwap(from: number, to: number) {
+  /**
+   * Plays a move out instead of jumping to its result.
+   *
+   * The engine resolves a whole cascade in one call, which is right for the
+   * rules and wrong for the eye: tiles would leave and arrive in the same
+   * frame, and a four-deep cascade would look identical to a single match.
+   * The frames it hands back are shown in order — the swap, then each wave's
+   * holes, then each wave settled — and the real state commits at the end.
+   *
+   * Reduced motion skips straight to the result: the point of the animation is
+   * to show what happened, and someone who has asked for stillness has said
+   * they would rather be told.
+   */
+  async function handleSwap(from: number, to: number) {
+    if (playing) return;
     const result = trySwap(session, from, to);
+
+    if (result.rejected) {
+      if (result.announcement) setAnnouncement(result.announcement);
+      // Show the trade, then take it back, so a swap that gathers nothing
+      // reads as "not that" rather than as a tap that did nothing.
+      if (!reduceMotion && result.swapped) {
+        setPlaying(true);
+        setPreview({ board: result.swapped, clearing: null });
+        await wait(200);
+        setPreview(null);
+        setPlaying(false);
+      }
+      setSession(result.session);
+      return;
+    }
+
+    if (reduceMotion || result.steps.length === 0) {
+      if (result.announcement) setAnnouncement(result.announcement);
+      setSession(result.session);
+      return;
+    }
+
+    setPlaying(true);
+    setPreview({ board: result.swapped ?? state.board, clearing: null });
+    await wait(120);
+    for (const step of result.steps) {
+      setPreview({ board: step.emptied, clearing: step.matched });
+      if (step.cascade > 1) setCombo(step.cascade);
+      await wait(170);
+      setPreview({ board: step.settled, clearing: null });
+      await wait(150);
+    }
+    setCombo(null);
+    if (result.reshuffledBoard) {
+      setPreview({ board: result.reshuffledBoard, clearing: null });
+      await wait(200);
+    }
+    setPreview(null);
+    setPlaying(false);
     setSession(result.session);
+    // Announced after the cascade, so a screen reader is told what happened
+    // rather than what is about to.
     if (result.announcement) setAnnouncement(result.announcement);
   }
 
@@ -218,14 +287,18 @@ export function SevenDaysLevelSession({
                 ))}
               </div>
               <div className="app-glass-surface shrink-0 rounded-[var(--radius-button)] border border-mist bg-paper px-3 py-1.5 text-center">
-                <span
+                <motion.span
+                  key={state.movesLeft}
+                  initial={{ scale: reduceMotion ? 1 : 1.25 }}
+                  animate={{ scale: 1 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.22 }}
                   className={cn(
                     "block font-display text-[1.25rem] leading-none tabular-nums",
                     state.movesLeft <= 5 ? "text-rose-700" : "text-graphite",
                   )}
                 >
                   {state.movesLeft}
-                </span>
+                </motion.span>
                 <span className="block text-caption text-ash">moves</span>
               </div>
             </div>
@@ -249,13 +322,32 @@ export function SevenDaysLevelSession({
               </p>
             </div>
 
-            <SevenDaysBoard
-              board={state.board}
-              selected={state.selected}
-              disabled={state.status !== "playing"}
+            <div className="relative">
+              {combo !== null && !reduceMotion && (
+                <motion.p
+                  key={combo}
+                  aria-hidden="true"
+                  initial={{ opacity: 0, y: 8, scale: 0.92 }}
+                  animate={{ opacity: 1, y: -4, scale: 1 }}
+                  transition={{ duration: 0.25 }}
+                  className="pointer-events-none absolute inset-x-0 top-1/2 z-20 -translate-y-1/2 text-center font-display text-[2rem] text-gilt drop-shadow-[0_2px_0_rgba(255,255,255,0.8)]"
+                >
+                  {combo === 2
+                    ? "And more fell"
+                    : combo === 3
+                      ? "And more still"
+                      : "It keeps going"}
+                </motion.p>
+              )}
+              <SevenDaysBoard
+              board={preview?.board ?? state.board}
+              selected={preview ? null : state.selected}
+              disabled={playing || state.status !== "playing"}
+              clearing={preview?.clearing ?? undefined}
               onSelect={(index) => setSession(selectTile(session, index))}
-              onSwap={handleSwap}
-            />
+              onSwap={(from, to) => void handleSwap(from, to)}
+              />
+            </div>
 
             <div className="flex items-center gap-2">
               <GentleButton

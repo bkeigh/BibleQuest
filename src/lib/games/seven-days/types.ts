@@ -79,6 +79,20 @@ export interface SevenDaysChapter {
   readonly questions: readonly SevenDaysQuestion[];
 }
 
+/**
+ * One wave of a cascade, kept so the board can be watched rather than only
+ * read: the matched cells, the board with those holes in it, and the board
+ * after everything fell. A surface handed only the final state has no way to
+ * show what was matched — tiles would leave and arrive in the same frame.
+ */
+export interface SevenDaysStep {
+  /** 1 for the match the reader made, 2+ for what it knocked loose. */
+  readonly cascade: number;
+  readonly matched: ReadonlySet<number>;
+  readonly emptied: SevenDaysBoard;
+  readonly settled: SevenDaysBoard;
+}
+
 /** What a resolved swap produced, for scoring and goal tracking. */
 export interface SevenDaysResolution {
   readonly board: SevenDaysBoard;
@@ -87,6 +101,8 @@ export interface SevenDaysResolution {
   /** 1 for a plain match; higher when clears fell into further matches. */
   readonly cascades: number;
   readonly points: number;
+  /** Each wave in order, for a surface that wants to play it out. */
+  readonly steps: readonly SevenDaysStep[];
 }
 
 export type SevenDaysLevelStatus = "playing" | "cleared" | "out-of-moves";
