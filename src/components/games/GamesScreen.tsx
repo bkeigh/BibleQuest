@@ -8,6 +8,7 @@ import {
   GentleLink,
 } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
+import { PixelIcon } from "@/components/design-system/PixelIcon";
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -100,6 +101,28 @@ export function GamesScreen() {
           <div className="mt-3 space-y-4">
             {GREEN_FEATURES.sevenDaysMatch && <SevenDaysArcadeCard />}
             <TodaysGameCard dayKey={dayKey} puzzle={puzzle} />
+            <Link
+              href="/app/games/store"
+              className="group block rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <PaperCard variant="paper" padding="md" interactive>
+                <div className="flex items-center gap-3">
+                  <span aria-hidden="true" className="shrink-0">
+                    <PixelIcon name="service-basket" size={3} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-display text-subheading text-graphite">
+                      Arcade Store
+                    </span>
+                    <span className="block text-small leading-relaxed text-ash">
+                      More days to play and helps for the board. Answers stay
+                      free.
+                    </span>
+                  </span>
+                  <IconArrowRight size={16} className="shrink-0 text-accent" />
+                </div>
+              </PaperCard>
+            </Link>
             <ArchiveCard
               loading={plus.loading}
               isPlus={plus.isPlus}

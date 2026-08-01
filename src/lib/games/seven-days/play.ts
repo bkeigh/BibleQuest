@@ -1,4 +1,5 @@
 import {
+  settleBoard,
   areAdjacent,
   boardRng,
   createBoard,
@@ -196,6 +197,71 @@ function describeMove(
   return reshuffled ? `${base} The board was rearranged so a move remains.` : base;
 }
 
+/**
+ * Adds moves to a level already underway.
+ *
+ * Spent from a reader's own inventory, and only while a level is still live —
+ * a level that has been cleared or spent is finished, and topping it up after
+ * the fact would let a help rewrite a result rather than change a game.
+ */
+export function addMoves(
+  session: SevenDaysSession,
+  moves: number,
+): SevenDaysSession {
+  const { state } = session;
+  if (state.status !== "playing" || moves <= 0) return session;
+  return {
+    ...session,
+    state: { ...state, movesLeft: state.movesLeft + moves, selected: null },
+  };
+}
+
+/**
+ * Clears every tile of one kind, as one move's worth of cascade.
+ *
+ * It costs no move: the boost is the cost. Everything it gathers counts toward
+ * goals exactly as a matched run would, because a help that did not count
+ * would be a help in name only.
+ */
+export function gatherKind(
+  session: SevenDaysSession,
+  tile: SevenDaysTileId,
+): { session: SevenDaysSession; gathered: number } {
+  const { state, random } = session;
+  if (state.status !== "playing") return { session, gathered: 0 };
+  const cells = state.board.cells.map((cell) => (cell === tile ? null : cell));
+  const emptied = { ...state.board, cells };
+  const removed = state.board.cells.filter((cell) => cell === tile).length;
+  if (removed === 0) return { session, gathered: 0 };
+
+  const resolution = resolveMatches(
+    settleBoard(emptied, state.level.tiles, random),
+    state.level.tiles,
+    random,
+  );
+  const gathered = tileTally();
+  for (const key of Object.keys(gathered) as SevenDaysTileId[]) {
+    gathered[key] = state.gathered[key] + resolution.cleared[key];
+  }
+  gathered[tile] += removed;
+
+  const cleared = goalsMet(state.level, gathered);
+  return {
+    session: {
+      random,
+      state: {
+        ...state,
+        board: resolution.board,
+        gathered,
+        points: state.points + resolution.points + removed * 5,
+        status: cleared ? "cleared" : state.status,
+        selected: null,
+      },
+    },
+    gathered: removed,
+  };
+}
+
 /** Free, unlimited: being stuck is never something to buy a way out of. */
 export function shuffleSession(session: SevenDaysSession): SevenDaysSession {
   const { state, random } = session;
@@ -208,6 +274,28 @@ export function shuffleSession(session: SevenDaysSession): SevenDaysSession {
       selected: null,
     },
   };
+}
+
+/**
+ * A trade that would gather something, for the hint boost.
+ *
+ * Returns the first it finds in reading order rather than the best one: this
+ * is meant to unstick someone, not to play the level for them.
+ */
+export function findHint(
+  session: SevenDaysSession,
+): { from: number; to: number } | null {
+  const { board } = session.state;
+  for (let index = 0; index < board.cells.length; index += 1) {
+    for (const other of [index + 1, index + board.cols]) {
+      if (other >= board.cells.length) continue;
+      if (!areAdjacent(board, index, other)) continue;
+      if (findMatches(swapCells(board, index, other)).size > 0) {
+        return { from: index, to: other };
+      }
+    }
+  }
+  return null;
 }
 
 /** How far along one goal is, for the HUD and for assistive announcements. */
