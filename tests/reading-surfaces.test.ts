@@ -61,6 +61,47 @@ describe("reading surfaces", () => {
       );
     });
 
+    it("does not paint a control's focus ring around the whole panel", () => {
+      // The sheet takes focus on open so a screen reader lands inside it, and
+      // Safari counts that as focus-visible. The global rule then drew a 2px
+      // accent outline — square-cornered, since it forces a 4px radius —
+      // around the entire sheet. A dialog is not a control.
+      expect(css).toContain(':focus-visible:not([id^="verse-"]):not([role="dialog"])');
+      // An `outline-none` utility cannot fix this: the rule is unlayered and
+      // utilities are layered, so the rule wins regardless of specificity.
+      expect(floating).not.toContain("outline-none\"");
+    });
+
+    it("is a card on every edge rather than a half-docked sheet", () => {
+      // Full-bleed sides belong to a sheet anchored to the bottom of the
+      // screen. This one stops above the tab bar, so the square side edges
+      // read as crowded rather than deliberate.
+      expect(floating).toContain('"px-4 sm:px-0"');
+      expect(floating).toContain('"rounded-[22px]"');
+      expect(floating).not.toContain("rounded-t-[22px]");
+    });
+
+    it("carries white on a blue that can actually hold it", () => {
+      // White on marian-500 is 4.45:1 — under the floor for text this size, so
+      // the header subtitle failed at any opacity. marian-700 carries it at 9.4:1.
+      expect(floating).toContain('const SHEPHERD_INK = "bg-marian-700"');
+      expect(floating).not.toContain("#3F7EA3");
+    });
+
+    it("shows send as waiting rather than as failed", () => {
+      // A filled circle at 45% opacity reads as a broken control.
+      expect(floating).toContain("const canSend =");
+      expect(floating).not.toContain("disabled:opacity-45");
+    });
+
+    it("keeps starters from looking like the replies they sit above", () => {
+      // As rounded-full chips they shared a shape and fill with the answer
+      // bubbles that arrive seconds later.
+      const starters = floating.slice(floating.indexOf("STARTERS.map"));
+      expect(starters.slice(0, 700)).not.toContain("rounded-full");
+      expect(starters.slice(0, 700)).toContain("IconArrowRight");
+    });
+
     it("keeps an unanswered question rather than dropping it", () => {
       // On failure the words were gone: the field had been cleared and no
       // turn was recorded, so a long question had to be retyped.

@@ -22,6 +22,7 @@ import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 import { cn } from "@/lib/utils/cn";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import {
+  IconArrowRight,
   IconArrowUp,
   IconClose,
   IconSparkle,
@@ -48,6 +49,16 @@ const FOCUSABLE_SELECTOR =
 const RESTING_GUTTER =
   "max(var(--app-bottom-nav-height, 4.5rem), calc(env(safe-area-inset-bottom) + 0.75rem))";
 
+/**
+ * MyShepherd's blue, one step deeper than the marian-500 it used to be.
+ *
+ * White on marian-500 is 4.45:1 — under the 4.5:1 floor for text this size, so
+ * the header subtitle failed at any opacity, not just at the 75% it was set to.
+ * marian-700 carries white at 9.4:1 and sits better against parchment. The
+ * lighter blue stays where it is only a tint, never behind white text.
+ */
+const SHEPHERD_INK = "bg-marian-700";
+
 interface ChatTurn {
   id: string;
   question: string;
@@ -65,7 +76,12 @@ function floatingErrorMessage(status: number): string {
 /** The reader's own words, shown the moment they send rather than on reply. */
 function AskedBubble({ question }: { question: string }) {
   return (
-    <p className="ms-auto w-fit max-w-[88%] rounded-[16px_16px_4px_16px] bg-[#3F7EA3] px-3.5 py-2.5 text-small leading-relaxed text-white">
+    <p
+      className={cn(
+        "ms-auto w-fit max-w-[88%] rounded-[16px_16px_4px_16px] px-3.5 py-2.5 text-small leading-relaxed text-white",
+        SHEPHERD_INK,
+      )}
+    >
       {question}
     </p>
   );
@@ -78,7 +94,7 @@ function ShepherdMark({ pulsing = false }: { pulsing?: boolean }) {
     <span
       aria-hidden="true"
       className={cn(
-        "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#3F7EA3]/12 text-[#3F7EA3] ring-1 ring-[#3F7EA3]/20",
+        "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-marian-500/12 text-marian-700 ring-1 ring-marian-500/25",
         pulsing && "animate-pulse",
       )}
     >
@@ -199,10 +215,12 @@ export function FloatingMyShepherd() {
     const ceiling = viewport.height
       ? Math.min(COMPOSER_MAX_HEIGHT, Math.round(viewport.height * 0.32))
       : COMPOSER_MAX_HEIGHT;
-    node.style.height = `${Math.max(
-      44,
-      Math.min(node.scrollHeight + border, ceiling),
-    )}px`;
+    const wanted = node.scrollHeight + border;
+    node.style.height = `${Math.max(44, Math.min(wanted, ceiling))}px`;
+    // Only let it scroll once it has actually hit the ceiling. Left on `auto`,
+    // macOS paints an overlay scrollbar down the edge of a field holding a
+    // single line — a stray dark rule beside the send button.
+    node.style.overflowY = wanted > ceiling ? "auto" : "hidden";
   }, [open, question, viewport.height]);
 
   async function ask(nextQuestion = question) {
@@ -287,6 +305,7 @@ export function FloatingMyShepherd() {
 
   const horizontalOffset = "max(1rem, calc((100vw - 48rem) / 2))";
   const remaining = MY_SHEPHERD_MAX_QUESTION_LENGTH - question.length;
+  const canSend = !working && question.trim().length >= 3;
   const sheetTransition =
     reduceMotion || dragging
       ? { duration: 0 }
@@ -306,13 +325,20 @@ export function FloatingMyShepherd() {
               // Sized to the region the reader can actually see, so the sheet
               // is laid out above the keyboard instead of guessing past it.
               "fixed inset-x-0 z-[45] flex flex-col justify-end",
+              // The phone sheet is inset from the screen edges; the desktop
+              // panel keeps its own margin, so the padding is compact-only.
+              "px-4 sm:px-0",
               !compact && "pointer-events-none",
             )}
             style={{
               top: viewport.offsetTop,
               height: viewport.height || "100dvh",
               paddingTop: "max(env(safe-area-inset-top), 0.75rem)",
-              paddingBottom: viewport.keyboardInset ? 0 : RESTING_GUTTER,
+              // A card with rounded corners needs to clear what it sits above,
+              // or its bottom edge reads as a seam against the tab bar.
+              paddingBottom: viewport.keyboardInset
+                ? "0.5rem"
+                : `calc(${RESTING_GUTTER} + 0.625rem)`,
             }}
           >
             {/* A scrim only on phones, where the sheet owns the screen. It sits
@@ -339,14 +365,16 @@ export function FloatingMyShepherd() {
               exit={compact ? { y: "100%" } : { opacity: 0, y: 12 }}
               transition={sheetTransition}
               className={[
-                "app-glass-surface pointer-events-auto relative flex min-h-0 max-h-full flex-col overflow-hidden outline-none",
+                "app-glass-surface pointer-events-auto relative flex min-h-0 max-h-full flex-col overflow-hidden",
                 "border border-mist bg-paper/95 paper-shadow-lg backdrop-blur-xl",
-                // Phone: a bottom sheet spanning the screen, square at the
-                // bottom edge so it reads as docked rather than floating.
-                "rounded-t-[22px]",
-                // Desktop: the original floating card, anchored bottom-end.
+                // A card, rounded on every corner. It used to run edge to edge
+                // with a square bottom — the sides of a docked sheet on
+                // something that stops above the tab bar, which is what made it
+                // read as crowded against the screen rather than deliberate.
+                "rounded-[22px]",
+                // Desktop: the same card, anchored bottom-end.
                 "sm:self-end sm:me-[var(--shepherd-inset)] sm:max-h-[42rem]",
-                "sm:w-[min(25rem,calc(100vw-2rem))] sm:rounded-[22px]",
+                "sm:w-[min(25rem,calc(100vw-2rem))]",
               ].join(" ")}
               style={{ ["--shepherd-inset" as string]: horizontalOffset }}
             >
@@ -356,12 +384,17 @@ export function FloatingMyShepherd() {
                 onPointerUp={endDrag}
                 onPointerCancel={endDrag}
                 style={{ touchAction: compact ? "none" : undefined }}
-                className="relative flex shrink-0 items-center gap-3 border-b border-mist/70 bg-[#3F7EA3] px-4 pt-4 pb-3 text-white sm:pt-3"
+                className={cn(
+                  "relative flex shrink-0 items-center gap-3 px-4 pt-4 pb-3 text-white sm:pt-3",
+                  SHEPHERD_INK,
+                )}
               >
                 {compact && (
+                  // The handle for the swipe-down dismiss. At 45% white it was
+                  // a smudge nobody would read as an affordance.
                   <span
                     aria-hidden="true"
-                    className="absolute inset-x-0 top-1.5 mx-auto h-1 w-9 rounded-full bg-white/45"
+                    className="absolute inset-x-0 top-2 mx-auto h-1.5 w-10 rounded-full bg-white/70"
                   />
                 )}
                 <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/25">
@@ -393,20 +426,33 @@ export function FloatingMyShepherd() {
                   <div>
                     <p className="text-small leading-relaxed text-charcoal">
                       Ask a Bible question, find a passage, or ask where to go in
-                      BibleQuest. Your questions are not saved.
+                      BibleQuest.
                     </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    {/* Rows with a leading arrow, not pills. As rounded-full
+                        chips these were the same shape and colour as the reply
+                        bubbles that appear seconds later, so the one thing on
+                        the empty screen worth tapping read as a message. */}
+                    <div className="mt-3 grid gap-2">
                       {STARTERS.map((starter) => (
                         <button
                           key={starter}
                           type="button"
                           onClick={() => void ask(starter)}
-                          className="min-h-10 rounded-full border border-mist bg-linen px-3 py-2 text-start text-caption text-charcoal hover:border-accent/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                          className="flex min-h-11 w-full items-center gap-2.5 rounded-[var(--radius-button)] border border-mist bg-linen/70 px-3.5 py-2.5 text-start text-small text-charcoal transition-colors duration-300 hover:border-accent/45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                         >
-                          {starter}
+                          <IconArrowRight
+                            size={15}
+                            className="shrink-0 text-accent"
+                          />
+                          <span className="min-w-0 flex-1">{starter}</span>
                         </button>
                       ))}
                     </div>
+                    {/* Housekeeping, kept true but kept quiet — it was the
+                        largest block on the screen, outweighing the invitation. */}
+                    <p className="mt-3 text-caption leading-relaxed text-ash">
+                      Your questions are not saved.
+                    </p>
                   </div>
                 )}
 
@@ -466,11 +512,20 @@ export function FloatingMyShepherd() {
                     placeholder="Ask about Scripture…"
                     className="min-h-11 flex-1 resize-none overflow-y-auto rounded-[14px] border border-mist bg-linen px-3 py-2.5 text-small leading-relaxed text-graphite outline-none placeholder:text-quill focus:border-accent/50"
                   />
+                  {/* Waiting, not broken: a filled blue circle faded to 45%
+                      read as a control that had failed. Empty until there is
+                      something to send, filled the moment there is. */}
                   <button
                     type="submit"
-                    disabled={working || question.trim().length < 3}
+                    disabled={!canSend}
                     aria-label="Send question"
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#3F7EA3] text-white transition-opacity disabled:opacity-45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    className={cn(
+                      "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors duration-300",
+                      "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                      canSend
+                        ? `${SHEPHERD_INK} text-white`
+                        : "border border-mist bg-linen text-quill",
+                    )}
                   >
                     <IconArrowUp size={19} />
                   </button>
@@ -494,7 +549,12 @@ export function FloatingMyShepherd() {
         aria-label="Ask MyShepherd"
         aria-expanded={open}
         aria-controls="floating-my-shepherd"
-        className="fixed z-50 flex h-14 w-14 items-center justify-center rounded-full border border-white/30 bg-[#3F7EA3] text-white shadow-[0_10px_28px_rgba(32,70,94,0.32)] transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0"
+        className={cn(
+          "fixed z-50 flex h-14 w-14 items-center justify-center rounded-full border border-white/30 text-white",
+          "shadow-[0_10px_28px_rgba(32,70,94,0.32)] transition-transform hover:-translate-y-0.5 active:translate-y-0",
+          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+          SHEPHERD_INK,
+        )}
         style={{
           insetInlineEnd: horizontalOffset,
           bottom: `calc(${RESTING_GUTTER} + 1rem)`,
