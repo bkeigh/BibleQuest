@@ -84,6 +84,14 @@ export const IconArrowLeft = (p: IconProps) => (
   </Svg>
 );
 
+/** Rearrange. A closed loop, for shuffles and retries rather than for undo. */
+export const IconRefresh = (p: IconProps) => (
+  <Svg {...p} size={p.size ?? 18}>
+    <path d="M19.5 9A7.5 7.5 0 0 0 6.2 6.6M4.5 15A7.5 7.5 0 0 0 17.8 17.4" />
+    <path d="M19.5 4.5V9h-4.5M4.5 19.5V15h4.5" />
+  </Svg>
+);
+
 /** Send. The upward arrow every messaging surface has taught readers to expect. */
 export const IconArrowUp = (p: IconProps) => (
   <Svg {...p} size={p.size ?? 18} strokeWidth={p.strokeWidth ?? 2}>

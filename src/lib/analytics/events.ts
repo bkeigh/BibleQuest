@@ -34,7 +34,7 @@ type SignInSource = "account" | "onboarding";
 type SyncStatus = "initial" | "push";
 type BillingInterval = "monthly" | "annual" | "lifetime";
 type GuidedPracticeKind = "daily" | "pilgrimage";
-type ScriptureGameKind = "connections" | "timeline";
+type ScriptureGameKind = "connections" | "timeline" | "seven-days-match";
 
 /** Compile-time event/property allowlist. No arbitrary strings are accepted. */
 export interface AnalyticsEventProps {
@@ -162,10 +162,20 @@ const EVENT_RULES = {
     props: { kind: { kind: "enum", values: ["daily", "pilgrimage"] } },
   },
   scripture_game_started: {
-    props: { kind: { kind: "enum", values: ["connections", "timeline"] } },
+    props: {
+      kind: {
+        kind: "enum",
+        values: ["connections", "timeline", "seven-days-match"],
+      },
+    },
   },
   scripture_game_completed: {
-    props: { kind: { kind: "enum", values: ["connections", "timeline"] } },
+    props: {
+      kind: {
+        kind: "enum",
+        values: ["connections", "timeline", "seven-days-match"],
+      },
+    },
   },
   rhythm_saved: noProps,
   streak_milestone: {

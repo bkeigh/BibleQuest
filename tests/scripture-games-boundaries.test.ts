@@ -29,12 +29,18 @@ describe("Scripture game product boundaries", () => {
   });
 
   it("has no QuestOS or growth write boundary", () => {
-    const roots = ["src/lib/games", "src/components/games"];
-    const files = roots.flatMap((root) =>
-      readdirSync(root)
-        .filter((name) => /\.(ts|tsx)$/.test(name))
-        .map((name) => join(root, name)),
-    );
+    // Recursive: the boundary has to hold for game modules added in
+    // subdirectories too, not only the ones that happen to sit at the top.
+    const collect = (root: string): string[] =>
+      readdirSync(root, { withFileTypes: true }).flatMap((entry) =>
+        entry.isDirectory()
+          ? collect(join(root, entry.name))
+          : /\.(ts|tsx)$/.test(entry.name)
+            ? [join(root, entry.name)]
+            : [],
+      );
+    const files = ["src/lib/games", "src/components/games"].flatMap(collect);
+    expect(files.length).toBeGreaterThan(10);
     const source = files.map((file) => readFileSync(file, "utf8")).join("\n");
     expect(source).not.toContain("@/lib/questos/store");
   });

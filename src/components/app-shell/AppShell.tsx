@@ -14,6 +14,7 @@ import {
 } from "@/lib/analytics/events";
 import { WallpaperBackdrop } from "./WallpaperBackdrop";
 import { usePlus } from "@/lib/billing/usePlus";
+import { cn } from "@/lib/utils/cn";
 
 const FloatingMyShepherd = dynamic(
   () =>
@@ -39,7 +40,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const hidesFloatingTools =
     pathname === "/app/shepherd" ||
     pathname === "/app/prayer/new" ||
-    pathname === "/app/prayer/reflection/new";
+    pathname === "/app/prayer/reflection/new" ||
+    pathname === "/app/games/seven-days";
+  // Kept in step with BottomNav's own list of full-screen routes.
+  const hidesBottomNav =
+    pathname === "/app/prayer/new" ||
+    pathname === "/app/prayer/reflection/new" ||
+    pathname === "/app/games/seven-days";
 
   useEffect(() => {
     // Analytics events queued while offline flush when the shell mounts
@@ -79,7 +86,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         >
           Skip to content
         </a>
-        <main id="app-main" tabIndex={-1} className="relative z-10 flex-1 pb-28">
+        {/* The bottom padding exists to clear the tab bar. On the routes that
+            hide it, the same padding is just a strip of dead screen — which a
+            full-height game notices more than a scrolling page would. */}
+        <main
+          id="app-main"
+          tabIndex={-1}
+          className={cn("relative z-10 flex-1", !hidesBottomNav && "pb-28")}
+        >
           {children}
         </main>
         {/* Plus members can opt into a lightweight assistant on safe app routes. */}

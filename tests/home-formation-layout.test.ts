@@ -80,8 +80,13 @@ describe("Home formation layout", () => {
     expect(formation).toContain("sm:-right-8");
     expect(formation).toContain("const edgeTolerance = 24");
     expect(formation).toContain("Seven Days Match");
-    expect(formation).toContain("7 chapters · 7 levels each");
-    expect(formation).toContain("Genesis 1:1");
+    // Seven Days Match stopped being a preview and became a real card, so the
+    // rail leads with a game the reader can open rather than one they cannot.
+    expect(formation).toContain("7 days · 7 levels each");
+    expect(formation).toContain('href="/app/games/seven-days"');
+    expect(formation.indexOf("Seven Days Match")).toBeLessThan(
+      formation.indexOf("Today’s game"),
+    );
   });
 
   it("sizes every Scripture game card identically", () => {
