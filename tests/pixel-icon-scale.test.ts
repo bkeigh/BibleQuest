@@ -8,7 +8,10 @@ const SOURCES = globSync("src/**/*.tsx");
 /** Every `size={n}` sitting on a PixelIcon or PixelMascot element. */
 function iconSizes(): { file: string; size: number }[] {
   const found: { file: string; size: number }[] = [];
-  const element = /<(PixelIcon|PixelMascot)((?:[^<>]|\n)*?)(?=\/?>)/g;
+  // `[^<>]` already matches a newline. Spelling it `(?:[^<>]|\n)` gave the
+  // engine two ways to consume every line break, which backtracks
+  // exponentially on a long attribute list — CodeQL flags it, rightly.
+  const element = /<(PixelIcon|PixelMascot)([^<>]*?)(?=\/?>)/g;
   for (const file of SOURCES) {
     const source = readFileSync(file, "utf8");
     for (const match of source.matchAll(element)) {
@@ -35,6 +38,20 @@ describe("pixel icon scale", () => {
     for (const { file, size } of iconSizes()) {
       expect(size, `${file} looks like an unmigrated cell multiplier`).toBeGreaterThanOrEqual(16);
     }
+  });
+
+  it("passes a whole sprite box, never a per-cell multiplier", () => {
+    // The literal-size guard above cannot see a computed size, and that is
+    // exactly where this went wrong: GrowthTree keeps its own cell grid and
+    // passed `cell` — a value near 7 — because the old PixelIcon multiplied it
+    // by the 32-cell grid itself. Under plain pixels that drew the entire tree
+    // seven pixels wide, and no assertion here noticed.
+    const tree = readFileSync("src/components/journey/GrowthTree.tsx", "utf8");
+    expect(tree).toContain("size={box}");
+    expect(tree).not.toMatch(/<PixelIcon[^>]*size=\{cell\}/);
+    // `mini` builds the hand-drawn fruit out of raw pixels and is far too
+    // small to be a sprite size; the flower beside it needs its own.
+    expect(tree).not.toMatch(/<PixelIcon[^>]*size=\{mini\}/);
   });
 
   it("keeps icons within a range a phone can show", () => {

@@ -64,9 +64,19 @@ export function GrowthTree({
 
   // Whole-cell scaling: the sprite's rendered width tracks `size`, snapped
   // to the nearest cell so rects land on device pixels instead of blurring.
+  // `cell` positions the decorations; `box` is what the sprite is drawn at.
+  //
+  // These two were once the same call: `PixelIcon` took a per-cell multiplier
+  // and did the `* GRID` itself, so passing `cell` produced a `box`-sized
+  // tree. It takes plain pixels now, and passing `cell` drew the whole tree
+  // seven pixels wide.
   const cell = Math.max(2, Math.round(size / GRID));
   const box = cell * GRID;
+  // `mini` is a raw pixel unit the hand-drawn fruit is built from, not a
+  // sprite size — the flower next to it needs its own, in the same pixels
+  // `PixelIcon` now speaks.
   const mini = Math.max(1, Math.round(cell / 2));
+  const flowerSize = Math.max(12, Math.round(box / 5));
 
   // A few quiet decorations resting at the base — gratitude to the left of
   // the trunk, service to the right. Capped so the ground never gets busy.
@@ -123,7 +133,7 @@ export function GrowthTree({
         animate={{ opacity: 1 }}
         transition={still ? { duration: 0 } : grow}
       >
-        <PixelIcon name={stageSprite(state.stage)} size={cell} animate />
+        <PixelIcon name={stageSprite(state.stage)} size={box} animate />
       </motion.div>
 
       {/* Flowers — gratitude rooted around the tree instead of floating in a row. */}
@@ -142,7 +152,7 @@ export function GrowthTree({
             animate={{ scale: slot.scale, opacity: 1 }}
             transition={still ? { duration: 0 } : grow}
           >
-            <PixelIcon name="flower" size={mini} />
+            <PixelIcon name="flower" size={flowerSize} />
           </motion.span>
         );
       })}

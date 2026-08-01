@@ -462,7 +462,13 @@ function JourneyScreenInner() {
               </>
             ) : (
               <div className="flex items-start gap-3">
-                <PixelIcon name="tree-stage-0" size={28} />
+                {/* The seed sprite sits inside a lot of transparent canvas, so
+                    a 28px box drew a seed a few pixels across. */}
+                <PixelIcon
+                  name="tree-stage-0"
+                  size={56}
+                  className="-mt-2 shrink-0"
+                />
                 <div>
                   <p className="text-[0.9375rem] text-graphite">
                     Your tree is resting this week.
