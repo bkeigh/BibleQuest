@@ -449,3 +449,35 @@ describe("Seven Days Match product boundaries", () => {
     expect(all).not.toContain("exit={{");
   });
 });
+
+describe("BibleQuest Arcade surface", () => {
+  const screen = readFileSync("src/components/games/GamesScreen.tsx", "utf8");
+  const card = readFileSync("src/components/games/ArcadeGameCard.tsx", "utf8");
+  const formation = readFileSync(
+    "src/components/home/TodayFormation.tsx",
+    "utf8",
+  );
+
+  it("calls itself the arcade everywhere a reader can see", () => {
+    for (const source of [screen, formation]) {
+      expect(source).not.toContain("Scripture Games");
+    }
+    expect(screen).toContain("BibleQuest Arcade");
+    expect(formation).toContain("BibleQuest Arcade");
+  });
+
+  it("offers a way back to Home", () => {
+    // The arcade has no nav tab, so without this the only exit was a browser
+    // gesture or a tab that lands somewhere else entirely.
+    expect(screen).toContain('href="/app"');
+    expect(screen).toContain("IconArrowLeft");
+  });
+
+  it("draws Home and the arcade from one card", () => {
+    // Two copies of the same art card drift apart; this one is shared.
+    expect(formation).toContain("ArcadeGameCard");
+    expect(screen).toContain("ArcadeGameCard");
+    expect(card).toContain("export const ARCADE_ART");
+    expect(formation).not.toContain("const GAME_ART");
+  });
+});

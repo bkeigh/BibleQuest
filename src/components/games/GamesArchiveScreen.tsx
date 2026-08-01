@@ -39,7 +39,7 @@ export function GamesArchiveScreen() {
   return (
     <>
       <PageHeader
-        title="Game Archive"
+        title="Arcade Archive"
         subtitle="Revisit a study by passage or theme."
       />
       <PageContainer className="pb-8 pt-4">
@@ -50,7 +50,7 @@ export function GamesArchiveScreen() {
         {!GREEN_FEATURES.games ? (
           <PaperCard variant="quiet" padding="lg" className="mt-4">
             <h2 className="font-display text-subheading text-graphite">
-              Scripture Games are resting
+              The arcade is resting
             </h2>
             <p className="mt-2 text-body text-charcoal">
               A release setting has paused the game library. The Bible and
@@ -146,7 +146,7 @@ export function GamesArchiveScreen() {
         <PlusFeatureDialog
           open={plusDialogOpen}
           onClose={() => setPlusDialogOpen(false)}
-          title="Revisit Scripture Games"
+          title="Revisit arcade studies"
           description="The game archive and themed collections are included with BibleQuest Plus. Today’s complete game remains available."
         />
       </PageContainer>

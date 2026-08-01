@@ -352,7 +352,7 @@ function HomeInner() {
             </Link>
           </section>
 
-          {/* Scripture Games follows growth as the lighter play surface. */}
+          {/* The arcade follows growth as the lighter play surface. */}
           <TodayFormation dayKey={dayKey} show="game" />
 
           {/* A gentle, once-per-context invitation to keep the journey

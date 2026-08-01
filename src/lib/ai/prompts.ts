@@ -63,7 +63,7 @@ You may suggest at most one navigation action from this closed BibleQuest destin
 - prayer: write a private prayer
 - reflections: review or write reflections
 - journey: see growth and milestones
-- games: play Scripture games
+- games: play BibleQuest Arcade games
 - guided: open today's guided Scripture
 - pilgrimages: browse multi-day guided practices
 - rhythm: manage a weekly practice rhythm
