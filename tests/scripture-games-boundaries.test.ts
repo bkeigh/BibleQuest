@@ -41,8 +41,28 @@ describe("Scripture game product boundaries", () => {
       );
     const files = ["src/lib/games", "src/components/games"].flatMap(collect);
     expect(files.length).toBeGreaterThan(10);
-    const source = files.map((file) => readFileSync(file, "utf8")).join("\n");
+
+    // One deliberate exception: the verse printed under a Seven Days board has
+    // a Save button, and saving a verse is a bookmark. That is the reader
+    // asking, by name, for the same thing the Bible tab offers — not the game
+    // awarding itself progress. Everything that plays the game stays out.
+    const allowed = "src/components/games/seven-days/SevenDaysVerseStrip.tsx";
+    const playing = files.filter((file) => file !== allowed);
+    expect(files).toContain(allowed);
+    const source = playing.map((file) => readFileSync(file, "utf8")).join("\n");
     expect(source).not.toContain("@/lib/questos/store");
+
+    // And even there, only the bookmark — no growth, streak, or quest writes.
+    const strip = readFileSync(allowed, "utf8");
+    for (const forbidden of [
+      "markChapterRead",
+      "completeQuest",
+      "addPrayer",
+      "recordMilestone",
+      "reconcileMilestones",
+    ]) {
+      expect(strip).not.toContain(forbidden);
+    }
   });
 
   it("emits only bounded game-kind lifecycle analytics", () => {

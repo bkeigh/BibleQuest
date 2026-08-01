@@ -14,8 +14,13 @@ export const SEVEN_DAYS_TILE_IDS = [
 
 export type SevenDaysTileId = (typeof SEVEN_DAYS_TILE_IDS)[number];
 
-/** A cell is empty only while a cascade is being resolved. */
-export type SevenDaysCell = SevenDaysTileId | null;
+/**
+ * A cell holds a tile, is empty mid-cascade (`null`), or is not part of this
+ * level's board at all (`"blocked"`). Blocked cells are what give each level
+ * its own shape: tiles never occupy them, fall through them, or refill them.
+ */
+export const BLOCKED = "blocked" as const;
+export type SevenDaysCell = SevenDaysTileId | null | typeof BLOCKED;
 
 export interface SevenDaysBoard {
   readonly rows: number;
@@ -23,6 +28,12 @@ export interface SevenDaysBoard {
   /** Row-major cells: index = row * cols + col. */
   readonly cells: readonly SevenDaysCell[];
 }
+
+/**
+ * A level's shape, drawn as text so it can be read at a glance in source.
+ * `#` is playable, anything else is cut away.
+ */
+export type SevenDaysMask = readonly string[];
 
 export interface SevenDaysGoal {
   readonly tile: SevenDaysTileId;
@@ -40,6 +51,10 @@ export interface SevenDaysLevel {
   readonly goals: readonly SevenDaysGoal[];
   /** Which of the five tiles appear on this board. */
   readonly tiles: readonly SevenDaysTileId[];
+  /** The board's shape. Every level in a day gets a different one. */
+  readonly mask: SevenDaysMask;
+  /** The scene this level is played over, by wallpaper catalogue id. */
+  readonly sceneId: string;
 }
 
 export interface SevenDaysQuestion {

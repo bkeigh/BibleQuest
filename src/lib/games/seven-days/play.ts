@@ -10,7 +10,7 @@ import {
   tileTally,
   type Rng,
 } from "./board";
-import { BOARD_COLS, BOARD_ROWS } from "./levels";
+
 import type {
   SevenDaysLevel,
   SevenDaysLevelState,
@@ -59,7 +59,7 @@ export function startLevel(
   attempt = 0,
 ): SevenDaysSession {
   const random = boardRng(`${level.id}:${attempt}`);
-  const board = createBoard(BOARD_ROWS, BOARD_COLS, level.tiles, random);
+  const board = createBoard(level.mask, level.tiles, random);
   return {
     random,
     state: {

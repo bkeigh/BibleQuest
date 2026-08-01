@@ -4,7 +4,10 @@ import { useRef, type KeyboardEvent, type PointerEvent } from "react";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { colOf, rowOf } from "@/lib/games/seven-days/board";
 import { SEVEN_DAYS_TILES } from "@/lib/games/seven-days/tiles";
-import type { SevenDaysBoard as Board } from "@/lib/games/seven-days/types";
+import {
+  BLOCKED,
+  type SevenDaysBoard as Board,
+} from "@/lib/games/seven-days/types";
 import { cn } from "@/lib/utils/cn";
 
 /** Travel that reads as a deliberate flick toward a neighbour, not a scroll. */
@@ -115,6 +118,16 @@ export function SevenDaysBoard({
       style={{ gridTemplateColumns: `repeat(${board.cols}, minmax(0, 1fr))` }}
     >
       {board.cells.map((cell, index) => {
+        // A cut-away cell still occupies its grid slot, or the shape collapses.
+        if (cell === BLOCKED) {
+          return (
+            <span
+              key={index}
+              aria-hidden="true"
+              className="aspect-square rounded-[11px] bg-graphite/[0.045]"
+            />
+          );
+        }
         if (!cell) return <span key={index} aria-hidden="true" />;
         const art = SEVEN_DAYS_TILES[cell];
         const isSelected = selected === index;

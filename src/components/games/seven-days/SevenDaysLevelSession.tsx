@@ -11,7 +11,7 @@ import {
 } from "@/components/design-system/icons";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { scriptureSourceHref } from "@/lib/games/links";
-import { chapterById } from "@/lib/games/seven-days/levels";
+import { chapterById, verseForLevel } from "@/lib/games/seven-days/levels";
 import {
   goalProgress,
   selectTile,
@@ -21,15 +21,13 @@ import {
   type SevenDaysSession,
 } from "@/lib/games/seven-days/play";
 import { SEVEN_DAYS_TILES } from "@/lib/games/seven-days/tiles";
-import type {
-  SevenDaysLevel,
-  SevenDaysQuestion,
-} from "@/lib/games/seven-days/types";
+import type { SevenDaysLevel } from "@/lib/games/seven-days/types";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 import { cn } from "@/lib/utils/cn";
 import { SevenDaysBoard } from "./SevenDaysBoard";
 import { SevenDaysGoalChip } from "./SevenDaysGoalChip";
-import { SevenDaysQuestionCard } from "./SevenDaysQuestionCard";
+import { SevenDaysScene, sceneById } from "./SevenDaysScene";
+import { SevenDaysVerseStrip } from "./SevenDaysVerseStrip";
 
 /**
  * Only two of these are chosen; the other two are what the board's own status
@@ -37,15 +35,14 @@ import { SevenDaysQuestionCard } from "./SevenDaysQuestionCard";
  * over" rather than a stage that has to be nudged into agreement.
  */
 type Stage = "intro" | "play";
-type Phase = Stage | "question" | "spent";
+type Phase = Stage | "cleared" | "spent";
 
 interface SevenDaysLevelSessionProps {
   level: SevenDaysLevel;
-  question: SevenDaysQuestion;
-  /** Whether a later level exists to move on to. */
-  hasNext: boolean;
+  /** What tapping through from the cleared card does next, named by the screen. */
+  nextLabel: string;
   onExit: () => void;
-  onCleared: (answeredFirstTry: boolean, advance: boolean) => void;
+  onCleared: () => void;
 }
 
 /**
@@ -56,8 +53,7 @@ interface SevenDaysLevelSessionProps {
  */
 export function SevenDaysLevelSession({
   level,
-  question,
-  hasNext,
+  nextLabel,
   onExit,
   onCleared,
 }: SevenDaysLevelSessionProps) {
@@ -74,9 +70,11 @@ export function SevenDaysLevelSession({
 
   const { state } = session;
   const goals = goalProgress(state);
+  const verse = verseForLevel(level);
+  const scene = sceneById(level.sceneId);
   const phase: Phase =
     state.status === "cleared"
-      ? "question"
+      ? "cleared"
       : state.status === "out-of-moves"
         ? "spent"
         : stage;
@@ -84,7 +82,7 @@ export function SevenDaysLevelSession({
   // Both endings replace the board with a card, so the reader — and anyone on
   // a screen reader — lands on the new heading rather than on a stale grid.
   useEffect(() => {
-    if (phase === "question" || phase === "spent") headingRef.current?.focus();
+    if (phase === "cleared" || phase === "spent") headingRef.current?.focus();
   }, [phase]);
 
   useEffect(() => {
@@ -117,6 +115,7 @@ export function SevenDaysLevelSession({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <SevenDaysScene sceneId={level.sceneId} />
       <p role="status" aria-live="polite" className="sr-only">
         {announcement}
       </p>
@@ -173,6 +172,13 @@ export function SevenDaysLevelSession({
                 >
                   Read {chapter.source.reference} <IconArrowRight size={15} />
                 </Link>
+              )}
+
+              {scene && (
+                <p className="mt-4 text-caption leading-relaxed text-ash">
+                  Scene: {scene.title} — one of the living wallpapers in Plus.
+                  It plays here for everyone.
+                </p>
               )}
 
               <GentleButton
@@ -272,6 +278,8 @@ export function SevenDaysLevelSession({
                 </Link>
               )}
             </div>
+            {verse && <SevenDaysVerseStrip verse={verse} />}
+
             <p className="text-center text-caption leading-relaxed text-ash">
               A swap that gathers nothing costs no move. Shuffling is always
               free.
@@ -279,31 +287,44 @@ export function SevenDaysLevelSession({
           </div>
         )}
 
-        {phase === "question" && (
+        {phase === "cleared" && (
           <div className="flex-1">
-            <h2
-              ref={headingRef}
-              tabIndex={-1}
-              className="font-display text-[1.5rem] text-graphite outline-none"
-            >
-              Day {level.day} gathered
-            </h2>
-            <p className="mt-1 text-body text-charcoal">
-              {level.goals
-                .map(
-                  (goal) => `${goal.count} ${SEVEN_DAYS_TILES[goal.tile].label}`,
-                )
-                .join(" · ")}{" "}
-              · {state.points} points
-            </p>
-            <div className="mt-4">
-              <SevenDaysQuestionCard
-                question={question}
-                onContinue={(answeredFirstTry) =>
-                  onCleared(answeredFirstTry, hasNext)
-                }
-              />
-            </div>
+            <PaperCard variant="atmospheric" padding="lg">
+              <p className="font-pixel text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
+                Level {level.level} gathered
+              </p>
+              <h2
+                ref={headingRef}
+                tabIndex={-1}
+                className="mt-2 font-display text-[1.5rem] leading-tight text-graphite outline-none"
+              >
+                {chapter?.title}
+              </h2>
+              <p className="mt-2 text-body text-charcoal">
+                {level.goals
+                  .map(
+                    (goal) => `${goal.count} ${SEVEN_DAYS_TILES[goal.tile].label}`,
+                  )
+                  .join(" · ")}{" "}
+                · {state.points} points
+              </p>
+              <GentleButton
+                variant="primary"
+                fullWidth
+                className="mt-5"
+                onClick={onCleared}
+              >
+                {nextLabel}
+              </GentleButton>
+              <GentleButton
+                variant="ghost"
+                fullWidth
+                className="mt-2"
+                onClick={onExit}
+              >
+                Back to the seven days
+              </GentleButton>
+            </PaperCard>
           </div>
         )}
 
@@ -410,7 +431,9 @@ export function SevenDaysLevelSession({
               Back to the seven days
             </GentleButton>
             <p className="mt-4 text-caption leading-relaxed text-ash">
-              This game does not change your Journey, candle, or quest progress.
+              Playing does not change your Journey, candle, or quest progress.
+              Saving the verse under the board does, exactly as it would in the
+              Bible.
             </p>
           </PaperCard>
         </div>

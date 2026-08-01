@@ -19,7 +19,8 @@ import {
   BOARD_ROWS,
   SEVEN_DAYS_LEVELS,
   levelOrdinal,
-  questionForLevel,
+  levelsForChapter,
+  verseForLevel,
 } from "@/lib/games/seven-days/levels";
 import {
   goalProgress,
@@ -30,9 +31,13 @@ import {
 } from "@/lib/games/seven-days/play";
 import {
   emptySevenDaysProgress,
+  isDayReadyForQuestions,
+  isDayUnlocked,
   isLevelUnlocked,
+  markDayAnswered,
   markLevelCleared,
   nextLevel,
+  pendingQuestionDay,
   readSevenDaysProgress,
   sanitizeSevenDaysProgress,
   summarize,
@@ -40,7 +45,10 @@ import {
   SEVEN_DAYS_STORAGE_KEY,
 } from "@/lib/games/seven-days/progress";
 import { collectSevenDaysContentErrors } from "@/lib/games/seven-days/validation";
-import type { SevenDaysBoard } from "@/lib/games/seven-days/types";
+import {
+  BLOCKED,
+  type SevenDaysBoard,
+} from "@/lib/games/seven-days/types";
 
 function board(rows: string[]): SevenDaysBoard {
   const legend = {
@@ -118,7 +126,9 @@ describe("Seven Days Match board", () => {
       expect(hasAvailableMove(state.board)).toBe(true);
       expect(
         state.board.cells.every(
-          (cell) => cell !== null && level.tiles.includes(cell),
+          (cell) =>
+            cell === BLOCKED ||
+            (cell !== null && level.tiles.includes(cell)),
         ),
       ).toBe(true);
     }
@@ -250,11 +260,34 @@ describe("Seven Days Match levels", () => {
     expect(last.tiles).toHaveLength(5);
   });
 
-  it("gives every level exactly one question from its own day", () => {
+  it("gives every level its own shape and scene", () => {
+    for (const chapter of SEVEN_DAYS_CHAPTERS) {
+      const shapes = levelsForChapter(chapter.id).map((level) =>
+        level.mask.join("|"),
+      );
+      // Seven levels, seven different boards — a day is not the same board
+      // played seven times.
+      expect(new Set(shapes).size).toBe(SEVEN_DAYS_LEVELS_PER_CHAPTER);
+    }
     for (const level of SEVEN_DAYS_LEVELS) {
-      const question = questionForLevel(level);
-      expect(question).toBeDefined();
-      expect(question?.id.startsWith(level.chapterId)).toBe(true);
+      expect(level.sceneId).toBeTruthy();
+      expect(verseForLevel(level)).not.toBeNull();
+    }
+  });
+
+  it("draws each level's verse from its own day", () => {
+    for (const level of SEVEN_DAYS_LEVELS) {
+      const chapter = SEVEN_DAYS_CHAPTERS[level.day - 1];
+      const verse = verseForLevel(level)!;
+      expect(verse.source.chapter).toBe(chapter.source.chapter);
+      expect(verse.source.verseStart).toBeGreaterThanOrEqual(
+        chapter.source.verseStart,
+      );
+      expect(verse.source.verseStart).toBeLessThanOrEqual(
+        chapter.source.verseEnd ?? chapter.source.verseStart,
+      );
+      // Fixed per level, so it is a line a reader can come back to and save.
+      expect(verseForLevel(level)).toEqual(verse);
     }
   });
 
@@ -316,14 +349,13 @@ describe("Seven Days Match progress", () => {
     const progress = markLevelCleared(
       emptySevenDaysProgress(),
       SEVEN_DAYS_LEVELS[0],
-      true,
     );
     expect(isLevelUnlocked(progress, SEVEN_DAYS_LEVELS[1])).toBe(true);
     expect(isLevelUnlocked(progress, SEVEN_DAYS_LEVELS[2])).toBe(false);
     expect(nextLevel(progress).id).toBe(SEVEN_DAYS_LEVELS[1].id);
     expect(summarize(progress)).toMatchObject({
       cleared: 1,
-      firstTry: 1,
+      daysAnswered: 0,
       daysOpened: 1,
       complete: false,
     });
@@ -333,11 +365,48 @@ describe("Seven Days Match progress", () => {
     let progress = markLevelCleared(
       emptySevenDaysProgress(),
       SEVEN_DAYS_LEVELS[0],
-      true,
     );
-    progress = markLevelCleared(progress, SEVEN_DAYS_LEVELS[0], false);
+    progress = markLevelCleared(progress, SEVEN_DAYS_LEVELS[0]);
     expect(progress.cleared).toHaveLength(1);
-    expect(progress.firstTry).toHaveLength(1);
+  });
+
+  it("holds the next day shut until this day's questions are answered", () => {
+    // Clearing all seven levels of day one is not enough on its own — the
+    // questions are the gate, which is the whole point of gathering them into
+    // a round instead of scattering one after every board.
+    let progress = emptySevenDaysProgress();
+    for (const level of levelsForChapter(SEVEN_DAYS_CHAPTERS[0].id)) {
+      progress = markLevelCleared(progress, level);
+    }
+    const dayTwoFirst = levelsForChapter(SEVEN_DAYS_CHAPTERS[1].id)[0];
+    expect(isDayUnlocked(progress, SEVEN_DAYS_CHAPTERS[1])).toBe(false);
+    expect(isLevelUnlocked(progress, dayTwoFirst)).toBe(false);
+    expect(isDayReadyForQuestions(progress, SEVEN_DAYS_CHAPTERS[0])).toBe(true);
+    expect(pendingQuestionDay(progress)?.id).toBe(SEVEN_DAYS_CHAPTERS[0].id);
+
+    progress = markDayAnswered(progress, SEVEN_DAYS_CHAPTERS[0], [
+      SEVEN_DAYS_CHAPTERS[0].questions[0].id,
+    ]);
+    expect(isDayUnlocked(progress, SEVEN_DAYS_CHAPTERS[1])).toBe(true);
+    expect(isLevelUnlocked(progress, dayTwoFirst)).toBe(true);
+    expect(pendingQuestionDay(progress)).toBeNull();
+    expect(summarize(progress)).toMatchObject({
+      daysAnswered: 1,
+      daysOpened: 2,
+      firstTry: 1,
+    });
+  });
+
+  it("opens the next day whatever the score", () => {
+    // Answering none of them right still opens the road: the explanations are
+    // the point, and a wall would stop the reader who most needs the next one.
+    let progress = emptySevenDaysProgress();
+    for (const level of levelsForChapter(SEVEN_DAYS_CHAPTERS[0].id)) {
+      progress = markLevelCleared(progress, level);
+    }
+    progress = markDayAnswered(progress, SEVEN_DAYS_CHAPTERS[0], []);
+    expect(isDayUnlocked(progress, SEVEN_DAYS_CHAPTERS[1])).toBe(true);
+    expect(progress.firstTry).toHaveLength(0);
   });
 
   it("round-trips through storage", () => {
@@ -345,7 +414,6 @@ describe("Seven Days Match progress", () => {
     const progress = markLevelCleared(
       emptySevenDaysProgress(),
       SEVEN_DAYS_LEVELS[0],
-      false,
     );
     expect(writeSevenDaysProgress(progress, storage)).toBe(true);
     expect(readSevenDaysProgress(storage)).toEqual(progress);
@@ -354,20 +422,23 @@ describe("Seven Days Match progress", () => {
   it("discards a record that did not come from this catalogue", () => {
     expect(
       sanitizeSevenDaysProgress({
-        version: 1,
+        version: 2,
         contentVersion: 1,
         cleared: ["day-9-level-1"],
+        daysAnswered: [],
         firstTry: [],
         updatedAt: 1,
       }),
     ).toBeNull();
-    // A first-try mark without a clear is not a state this game can produce.
+    // A day answered before its levels were played is not a state this game
+    // can produce.
     expect(
       sanitizeSevenDaysProgress({
-        version: 1,
+        version: 2,
         contentVersion: 1,
         cleared: [],
-        firstTry: [SEVEN_DAYS_LEVELS[0].id],
+        daysAnswered: [SEVEN_DAYS_CHAPTERS[0].id],
+        firstTry: [],
         updatedAt: 1,
       }),
     ).toBeNull();
@@ -413,6 +484,9 @@ describe("Seven Days Match product boundaries", () => {
     }
     expect(screen).toContain("nothing to buy");
     expect(session).toContain("no wait and no cost");
+    // The one thing the game does write is a bookmark the reader asked for,
+    // and the pause card says so rather than claiming it changes nothing.
+    expect(session).toContain("Playing does not change your Journey");
   });
 
   it("emits only bounded game-kind lifecycle analytics", () => {
