@@ -156,6 +156,8 @@ export const id: UIStrings = {
     theme: "Tema",
     themeLight: "Terang",
     themeDark: "Cahaya lilin",
+    themePaper: "Kertas",
+    themePlainDark: "Gelap",
     themeSystem: "Ikuti perangkat",
     textSize: "Ukuran teks",
     textSizeDefault: "Bawaan",

@@ -186,6 +186,8 @@ export const hi: UIStrings = {
     theme: "थीम",
     themeLight: "हल्का",
     themeDark: "दीपक की रोशनी",
+    themePaper: "कागज़",
+    themePlainDark: "गहरा",
     themeSystem: "डिवाइस के अनुसार",
     textSize: "अक्षरों का आकार",
     textSizeDefault: "सामान्य",

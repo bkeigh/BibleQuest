@@ -155,6 +155,8 @@ export const it: UIStrings = {
     theme: "Tema",
     themeLight: "Chiaro",
     themeDark: "Lume di candela",
+    themePaper: "Carta",
+    themePlainDark: "Scuro",
     themeSystem: "Come il dispositivo",
     textSize: "Dimensione del testo",
     textSizeDefault: "Normale",

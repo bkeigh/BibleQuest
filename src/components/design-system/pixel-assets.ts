@@ -104,11 +104,7 @@ export const PIXEL_SPRITES = defineAssets({
   myshepherd: pixelPng("/pixel/myshepherd.png", 32, 32, 0.2),
 
   "candle-unlit": pixelPng("/pixel/candle-unlit.png", 16, 16, 0.75),
-  // The one lit stage with no hand-drawn frames, so it falls back to the CSS
-  // flicker. Drop a `candle-small.gif` beside the others and move it to the
-  // eighth argument like its siblings; `tests/candle-motion.test.ts` already
-  // checks that every declared GIF exists and that every lit stage moves.
-  "candle-small": pixelPng("/pixel/candle-small.png", 16, 16, 0.75, "[animation:var(--animate-flicker)]"),
+  "candle-small": pixelPng("/pixel/candle-small.png", 16, 16, 0.75, undefined, undefined, undefined, "/pixel/candle-small.gif"),
   "candle-steady": pixelPng("/pixel/candle-steady.png", 16, 16, 0.75, undefined, undefined, undefined, "/pixel/candle-steady.gif"),
   "candle-sparks": pixelPng("/pixel/candle-sparks.png", 16, 16, 0.75, undefined, undefined, undefined, "/pixel/candle-sparks.gif"),
   "candle-halo": pixelPng("/pixel/candle-halo.png", 16, 16, 0.75, undefined, undefined, undefined, "/pixel/candle-halo.gif"),

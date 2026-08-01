@@ -156,6 +156,8 @@ export const sw: UIStrings = {
     theme: "Mandhari",
     themeLight: "Mwangaza",
     themeDark: "Mwanga wa mshumaa",
+    themePaper: "Karatasi",
+    themePlainDark: "Giza",
     themeSystem: "Fuata kifaa",
     textSize: "Ukubwa wa maandishi",
     textSizeDefault: "Kawaida",

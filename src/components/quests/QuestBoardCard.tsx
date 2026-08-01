@@ -196,7 +196,7 @@ export function QuestBoardCard({
           <span className="-mt-1 shrink-0">
             <PixelIcon
               name={CATEGORY_SPRITE[quest.category] ?? "leaf"}
-              size={68}
+              size={80}
             />
           </span>
           <div className="min-w-0 flex-1">

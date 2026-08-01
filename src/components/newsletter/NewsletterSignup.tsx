@@ -22,7 +22,7 @@ export function NewsletterSignup() {
   return (
     <div className="mx-auto max-w-3xl">
       <header className="mx-auto mb-8 max-w-2xl text-center">
-        <PixelIcon name="scroll" size={88} className="mx-auto mb-5" />
+        <PixelIcon name="scroll" size={104} className="mx-auto mb-5" />
         <p className="font-pixel text-caption uppercase tracking-[0.16em] text-accent">
           Stay connected
         </p>

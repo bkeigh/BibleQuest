@@ -41,7 +41,7 @@ export function SevenDaysGoalChip({
             art.chipClassName,
           )}
         >
-          <PixelIcon name={art.sprite} size={48} />
+          <PixelIcon name={art.sprite} size={56} />
         </span>
         <span className="min-w-0 flex-1 text-small text-charcoal">
           Gather {need} {art.label}
@@ -68,7 +68,7 @@ export function SevenDaysGoalChip({
           met && "ring-2 ring-accent",
         )}
       >
-        <PixelIcon name={art.sprite} size={36} />
+        <PixelIcon name={art.sprite} size={44} />
       </motion.span>
       <motion.span
         key={have}

@@ -279,7 +279,7 @@ export function SevenDaysBoard({
                 wide one. */}
             <PixelIcon
               name={art.sprite}
-              size={48}
+              size={56}
               className="max-h-full max-w-full"
             />
           </motion.button>

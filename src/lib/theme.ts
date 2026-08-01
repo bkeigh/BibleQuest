@@ -1,5 +1,6 @@
 import type { AppearanceSettings } from "@/lib/questos/types";
 import { glassOpacityVariables } from "@/lib/glass-opacity";
+import { resolveTheme } from "@/lib/appearance-theme";
 
 /**
  * Applies appearance settings to <html> via classes that globals.css reacts to.
@@ -12,9 +13,13 @@ export function applyAppearance(a: AppearanceSettings) {
   const prefersDark =
     typeof window !== "undefined" &&
     window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const dark = a.theme === "dark" || (a.theme === "system" && prefersDark);
+  const { dark, plain } = resolveTheme(a.theme, prefersDark);
 
   root.classList.toggle("theme-dark", dark);
+  // The palette layer. Every existing `html.theme-dark` rule keeps working;
+  // `theme-plain` only swaps parchment for neutral and the pixel face for the
+  // display face.
+  root.classList.toggle("theme-plain", plain);
   root.classList.toggle("text-large", a.textSize === "large");
   // !! guards pre-v5 persisted appearance objects that lack the field.
   root.classList.toggle("text-bold", !!a.boldText);

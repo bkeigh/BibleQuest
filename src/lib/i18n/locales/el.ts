@@ -156,6 +156,8 @@ export const el: UIStrings = {
     theme: "Θέμα",
     themeLight: "Φωτεινό",
     themeDark: "Φως κεριού",
+    themePaper: "Χαρτί",
+    themePlainDark: "Σκούρο",
     themeSystem: "Όπως η συσκευή",
     textSize: "Μέγεθος κειμένου",
     textSizeDefault: "Κανονικό",

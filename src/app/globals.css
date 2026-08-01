@@ -235,6 +235,118 @@ html.theme-dark ::selection {
   color: var(--color-moon-paper);
 }
 
+/* ---- MyShepherd's own glass ----
+   Deliberately the most opaque surface in the app. Every other card sits
+   around 54% and lets the canvas through; this one is an invitation rather
+   than a container, and at that transparency it stopped reading as the one
+   blue thing on a parchment page. 88% keeps the blue unmistakable while still
+   admitting what is behind it — glass, not paint.
+
+   The solid base is first so a reader who has turned glass off still gets the
+   blue rather than a transparent card. */
+[data-app-shell] .app-glass-shepherd {
+  background-color: #3f7ea3;
+  border-color: #3f7ea3;
+}
+html.theme-dark [data-app-shell] .app-glass-shepherd {
+  background-color: #35708f;
+  border-color: #35708f;
+}
+html.glass-surfaces [data-app-shell] .app-glass-shepherd {
+  background-color: color-mix(in srgb, #3f7ea3 88%, transparent) !important;
+  border-color: color-mix(in srgb, #3f7ea3 92%, white) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    0 12px 32px rgb(23 54 72 / 0.24);
+}
+html.theme-dark.glass-surfaces [data-app-shell] .app-glass-shepherd {
+  /* The same blue reads heavier against a dark canvas, so it gives a little
+     more back rather than glowing. */
+  background-color: color-mix(in srgb, #35708f 84%, transparent) !important;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    0 12px 32px rgb(0 0 0 / 0.3);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  /* Same rule as every other surface: a blur only buys anything when there is
+     detail behind it to blur. */
+  html.glass-surfaces.has-wallpaper [data-app-shell] .app-glass-shepherd {
+    -webkit-backdrop-filter: blur(18px) saturate(1.3);
+    backdrop-filter: blur(18px) saturate(1.3);
+  }
+}
+
+/* ============================================================
+   Plain themes — Light and Dark
+   ============================================================
+   Parchment is BibleQuest's own look and stays the default. These two
+   are for readers who simply prefer plain white or plain black, and
+   they are a palette layer only: every spacing, radius, shadow and
+   layout decision is shared, and `theme-dark` still carries darkness,
+   so nothing above needs to know these exist.
+
+   The warm hues stay in the accents rather than the surfaces — the
+   green and the gilt are the brand, the parchment is the texture. Drop
+   both and it stops being BibleQuest; drop only the texture and it is
+   still recognisably the same app in a different room. */
+html.theme-plain {
+  --color-parchment: #f6f7f8; /* canvas — cool near-white */
+  --color-paper: #ffffff;     /* cards */
+  --color-linen: #f0f2f4;     /* inputs, quiet panels */
+  --color-vellum: #e9ecef;    /* atmospheric bands */
+  --color-ink: #16181c;
+  --color-graphite: #16181c;  /* headings */
+  --color-charcoal: #3b4149;  /* body */
+  --color-ash: #5f6873;       /* helper text */
+  --color-quill: #6b7480;     /* placeholders */
+  --color-fog: #98a1ac;
+  --color-mist: #dde1e6;      /* hairline borders */
+}
+
+html.theme-dark.theme-plain {
+  --color-parchment: #0e0f11; /* canvas — neutral near-black */
+  --color-paper: #17191c;
+  --color-linen: #1c1f23;
+  --color-vellum: #212529;
+  --color-ink: #f2f4f6;
+  --color-graphite: #f2f4f6;
+  --color-charcoal: #d6dade;
+  --color-ash: #a3aab3;
+  --color-quill: #939ba4;
+  --color-fog: #6c747d;
+  --color-mist: #2c3137;
+}
+
+/* The pixel face is part of the parchment look, so the plain themes hand its
+   short labels to the display face instead. Same rule the RTL locales already
+   use, for the same reason: keep the type, drop the texture. */
+html.theme-plain .font-pixel {
+  font-family: var(--font-display);
+  /* Fraunces sets far wider than Ithaca at the same size, and these labels are
+     uppercase with positive tracking — at 1:1 the section headings wrapped to
+     two lines. `em` keeps the correction proportional, so a caption-sized
+     label shrinks by as much as a heading does and no call site needs to know. */
+  font-size: 0.88em;
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+  font-smooth: auto;
+  font-weight: 600;
+}
+
+/* Parchment's frames and stepped shadows are texture too. Flatten them so a
+   plain theme reads as plain rather than as parchment with the colour drained. */
+html.theme-plain .pixel-frame,
+html.theme-plain .pixel-frame-gold {
+  border-width: 1px;
+  border-color: var(--color-mist);
+  border-radius: var(--radius-card);
+  box-shadow: none;
+}
+html.theme-plain .sacred-frame::before,
+html.theme-plain .sacred-frame::after {
+  display: none;
+}
+
 /* ---- Larger, more comfortable reading ----
    Scaling the ROOT font-size lifts every rem-based size in the app
    (Tailwind's scale, the type tokens, and inline text-[…rem] utilities

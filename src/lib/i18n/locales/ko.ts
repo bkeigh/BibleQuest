@@ -156,6 +156,8 @@ export const ko: UIStrings = {
     theme: "테마",
     themeLight: "밝게",
     themeDark: "촛불",
+    themePaper: "종이",
+    themePlainDark: "어두움",
     themeSystem: "기기 설정 따르기",
     textSize: "글자 크기",
     textSizeDefault: "기본",

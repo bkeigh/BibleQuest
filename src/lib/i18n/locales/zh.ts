@@ -185,6 +185,8 @@ export const zh: UIStrings = {
     theme: "主题",
     themeLight: "浅色",
     themeDark: "烛光",
+    themePaper: "纸张",
+    themePlainDark: "深色",
     themeSystem: "跟随系统",
     textSize: "文字大小",
     textSizeDefault: "默认",

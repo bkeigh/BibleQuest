@@ -78,6 +78,7 @@ import { canRefreshDailyVerse } from "./verse-engine";
 import {
   isWallpaperId,
 } from "@/lib/wallpapers/catalog";
+import { migrateLegacyTheme } from "@/lib/appearance-theme";
 import { normalizeGlassOpacity } from "@/lib/glass-opacity";
 import {
   advanceGuidedSession,
@@ -1693,7 +1694,7 @@ export const useQuestOS = create<QuestOSState>()(
     {
       name: "biblequest:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 17,
+      version: 18,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
@@ -1935,6 +1936,20 @@ export const useQuestOS = create<QuestOSState>()(
             | Record<string, unknown>
             | undefined;
           if (appearance) appearance.myShepherdFloatingButton = true;
+        }
+        if (version < 18) {
+          // v18 splits the theme into four. "light" and "dark" used to mean
+          // parchment by day and parchment by candle; those two names now
+          // belong to the plain white and near-black themes, so a stored value
+          // has to be renamed or every existing reader would open the app to a
+          // canvas they never chose.
+          const settings = state.settings as Record<string, unknown> | undefined;
+          const appearance = settings?.appearance as
+            | Record<string, unknown>
+            | undefined;
+          if (appearance) {
+            appearance.theme = migrateLegacyTheme(appearance.theme);
+          }
         }
         return state as unknown as QuestOSState;
       },

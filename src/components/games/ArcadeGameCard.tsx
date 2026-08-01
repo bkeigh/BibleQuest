@@ -67,7 +67,7 @@ export function ArcadeGameCard({
           <span className="flex shrink-0 items-center justify-center">
             <PixelIcon
               name={icon}
-              size={56}
+              size={68}
               className="[filter:drop-shadow(0_2px_5px_rgb(0_0_0/0.45))]"
             />
           </span>

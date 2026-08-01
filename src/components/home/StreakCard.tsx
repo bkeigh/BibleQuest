@@ -41,8 +41,10 @@ export function StreakCard({
         className
       )}
     >
-      <span className="flex h-12 items-end justify-center">
-        <PixelIcon name={candleStage(days)} size={56} animate={lit} />
+      {/* Sized to the sprite. At h-12 the box was 48px around a taller candle,
+          so the flame overflowed the top and `items-end` pushed it off centre. */}
+      <span className="flex h-[4.5rem] items-end justify-center">
+        <PixelIcon name={candleStage(days)} size={68} animate={lit} />
       </span>
       <span className="mt-1 font-pixel text-[0.875rem] leading-none uppercase tracking-[0.05em] text-gilt max-[430px]:text-[0.6875rem] max-[430px]:leading-tight max-[430px]:tracking-[0.03em]">
         {days > 0 ? fmt(t.streak.day, { n: days }) : t.streak.title}

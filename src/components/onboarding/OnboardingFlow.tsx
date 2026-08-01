@@ -6,11 +6,18 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, MotionConfig, motion } from "framer-motion";
+import { MotionConfig, motion } from "framer-motion";
 import { useQuestOS } from "@/lib/questos/store";
 import { useSession } from "@/lib/supabase/useSession";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { GentleButton } from "@/components/design-system/GentleButton";
+import { IconCheck } from "@/components/design-system/icons";
+import { LANGUAGES } from "@/lib/i18n";
+import {
+  FEATURED_TRANSLATIONS,
+  featuredBibleTranslationOptions,
+} from "@/lib/bible/translations";
+import { cn } from "@/lib/utils/cn";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import {
   PixelMascot,
@@ -42,18 +49,26 @@ import type { QuestTemplate } from "@/lib/questos/types";
 
 interface Draft {
   displayName: string;
+  /** UI-chrome language. */
+  language: string;
+  /** Key of the Scripture edition to open the Bible in. */
+  bibleTranslation: string;
 }
 
 const ACCOUNT_STEP = 0;
 const NAME_STEP = 1;
-const WELCOME_STEP = 2;
-const DENOMINATIONS_STEP = 3;
-const HOME_STEP = 4;
-const QUESTS_STEP = 5;
-const BIBLE_STEP = 6;
-const PRAYER_STEP = 7;
-const FIRST_QUEST_STEP = 8;
-const PLUS_STEP = 9;
+// Asked right after the name, while a reader is still filling in who they are,
+// so the very first screen of the app is already in their language rather than
+// in English until they find Settings.
+const LANGUAGE_STEP = 2;
+const WELCOME_STEP = 3;
+const DENOMINATIONS_STEP = 4;
+const HOME_STEP = 5;
+const QUESTS_STEP = 6;
+const BIBLE_STEP = 7;
+const PRAYER_STEP = 8;
+const FIRST_QUEST_STEP = 9;
+const PLUS_STEP = 10;
 const TOTAL_STEPS = PLUS_STEP + 1;
 
 const STEP_HEADING_ID = "onboarding-step-heading";
@@ -87,14 +102,20 @@ function OnboardingInner({
     (state) => state.markAccountNudgeShown,
   );
   const profile = useQuestOS((state) => state.profile);
+  const updateSettings = useQuestOS((state) => state.updateSettings);
   const alreadyDone = profile?.onboardingCompleted ?? false;
   const resumeStage = getOnboardingResumeStage();
   const continuingPlus = alreadyDone && resumeStage === "plus";
   const [step, setStep] = useState(() =>
     continuingPlus ? PLUS_STEP : user ? NAME_STEP : ACCOUNT_STEP,
   );
+  const settings = useQuestOS((state) => state.settings);
   const [draft, setDraft] = useState<Draft>(() => ({
     displayName: profile?.displayName === "friend" ? "" : profile?.displayName ?? "",
+    // The browser already knows; offering its answer first means most readers
+    // confirm rather than hunt through nineteen languages.
+    language: settings.language ?? preferredBrowserLanguage(),
+    bibleTranslation: settings.preferredBibleTranslation,
   }));
   const [legalDocument, setLegalDocument] =
     useState<LegalDocumentKind | null>(null);
@@ -147,6 +168,10 @@ function OnboardingInner({
   function saveProfile() {
     completeOnboarding({
       displayName: draft.displayName.trim() || "friend",
+    });
+    updateSettings({
+      language: draft.language,
+      preferredBibleTranslation: draft.bibleTranslation,
     });
   }
 
@@ -222,13 +247,19 @@ function OnboardingInner({
         </div>
 
         <div className="relative z-10 mx-auto flex w-full max-w-md flex-1 flex-col justify-start py-6 [@media(min-height:700px)]:justify-center [@media(min-height:700px)]:py-5">
-          <AnimatePresence mode="wait">
+          {/* Enter-only, and deliberately not wrapped in `AnimatePresence`.
+              With `mode="wait"` the outgoing step has to finish exiting before
+              the next one may mount, and when that completion never arrived the
+              guide stripped to a blank screen: the progress dots advanced, the
+              old step sat at opacity 0, and the new one never mounted. Keying a
+              plain `motion.div` gives the same cross-fade with nothing to wait
+              on. Same fix, same reason, as the arcade hub. */}
+          <div>
             <motion.div
               key={visibleStep}
               variants={stepTransition}
               initial="enter"
               animate="center"
-              exit="exit"
               onAnimationComplete={(definition) => {
                 if (definition === "center" && hasNavigated.current) {
                   document.getElementById(STEP_HEADING_ID)?.focus();
@@ -246,11 +277,26 @@ function OnboardingInner({
               {visibleStep === NAME_STEP && (
                 <StepName
                   name={draft.displayName}
-                  onName={(displayName) => setDraft({ displayName })}
+                  onName={(displayName) =>
+                    setDraft((current) => ({ ...current, displayName }))
+                  }
                   onNext={() => {
                     setOnboardingResumeStage("guide");
-                    goTo(WELCOME_STEP);
+                    goTo(LANGUAGE_STEP);
                   }}
+                />
+              )}
+              {visibleStep === LANGUAGE_STEP && (
+                <StepLanguage
+                  language={draft.language}
+                  bibleTranslation={draft.bibleTranslation}
+                  onLanguage={(language) =>
+                    setDraft((current) => ({ ...current, language }))
+                  }
+                  onBibleTranslation={(bibleTranslation) =>
+                    setDraft((current) => ({ ...current, bibleTranslation }))
+                  }
+                  onNext={() => goTo(WELCOME_STEP)}
                 />
               )}
               {visibleStep === WELCOME_STEP && (
@@ -351,7 +397,7 @@ function OnboardingInner({
                 />
               )}
             </motion.div>
-          </AnimatePresence>
+          </div>
         </div>
 
         <div className="relative z-10 mx-auto flex min-h-11 w-full max-w-md items-center">
@@ -390,8 +436,9 @@ function OnboardingInner({
 // Keeps one centered brand companion above each onboarding heading.
 function StepMascot({
   name,
-  size = 8,
+  size = 160,
 }: {
+  /** Rendered edge in CSS pixels, same units as `PixelMascot`. */
   name: PixelMascotName;
   size?: number;
 }) {
@@ -427,7 +474,7 @@ function StepAccount({
   return (
     <div>
       <div className="text-center">
-        <StepMascot name="key" size={7} />
+        <StepMascot name="key" size={144} />
         <p className="text-caption uppercase tracking-[0.16em] text-accent">
           Get BibleQuest
         </p>
@@ -510,6 +557,185 @@ function StepAccount({
   );
 }
 
+/**
+ * The browser's own preference, narrowed to a language BibleQuest speaks.
+ *
+ * Offering a likely answer first is the difference between confirming a choice
+ * and hunting through nineteen of them. `navigator.languages` is ordered by
+ * preference, so the first match wins; English is the fallback because it is
+ * the source locale, not because it is likeliest.
+ */
+function preferredBrowserLanguage(): string {
+  if (typeof navigator === "undefined") return "en";
+  for (const tag of navigator.languages ?? [navigator.language]) {
+    const base = tag?.toLowerCase().split("-")[0];
+    const match = LANGUAGES.find((language) => language.code === base);
+    if (match) return match.code;
+  }
+  return "en";
+}
+
+/**
+ * Two questions on one screen: what BibleQuest should speak, and what Scripture
+ * should be read in.
+ *
+ * They are genuinely separate — a reader may want the app in Spanish and the
+ * King James in English, or the reverse — so this asks twice rather than
+ * inferring the second from the first. Flags carry the recognition and the
+ * endonym carries the meaning: a reader scanning for their own language finds
+ * the flag first and confirms with the name, which is faster than reading
+ * nineteen names in scripts they may not use.
+ */
+function StepLanguage({
+  language,
+  bibleTranslation,
+  onLanguage,
+  onBibleTranslation,
+  onNext,
+}: {
+  language: string;
+  bibleTranslation: string;
+  onLanguage: (code: string) => void;
+  onBibleTranslation: (key: string) => void;
+  onNext: () => void;
+}) {
+  const editions = featuredBibleTranslationOptions(
+    FEATURED_TRANSLATIONS,
+    bibleTranslation,
+  );
+
+  return (
+    <div className="text-center">
+      <StepMascot name="dove" size={144} />
+      <h1
+        id={STEP_HEADING_ID}
+        tabIndex={-1}
+        className="font-display text-editorial text-graphite outline-none"
+      >
+        What should we speak?
+      </h1>
+      <p className="mx-auto mt-2 max-w-xs text-small leading-relaxed text-ash">
+        Both can be changed at any time in Settings, and they do not have to
+        match.
+      </p>
+
+      <fieldset className="mt-6 text-start">
+        <legend className="font-pixel text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
+          The app
+        </legend>
+        <div className="mt-2 max-h-52 overflow-y-auto rounded-[var(--radius-button)] border border-mist bg-paper">
+          {LANGUAGES.map((option) => (
+            <label
+              key={option.code}
+              className={cn(
+                "flex min-h-12 cursor-pointer items-center gap-3 border-b border-mist/60 px-3 last:border-b-0 transition-colors",
+                language === option.code ? "bg-accent-surface" : "hover:bg-linen/60",
+              )}
+            >
+              <input
+                type="radio"
+                name="onboarding-language"
+                value={option.code}
+                checked={language === option.code}
+                onChange={() => onLanguage(option.code)}
+                className="sr-only"
+              />
+              <span aria-hidden="true" className="text-[1.125rem] leading-none">
+                {option.flags.join("")}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span
+                  lang={option.code}
+                  dir={option.dir}
+                  className="block text-small text-graphite"
+                >
+                  {option.endonym}
+                </span>
+                <span className="block text-caption text-ash">
+                  {option.english}
+                </span>
+              </span>
+              {language === option.code && (
+                <IconCheck size={16} className="shrink-0 text-accent" />
+              )}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset className="mt-5 text-start">
+        <legend className="font-pixel text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
+          The Bible
+        </legend>
+        <div className="mt-2 rounded-[var(--radius-button)] border border-mist bg-paper">
+          {editions.map(({ translation, disabled }) => (
+            <label
+              key={translation.key}
+              className={cn(
+                "flex min-h-12 items-center gap-3 border-b border-mist/60 px-3 last:border-b-0 transition-colors",
+                disabled
+                  ? "cursor-not-allowed opacity-45"
+                  : "cursor-pointer hover:bg-linen/60",
+                bibleTranslation === translation.key && "bg-accent-surface",
+              )}
+            >
+              <input
+                type="radio"
+                name="onboarding-bible"
+                value={translation.key}
+                checked={bibleTranslation === translation.key}
+                disabled={disabled}
+                onChange={() => onBibleTranslation(translation.key)}
+                className="sr-only"
+              />
+              <span aria-hidden="true" className="text-[1.125rem] leading-none">
+                {bibleFlags(translation.languageId)}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-small text-graphite">
+                  {translation.abbreviation}
+                </span>
+                <span
+                  dir={translation.direction}
+                  lang={translation.languageId}
+                  className="block text-caption text-ash"
+                >
+                  {translation.languageNameLocal}
+                </span>
+              </span>
+              {bibleTranslation === translation.key && (
+                <IconCheck size={16} className="shrink-0 text-accent" />
+              )}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <GentleButton variant="primary" size="lg" fullWidth className="mt-6" onClick={onNext}>
+        Continue
+      </GentleButton>
+    </div>
+  );
+}
+
+/** ISO-639-3 codes the Scripture catalogue uses, mapped back to the UI flags. */
+const BIBLE_LANGUAGE_FLAGS: Record<string, string> = {
+  eng: "🇺🇸🇬🇧",
+  spa: "🇪🇸",
+  deu: "🇩🇪",
+  cmn: "🇨🇳",
+  arb: "🇸🇦",
+  fra: "🇫🇷",
+  por: "🇧🇷",
+  ita: "🇮🇹",
+  rus: "🇷🇺",
+  lat: "🇻🇦",
+};
+
+function bibleFlags(languageId: string): string {
+  return BIBLE_LANGUAGE_FLAGS[languageId] ?? "📖";
+}
+
 function StepName({
   name,
   onName,
@@ -521,7 +747,7 @@ function StepName({
 }) {
   return (
     <div className="text-center">
-      <StepMascot name="lamb" size={9} />
+      <StepMascot name="lamb" size={192} />
       <h1
         id={STEP_HEADING_ID}
         tabIndex={-1}
@@ -578,7 +804,7 @@ function StepGuide({
   return (
     <PaperCard variant="quiet" padding="lg" className="border-paper/50 bg-paper/90 backdrop-blur-md">
       <div className="text-center">
-        <StepMascot name={mascot} size={7} />
+        <StepMascot name={mascot} size={144} />
         <p className="text-caption uppercase tracking-[0.16em] text-accent">
           {eyebrow}
         </p>
@@ -631,7 +857,7 @@ function StepFirstQuest({
   return (
     <div>
       <div className="text-center">
-        <StepMascot name="sprout" size={7} />
+        <StepMascot name="sprout" size={144} />
         <p className="text-caption uppercase tracking-[0.16em] text-accent">
           Your first step
         </p>
@@ -680,7 +906,7 @@ function StepPlus({
         animate="visible"
         className="mb-4 flex justify-center"
       >
-        <PixelIcon name="crown" size={104} />
+        <PixelIcon name="crown" size={120} />
       </motion.div>
       <p className="text-caption uppercase tracking-[0.16em] text-gilt">
         BibleQuest Plus

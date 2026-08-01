@@ -58,7 +58,10 @@ describe("Home formation layout", () => {
   });
 
   it("uses the requested MyShepherd color and matched quick actions", () => {
-    expect(home).toContain('backgroundColor: "#3F7EA3"');
+    // The blue moved from an inline style into `.app-glass-shepherd` so the
+    // glass rule can tint it; an inline background would have out-ranked it.
+    expect(home).toContain("app-glass-shepherd");
+    expect(home).not.toContain('backgroundColor: "#3F7EA3"');
     expect(home).toContain("space-y-7 pb-7");
     expect(home).toContain("grid grid-cols-3");
     // The three tiles have to match each other, which a shared min-height is

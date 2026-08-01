@@ -156,6 +156,8 @@ export const la: UIStrings = {
     theme: "Thema",
     themeLight: "Lucidum",
     themeDark: "Lumen candelae",
+    themePaper: "Charta",
+    themePlainDark: "Obscurus",
     themeSystem: "Secundum machinam",
     textSize: "Magnitudo litterarum",
     textSizeDefault: "Solita",
