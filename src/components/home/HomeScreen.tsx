@@ -426,7 +426,7 @@ function TodaysVerseLink() {
           aria-hidden="true"
           className="ambient absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gold-300/15 blur-2xl [animation:var(--animate-twinkle)]"
         />
-        <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-[#fdfbf3]/10 ring-1 ring-[#fdfbf3]/20">
+        <span className="relative flex shrink-0 items-center justify-center">
           <PixelIcon name="open-book" size={56} animate />
         </span>
         <span className="relative min-w-0 flex-1">
@@ -458,7 +458,7 @@ function ShepherdCallout({
       className="flex min-h-24 items-center gap-4"
       style={{ backgroundColor: "#3F7EA3", borderColor: "#3F7EA3" }}
     >
-      <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[14px] bg-white/15 ring-1 ring-white/30">
+      <span className="relative flex shrink-0 items-center justify-center">
         <PixelIcon name="star" size={68} />
       </span>
       <div className="min-w-0 flex-1">

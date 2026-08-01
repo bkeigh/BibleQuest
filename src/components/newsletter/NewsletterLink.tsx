@@ -21,7 +21,7 @@ export function NewsletterLink({ className }: NewsletterLinkProps) {
         aria-hidden="true"
         className="ambient absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gold-300/20 blur-2xl [animation:var(--animate-twinkle)]"
       />
-      <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-accent-surface ring-1 ring-accent/15">
+      <span className="relative flex shrink-0 items-center justify-center">
         <PixelIcon name="scroll" size={56} />
       </span>
       <span className="relative min-w-0 flex-1">

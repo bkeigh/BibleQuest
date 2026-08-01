@@ -24,7 +24,7 @@ export function SupportLink({ className }: SupportLinkProps) {
         aria-hidden="true"
         className="ambient absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gold-300/15 blur-2xl [animation:var(--animate-twinkle)]"
       />
-      <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-[#fdfbf3]/10 ring-1 ring-[#fdfbf3]/20">
+      <span className="relative flex shrink-0 items-center justify-center">
         <PixelIcon name="service-basket" size={56} />
       </span>
       <span className="relative min-w-0 flex-1">
