@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, type KeyboardEvent, type PointerEvent } from "react";
+import { motion } from "framer-motion";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { colOf, rowOf } from "@/lib/games/seven-days/board";
 import { SEVEN_DAYS_TILES } from "@/lib/games/seven-days/tiles";
@@ -8,6 +9,7 @@ import {
   BLOCKED,
   type SevenDaysBoard as Board,
 } from "@/lib/games/seven-days/types";
+import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 import { cn } from "@/lib/utils/cn";
 
 /** Travel that reads as a deliberate flick toward a neighbour, not a scroll. */
@@ -17,6 +19,8 @@ interface SevenDaysBoardProps {
   board: Board;
   selected: number | null;
   disabled: boolean;
+  /** Cells about to leave, so they can be seen going rather than just gone. */
+  clearing?: ReadonlySet<number>;
   onSelect: (index: number) => void;
   onSwap: (from: number, to: number) => void;
 }
@@ -33,9 +37,11 @@ export function SevenDaysBoard({
   board,
   selected,
   disabled,
+  clearing,
   onSelect,
   onSwap,
 }: SevenDaysBoardProps) {
+  const reduceMotion = useShouldReduceMotion();
   const cellRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const swipeOrigin = useRef<{ index: number; x: number; y: number } | null>(
     null,
@@ -131,11 +137,28 @@ export function SevenDaysBoard({
         if (!cell) return <span key={index} aria-hidden="true" />;
         const art = SEVEN_DAYS_TILES[cell];
         const isSelected = selected === index;
+        const isClearing = clearing?.has(index) ?? false;
         const row = rowOf(board, index) + 1;
         const col = colOf(board, index) + 1;
         return (
-          <button
-            key={index}
+          <motion.button
+            // Keyed by what is in the cell, not only where: a tile that
+            // changes kind is a new tile and gets to arrive, while one that
+            // simply stays put is left alone.
+            key={`${index}:${cell}`}
+            initial={reduceMotion ? false : { y: -18, opacity: 0, scale: 0.9 }}
+            animate={
+              isClearing
+                ? { scale: reduceMotion ? 1 : 0.35, opacity: reduceMotion ? 1 : 0 }
+                : { y: 0, opacity: 1, scale: isSelected ? 1.06 : 1 }
+            }
+            transition={
+              reduceMotion
+                ? { duration: 0 }
+                : isClearing
+                  ? { duration: 0.16, ease: "easeIn" }
+                  : { type: "spring", stiffness: 520, damping: 32 }
+            }
             ref={(node) => {
               cellRefs.current[index] = node;
             }}
@@ -149,17 +172,15 @@ export function SevenDaysBoard({
             onPointerDown={(event) => onPointerDown(event, index)}
             onPointerUp={onPointerUp}
             className={cn(
-              "relative flex aspect-square items-center justify-center rounded-[11px] ring-1 transition-transform duration-200 [transition-timing-function:var(--ease-gentle)]",
+              "relative flex aspect-square items-center justify-center rounded-[11px] ring-1",
               art.chipClassName,
-              isSelected
-                ? "scale-[1.06] ring-2 ring-accent"
-                : "hover:scale-[1.03]",
+              isSelected ? "ring-2 ring-accent" : "hover:brightness-105",
               disabled && "pointer-events-none opacity-70",
               "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
             )}
           >
             <PixelIcon name={art.sprite} size={3} />
-          </button>
+          </motion.button>
         );
       })}
     </div>

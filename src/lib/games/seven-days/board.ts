@@ -6,6 +6,7 @@ import {
   type SevenDaysCell,
   type SevenDaysMask,
   type SevenDaysResolution,
+  type SevenDaysStep,
   type SevenDaysTileId,
 } from "./types";
 
@@ -165,6 +166,7 @@ export function resolveMatches(
   let current = board;
   let cascades = 0;
   let points = 0;
+  const steps: SevenDaysStep[] = [];
 
   for (;;) {
     const matched = findMatches(current);
@@ -176,11 +178,16 @@ export function resolveMatches(
       if (tile && tile !== BLOCKED) cleared[tile] += 1;
       cells[index] = null;
     }
+    // The board with holes in it, before anything falls. A surface that only
+    // ever sees the settled result cannot show the reader what they matched —
+    // tiles would vanish and reappear elsewhere in the same frame.
+    const emptied: SevenDaysBoard = { ...current, cells };
     points += matched.size * POINTS_PER_TILE + (cascades - 1) * CASCADE_BONUS;
-    current = settle({ ...current, cells }, tiles, random);
+    current = settle(emptied, tiles, random);
+    steps.push({ cascade: cascades, matched, emptied, settled: current });
   }
 
-  return { board: current, cleared, cascades, points };
+  return { board: current, cleared, cascades, points, steps };
 }
 
 /** True when some adjacent trade would create a run — used to avoid dead boards. */

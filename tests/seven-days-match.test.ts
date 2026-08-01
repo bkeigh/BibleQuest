@@ -555,3 +555,59 @@ describe("BibleQuest Arcade surface", () => {
     expect(formation).not.toContain("const GAME_ART");
   });
 });
+
+describe("Seven Days Match cascade frames", () => {
+  it("hands the surface every wave, not just the result", () => {
+    // The engine resolves a whole cascade in one call, which is right for the
+    // rules and wrong for the eye: tiles would leave and arrive in the same
+    // frame, and a four-deep cascade would look like a single match.
+    const session = startLevel(SEVEN_DAYS_LEVELS[0]);
+    const { board: grid } = session.state;
+    let pair: [number, number] | null = null;
+    for (let index = 0; index < grid.cells.length && !pair; index += 1) {
+      for (const other of [index + 1, index + grid.cols]) {
+        if (other >= grid.cells.length) continue;
+        if (!areAdjacent(grid, index, other)) continue;
+        if (findMatches(swapCells(grid, index, other)).size > 0) {
+          pair = [index, other];
+          break;
+        }
+      }
+    }
+    const result = trySwap(session, pair![0], pair![1]);
+    expect(result.steps.length).toBeGreaterThan(0);
+    expect(result.swapped).toBeDefined();
+    result.steps.forEach((step, position) => {
+      expect(step.cascade).toBe(position + 1);
+      expect(step.matched.size).toBeGreaterThanOrEqual(3);
+      // The emptied frame must actually have holes, or there is nothing to see.
+      expect(step.emptied.cells.some((cell) => cell === null)).toBe(true);
+      // And the settled frame must have none left.
+      expect(step.settled.cells.every((cell) => cell !== null)).toBe(true);
+    });
+    // The last settled frame is where the move actually lands.
+    expect(result.steps[result.steps.length - 1].settled.cells).toEqual(
+      result.session.state.board.cells,
+    );
+  });
+
+  it("shows a rejected swap before taking it back", () => {
+    const session = startLevel(SEVEN_DAYS_LEVELS[0]);
+    const { board: grid } = session.state;
+    let pair: [number, number] | null = null;
+    for (let index = 0; index < grid.cells.length - 1 && !pair; index += 1) {
+      const right = index + 1;
+      if (!areAdjacent(grid, index, right)) continue;
+      if (findMatches(swapCells(grid, index, right)).size === 0) {
+        pair = [index, right];
+      }
+    }
+    const result = trySwap(session, pair![0], pair![1]);
+    expect(result.rejected).toBe(true);
+    // The traded frame is what makes it read as "not that" rather than as a
+    // tap that did nothing at all.
+    expect(result.swapped).toBeDefined();
+    expect(result.steps).toHaveLength(0);
+    expect(result.session.state.board.cells).toEqual(grid.cells);
+  });
+});

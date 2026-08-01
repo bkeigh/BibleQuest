@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { IconCheck } from "@/components/design-system/icons";
 import { SEVEN_DAYS_TILES } from "@/lib/games/seven-days/tiles";
@@ -52,24 +53,33 @@ export function SevenDaysGoalChip({
       className="inline-flex items-center gap-1.5 tabular-nums"
       aria-label={label}
     >
-      <span
+      <motion.span
         aria-hidden="true"
+        // A goal that fills is the one thing on the HUD worth noticing, so it
+        // gets a beat of its own rather than silently changing a number.
+        animate={met ? { scale: [1, 1.18, 1] } : { scale: 1 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
         className={cn(
           "flex h-7 w-7 items-center justify-center rounded-[8px] ring-1",
           art.chipClassName,
+          met && "ring-2 ring-accent",
         )}
       >
         <PixelIcon name={art.sprite} size={2} />
-      </span>
-      <span
+      </motion.span>
+      <motion.span
+        key={have}
         aria-hidden="true"
+        initial={{ y: -3, opacity: 0.5 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.18 }}
         className={cn(
           "text-small font-medium",
           met ? "text-accent" : "text-graphite",
         )}
       >
         {met ? <IconCheck size={15} /> : `${have}/${need}`}
-      </span>
+      </motion.span>
     </span>
   );
 }
