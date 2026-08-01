@@ -197,6 +197,30 @@ export function TodayFormation({
               onScroll={updateGameRailEdges}
               className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
+              {GREEN_FEATURES.sevenDaysMatch && (
+                <div role="listitem" className={GAME_RAIL_ITEM}>
+                  <Link
+                    href="/app/games/seven-days"
+                    className="group block h-full rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  >
+                    <ScriptureGameCard
+                      image={GAME_ART.comingOne}
+                      eyebrow="Play any time"
+                      title="Seven Days Match"
+                      description="Match three, answer a Bible question, and open the next level across creation’s seven-day story."
+                      icon="crown"
+                      footer={
+                        <>
+                          <span>7 days · 7 levels each</span>
+                          <span className="inline-flex items-center gap-1.5 font-medium text-white">
+                            Play <IconArrowRight size={14} />
+                          </span>
+                        </>
+                      }
+                    />
+                  </Link>
+                </div>
+              )}
               <div role="listitem" className={GAME_RAIL_ITEM}>
                 <Link
                   href="/app/games"
@@ -221,24 +245,6 @@ export function TodayFormation({
                     }
                   />
                 </Link>
-              </div>
-              <div role="listitem" className={GAME_RAIL_ITEM}>
-                <ScriptureGameCard
-                  image={GAME_ART.comingOne}
-                  eyebrow="Game preview"
-                  title="Seven Days Match"
-                  description="Match three, answer a Bible question, and open the next level across creation’s seven-day story."
-                  icon="crown"
-                  footer={
-                    <>
-                      <span>7 chapters · 7 levels each</span>
-                      <span className="font-medium text-white">
-                        Genesis 1:1
-                      </span>
-                    </>
-                  }
-                  muted
-                />
               </div>
               <div role="listitem" className={GAME_RAIL_ITEM}>
                 <ScriptureGameCard

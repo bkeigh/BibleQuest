@@ -7,9 +7,12 @@ import {
   GentleLink,
 } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
+import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
 import { usePlus } from "@/lib/billing/usePlus";
 import { GREEN_FEATURES } from "@/lib/features/green";
+import { SEVEN_DAYS_TILES } from "@/lib/games/seven-days/tiles";
+import { cn } from "@/lib/utils/cn";
 import {
   dailyGameSessionKey,
   selectDailyGame,
@@ -60,6 +63,9 @@ export function GamesScreen() {
         subtitle="Notice a pattern. Learn the passage. Carry it into life."
       />
       <PageContainer className="pb-8 pt-4">
+        {GREEN_FEATURES.games && GREEN_FEATURES.sevenDaysMatch && (
+          <SevenDaysMatchCard />
+        )}
         {!GREEN_FEATURES.games ? (
           <PaperCard variant="quiet" padding="lg">
             <h2 className="font-display text-subheading text-graphite">
@@ -146,6 +152,57 @@ export function GamesScreen() {
         />
       </PageContainer>
     </>
+  );
+}
+
+/**
+ * Seven Days Match leads the surface: it is the one game a reader can pick up
+ * whenever they like, so it sits above the single study that changes daily.
+ */
+function SevenDaysMatchCard() {
+  return (
+    <PaperCard
+      as="section"
+      variant="atmospheric"
+      padding="lg"
+      className="mb-5"
+      aria-labelledby="seven-days-match-title"
+    >
+      {/* Sprites lead as a full row rather than sitting beside the title: at
+          phone width a three-chip column squeezed the name onto two lines. */}
+      <span aria-hidden="true" className="flex items-center gap-1.5">
+        {(["light", "waters", "seed"] as const).map((tile) => (
+          <span
+            key={tile}
+            className={cn(
+              "flex h-10 w-10 items-center justify-center rounded-[11px] ring-1",
+              SEVEN_DAYS_TILES[tile].chipClassName,
+            )}
+          >
+            <PixelIcon name={SEVEN_DAYS_TILES[tile].sprite} size={3} />
+          </span>
+        ))}
+      </span>
+      <p className="mt-4 font-pixel text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
+        Play any time
+      </p>
+      <h2
+        id="seven-days-match-title"
+        className="mt-1.5 font-display text-[1.5rem] leading-tight text-graphite"
+      >
+        Seven Days Match
+      </h2>
+      <p className="mt-3 text-body leading-relaxed text-charcoal">
+        Match three, answer one question from the passage, and open the next
+        level across creation&apos;s seven-day story.
+      </p>
+      <p className="mt-2 text-caption text-ash">
+        7 days · 7 levels each · Genesis 1:1 – 2:3
+      </p>
+      <GentleLink href="/app/games/seven-days" variant="primary" className="mt-5">
+        Open Seven Days Match
+      </GentleLink>
+    </PaperCard>
   );
 }
 

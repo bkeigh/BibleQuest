@@ -12,6 +12,7 @@ describe("Green feature rollout flags", () => {
       games: true,
       scriptureConnections: true,
       bibleTimeline: true,
+      sevenDaysMatch: true,
       rhythmBuilder: true,
     });
   });
@@ -29,6 +30,7 @@ describe("Green feature rollout flags", () => {
       games: false,
       scriptureConnections: false,
       bibleTimeline: false,
+      sevenDaysMatch: false,
       rhythmBuilder: false,
     });
   });
@@ -54,6 +56,7 @@ describe("Green feature rollout flags", () => {
       games: false,
       scriptureConnections: false,
       bibleTimeline: false,
+      sevenDaysMatch: false,
     });
   });
 

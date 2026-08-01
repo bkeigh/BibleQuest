@@ -75,9 +75,13 @@ export function BottomNav() {
   // Journal composers are intentional, full-page writing spaces. Keeping the
   // tab bar onscreen competes with the editor and can be tapped accidentally
   // while the keyboard is open; Close/Done provide the clear exits here.
+  // Seven Days Match is the same bargain in a different room: the board runs
+  // to the bottom of the screen, and a tab bar under a match-three grid is a
+  // mis-tap waiting to happen. Its own back link is the way out.
   if (
     pathname === "/app/prayer/new" ||
-    pathname === "/app/prayer/reflection/new"
+    pathname === "/app/prayer/reflection/new" ||
+    pathname === "/app/games/seven-days"
   ) {
     return null;
   }

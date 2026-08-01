@@ -10,6 +10,7 @@ export interface GreenFeatureFlags {
   games: boolean;
   scriptureConnections: boolean;
   bibleTimeline: boolean;
+  sevenDaysMatch: boolean;
   rhythmBuilder: boolean;
 }
 
@@ -32,6 +33,7 @@ export function resolveGreenFeatureFlags(values: {
   games?: string;
   scriptureConnections?: string;
   bibleTimeline?: string;
+  sevenDaysMatch?: string;
   rhythmBuilder?: string;
 }): GreenFeatureFlags {
   const master = parsePublicFeatureFlag(values.master, true);
@@ -47,6 +49,8 @@ export function resolveGreenFeatureFlags(values: {
       games && parsePublicFeatureFlag(values.scriptureConnections, true),
     bibleTimeline:
       games && parsePublicFeatureFlag(values.bibleTimeline, true),
+    sevenDaysMatch:
+      games && parsePublicFeatureFlag(values.sevenDaysMatch, true),
     rhythmBuilder: enabled(values.rhythmBuilder),
   };
 }
@@ -62,6 +66,7 @@ export const GREEN_FEATURES = Object.freeze(
     scriptureConnections:
       process.env.NEXT_PUBLIC_SCRIPTURE_CONNECTIONS_ENABLED,
     bibleTimeline: process.env.NEXT_PUBLIC_BIBLE_TIMELINE_ENABLED,
+    sevenDaysMatch: process.env.NEXT_PUBLIC_SEVEN_DAYS_MATCH_ENABLED,
     rhythmBuilder: process.env.NEXT_PUBLIC_RHYTHM_BUILDER_ENABLED,
   }),
 );
