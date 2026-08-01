@@ -147,7 +147,7 @@ export function QuestAccordionCard({
         className="flex w-full items-start gap-3.5 rounded-[var(--radius-card)] px-4 py-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:px-5"
       >
         <span className="mt-0.5 shrink-0 rounded-[10px] bg-linen p-2 ring-1 ring-mist">
-          <PixelIcon name={CATEGORY_SPRITE[quest.category] ?? "leaf"} size={5} />
+          <PixelIcon name={CATEGORY_SPRITE[quest.category] ?? "leaf"} size={52} />
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.75rem] text-ash">

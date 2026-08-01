@@ -496,6 +496,36 @@ describe("Seven Days Match product boundaries", () => {
     expect(session).toContain("Playing does not change your Journey");
   });
 
+  it("lets a thumb swipe without the page scrolling out from under it", () => {
+    // The board shipped with swipe handlers and no `touchAction: "none"`, so
+    // on a touch screen the browser claimed every vertical drag for scrolling
+    // before a single pointermove arrived. Swiping — the first thing anyone
+    // who has played a match-3 tries — silently did nothing.
+    expect(board).toContain('touchAction: "none"');
+    // Capture, or a release that lands off the origin tile never comes back
+    // and leaves a stale swipe waiting to fire on an unrelated tap.
+    expect(board).toContain("setPointerCapture");
+    expect(board).toContain("onPointerCancel");
+  });
+
+  it("does not also count a completed swipe as a tap", () => {
+    // A flick fires pointerup and then click. Without swallowing that click,
+    // one swipe both traded the tiles and left the origin selected, so the
+    // next tap traded again on its own.
+    expect(board).toContain("swallowClick");
+  });
+
+  it("keeps the board playable without a thumb at all", () => {
+    // Swiping is an addition, never a replacement. Arrow-key travel, the
+    // tap-tap path, and the per-tile labels are what make the board reachable
+    // by keyboard and screen reader.
+    for (const key of ["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown"]) {
+      expect(board).toContain(key);
+    }
+    expect(board).toContain("onSelect(index)");
+    expect(board).toContain("row ${row}, column ${col}");
+  });
+
   it("never sells a way past the Scripture", () => {
     // The one line the arcade may not cross. Enforced in the catalogue itself
     // so it fails a build rather than a review, and asserted here so the rule

@@ -29,22 +29,25 @@ const VARIANTS: Record<
   /** PaperCard-like surface. */
   card: {
     root: "app-glass-surface rounded-[var(--radius-card)] border border-mist bg-paper paper-shadow",
-    trigger: "px-5 py-3.5",
-    content: "px-5 pb-4",
+    trigger: "px-4 py-2",
+    content: "px-4 pb-3",
   },
   /** Soft linen panel. */
   quiet: {
     root: "app-glass-surface app-glass-surface-quiet rounded-[var(--radius-card)] bg-linen",
-    trigger: "px-5 py-3.5",
-    content: "px-5 pb-4",
+    trigger: "px-4 py-2",
+    content: "px-4 pb-3",
   },
   /** Exact MyShepherd blue for prominent AI-assisted surfaces. */
   blue: {
     root: "rounded-[var(--radius-card)] border border-[#3F7EA3] bg-[#3F7EA3] paper-shadow",
-    trigger: "px-5 py-4",
-    content: "px-5 pb-5",
+    trigger: "px-4 py-2.5",
+    content: "px-4 pb-4",
   },
 };
+// The trigger row keeps `min-h-12` for the tap target, so these paddings only
+// ever add to an already-comfortable 48px. At py-3.5 a closed disclosure
+// holding one word stood 62px tall, and the quests page stacked four of them.
 
 interface DisclosureProps {
   /** Trigger label (left side of the button). */

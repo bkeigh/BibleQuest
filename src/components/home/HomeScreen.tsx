@@ -244,7 +244,7 @@ function HomeInner() {
                         ? CATEGORY_SPRITE[featuredQuest.category] ?? "scroll"
                         : "scroll"
                     }
-                    size={5}
+                    size={52}
                   />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -378,6 +378,7 @@ function HomeInner() {
               href="/app/prayer/new"
               sprite="candle"
               title="One minute of prayer"
+              animate
             />
             <QuickActionTile
               href={
@@ -426,7 +427,7 @@ function TodaysVerseLink() {
           className="ambient absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gold-300/15 blur-2xl [animation:var(--animate-twinkle)]"
         />
         <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-[#fdfbf3]/10 ring-1 ring-[#fdfbf3]/20">
-          <PixelIcon name="open-book" size={4} animate />
+          <PixelIcon name="open-book" size={44} animate />
         </span>
         <span className="relative min-w-0 flex-1">
           <span className="block font-display text-[1.125rem] leading-tight">
@@ -458,7 +459,7 @@ function ShepherdCallout({
       style={{ backgroundColor: "#3F7EA3", borderColor: "#3F7EA3" }}
     >
       <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[14px] bg-white/15 ring-1 ring-white/30">
-        <PixelIcon name="star" size={5} />
+        <PixelIcon name="star" size={52} />
       </span>
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-2 font-display text-[1.25rem] leading-tight text-white">
@@ -500,11 +501,14 @@ function QuickActionTile({
   sprite,
   title,
   ariaLabel,
+  animate = false,
 }: {
   href: string;
   sprite: Parameters<typeof PixelIcon>[0]["name"];
   title: string;
   ariaLabel?: string;
+  /** Play the sprite's hand-animated GIF, reduced-motion switch and all. */
+  animate?: boolean;
 }) {
   return (
     <Link
@@ -516,10 +520,12 @@ function QuickActionTile({
         interactive
         variant="paper"
         padding="sm"
-        className="flex h-full min-h-[7.5rem] flex-col items-center justify-center gap-3 text-center sm:min-h-[8.25rem]"
+        className="flex h-full min-h-[7rem] flex-col items-center justify-center gap-2.5 text-center sm:min-h-[7.75rem]"
       >
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-linen ring-1 ring-mist transition-transform duration-300 group-hover:-translate-y-0.5">
-          <PixelIcon name={sprite} size={4} />
+        {/* The chip has to be larger than the sprite it holds. At 44px around a
+            44px icon the art was flush to all four edges and read as clipped. */}
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[12px] bg-linen ring-1 ring-mist transition-transform duration-300 group-hover:-translate-y-0.5">
+          <PixelIcon name={sprite} size={44} animate={animate} />
         </span>
         <span className="text-[0.75rem] font-medium leading-snug text-graphite min-[390px]:text-[0.8125rem] sm:text-small">
           {title}

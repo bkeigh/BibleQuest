@@ -97,8 +97,10 @@ function normalizeAppearanceSettings(
   return {
     ...appearance,
     glassOpacity: normalizeGlassOpacity(appearance.glassOpacity),
+    // Absent means on: the launcher ships present, and only an explicit
+    // `false` from the settings toggle takes it away.
     myShepherdFloatingButton:
-      appearance.myShepherdFloatingButton === true,
+      appearance.myShepherdFloatingButton !== false,
   };
 }
 
@@ -1691,7 +1693,7 @@ export const useQuestOS = create<QuestOSState>()(
     {
       name: "biblequest:v1",
       storage: createJSONStorage(() => localStorage),
-      version: 15,
+      version: 17,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
         if (version < 2) {
@@ -1914,6 +1916,25 @@ export const useQuestOS = create<QuestOSState>()(
           // v15 introduces versioned guide bookmarks without synthesizing
           // Journey or growth records for opening/completing a guide screen.
           state.guidedProgress = {};
+        }
+        if (version < 17) {
+          // v17 turns the floating MyShepherd on by default and offers it to
+          // everyone rather than to Plus alone. Every prior build persisted
+          // the whole appearance object, so almost every reader is carrying an
+          // explicit `false` that was the old default rather than a choice,
+          // and there is no way to tell those apart after the fact.
+          //
+          // Written rather than deleted: persisted state is merged over the
+          // defaults one level deep, so a missing key inside `appearance` does
+          // not fall back to the default — it just arrives undefined. Setting
+          // it is the only way for the new default to reach an existing
+          // reader. Anyone who wants it gone now has a visible toggle, which
+          // they did not have before unless they were on Plus.
+          const settings = state.settings as Record<string, unknown> | undefined;
+          const appearance = settings?.appearance as
+            | Record<string, unknown>
+            | undefined;
+          if (appearance) appearance.myShepherdFloatingButton = true;
         }
         return state as unknown as QuestOSState;
       },

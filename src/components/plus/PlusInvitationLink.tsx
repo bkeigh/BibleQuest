@@ -30,7 +30,7 @@ export function PlusInvitationLink({
         className="ambient absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/25 blur-2xl [animation:var(--animate-twinkle)]"
       />
       <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-white/20 ring-1 ring-[#2c2618]/15">
-        <PixelIcon name="crown" size={4} />
+        <PixelIcon name="crown" size={44} />
       </span>
       <span className="relative min-w-0 flex-1">
         <span className="block font-display text-[1.125rem] leading-tight">

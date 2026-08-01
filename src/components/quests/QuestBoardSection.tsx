@@ -39,9 +39,11 @@ export function QuestBoardSection({
           aria-expanded={open}
           aria-controls={contentId}
           onClick={() => onOpenChange(!open)}
-          className="flex min-h-14 w-full items-center gap-3 rounded-[var(--radius-card)] px-4 py-3 text-left transition-colors hover:bg-paper/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:px-5"
+          className="flex min-h-12 w-full items-center gap-3 rounded-[var(--radius-card)] px-4 py-2 text-left transition-colors hover:bg-paper/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
-          <span className="min-w-0 flex-1 font-display text-[1.25rem] text-graphite">
+          {/* A state label, not a page title. At display 1.25rem three empty
+              groups stacked taller than the quest list they were introducing. */}
+          <span className="min-w-0 flex-1 font-display text-[1.0625rem] text-graphite">
             {label}
           </span>
           <motion.span
@@ -76,11 +78,13 @@ export function QuestBoardSection({
         )}
       >
         <div inert={!open} className="min-h-0 overflow-hidden">
-          <div className="px-3 pb-3 sm:px-4 sm:pb-4">
+          <div className="px-4 pb-3">
             {count > 0 ? (
               children
             ) : (
-              <p className="px-1 py-2 text-small text-ash">{emptyBody}</p>
+              <p className="pb-1 text-small leading-relaxed text-ash">
+                {emptyBody}
+              </p>
             )}
           </div>
         </div>

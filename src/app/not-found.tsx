@@ -18,7 +18,7 @@ export default function NotFoundPage() {
         height={44}
         className="mb-6 h-11 w-auto"
       />
-      <PixelMascot name="map" size={8} />
+      <PixelMascot name="map" size={160} />
       <p className="mt-5 text-caption uppercase tracking-[0.16em] text-accent">
         Path not found
       </p>

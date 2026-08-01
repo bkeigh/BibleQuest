@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Image from "next/image";
 import { WALLPAPER_CATALOG } from "@/lib/wallpapers/catalog";
 
@@ -21,6 +22,19 @@ export function sceneById(id: string) {
  */
 export function SevenDaysScene({ sceneId }: { sceneId: string }) {
   const scene = sceneById(sceneId);
+
+  // A level scene is a wallpaper by any other name, so the glass above it gets
+  // to blur — see the `has-wallpaper` note in globals.css. Safe to switch on
+  // here where it would not be on a long page: a level is one screen that does
+  // not scroll, so the blur is composited once rather than every frame, and
+  // showing these scenes at their best is the whole point of putting them here.
+  useEffect(() => {
+    if (!scene) return;
+    const root = document.documentElement;
+    root.classList.add("has-wallpaper");
+    return () => root.classList.remove("has-wallpaper");
+  }, [scene]);
+
   if (!scene) return null;
   return (
     <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10">

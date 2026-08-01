@@ -181,7 +181,7 @@ function MilestoneHighlight({ view }: { view: MilestoneView }) {
               : "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-paper/85 ring-1 ring-mist/70"
           }
         >
-          <PixelIcon name={(milestone.iconKey as PixelSpriteName) ?? "star"} size={4} />
+          <PixelIcon name={(milestone.iconKey as PixelSpriteName) ?? "star"} size={44} />
         </span>
         <div className="min-w-0">
           <p className="font-pixel text-[0.875rem] leading-tight text-graphite">
@@ -225,7 +225,7 @@ function MilestoneListRow({ view }: { view: MilestoneView }) {
             : "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-paper"
         }
       >
-        <PixelIcon name={(milestone.iconKey as PixelSpriteName) ?? "star"} size={3} />
+        <PixelIcon name={(milestone.iconKey as PixelSpriteName) ?? "star"} size={36} />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
@@ -453,7 +453,7 @@ function JourneyScreenInner() {
                         key={type}
                         className="inline-flex min-h-9 items-center gap-2 rounded-full border border-mist bg-paper/80 px-3 text-caption text-charcoal"
                       >
-                        <PixelIcon name={facet.sprite} size={2} />
+                        <PixelIcon name={facet.sprite} size={28} />
                         {facet.label}
                       </span>
                     );
@@ -462,7 +462,7 @@ function JourneyScreenInner() {
               </>
             ) : (
               <div className="flex items-start gap-3">
-                <PixelIcon name="tree-stage-0" size={2} />
+                <PixelIcon name="tree-stage-0" size={28} />
                 <div>
                   <p className="text-[0.9375rem] text-graphite">
                     Your tree is resting this week.
@@ -501,7 +501,7 @@ function JourneyScreenInner() {
                 >
                   <span className="flex items-start justify-between gap-2">
                     <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-surface">
-                      <PixelIcon name={facet.sprite} size={3} />
+                      <PixelIcon name={facet.sprite} size={36} />
                     </span>
                     <span
                       className={
@@ -599,7 +599,7 @@ function JourneyScreenInner() {
           </h2>
           {timeline.length === 0 ? (
             <div className="py-6 text-center">
-              <PixelMascot name="sprout" size={8} className="mb-4" />
+              <PixelMascot name="sprout" size={160} className="mb-4" />
               <p className="text-[0.9375rem] text-ash">{emptyStates.journey}</p>
             </div>
           ) : (
@@ -619,7 +619,7 @@ function JourneyScreenInner() {
                     {month.events.map((e) => (
                       <li key={e.id} className="relative ms-6 pb-6 last:pb-0">
                         <span className="absolute -start-[2.05rem] top-0 flex h-6 w-6 items-center justify-center rounded-full bg-parchment ring-1 ring-mist">
-                          <PixelIcon name={EVENT_SPRITE[e.type]} size={3} />
+                          <PixelIcon name={EVENT_SPRITE[e.type]} size={36} />
                         </span>
                         <p className="text-[0.9375rem] text-charcoal">{e.title}</p>
                         <p className="mt-0.5 text-[0.75rem] text-ash">
@@ -654,7 +654,7 @@ function JourneyScreenInner() {
             className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4"
           >
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent-surface">
-              <PixelIcon name="star" size={4} />
+              <PixelIcon name="star" size={44} />
             </span>
             <div className="min-w-0 flex-1">
               <h2 className="text-[1rem] font-medium text-graphite">Make the space yours</h2>

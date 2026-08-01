@@ -20,7 +20,7 @@ export function QuestDemo({ quest }: { quest: QuestTemplate }) {
     <PaperCard variant="paper" padding="md">
       <div className="flex items-start gap-3.5">
         <span className="mt-0.5 rounded-[10px] bg-linen p-2 ring-1 ring-mist">
-          <PixelIcon name={CATEGORY_SPRITE[quest.category] ?? "leaf"} size={5} />
+          <PixelIcon name={CATEGORY_SPRITE[quest.category] ?? "leaf"} size={52} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-[0.75rem] text-ash">
@@ -50,7 +50,7 @@ export function PrayerDemo() {
   return (
     <PaperCard variant="paper" padding="md">
       <div className="flex items-start gap-3">
-        <PixelIcon name="candle" size={5} />
+        <PixelIcon name="candle" size={52} />
         <div>
           <h3 className="font-display text-[1.125rem] text-graphite">
             Before tomorrow’s conversation

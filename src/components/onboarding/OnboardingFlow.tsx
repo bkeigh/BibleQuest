@@ -680,7 +680,7 @@ function StepPlus({
         animate="visible"
         className="mb-4 flex justify-center"
       >
-        <PixelIcon name="crown" size={8} />
+        <PixelIcon name="crown" size={80} />
       </motion.div>
       <p className="text-caption uppercase tracking-[0.16em] text-gilt">
         BibleQuest Plus
@@ -867,7 +867,7 @@ export function OnboardingFlow({
     <ClientOnly
       fallback={
         <div className="flex min-h-dvh items-center justify-center bg-parchment">
-          <PixelMascot name="lantern" size={7} />
+          <PixelMascot name="lantern" size={144} />
         </div>
       }
     >

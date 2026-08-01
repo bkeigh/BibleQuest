@@ -237,7 +237,12 @@ describe("Bible translation preference and licensing boundary", () => {
       ),
       "utf8",
     );
-    expect(store).toContain("version: 15");
+    // The persisted version only has to be at or past the one that introduced
+    // the translation preference, so the v9 branch is still reachable. Pinning
+    // the exact current number made every unrelated migration fail this test,
+    // which teaches people to edit the number rather than read the assertion.
+    const version = Number(/version:\s*(\d+)/.exec(store)?.[1]);
+    expect(version).toBeGreaterThanOrEqual(9);
     expect(store).toContain("if (version < 9)");
     expect(store).toContain("DEFAULT_BIBLE_TRANSLATION_KEY");
     expect(preferenceMigration).toContain("preferred_bible_translation");

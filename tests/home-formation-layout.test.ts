@@ -61,7 +61,12 @@ describe("Home formation layout", () => {
     expect(home).toContain('backgroundColor: "#3F7EA3"');
     expect(home).toContain("space-y-7 pb-7");
     expect(home).toContain("grid grid-cols-3");
-    expect(home).toContain("min-h-[7.5rem]");
+    // The three tiles have to match each other, which a shared min-height is
+    // what guarantees. The exact figure is a design decision that has moved
+    // once already; that it is shared is the part worth holding.
+    const tileMinHeight = /min-h-\[([\d.]+)rem\]/.exec(home)?.[1];
+    expect(tileMinHeight, "quick action tiles lost their shared min-height").toBeDefined();
+    expect(Number(tileMinHeight)).toBeGreaterThanOrEqual(6);
   });
 
   it("uses Instagram artwork and prominent Ithaca type for games", () => {

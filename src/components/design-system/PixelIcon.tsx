@@ -15,7 +15,17 @@ export type { PixelSpriteName } from "./pixel-assets";
 
 interface PixelIconProps {
   name: PixelSpriteName;
-  /** Rendered pixel size (each cell). */
+  /**
+   * Rendered edge in CSS pixels. See `PIXEL_ICON` for the named ladder.
+   *
+   * This used to be a multiplier fed through each sprite's `cellScale` and
+   * rounded to a whole art cell, which meant `max(1, round(size * 0.2)) * 32`
+   * — so every size from 2 to 7 collapsed to exactly 32px and 8 jumped
+   * straight to 64px. Eight distinct intents at the call sites rendered as
+   * two actual sizes, and no call site could ask for anything in between.
+   * Plain pixels cost the quantisation and buy a size that means what it says
+   * and is the same across sprites with different art grids.
+   */
   size?: number;
   /** Enable subtle ambient motion (flicker/sway/twinkle). */
   animate?: boolean;
@@ -23,9 +33,26 @@ interface PixelIconProps {
   title?: string;
 }
 
+/**
+ * The icon ladder. Named so a screen picks a role rather than a number, and
+ * so the whole app moves together when one step needs adjusting.
+ */
+export const PIXEL_ICON = {
+  /** Inline with running text — a chip, a byline, a meta row. */
+  inline: 24,
+  /** A list row's leading glyph. */
+  row: 36,
+  /** A card's subject mark. */
+  card: 48,
+  /** The thing a screen is about. */
+  feature: 64,
+  /** Empty states and hero marks. */
+  hero: 96,
+} as const;
+
 export function PixelIcon({
   name,
-  size = 6,
+  size = PIXEL_ICON.row,
   animate = false,
   className,
   title,
@@ -33,9 +60,9 @@ export function PixelIcon({
   const asset = PIXEL_SPRITES[name];
   if (!asset) return null;
 
-  const cell = Math.max(1, Math.round(size * (asset.cellScale ?? 1)));
-  const renderedWidth = asset.cols * cell;
-  const renderedHeight = asset.rows * cell;
+  // Aspect comes from the art grid so a non-square sprite is never stretched.
+  const renderedWidth = Math.round(size);
+  const renderedHeight = Math.round(size * (asset.rows / asset.cols));
   const box = { width: renderedWidth, height: renderedHeight };
 
   const frame = (src: string, extra?: string) => (

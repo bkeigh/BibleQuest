@@ -337,6 +337,17 @@ html.theme-dark .wallpaper-scrim {
    highlights, translucency, and saturation echo iOS glass while preserving
    the warm paper palette. Unsupported browsers keep the opaque fallback. */
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+/*
+ * Backdrop blur is scoped to `has-wallpaper`.
+ *
+ * A blur only reads against detail. Over the flat parchment the app ships with,
+ * blurring produces a pixel-identical result to the translucent fill alone —
+ * but the compositor still rasterises the backdrop and runs a large-radius
+ * Gaussian for every surface, every frame, on a screen that carries seventeen
+ * of them. That was the scrolling stutter: seventeen invisible blurs.
+ *
+ * With a wallpaper behind, the blur is the whole point and is kept in full.
+ */
   html.glass-surfaces [data-app-shell] .app-glass-surface:not([data-paper-variant="outlined"]) {
     background-color: color-mix(in srgb, var(--color-paper) var(--glass-surface-opacity), transparent) !important;
     border-color: color-mix(in srgb, var(--color-paper) 68%, var(--color-mist)) !important;
@@ -344,8 +355,13 @@ html.theme-dark .wallpaper-scrim {
       inset 0 1px 0 rgb(255 255 255 / 0.58),
       inset 0 -1px 0 rgb(255 255 255 / 0.12),
       0 12px 36px rgb(18 33 27 / 0.1);
-    -webkit-backdrop-filter: blur(28px) saturate(1.38);
-    backdrop-filter: blur(28px) saturate(1.38);
+  }
+  /* Fill, border, and shadow above are what the glass *looks* like and always
+     apply. Only the blur — the part that costs a frame and shows nothing over
+     a flat background — waits for a wallpaper. */
+  html.glass-surfaces.has-wallpaper [data-app-shell] .app-glass-surface:not([data-paper-variant="outlined"]) {
+    -webkit-backdrop-filter: blur(18px) saturate(1.32);
+    backdrop-filter: blur(18px) saturate(1.32);
   }
   html.glass-surfaces [data-app-shell] .app-glass-surface[data-paper-variant="linen"],
   html.glass-surfaces [data-app-shell] .app-glass-surface[data-paper-variant="atmospheric"],
@@ -366,8 +382,8 @@ html.theme-dark .wallpaper-scrim {
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 0.42),
       0 -10px 34px rgb(18 33 27 / 0.1);
-    -webkit-backdrop-filter: blur(30px) saturate(1.4);
-    backdrop-filter: blur(30px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.34);
+    backdrop-filter: blur(20px) saturate(1.34);
   }
   html.theme-dark.glass-surfaces [data-app-shell] .app-glass-surface:not([data-paper-variant="outlined"]) {
     background-color: color-mix(in srgb, var(--color-paper) var(--glass-dark-surface-opacity), transparent) !important;
@@ -415,8 +431,10 @@ html.theme-dark .milestone-glass-surface[data-milestone-state="reached"] {
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   html.glass-surfaces [data-app-shell] .milestone-glass-surface {
     background-color: color-mix(in srgb, var(--color-paper) var(--glass-milestone-opacity), transparent);
-    -webkit-backdrop-filter: blur(24px) saturate(1.3);
-    backdrop-filter: blur(24px) saturate(1.3);
+  }
+  html.glass-surfaces.has-wallpaper [data-app-shell] .milestone-glass-surface {
+    -webkit-backdrop-filter: blur(16px) saturate(1.28);
+    backdrop-filter: blur(16px) saturate(1.28);
   }
   html.glass-surfaces [data-app-shell] .milestone-glass-surface[data-milestone-state="reached"] {
     background-color: color-mix(in srgb, var(--color-gold-100) var(--glass-milestone-reached-opacity), transparent);

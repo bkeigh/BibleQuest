@@ -33,6 +33,7 @@ import {
 } from "@/components/quests/QuestSlip";
 import { QuestBoardCard } from "@/components/quests/QuestBoardCard";
 import {
+  QuestLane,
   QuestLayoutToggle,
   QuestShelf,
   readQuestLayout,
@@ -182,22 +183,6 @@ function QuestBrowseInner() {
     [duration, category, energy, company, setting, search]
   );
 
-  const groupedResults = useMemo(() => {
-    const byCategory = new Map<QuestCategory, QuestTemplate[]>();
-    for (const quest of results) {
-      const bucket = byCategory.get(quest.category);
-      if (bucket) bucket.push(quest);
-      else byCategory.set(quest.category, [quest]);
-    }
-    // Follow the catalogue's own category order so the shelves keep a stable
-    // sequence between visits rather than reordering with the data.
-    return QUEST_CATEGORIES.flatMap((category) => {
-      const quests = byCategory.get(category);
-      return quests && quests.length > 0
-        ? ([[category, quests]] as [QuestCategory, QuestTemplate[]][])
-        : [];
-    });
-  }, [results]);
 
 
   const suggested = useMemo(
@@ -363,19 +348,24 @@ function QuestBrowseInner() {
       <PageContainer>
         {/* The board is the one canonical lifecycle surface above discovery. */}
         <section aria-label="Your quest board">
-          <div className="flex items-baseline justify-between">
+          <div className="flex items-baseline justify-between gap-3">
             <h2 className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
               Your quests
             </h2>
-            <p aria-live="polite" className="text-caption text-ash">
-              {todayStatusSummary}
-            </p>
+            {/* The switch belongs to the board, not to the catalogue below it.
+                On the catalogue a rail put three cards' worth of chrome around
+                one card; here it turns a stack of tall quest cards into one
+                screen a thumb can move through. */}
+            <QuestLayoutToggle layout={layout} onChange={chooseLayout} />
           </div>
+          <p aria-live="polite" className="mt-1 text-caption text-ash">
+            {todayStatusSummary}
+          </p>
           <p aria-live="polite" aria-atomic="true" className="sr-only">
             {boardAnnouncement}
           </p>
 
-          <div className="mt-3 space-y-3">
+          <div className="mt-3 space-y-2">
               <QuestBoardSection
                 label="Active"
                 count={activePicks.length}
@@ -389,7 +379,7 @@ function QuestBrowseInner() {
                 emptyBody="No quest is underway right now."
               >
                 {/* Native grid gaps stay stable while Safari reflows moved cards. */}
-                <ul data-quest-board-list className="grid gap-3">
+                <QuestLane as="ul" layout={layout} data-quest-board-list>
                   {activePicks.flatMap((assignment) => {
                     const quest = questBySlug.get(assignment.questSlug);
                     return quest ? (
@@ -410,7 +400,7 @@ function QuestBrowseInner() {
                       []
                     );
                   })}
-                </ul>
+                </QuestLane>
               </QuestBoardSection>
 
               <QuestBoardSection
@@ -422,7 +412,7 @@ function QuestBrowseInner() {
                 }
                 emptyBody="Choose a quest below when you want a place to begin."
               >
-                <ul data-quest-board-list className="grid gap-3">
+                <QuestLane as="ul" layout={layout} data-quest-board-list>
                   {readyPicks.flatMap((assignment) => {
                     const quest = questBySlug.get(assignment.questSlug);
                     return quest ? (
@@ -443,7 +433,7 @@ function QuestBrowseInner() {
                       []
                     );
                   })}
-                </ul>
+                </QuestLane>
               </QuestBoardSection>
 
               <QuestBoardSection
@@ -458,7 +448,7 @@ function QuestBrowseInner() {
                 }
                 emptyBody="Completed quests will gather here for today."
               >
-                <ul data-quest-board-list className="grid gap-3">
+                <QuestLane as="ul" layout={layout} data-quest-board-list>
                   {completedQuests.map((quest) => (
                     <QuestBoardCard
                       key={quest.slug}
@@ -473,7 +463,7 @@ function QuestBrowseInner() {
                       onCompleted={setCompletedQuest}
                     />
                   ))}
-                </ul>
+                </QuestLane>
               </QuestBoardSection>
           </div>
         </section>
@@ -622,29 +612,27 @@ function QuestBrowseInner() {
         {/* Suggested for today — the old daily scorer, now an offer.
             Compact slips: the shelf invites, the quest page tells the story. */}
         {!hasFilters && suggested.length > 0 && (
-          <QuestShelf
-            title={t.quests.suggested}
-            layout={layout}
-            action={<QuestLayoutToggle layout={layout} onChange={chooseLayout} />}
-          >
-            {suggested.map((quest) => browseSlip(quest, layout === "rail"))}
+          <QuestShelf title={t.quests.suggested} layout="list">
+            {suggested.map((quest) => browseSlip(quest, false))}
           </QuestShelf>
         )}
 
         {/* Seasonal shelf */}
         {seasonal.length > 0 && !hasFilters && (
-          <QuestShelf title={`For ${season.label}`} layout={layout}>
-            {seasonal.map((quest) => browseSlip(quest, layout === "rail"))}
+          <QuestShelf title={`For ${season.label}`} layout="list">
+            {seasonal.map((quest) => browseSlip(quest, false))}
           </QuestShelf>
         )}
 
-        {/* Results.
+        {/* Results — one list, twenty-four at a time.
 
-            Unfiltered, the collection is grouped by category and each category
-            gets its own shelf — the flat list ran to hundreds of cards in one
-            column, so the only way to learn that Service quests existed was to
-            scroll past every Prayer one. Filtering collapses back to a single
-            shelf, because a filtered result is already the group. */}
+            Grouping the collection into a shelf per category was meant to make
+            the range of quests visible, and as rails it did. As columns it
+            does not: seventeen categories at twenty-four cards each rendered
+            four hundred cards and a page fifty-six thousand pixels tall, so
+            the range was buried under exactly the scrolling it was supposed to
+            replace. The Filters disclosure above already answers "what kinds
+            are there", and it answers it in one screen. */}
         {results.length === 0 ? (
           <section className="mt-6" aria-label="All quests">
             <PaperCard variant="quiet" padding="lg" className="text-center">
@@ -666,32 +654,14 @@ function QuestBrowseInner() {
               </GentleButton>
             </PaperCard>
           </section>
-        ) : hasFilters ? (
-          <QuestShelf
-            title="Matching quests"
-            count={results.length}
-            layout={layout}
-            action={<QuestLayoutToggle layout={layout} onChange={chooseLayout} />}
-          >
-            {results.slice(0, visibleCount).map((quest) =>
-              browseSlip(quest, layout === "rail"),
-            )}
-          </QuestShelf>
         ) : (
-          <>
-            {groupedResults.map(([groupCategory, quests]) => (
-              <QuestShelf
-                key={groupCategory}
-                title={CATEGORY_LABEL[groupCategory]}
-                count={quests.length}
-                layout={layout}
-              >
-                {quests
-                  .slice(0, visibleCount)
-                  .map((quest) => browseSlip(quest, layout === "rail"))}
-              </QuestShelf>
-            ))}
-          </>
+          <QuestShelf
+            title={hasFilters ? "Matching quests" : "All quests"}
+            count={results.length}
+            layout="list"
+          >
+            {results.slice(0, visibleCount).map((quest) => browseSlip(quest, false))}
+          </QuestShelf>
         )}
 
         {results.length > 0 && visibleCount < results.length && (
@@ -702,7 +672,7 @@ function QuestBrowseInner() {
             }
             className="mx-auto mt-6 block min-h-11 rounded-full border border-mist bg-paper px-5 py-2.5 text-small font-medium text-accent transition-colors hover:border-accent/40 hover:bg-accent-surface"
           >
-            Show 24 more per shelf
+            Show 24 more · {results.length - visibleCount} remaining
           </button>
         )}
         <div className="pb-6" />

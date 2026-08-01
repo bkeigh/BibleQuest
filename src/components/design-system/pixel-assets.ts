@@ -19,7 +19,15 @@ export type PixelAsset = {
   /** Intrinsic file dimensions used before CSS layout. */
   nativeWidth: number;
   nativeHeight: number;
-  /** Preserves the established component footprint at existing call sites. */
+  /**
+   * Art density recorded per family, cross-checked against the asset manifest.
+   *
+   * No longer a rendering input. It used to multiply a call site's `size` and
+   * round to a whole art cell, which quantised every icon in the app to 32px
+   * or 64px with nothing in between; `PixelIcon` now takes plain pixels. Kept
+   * because `docs/pixel-upgrade/asset-manifest.json` records it per family and
+   * the manifest test holds the two in agreement.
+   */
   cellScale?: number;
   ambientClassName?: string;
   /**

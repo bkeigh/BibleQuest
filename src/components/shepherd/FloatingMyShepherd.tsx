@@ -9,8 +9,10 @@ import {
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
+import { usePlus } from "@/lib/billing/usePlus";
 import {
   MY_SHEPHERD_MAX_QUESTION_LENGTH,
   type MyShepherdAnswer,
@@ -109,6 +111,11 @@ export function FloatingMyShepherd() {
   const viewport = useVisualViewport();
   const compact = useCompactViewport();
   const reduceMotion = useShouldReduceMotion();
+  // Asking is Plus's. The sheet still opens for everyone, because a button
+  // that does nothing when pressed is worse than one that explains itself —
+  // and the old order let a free reader write out a whole question before a
+  // 403 came back to tell them it was never going to be answered.
+  const { isPlus } = usePlus();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
@@ -422,7 +429,43 @@ export function FloatingMyShepherd() {
                 ref={scrollRef}
                 className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4"
               >
-                {turns.length === 0 && !working && (
+                {!isPlus && (
+                  <div>
+                    <p className="text-small leading-relaxed text-charcoal">
+                      MyShepherd answers Bible questions, finds a passage from a
+                      half-remembered line, and points you to the right corner
+                      of BibleQuest. It comes with Plus.
+                    </p>
+                    <div className="mt-3 grid gap-2">
+                      {STARTERS.map((starter) => (
+                        <p
+                          key={starter}
+                          className="flex min-h-11 w-full items-center gap-2.5 rounded-[var(--radius-button)] border border-mist bg-linen/50 px-3.5 py-2.5 text-start text-small text-ash"
+                        >
+                          <IconArrowRight
+                            size={15}
+                            aria-hidden="true"
+                            className="shrink-0 text-gilt"
+                          />
+                          <span className="min-w-0 flex-1">{starter}</span>
+                        </p>
+                      ))}
+                    </div>
+                    <Link
+                      href="/app/plus"
+                      onClick={close}
+                      className="mt-4 flex min-h-12 w-full items-center justify-center rounded-[var(--radius-button)] bg-gold-500 px-4 text-[0.9375rem] font-medium text-graphite transition-colors hover:bg-gold-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    >
+                      Explore Plus
+                    </Link>
+                    <p className="mt-3 text-caption leading-relaxed text-ash">
+                      Reading, prayers, quests, and the arcade never need Plus.
+                      You can also turn this button off in Settings.
+                    </p>
+                  </div>
+                )}
+
+                {isPlus && turns.length === 0 && !working && (
                   <div>
                     <p className="text-small leading-relaxed text-charcoal">
                       Ask a Bible question, find a passage, or ask where to go in
@@ -490,6 +533,9 @@ export function FloatingMyShepherd() {
                 )}
               </div>
 
+              {/* No composer without Plus. A disabled textarea would still
+                  invite a reader to try typing into it. */}
+              {isPlus && (
               <form
                 className="shrink-0 border-t border-mist/70 px-3 py-3"
                 onSubmit={(event) => {
@@ -536,6 +582,7 @@ export function FloatingMyShepherd() {
                   </p>
                 )}
               </form>
+              )}
             </motion.section>
           </motion.div>
         )}
@@ -550,9 +597,15 @@ export function FloatingMyShepherd() {
         aria-expanded={open}
         aria-controls="floating-my-shepherd"
         className={cn(
-          "fixed z-50 flex h-14 w-14 items-center justify-center rounded-full border border-white/30 text-white",
-          "shadow-[0_10px_28px_rgba(32,70,94,0.32)] transition-transform hover:-translate-y-0.5 active:translate-y-0",
-          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+          "fixed z-50 grid h-16 w-16 place-items-center overflow-hidden rounded-full border border-white/30 text-white",
+          "transition-transform hover:-translate-y-0.5 active:translate-y-0",
+          // The focus ring is a box-shadow, never `outline`. An outline with
+          // an offset is drawn as a rectangle by some engines regardless of
+          // border-radius, which is what turned this button into a square with
+          // a green box around it the moment it took focus — most visibly
+          // right after the sheet closed and put focus back on it.
+          "shadow-[0_10px_28px_rgba(32,70,94,0.32)] outline-none",
+          "focus-visible:shadow-[0_0_0_2px_var(--color-paper),0_0_0_4px_var(--color-accent),0_10px_28px_rgba(32,70,94,0.32)]",
           SHEPHERD_INK,
         )}
         style={{
@@ -560,7 +613,15 @@ export function FloatingMyShepherd() {
           bottom: `calc(${RESTING_GUTTER} + 1rem)`,
         }}
       >
-        <PixelIcon name="myshepherd" size={4} />
+        {/* Deliberately larger than the button's inner box and anchored to the
+            bottom, so the shepherd stands in the circle rather than floating as
+            a small mark in the middle of it. `overflow-hidden` keeps the
+            silhouette round. */}
+        <PixelIcon
+          name="myshepherd"
+          size={58}
+          className="translate-y-[3px]"
+        />
       </button>
     </>
   );

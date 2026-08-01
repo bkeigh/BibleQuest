@@ -60,12 +60,16 @@ export function displayStreak(
   return gap <= 1 ? streak.current : 0;
 }
 
-export type CandleStage =
-  | "candle-unlit"
-  | "candle-small"
-  | "candle-steady"
-  | "candle-sparks"
-  | "candle-halo";
+/** Every stage the candle can be in, in order. Exported so a test can walk them. */
+export const CANDLE_STAGES = [
+  "candle-unlit",
+  "candle-small",
+  "candle-steady",
+  "candle-sparks",
+  "candle-halo",
+] as const;
+
+export type CandleStage = (typeof CANDLE_STAGES)[number];
 
 /**
  * Candle art stage for a streak. Thresholds are deliberately gentle:
