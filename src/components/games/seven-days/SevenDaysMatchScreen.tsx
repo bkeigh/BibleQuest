@@ -175,7 +175,7 @@ function SevenDaysMatchInner() {
                   <span
                     key={chapter.id}
                     className={cn(
-                      "flex h-9 w-9 items-center justify-center rounded-[10px] ring-1",
+                      "flex h-11 w-11 items-center justify-center rounded-[11px] ring-1",
                       SEVEN_DAYS_TILES[chapter.signature].chipClassName,
                     )}
                   >
@@ -280,7 +280,7 @@ function SevenDaysMatchInner() {
                       <span
                         aria-hidden="true"
                         className={cn(
-                          "flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] ring-1",
+                          "flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] ring-1",
                           art.chipClassName,
                           !open && "opacity-45 grayscale",
                         )}

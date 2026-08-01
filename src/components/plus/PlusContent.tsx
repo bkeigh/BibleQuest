@@ -68,7 +68,7 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
       {/* Plus — crown in the content flow so it never crowds a corner. */}
       <PaperCard variant="atmospheric" padding="lg" className="relative overflow-hidden">
         <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-gold-500/15 ring-1 ring-gold-500/35">
+          <span className="flex shrink-0 items-center justify-center">
             <PixelIcon name="crown" size={56} />
           </span>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-gold-500/45 bg-gold-500/15 px-3 py-1 text-[0.75rem] text-gilt">

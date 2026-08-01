@@ -34,7 +34,10 @@ export function SevenDaysGoalChip({
       >
         <span
           className={cn(
-            "flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] ring-1",
+            // Sized to the sprite it holds. The colour here is tile identity — how
+            // you tell Light from Waters at a glance — so the chip stays; it just
+            // stopped clipping a 48px sprite into 36px.
+            "flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] ring-1",
             art.chipClassName,
           )}
         >
