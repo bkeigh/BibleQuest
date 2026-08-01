@@ -1,8 +1,10 @@
 import { hashString, seededRandom } from "@/lib/utils/dates";
 import {
+  BLOCKED,
   SEVEN_DAYS_TILE_IDS,
   type SevenDaysBoard,
   type SevenDaysCell,
+  type SevenDaysMask,
   type SevenDaysResolution,
   type SevenDaysTileId,
 } from "./types";
@@ -46,13 +48,22 @@ export function colOf(board: SevenDaysBoard, index: number): number {
   return index % board.cols;
 }
 
-/** Only orthogonal neighbours may trade places — no diagonal reach. */
+/** True for a cell that is not part of this level's shape. */
+export function isBlocked(board: SevenDaysBoard, index: number): boolean {
+  return board.cells[index] === BLOCKED;
+}
+
+/**
+ * Only orthogonal neighbours may trade places — no diagonal reach, and never
+ * across a cell the level cut away.
+ */
 export function areAdjacent(
   board: SevenDaysBoard,
   a: number,
   b: number,
 ): boolean {
   if (a === b) return false;
+  if (isBlocked(board, a) || isBlocked(board, b)) return false;
   const rowDelta = Math.abs(rowOf(board, a) - rowOf(board, b));
   const colDelta = Math.abs(colOf(board, a) - colOf(board, b));
   return rowDelta + colDelta === 1;
@@ -71,7 +82,8 @@ export function swapCells(
 /**
  * Collects every cell inside a horizontal or vertical run of three or more.
  * Runs that cross share their intersection, which is why this returns a set
- * rather than a list of runs.
+ * rather than a list of runs. A blocked cell breaks a run: two tiles either
+ * side of a gap are not three in a row.
  */
 export function findMatches(board: SevenDaysBoard): Set<number> {
   const matched = new Set<number>();
@@ -86,9 +98,10 @@ export function findMatches(board: SevenDaysBoard): Set<number> {
       for (let i = 1; i <= inner; i += 1) {
         const previous = board.cells[at(o, i - 1)];
         const current = i < inner ? board.cells[at(o, i)] : null;
-        if (current !== null && current === previous) continue;
+        const playable = previous !== null && previous !== BLOCKED;
+        if (playable && current === previous) continue;
         const length = i - runStart;
-        if (previous !== null && length >= MATCH_LENGTH) {
+        if (playable && length >= MATCH_LENGTH) {
           for (let k = runStart; k < i; k += 1) matched.add(at(o, k));
         }
         runStart = i;
@@ -101,7 +114,14 @@ export function findMatches(board: SevenDaysBoard): Set<number> {
   return matched;
 }
 
-/** Drops surviving tiles into the gaps and seeds new ones along the top. */
+/**
+ * Drops surviving tiles into the gaps and seeds new ones at the top.
+ *
+ * A blocked cell is a floor as well as a wall: tiles stack on top of it rather
+ * than falling past, and each unbroken stretch of open cells in a column
+ * refills from its own top. Without that, a board with a hole in the middle
+ * would drain through it.
+ */
 function settle(
   board: SevenDaysBoard,
   tiles: readonly SevenDaysTileId[],
@@ -109,15 +129,23 @@ function settle(
 ): SevenDaysBoard {
   const cells: SevenDaysCell[] = [...board.cells];
   for (let col = 0; col < board.cols; col += 1) {
-    let write = board.rows - 1;
-    for (let row = board.rows - 1; row >= 0; row -= 1) {
-      const cell = cells[indexOf(board, row, col)];
-      if (cell === null) continue;
-      cells[indexOf(board, write, col)] = cell;
-      write -= 1;
-    }
-    for (let row = write; row >= 0; row -= 1) {
-      cells[indexOf(board, row, col)] = tiles[Math.floor(random() * tiles.length)];
+    let segmentBottom = board.rows - 1;
+    for (let row = board.rows - 1; row >= -1; row -= 1) {
+      const blocked = row < 0 || cells[indexOf(board, row, col)] === BLOCKED;
+      if (!blocked) continue;
+      // Compact the open run between this wall and the previous one.
+      let write = segmentBottom;
+      for (let read = segmentBottom; read > row; read -= 1) {
+        const cell = cells[indexOf(board, read, col)];
+        if (cell === null) continue;
+        cells[indexOf(board, write, col)] = cell;
+        write -= 1;
+      }
+      for (let fill = write; fill > row; fill -= 1) {
+        cells[indexOf(board, fill, col)] =
+          tiles[Math.floor(random() * tiles.length)];
+      }
+      segmentBottom = row - 1;
     }
   }
   return { ...board, cells };
@@ -145,7 +173,7 @@ export function resolveMatches(
     const cells: SevenDaysCell[] = [...current.cells];
     for (const index of matched) {
       const tile = cells[index];
-      if (tile) cleared[tile] += 1;
+      if (tile && tile !== BLOCKED) cleared[tile] += 1;
       cells[index] = null;
     }
     points += matched.size * POINTS_PER_TILE + (cascades - 1) * CASCADE_BONUS;
@@ -160,17 +188,49 @@ export function hasAvailableMove(board: SevenDaysBoard): boolean {
   for (let row = 0; row < board.rows; row += 1) {
     for (let col = 0; col < board.cols; col += 1) {
       const index = indexOf(board, row, col);
+      if (isBlocked(board, index)) continue;
       if (col + 1 < board.cols) {
         const right = indexOf(board, row, col + 1);
-        if (findMatches(swapCells(board, index, right)).size > 0) return true;
+        if (
+          !isBlocked(board, right) &&
+          findMatches(swapCells(board, index, right)).size > 0
+        ) {
+          return true;
+        }
       }
       if (row + 1 < board.rows) {
         const down = indexOf(board, row + 1, col);
-        if (findMatches(swapCells(board, index, down)).size > 0) return true;
+        if (
+          !isBlocked(board, down) &&
+          findMatches(swapCells(board, index, down)).size > 0
+        ) {
+          return true;
+        }
       }
     }
   }
   return false;
+}
+
+/** Reads a text mask into the blocked/open skeleton of a board. */
+export function maskToBoard(mask: SevenDaysMask): SevenDaysBoard {
+  const rows = mask.length;
+  const cols = mask[0]?.length ?? 0;
+  const cells: SevenDaysCell[] = [];
+  for (const line of mask) {
+    for (let col = 0; col < cols; col += 1) {
+      cells.push(line[col] === "#" ? null : BLOCKED);
+    }
+  }
+  return { rows, cols, cells };
+}
+
+/** How many cells a shape actually plays on. */
+export function playableCount(board: SevenDaysBoard): number {
+  return board.cells.reduce<number>(
+    (total, cell) => (cell === BLOCKED ? total : total + 1),
+    0,
+  );
 }
 
 /**
@@ -180,20 +240,29 @@ export function hasAvailableMove(board: SevenDaysBoard): boolean {
  * the board match-free is the difference between one pass and a reject loop.
  */
 function fillWithoutMatches(
-  rows: number,
-  cols: number,
+  skeleton: SevenDaysBoard,
   tiles: readonly SevenDaysTileId[],
   random: Rng,
 ): SevenDaysBoard {
-  const cells: SevenDaysCell[] = new Array(rows * cols).fill(null);
+  const { rows, cols } = skeleton;
+  const cells: SevenDaysCell[] = [...skeleton.cells];
   const at = (row: number, col: number) => row * cols + col;
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
+      if (cells[at(row, col)] === BLOCKED) continue;
       const banned = new Set<SevenDaysCell>();
-      if (col >= 2 && cells[at(row, col - 1)] === cells[at(row, col - 2)]) {
+      if (
+        col >= 2 &&
+        cells[at(row, col - 1)] !== BLOCKED &&
+        cells[at(row, col - 1)] === cells[at(row, col - 2)]
+      ) {
         banned.add(cells[at(row, col - 1)]);
       }
-      if (row >= 2 && cells[at(row - 1, col)] === cells[at(row - 2, col)]) {
+      if (
+        row >= 2 &&
+        cells[at(row - 1, col)] !== BLOCKED &&
+        cells[at(row - 1, col)] === cells[at(row - 2, col)]
+      ) {
         banned.add(cells[at(row - 1, col)]);
       }
       // At most two tiles can be banned, so four kinds always leave a choice.
@@ -201,7 +270,7 @@ function fillWithoutMatches(
       cells[at(row, col)] = choices[Math.floor(random() * choices.length)];
     }
   }
-  return { rows, cols, cells };
+  return { ...skeleton, cells };
 }
 
 /**
@@ -209,14 +278,14 @@ function fillWithoutMatches(
  * matches handed to the player, and never a dead board they cannot move on.
  */
 export function createBoard(
-  rows: number,
-  cols: number,
+  mask: SevenDaysMask,
   tiles: readonly SevenDaysTileId[],
   random: Rng,
 ): SevenDaysBoard {
-  let candidate = fillWithoutMatches(rows, cols, tiles, random);
+  const skeleton = maskToBoard(mask);
+  let candidate = fillWithoutMatches(skeleton, tiles, random);
   for (let attempt = 0; attempt < 40 && !hasAvailableMove(candidate); attempt += 1) {
-    candidate = fillWithoutMatches(rows, cols, tiles, random);
+    candidate = fillWithoutMatches(skeleton, tiles, random);
   }
   return candidate;
 }
@@ -232,19 +301,27 @@ export function reshuffleBoard(
   tiles: readonly SevenDaysTileId[],
   random: Rng,
 ): SevenDaysBoard {
+  const open = board.cells
+    .map((cell, index) => ({ cell, index }))
+    .filter((entry) => entry.cell !== BLOCKED);
+
   for (let attempt = 0; attempt < 24; attempt += 1) {
-    const cells = [...board.cells];
-    for (let index = cells.length - 1; index > 0; index -= 1) {
+    const pool = open.map((entry) => entry.cell);
+    for (let index = pool.length - 1; index > 0; index -= 1) {
       const target = Math.floor(random() * (index + 1));
-      [cells[index], cells[target]] = [cells[target], cells[index]];
+      [pool[index], pool[target]] = [pool[target], pool[index]];
     }
+    const cells = [...board.cells];
+    open.forEach((entry, position) => {
+      cells[entry.index] = pool[position];
+    });
     let candidate: SevenDaysBoard = { ...board, cells };
     for (let repair = 0; repair < 200; repair += 1) {
       const matched = findMatches(candidate);
       if (matched.size === 0) break;
       const offenders = [...matched];
       const from = offenders[Math.floor(random() * offenders.length)];
-      const to = Math.floor(random() * candidate.cells.length);
+      const to = open[Math.floor(random() * open.length)].index;
       if (candidate.cells[from] === candidate.cells[to]) continue;
       candidate = swapCells(candidate, from, to);
     }
@@ -253,7 +330,15 @@ export function reshuffleBoard(
     return candidate;
   }
   // Unreachable for any real board; a fresh deal still beats a stuck one.
-  return createBoard(board.rows, board.cols, tiles, random);
+  return createBoard(
+    Array.from({ length: board.rows }, (_, row) =>
+      Array.from({ length: board.cols }, (_, col) =>
+        board.cells[row * board.cols + col] === BLOCKED ? "." : "#",
+      ).join(""),
+    ),
+    tiles,
+    random,
+  );
 }
 
 /** Guards content and storage against a tile id that is no longer in the set. */

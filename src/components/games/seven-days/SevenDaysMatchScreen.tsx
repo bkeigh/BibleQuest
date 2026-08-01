@@ -18,16 +18,24 @@ import { PixelIcon } from "@/components/design-system/PixelIcon";
 import { track } from "@/lib/analytics/events";
 import { GREEN_FEATURES } from "@/lib/features/green";
 import { scriptureSourceHref } from "@/lib/games/links";
-import { SEVEN_DAYS_CHAPTERS } from "@/lib/games/seven-days/content";
+import {
+  SEVEN_DAYS_CHAPTERS,
+  SEVEN_DAYS_LEVELS_PER_CHAPTER,
+} from "@/lib/games/seven-days/content";
 import {
   SEVEN_DAYS_LEVELS,
   levelOrdinal,
-  questionForLevel,
+  levelsForChapter,
 } from "@/lib/games/seven-days/levels";
 import {
+  isDayAnswered,
+  isDayReadyForQuestions,
+  isDayUnlocked,
   isLevelCleared,
   isLevelUnlocked,
+  markDayAnswered,
   markLevelCleared,
+  pendingQuestionDay,
   nextLevel,
   readSevenDaysProgress,
   sevenDaysStorageAvailable,
@@ -36,12 +44,20 @@ import {
   type SevenDaysProgress,
 } from "@/lib/games/seven-days/progress";
 import { SEVEN_DAYS_TILES } from "@/lib/games/seven-days/tiles";
-import type { SevenDaysLevel } from "@/lib/games/seven-days/types";
+import type {
+  SevenDaysChapter,
+  SevenDaysLevel,
+} from "@/lib/games/seven-days/types";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 import { cn } from "@/lib/utils/cn";
 import { SevenDaysLevelSession } from "./SevenDaysLevelSession";
+import { SevenDaysQuestionRound } from "./SevenDaysQuestionRound";
 
-type View = { kind: "hub" } | { kind: "map" } | { kind: "level"; level: SevenDaysLevel };
+type View =
+  | { kind: "hub" }
+  | { kind: "map" }
+  | { kind: "level"; level: SevenDaysLevel }
+  | { kind: "questions"; chapter: SevenDaysChapter };
 
 function SevenDaysMatchInner() {
   const reduceMotion = useShouldReduceMotion();
@@ -70,8 +86,30 @@ function SevenDaysMatchInner() {
   );
 
   const handleCleared = useCallback(
-    (level: SevenDaysLevel, answeredFirstTry: boolean, advance: boolean) => {
-      const updated = markLevelCleared(progress, level, answeredFirstTry);
+    (level: SevenDaysLevel) => {
+      const updated = markLevelCleared(progress, level);
+      setProgress(updated);
+      writeSevenDaysProgress(updated);
+      // The last level of a day hands over to that day's questions; every
+      // other level runs straight into the next board.
+      const waiting = pendingQuestionDay(updated);
+      if (waiting && waiting.id === level.chapterId) {
+        setView({ kind: "questions", chapter: waiting });
+        return;
+      }
+      const following = SEVEN_DAYS_LEVELS[levelOrdinal(level) + 1];
+      if (following && isLevelUnlocked(updated, following)) {
+        setView({ kind: "level", level: following });
+      } else {
+        setView({ kind: "map" });
+      }
+    },
+    [progress],
+  );
+
+  const handleRoundComplete = useCallback(
+    (chapter: SevenDaysChapter, firstTryQuestionIds: string[]) => {
+      const updated = markDayAnswered(progress, chapter, firstTryQuestionIds);
       setProgress(updated);
       writeSevenDaysProgress(updated);
       // One completion for the whole week, not one per level: forty-nine
@@ -80,10 +118,7 @@ function SevenDaysMatchInner() {
       if (summarize(updated).complete) {
         track("scripture_game_completed", { kind: "seven-days-match" });
       }
-      const ordinal = levelOrdinal(level);
-      const following = SEVEN_DAYS_LEVELS[ordinal + 1];
-      if (advance && following) setView({ kind: "level", level: following });
-      else setView({ kind: "map" });
+      setView({ kind: "map" });
     },
     [progress],
   );
@@ -115,7 +150,13 @@ function SevenDaysMatchInner() {
        agrees to leave — and a game that will not leave a screen is broken in
        the way a reader notices most. */
     <motion.div
-      key={view.kind === "level" ? view.level.id : view.kind}
+      key={
+        view.kind === "level"
+          ? view.level.id
+          : view.kind === "questions"
+            ? `questions-${view.chapter.id}`
+            : view.kind
+      }
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={transition}
@@ -209,14 +250,15 @@ function SevenDaysMatchInner() {
             </button>
             <ul className="mt-3 space-y-3">
               {SEVEN_DAYS_CHAPTERS.map((chapter) => {
-                const levels = SEVEN_DAYS_LEVELS.filter(
-                  (level) => level.chapterId === chapter.id,
-                );
+                const levels = levelsForChapter(chapter.id);
                 const clearedCount = levels.filter((level) =>
                   isLevelCleared(progress, level),
                 ).length;
-                const open = levels.some((level) =>
-                  isLevelUnlocked(progress, level),
+                const open = isDayUnlocked(progress, chapter);
+                const answered = isDayAnswered(progress, chapter);
+                const questionsWaiting = isDayReadyForQuestions(
+                  progress,
+                  chapter,
                 );
                 const art = SEVEN_DAYS_TILES[chapter.signature];
                 return (
@@ -240,14 +282,17 @@ function SevenDaysMatchInner() {
                       <div className="min-w-0 flex-1">
                         <p className="font-pixel text-caption uppercase tracking-[0.06em] text-gilt">
                           Day {chapter.day} · {clearedCount}/{levels.length}
+                          {answered && " · answered"}
                         </p>
                         <h3 className="mt-1 font-display text-subheading text-graphite">
                           {chapter.title}
                         </h3>
                         <p className="mt-1 text-small leading-relaxed text-ash">
-                          {open
-                            ? chapter.summary
-                            : "Finish the day before this one to open it."}
+                          {!open
+                            ? "Answer the day before this one to open it."
+                            : questionsWaiting
+                              ? "Every level is gathered. Seven questions open the next day."
+                              : chapter.summary}
                         </p>
                         {open && (
                           <Link
@@ -263,6 +308,17 @@ function SevenDaysMatchInner() {
 
                     {/* Seven across, always — the row is the day, and a set
                         that wrapped to five-and-two stopped reading as one. */}
+                    {questionsWaiting && (
+                      <GentleButton
+                        variant="primary"
+                        fullWidth
+                        className="mt-3"
+                        onClick={() => setView({ kind: "questions", chapter })}
+                      >
+                        Answer Day {chapter.day}&apos;s questions
+                      </GentleButton>
+                    )}
+
                     <ol className="mt-3 grid grid-cols-7 gap-1.5">
                       {levels.map((level) => {
                         const unlocked = isLevelUnlocked(progress, level);
@@ -320,6 +376,17 @@ function SevenDaysMatchInner() {
         </div>
       )}
 
+      {view.kind === "questions" && (
+        <div className="flex-1">
+          <SevenDaysQuestionRound
+            key={view.chapter.id}
+            chapter={view.chapter}
+            onComplete={(marks) => handleRoundComplete(view.chapter, marks)}
+            onExit={() => setView({ kind: "map" })}
+          />
+        </div>
+      )}
+
       {view.kind === "level" && (
         <div className="flex min-h-0 flex-1 flex-col">
             <SevenDaysLevelSession
@@ -327,12 +394,13 @@ function SevenDaysMatchInner() {
               // the attempt count, and the phase without an effect to do it.
               key={view.level.id}
               level={view.level}
-              question={questionForLevel(view.level)!}
-              hasNext={levelOrdinal(view.level) + 1 < SEVEN_DAYS_LEVELS.length}
-              onExit={() => setView({ kind: "map" })}
-              onCleared={(answeredFirstTry, advance) =>
-                handleCleared(view.level, answeredFirstTry, advance)
+              nextLabel={
+                view.level.level === SEVEN_DAYS_LEVELS_PER_CHAPTER
+                  ? `Day ${view.level.day} questions`
+                  : `Level ${view.level.level + 1}`
               }
+              onExit={() => setView({ kind: "map" })}
+              onCleared={() => handleCleared(view.level)}
             />
         </div>
       )}

@@ -1,3 +1,5 @@
+import { WALLPAPER_CATALOG } from "@/lib/wallpapers/catalog";
+import { hashString } from "@/lib/utils/dates";
 import {
   SEVEN_DAYS_CHAPTERS,
   SEVEN_DAYS_LEVELS_PER_CHAPTER,
@@ -8,8 +10,10 @@ import {
   type SevenDaysChapter,
   type SevenDaysGoal,
   type SevenDaysLevel,
+  type SevenDaysMask,
   type SevenDaysTileId,
 } from "./types";
+import { versesForDay, type SevenDaysVerse } from "./verses";
 
 /** Seven rows and seven columns — the board is the week it retells. */
 export const BOARD_ROWS = 7;
@@ -21,6 +25,32 @@ const FOUR_TILE_CHAPTERS = 3;
 
 const BASE_MOVES = 32;
 const BASE_GOAL = 10;
+
+/**
+ * One shape per level, so a day is seven boards rather than the same board
+ * seven times. `#` plays, `.` is cut away — readable in source, which matters
+ * because a mask with an isolated cell is unwinnable and easy to write by
+ * accident. `assertValidSevenDaysContent` checks every one.
+ */
+const MASKS: readonly SevenDaysMask[] = [
+  // 1 — the full field.
+  ["#######", "#######", "#######", "#######", "#######", "#######", "#######"],
+  // 2 — corners drawn in.
+  [".#####.", "#######", "#######", "#######", "#######", "#######", ".#####."],
+  // 3 — a diamond.
+  ["...#...", "..###..", ".#####.", "#######", ".#####.", "..###..", "...#..."],
+  // 4 — a cross.
+  ["..###..", "..###..", "#######", "#######", "#######", "..###..", "..###.."],
+  // 5 — an hourglass.
+  ["#######", "#######", ".#####.", "..###..", ".#####.", "#######", "#######"],
+  // 6 — stepped, like a hillside.
+  ["####...", "#####..", "######.", "#######", ".######", "..#####", "...####"],
+  // 7 — a ring, open at the centre.
+  ["#######", "#######", "##...##", "##...##", "##...##", "#######", "#######"],
+];
+
+/** Every level plays over a different scene, cycling the catalogue. */
+const SCENES = WALLPAPER_CATALOG.map((wallpaper) => wallpaper.id);
 
 function tilesForChapter(chapter: SevenDaysChapter): SevenDaysTileId[] {
   const all = [...SEVEN_DAYS_TILE_IDS];
@@ -48,22 +78,38 @@ function goalTile(
   return others[(levelIndex - 1) % others.length];
 }
 
+/**
+ * Goals scale with the day and the level, and shrink with the board: a diamond
+ * plays on twenty-five cells where the full field plays on forty-nine, and
+ * asking the same count of both would make the cut-away shapes the hard ones
+ * for no reason a player could see.
+ */
 function goalsFor(
   chapter: SevenDaysChapter,
   levelIndex: number,
   tiles: readonly SevenDaysTileId[],
+  openCells: number,
 ): SevenDaysGoal[] {
   const primary = goalTile(chapter, levelIndex, tiles);
-  const count = BASE_GOAL + (chapter.day - 1) + levelIndex * 2;
+  const room = openCells / (BOARD_ROWS * BOARD_COLS);
+  const base = BASE_GOAL + (chapter.day - 1) + levelIndex * 2;
+  const count = Math.max(6, Math.round(base * room));
   const goals: SevenDaysGoal[] = [{ tile: primary, count }];
   // A second goal from the fourth level on: enough to ask for attention on two
   // parts of the board without turning a quiet game into bookkeeping.
   if (levelIndex >= 3) {
     const secondary =
       tiles.filter((tile) => tile !== primary)[levelIndex % (tiles.length - 1)];
-    goals.push({ tile: secondary, count: Math.max(6, Math.round(count * 0.6)) });
+    goals.push({ tile: secondary, count: Math.max(5, Math.round(count * 0.6)) });
   }
   return goals;
+}
+
+function countOpen(mask: SevenDaysMask): number {
+  return mask.reduce(
+    (total, line) => total + [...line].filter((cell) => cell === "#").length,
+    0,
+  );
 }
 
 /** Builds one level's rules. Pure, so the curve can be inspected in a test. */
@@ -72,14 +118,20 @@ export function buildLevel(
   levelIndex: number,
 ): SevenDaysLevel {
   const tiles = tilesForChapter(chapter);
+  // Rotate the shapes by day so day two's first level is not day one's first
+  // board again; every day still sees all seven.
+  const mask = MASKS[(levelIndex + chapter.day - 1) % MASKS.length];
+  const ordinal = (chapter.day - 1) * SEVEN_DAYS_LEVELS_PER_CHAPTER + levelIndex;
   return {
     id: `${chapter.id}-level-${levelIndex + 1}`,
     chapterId: chapter.id,
     day: chapter.day,
     level: levelIndex + 1,
     moves: BASE_MOVES - (chapter.day - 1) - levelIndex,
-    goals: goalsFor(chapter, levelIndex, tiles),
+    goals: goalsFor(chapter, levelIndex, tiles, countOpen(mask)),
     tiles,
+    mask,
+    sceneId: SCENES[ordinal % SCENES.length],
   };
 }
 
@@ -109,10 +161,28 @@ export function chapterById(id: string): SevenDaysChapter | undefined {
   return SEVEN_DAYS_CHAPTERS.find((chapter) => chapter.id === id);
 }
 
-/** The question a level ends with — one per level, in level order. */
-export function questionForLevel(level: SevenDaysLevel) {
+export function levelsForChapter(chapterId: string): SevenDaysLevel[] {
+  return SEVEN_DAYS_LEVELS.filter((level) => level.chapterId === chapterId);
+}
+
+/**
+ * The verse printed under the board.
+ *
+ * Drawn from the day's own passage rather than the whole Bible, so what a
+ * reader sees under a Day 3 board is Day 3's ground and seed. Seeded by level
+ * id, so the same level always shows the same verse — a line you can come back
+ * to, which is the point of being able to save it.
+ */
+export function verseForLevel(level: SevenDaysLevel): SevenDaysVerse | null {
   const chapter = chapterById(level.chapterId);
-  return chapter?.questions[level.level - 1];
+  if (!chapter) return null;
+  const pool = versesForDay(
+    chapter.source.chapter,
+    chapter.source.verseStart,
+    chapter.source.verseEnd ?? chapter.source.verseStart,
+  );
+  if (pool.length === 0) return null;
+  return pool[hashString(level.id) % pool.length];
 }
 
 export { SEVEN_DAYS_TOTAL_LEVELS };

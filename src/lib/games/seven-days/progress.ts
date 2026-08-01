@@ -1,20 +1,36 @@
-import { SEVEN_DAYS_CONTENT_VERSION } from "./content";
-import { SEVEN_DAYS_LEVELS, SEVEN_DAYS_LEVEL_BY_ID, levelOrdinal } from "./levels";
-import type { SevenDaysLevel } from "./types";
+import { SEVEN_DAYS_CHAPTERS, SEVEN_DAYS_CONTENT_VERSION } from "./content";
+import {
+  SEVEN_DAYS_LEVELS,
+  SEVEN_DAYS_LEVEL_BY_ID,
+  levelsForChapter,
+} from "./levels";
+import type { SevenDaysChapter, SevenDaysLevel } from "./types";
 
 export const SEVEN_DAYS_STORAGE_KEY = "biblequest:seven-days-match:v1";
-export const SEVEN_DAYS_STORAGE_VERSION = 1;
+export const SEVEN_DAYS_STORAGE_VERSION = 2;
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
+
+const LEVEL_IDS = new Set(SEVEN_DAYS_LEVEL_BY_ID.keys());
+const CHAPTER_IDS = new Set(SEVEN_DAYS_CHAPTERS.map((chapter) => chapter.id));
+const QUESTION_IDS = new Set(
+  SEVEN_DAYS_CHAPTERS.flatMap((chapter) =>
+    chapter.questions.map((question) => question.id),
+  ),
+);
 
 /**
  * What the game remembers, and nothing else: which levels have been cleared,
- * and which were answered on the first try. No score history, no attempt
- * counts, no identity — a match-3 board is not a record of anyone's faith.
+ * which days have had their questions answered, and which questions were right
+ * first time. No score history, no attempt counts, no identity — a match-three
+ * board is not a record of anyone's faith.
  */
 export interface SevenDaysProgress {
   readonly version: typeof SEVEN_DAYS_STORAGE_VERSION;
   readonly contentVersion: number;
   readonly cleared: readonly string[];
+  /** Chapter ids whose seven-question round has been completed. */
+  readonly daysAnswered: readonly string[];
+  /** Question ids answered correctly the first time they were asked. */
   readonly firstTry: readonly string[];
   readonly updatedAt: number;
 }
@@ -24,18 +40,19 @@ export function emptySevenDaysProgress(now = Date.now()): SevenDaysProgress {
     version: SEVEN_DAYS_STORAGE_VERSION,
     contentVersion: SEVEN_DAYS_CONTENT_VERSION,
     cleared: [],
+    daysAnswered: [],
     firstTry: [],
     updatedAt: now,
   };
 }
 
-function knownLevelIds(value: unknown): string[] | null {
+function knownIds(value: unknown, known: ReadonlySet<string>): string[] | null {
   if (!Array.isArray(value)) return null;
-  if (value.length > SEVEN_DAYS_LEVELS.length) return null;
+  if (value.length > known.size) return null;
   const ids: string[] = [];
   for (const entry of value) {
     if (typeof entry !== "string") return null;
-    if (!SEVEN_DAYS_LEVEL_BY_ID.has(entry)) return null;
+    if (!known.has(entry)) return null;
     if (ids.includes(entry)) continue;
     ids.push(entry);
   }
@@ -61,15 +78,21 @@ export function sanitizeSevenDaysProgress(
   ) {
     return null;
   }
-  const cleared = knownLevelIds(entry.cleared);
-  const firstTry = knownLevelIds(entry.firstTry);
-  if (!cleared || !firstTry) return null;
-  // A level answered on the first try must also be a level that was cleared.
-  if (firstTry.some((id) => !cleared.includes(id))) return null;
+  const cleared = knownIds(entry.cleared, LEVEL_IDS);
+  const daysAnswered = knownIds(entry.daysAnswered, CHAPTER_IDS);
+  const firstTry = knownIds(entry.firstTry, QUESTION_IDS);
+  if (!cleared || !daysAnswered || !firstTry) return null;
+  // A day's questions cannot have been answered before its levels were played.
+  for (const chapterId of daysAnswered) {
+    if (levelsForChapter(chapterId).some((l) => !cleared.includes(l.id))) {
+      return null;
+    }
+  }
   return {
     version: SEVEN_DAYS_STORAGE_VERSION,
     contentVersion: SEVEN_DAYS_CONTENT_VERSION,
     cleared,
+    daysAnswered,
     firstTry,
     updatedAt: Number(entry.updatedAt),
   };
@@ -143,21 +166,40 @@ export function clearSevenDaysProgress(storage?: Storage): boolean {
   }
 }
 
-/** Records a cleared level without ever losing an earlier first-try mark. */
 export function markLevelCleared(
   progress: SevenDaysProgress,
   level: SevenDaysLevel,
-  answeredFirstTry: boolean,
   now = Date.now(),
 ): SevenDaysProgress {
-  const cleared = progress.cleared.includes(level.id)
-    ? progress.cleared
-    : [...progress.cleared, level.id];
-  const firstTry =
-    answeredFirstTry && !progress.firstTry.includes(level.id)
-      ? [...progress.firstTry, level.id]
-      : progress.firstTry;
-  return { ...progress, cleared, firstTry, updatedAt: now };
+  if (progress.cleared.includes(level.id)) return progress;
+  return {
+    ...progress,
+    cleared: [...progress.cleared, level.id],
+    updatedAt: now,
+  };
+}
+
+/**
+ * Records a finished question round.
+ *
+ * The round opens the next day whatever the score. The explanations are the
+ * point, and a wall would only stop the reader who most needs the next one —
+ * what the score changes is the mark on the map, never the road.
+ */
+export function markDayAnswered(
+  progress: SevenDaysProgress,
+  chapter: SevenDaysChapter,
+  firstTryQuestionIds: readonly string[],
+  now = Date.now(),
+): SevenDaysProgress {
+  const daysAnswered = progress.daysAnswered.includes(chapter.id)
+    ? progress.daysAnswered
+    : [...progress.daysAnswered, chapter.id];
+  const firstTry = [...progress.firstTry];
+  for (const id of firstTryQuestionIds) {
+    if (QUESTION_IDS.has(id) && !firstTry.includes(id)) firstTry.push(id);
+  }
+  return { ...progress, daysAnswered, firstTry, updatedAt: now };
 }
 
 export function isLevelCleared(
@@ -167,17 +209,47 @@ export function isLevelCleared(
   return progress.cleared.includes(level.id);
 }
 
+export function isDayAnswered(
+  progress: SevenDaysProgress,
+  chapter: SevenDaysChapter,
+): boolean {
+  return progress.daysAnswered.includes(chapter.id);
+}
+
+/** True once every level of a day is cleared and its questions are waiting. */
+export function isDayReadyForQuestions(
+  progress: SevenDaysProgress,
+  chapter: SevenDaysChapter,
+): boolean {
+  if (isDayAnswered(progress, chapter)) return false;
+  return levelsForChapter(chapter.id).every((level) =>
+    progress.cleared.includes(level.id),
+  );
+}
+
+/** A day opens when the day before it has answered its questions. */
+export function isDayUnlocked(
+  progress: SevenDaysProgress,
+  chapter: SevenDaysChapter,
+): boolean {
+  if (chapter.day === 1) return true;
+  const previous = SEVEN_DAYS_CHAPTERS[chapter.day - 2];
+  return progress.daysAnswered.includes(previous.id);
+}
+
 /**
- * A level opens when the one before it has been cleared. Levels already
- * cleared stay open, so a reader can revisit a day whenever they like.
+ * A level opens when the one before it in the same day has been cleared, and
+ * the day itself has been opened. Levels already cleared stay open, so a
+ * reader can revisit a day whenever they like.
  */
 export function isLevelUnlocked(
   progress: SevenDaysProgress,
   level: SevenDaysLevel,
 ): boolean {
-  const ordinal = levelOrdinal(level);
-  if (ordinal === 0) return true;
-  const previous = SEVEN_DAYS_LEVELS[ordinal - 1];
+  const chapter = SEVEN_DAYS_CHAPTERS[level.day - 1];
+  if (!chapter || !isDayUnlocked(progress, chapter)) return false;
+  if (level.level === 1) return true;
+  const previous = levelsForChapter(level.chapterId)[level.level - 2];
   return progress.cleared.includes(previous.id);
 }
 
@@ -189,25 +261,38 @@ export function nextLevel(progress: SevenDaysProgress): SevenDaysLevel {
   return pending ?? SEVEN_DAYS_LEVELS[SEVEN_DAYS_LEVELS.length - 1];
 }
 
+/** The day whose questions are waiting, if any. */
+export function pendingQuestionDay(
+  progress: SevenDaysProgress,
+): SevenDaysChapter | null {
+  return (
+    SEVEN_DAYS_CHAPTERS.find((chapter) =>
+      isDayReadyForQuestions(progress, chapter),
+    ) ?? null
+  );
+}
+
 export interface SevenDaysSummary {
   readonly cleared: number;
   readonly total: number;
   readonly firstTry: number;
+  readonly daysAnswered: number;
   readonly daysOpened: number;
   readonly complete: boolean;
 }
 
 export function summarize(progress: SevenDaysProgress): SevenDaysSummary {
-  const daysOpened = new Set(
-    SEVEN_DAYS_LEVELS.filter((level) =>
-      progress.cleared.includes(level.id),
-    ).map((level) => level.day),
-  ).size;
+  const daysOpened = SEVEN_DAYS_CHAPTERS.filter((chapter) =>
+    isDayUnlocked(progress, chapter),
+  ).length;
   return {
     cleared: progress.cleared.length,
     total: SEVEN_DAYS_LEVELS.length,
     firstTry: progress.firstTry.length,
+    daysAnswered: progress.daysAnswered.length,
     daysOpened,
-    complete: progress.cleared.length === SEVEN_DAYS_LEVELS.length,
+    complete:
+      progress.cleared.length === SEVEN_DAYS_LEVELS.length &&
+      progress.daysAnswered.length === SEVEN_DAYS_CHAPTERS.length,
   };
 }

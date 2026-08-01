@@ -1,6 +1,13 @@
 import { getBookMeta } from "@/lib/bible";
 import type { ScriptureSource } from "@/lib/games/types";
-import { isSevenDaysTileId } from "./board";
+import {
+  createBoard,
+  boardRng,
+  hasAvailableMove,
+  isSevenDaysTileId,
+  maskToBoard,
+  playableCount,
+} from "./board";
 import {
   SEVEN_DAYS_CHAPTERS,
   SEVEN_DAYS_LEVELS_PER_CHAPTER,
@@ -119,6 +126,27 @@ export function collectSevenDaysContentErrors(): string[] {
       errors.push(`${label} needs at least four tiles for matches to appear.`);
     }
     if (level.goals.length === 0) errors.push(`${label} has no goal.`);
+
+    // A shape has to be playable: square, big enough for runs of three, and
+    // able to deal an opening board that still has a move in it.
+    const skeleton = maskToBoard(level.mask);
+    if (skeleton.rows !== 7 || skeleton.cols !== 7) {
+      errors.push(`${label} mask is not seven by seven.`);
+    } else if (level.mask.some((line) => line.length !== 7)) {
+      errors.push(`${label} mask has a ragged row.`);
+    } else {
+      const open = playableCount(skeleton);
+      if (open < 24) errors.push(`${label} mask leaves too few cells to play.`);
+      const opening = createBoard(level.mask, level.tiles, boardRng(level.id));
+      if (!hasAvailableMove(opening)) {
+        errors.push(`${label} mask cannot be dealt with a move available.`);
+      }
+      const asked = level.goals.reduce((total, goal) => total + goal.count, 0);
+      if (asked > level.moves * 3) {
+        errors.push(`${label} asks for more than its moves can clear.`);
+      }
+    }
+    if (!level.sceneId) errors.push(`${label} has no scene.`);
     for (const goal of level.goals) {
       if (!level.tiles.includes(goal.tile)) {
         errors.push(`${label} asks for a tile that is not on its board.`);
