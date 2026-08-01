@@ -134,6 +134,49 @@ export const PIXEL_SPRITES = defineAssets({
 export type PixelSpriteName = keyof typeof PIXEL_SPRITES;
 export const PIXEL_SPRITE_NAMES = Object.keys(PIXEL_SPRITES) as PixelSpriteName[];
 
+/**
+ * Per-sprite correction so that one `size` means one visual weight.
+ *
+ * Every sprite is drawn on the same square canvas, but the art inside it is
+ * not the same size: the crown fills about three quarters of its canvas while
+ * the chain links fill under a third. Asked for at the same size those render
+ * as a bold mark and a faint one, which is why some icons kept reading as too
+ * small however far the ladder was raised — the number was never the problem.
+ *
+ * Measured, not guessed: each value is `0.5 / coverage`, where coverage is the
+ * sprite's opaque bounding box as a fraction of its canvas and 0.5 is the
+ * median across the set. Capped at 1.7, and never below 1 — a sprite that
+ * already fills its canvas is left exactly as it is, so nothing that looks
+ * right today gets smaller.
+ *
+ * Two families are deliberately absent. Tree stages and candle stages are
+ * progressions where the art growing within its canvas *is* the meaning: a
+ * seed is meant to be small and a lit candle is meant to outgrow an unlit one.
+ * Normalising those would have drawn every stage of the journey at the same
+ * size and quietly deleted twenty stages of growth.
+ */
+export const PIXEL_ART_WEIGHT: Partial<Record<PixelSpriteName, number>> = {
+  links: 1.68,
+  stone: 1.56,
+  "service-basket": 1.49,
+  leaf: 1.45,
+  sprout: 1.45,
+  sun: 1.45,
+  bird: 1.42,
+  scroll: 1.36,
+  star: 1.36,
+  flower: 1.33,
+  map: 1.25,
+  dove: 1.21,
+  cross: 1.19,
+  wheat: 1.16,
+  myshepherd: 1.12,
+  tree: 1.12,
+  // Registry key, not filename — this one is `hands-praying.png`.
+  hands: 1.1,
+  door: 1.07,
+};
+
 /** Larger character and object art for onboarding and empty states. */
 export const PIXEL_MASCOTS = defineAssets({
   lamb: pixelPng("/pixel/mascot-lamb.png", 32, 32, 0.625, undefined, undefined, undefined, "/pixel/mascot-lamb-walk.gif"),

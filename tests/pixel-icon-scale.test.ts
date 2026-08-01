@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { globSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { PIXEL_ICON } from "@/components/design-system/PixelIcon";
+import { PIXEL_ART_WEIGHT } from "@/components/design-system/pixel-assets";
 
 const SOURCES = globSync("src/**/*.tsx");
 
@@ -52,6 +53,33 @@ describe("pixel icon scale", () => {
     // `mini` builds the hand-drawn fruit out of raw pixels and is far too
     // small to be a sprite size; the flower beside it needs its own.
     expect(tree).not.toMatch(/<PixelIcon[^>]*size=\{mini\}/);
+  });
+
+  it("corrects for how much of its canvas each sprite's art fills", () => {
+    // Every sprite shares one square canvas, but the art inside does not fill
+    // it equally — the crown takes about three quarters, the chain links under
+    // a third. Asked for at the same size those render as a bold mark and a
+    // faint one, which is why some icons kept reading as small however far the
+    // ladder was raised. The number was never the problem.
+    expect(PIXEL_ART_WEIGHT.links).toBeGreaterThan(1.5);
+    expect(PIXEL_ART_WEIGHT["service-basket"]).toBeGreaterThan(1.3);
+    for (const [name, weight] of Object.entries(PIXEL_ART_WEIGHT)) {
+      // Only ever up. A sprite that already fills its canvas is left alone, so
+      // nothing that looks right today is made smaller by this table.
+      expect(weight, `${name} would shrink`).toBeGreaterThanOrEqual(1);
+      expect(weight, `${name} is scaled past reason`).toBeLessThanOrEqual(1.7);
+    }
+  });
+
+  it("leaves the two progressions alone", () => {
+    // Tree stages and candle stages grow within their canvas on purpose: a
+    // seed is meant to be small, and a lit candle to outgrow an unlit one.
+    // Normalising those would draw every stage at the same size and quietly
+    // delete the growth the whole Journey screen is about.
+    for (const name of Object.keys(PIXEL_ART_WEIGHT)) {
+      expect(name.startsWith("tree-stage-"), `${name} is a tree stage`).toBe(false);
+      expect(name.startsWith("candle"), `${name} is a candle stage`).toBe(false);
+    }
   });
 
   it("keeps icons within a range a phone can show", () => {
