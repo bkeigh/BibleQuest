@@ -68,7 +68,7 @@ export function SevenDaysBoostBar({
             )}
           >
             <span aria-hidden="true" className={cn(!usable && "opacity-45")}>
-              <PixelIcon name={boost.sprite} size={32} />
+              <PixelIcon name={boost.sprite} size={44} />
             </span>
             <span aria-hidden="true" className="text-caption font-medium">
               {count > 0 ? count : "none"}

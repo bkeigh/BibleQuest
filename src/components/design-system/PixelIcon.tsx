@@ -39,15 +39,15 @@ interface PixelIconProps {
  */
 export const PIXEL_ICON = {
   /** Inline with running text — a chip, a byline, a meta row. */
-  inline: 24,
+  inline: 32,
   /** A list row's leading glyph. */
-  row: 36,
+  row: 48,
   /** A card's subject mark. */
-  card: 48,
+  card: 64,
   /** The thing a screen is about. */
-  feature: 64,
+  feature: 88,
   /** Empty states and hero marks. */
-  hero: 96,
+  hero: 128,
 } as const;
 
 export function PixelIcon({

@@ -86,7 +86,7 @@ export default async function SharedVersePage({
   return (
     <article className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-5 pb-24 pt-32 sm:px-8">
       <div className="mb-4 flex items-center gap-2 text-caption uppercase tracking-[0.14em] text-accent">
-        <PixelIcon name="open-book" size={36} /> Shared Scripture
+        <PixelIcon name="open-book" size={48} /> Shared Scripture
       </div>
 
       <PaperCard variant="atmospheric" padding="lg" className="relative overflow-hidden">

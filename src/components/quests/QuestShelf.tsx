@@ -117,10 +117,31 @@ export function QuestLane({
     });
   }
 
+  /**
+   * One card's slot.
+   *
+   * When the lane is a `<ul>` the slot has to be the `<li>`, and the lane has
+   * to place it directly. A rail slot used to be a `<div>`, which put a plain
+   * div between the list and its items — so the list announced no items at all
+   * and every card lost its "2 of 3". Owning the item here rather than asking
+   * each card to be one keeps both layouts right for the same children.
+   */
+  const Slot = Tag === "ul" ? "li" : "div";
+  const slots = (extra?: string) => {
+    const wrap = (child: React.ReactNode, key: React.Key) => (
+      <Slot key={key} className={cn(Tag === "ul" && "list-none", extra)}>
+        {child}
+      </Slot>
+    );
+    return Array.isArray(children)
+      ? children.map((child, index) => wrap(child, index))
+      : wrap(children, 0);
+  };
+
   if (layout === "list") {
     return (
       <Tag className={cn("grid gap-3", className)} {...rest}>
-        {children}
+        {Tag === "ul" ? slots() : children}
       </Tag>
     );
   }
@@ -134,13 +155,7 @@ export function QuestLane({
         {...rest}
       >
         {/* Each child owns one rail slot so the cards read as one set. */}
-        {Array.isArray(children)
-          ? children.map((child, index) => (
-              <div key={index} className={RAIL_ITEM}>
-                {child}
-              </div>
-            ))
-          : <div className={RAIL_ITEM}>{children}</div>}
+        {slots(RAIL_ITEM)}
       </Tag>
 
       {!(edges.atStart && edges.atEnd) && (

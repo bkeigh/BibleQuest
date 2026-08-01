@@ -106,7 +106,7 @@ function ToastCard({
       )}
     >
       {variant === "celebrate" && (
-        <PixelIcon name="star" size={36} animate className="shrink-0" />
+        <PixelIcon name="star" size={48} animate className="shrink-0" />
       )}
       <span className="min-w-0 flex-1">{item.message}</span>
       {item.action && (

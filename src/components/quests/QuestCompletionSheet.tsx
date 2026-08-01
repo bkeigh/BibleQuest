@@ -117,7 +117,7 @@ export function QuestCompletionSheet({
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent-surface ring-1 ring-accent/20">
-              <PixelIcon name="star" size={44} animate />
+              <PixelIcon name="star" size={56} animate />
             </span>
             <div className="min-w-0">
               <p className="text-caption uppercase tracking-[0.14em] text-accent">

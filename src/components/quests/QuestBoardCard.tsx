@@ -72,7 +72,7 @@ export function QuestBoardCard({
   const removeQuest = useQuestOS((store) => store.removeQuest);
   const completeQuest = useQuestOS((store) => store.completeQuestBySlug);
   const markQuestStep = useQuestOS((store) => store.markQuestStep);
-  const cardRef = useRef<HTMLLIElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const nextStepRef = useRef<HTMLButtonElement>(null);
   const contentId = useId();
 
@@ -176,12 +176,15 @@ export function QuestBoardCard({
     );
 
   return (
-    <motion.li
+    // Not a list item. `QuestLane` places the `<li>` around this, because only
+    // the lane knows whether it is laying the cards out as a column or a rail
+    // — and a rail needs the item to carry the slot width.
+    <motion.div
       ref={cardRef}
       data-quest-card={quest.slug}
       data-quest-card-state={state}
       tabIndex={-1}
-      className="list-none scroll-mt-28 outline-none"
+      className="h-full scroll-mt-28 outline-none"
       // A local entrance avoids Safari's stale shared-layout projections while
       // still making a card's destination apparent after a state transition.
       initial={{ opacity: 0, y: 6 }}
@@ -190,10 +193,10 @@ export function QuestBoardCard({
     >
       <PaperCard padding="none" className="overflow-hidden">
         <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3.5 px-4 pt-4 sm:px-5">
-          <span className="mt-0.5 shrink-0 rounded-[10px] bg-linen p-2 ring-1 ring-mist">
+          <span className="-mt-1 shrink-0">
             <PixelIcon
               name={CATEGORY_SPRITE[quest.category] ?? "leaf"}
-              size={52}
+              size={68}
             />
           </span>
           <div className="min-w-0 flex-1">
@@ -402,6 +405,6 @@ export function QuestBoardCard({
           </div>
         </div>
       </PaperCard>
-    </motion.li>
+    </motion.div>
   );
 }

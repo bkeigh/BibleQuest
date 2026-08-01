@@ -271,7 +271,7 @@ export function SevenDaysBoard({
               "outline-none focus-visible:ring-2 focus-visible:ring-accent",
             )}
           >
-            <PixelIcon name={art.sprite} size={36} />
+            <PixelIcon name={art.sprite} size={48} />
           </motion.button>
         );
       })}

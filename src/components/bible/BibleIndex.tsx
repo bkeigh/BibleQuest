@@ -231,7 +231,7 @@ function BibleIndexInner() {
                   ? `/app/bible/${readingPosition.bookSlug}/${readingPosition.chapter}`
                   : "/app/bible/john/1"
               }
-              icon={<PixelIcon name="bookmark" size={44} />}
+              icon={<PixelIcon name="bookmark" size={56} />}
               eyebrow={readingPosition ? "Continue" : "A place to begin"}
               title={
                 readingPosition
@@ -241,7 +241,7 @@ function BibleIndexInner() {
             />
             <QuickLink
               href="/app/bible/saved"
-              icon={<IconBookmark size={20} />}
+              icon={<IconBookmark size={34} />}
               eyebrow="Saved verses"
               title={`${bookmarks.length} saved`}
             />
@@ -311,7 +311,7 @@ function BibleIndexInner() {
                         className="flex h-full min-h-28 flex-col"
                       >
                         <div className="flex items-center gap-2">
-                          <PixelIcon name="open-book" size={36} />
+                          <PixelIcon name="open-book" size={48} />
                           <p className="font-display text-[1.0625rem] text-graphite">
                             {recentVerse.reference}
                           </p>
@@ -498,9 +498,10 @@ function QuickLink({
           padding="sm"
           className="flex h-full min-h-28 flex-col justify-between"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-[9px] bg-linen text-accent ring-1 ring-mist">
-            {icon}
-          </span>
+          {/* No plate. A 36px box was squeezing a 56px sprite, and the pixel
+              art carries its own edges — the Save and Share controls above
+              already sit bare on the same page. */}
+          <span className="flex items-center text-accent">{icon}</span>
           <span className="mt-3">
             <span className="block text-caption uppercase tracking-[0.1em] text-accent">
               {eyebrow}
