@@ -502,6 +502,30 @@ html.theme-dark .milestone-glass-surface[data-milestone-state="reached"] {
   image-rendering: pixelated;
 }
 
+/* ---- Hand-animated sprites ----
+   A GIF ignores every stylesheet, so PixelIcon renders the moving frame and
+   the still one beside each other and lets CSS pick. Motion is the default;
+   either the operating system's preference or BibleQuest's own switch puts the
+   still in its place. The hidden one is display:none, so only one occupies
+   layout and only one is announced. */
+.pixel-at-rest {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pixel-in-motion {
+    display: none;
+  }
+  .pixel-at-rest {
+    display: block;
+  }
+}
+html.force-reduce-motion .pixel-in-motion {
+  display: none;
+}
+html.force-reduce-motion .pixel-at-rest {
+  display: block;
+}
+
 /* ============================================================
    Pixel accent system — sacred exploration, never arcade
    Rules live in docs/PIXEL_SYSTEM.md. In short:

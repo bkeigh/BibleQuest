@@ -27,7 +27,7 @@ export default async function SupportPage({
   return (
     <div className="mx-auto w-full max-w-2xl px-5 pb-24 pt-32 sm:px-8">
       <div className="flex items-center gap-2 text-caption uppercase tracking-[0.14em] text-accent">
-        <PixelIcon name="heart" size={3} /> Support BibleQuest
+        <PixelIcon name="service-basket" size={3} /> Support BibleQuest
       </div>
       <h1 className="mt-2 font-display text-heading text-graphite sm:text-heading-lg">
         Help keep the essentials free.
