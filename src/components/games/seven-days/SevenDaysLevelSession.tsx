@@ -13,6 +13,17 @@ import { PaperCard } from "@/components/design-system/PaperCard";
 import { scriptureSourceHref } from "@/lib/games/links";
 import { chapterById, verseForLevel } from "@/lib/games/seven-days/levels";
 import {
+  EXTRA_MOVES,
+  readInventory,
+  spendBoost,
+  writeInventory,
+  type BoostId,
+  type BoostInventory,
+} from "@/lib/games/arcade/boosts";
+import {
+  addMoves,
+  findHint,
+  gatherKind,
   goalProgress,
   selectTile,
   shuffleSession,
@@ -28,6 +39,7 @@ import type {
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 import { cn } from "@/lib/utils/cn";
 import { SevenDaysBoard } from "./SevenDaysBoard";
+import { SevenDaysBoostBar } from "./SevenDaysBoostBar";
 import { SevenDaysGoalChip } from "./SevenDaysGoalChip";
 import { SevenDaysScene, sceneById } from "./SevenDaysScene";
 import { SevenDaysVerseStrip } from "./SevenDaysVerseStrip";
@@ -80,6 +92,10 @@ export function SevenDaysLevelSession({
   } | null>(null);
   const [playing, setPlaying] = useState(false);
   const [combo, setCombo] = useState<number | null>(null);
+  const [inventory, setInventory] = useState<BoostInventory>(readInventory);
+  const [hinted, setHinted] = useState<{ from: number; to: number } | null>(
+    null,
+  );
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   const { state } = session;
@@ -115,6 +131,53 @@ export function SevenDaysLevelSession({
     setAnnouncement("This level begins again.");
     setStage("play");
     setPaused(false);
+  }
+
+  /**
+   * Spends one board help.
+   *
+   * Never during a cascade, and never on a level that is already finished —
+   * a help changes a game in progress, it does not rewrite a result. A hint
+   * with nothing to point at is not spent at all, because the board being
+   * stuck is what the free shuffle is for.
+   */
+  function spendOnBoard(id: BoostId) {
+    if (playing || state.status !== "playing") return;
+    const spent = spendBoost(inventory, id);
+    if (!spent) return;
+
+    if (id === "extra-moves") {
+      setSession(addMoves(session, EXTRA_MOVES));
+      setAnnouncement(`${EXTRA_MOVES} more moves.`);
+    } else if (id === "hint") {
+      const move = findHint(session);
+      if (!move) {
+        setAnnouncement("Nothing to trade here. Shuffling is free.");
+        return;
+      }
+      setHinted(move);
+      setAnnouncement("A trade worth making is marked on the board.");
+      window.setTimeout(() => setHinted(null), 2600);
+    } else {
+      // Gather goes after whichever kind the level is still asking for, so the
+      // help lands on the reader's goal rather than somewhere generic.
+      const wanted =
+        state.level.goals.find(
+          (goal) => state.gathered[goal.tile] < goal.count,
+        )?.tile ?? state.level.goals[0].tile;
+      const result = gatherKind(session, wanted);
+      if (result.gathered === 0) {
+        setAnnouncement("None of those are on the board.");
+        return;
+      }
+      setSession(result.session);
+      setAnnouncement(
+        `Gathered ${result.gathered} ${SEVEN_DAYS_TILES[wanted].label}.`,
+      );
+    }
+
+    setInventory(spent);
+    writeInventory(spent);
   }
 
   /**
@@ -346,8 +409,15 @@ export function SevenDaysLevelSession({
               clearing={preview?.clearing ?? undefined}
               onSelect={(index) => setSession(selectTile(session, index))}
               onSwap={(from, to) => void handleSwap(from, to)}
+              hinted={hinted}
               />
             </div>
+
+            <SevenDaysBoostBar
+              inventory={inventory}
+              disabled={playing || state.status !== "playing"}
+              onUse={spendOnBoard}
+            />
 
             <div className="flex items-center gap-2">
               <GentleButton

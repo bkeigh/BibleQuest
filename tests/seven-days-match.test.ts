@@ -46,6 +46,19 @@ import {
 } from "@/lib/games/seven-days/progress";
 import { collectSevenDaysContentErrors } from "@/lib/games/seven-days/validation";
 import {
+  BOOSTS,
+  BOOST_IDS,
+  EMPTY_INVENTORY,
+  boostsEarnedForRound,
+  grantBoost,
+  sanitizeInventory,
+  spendBoost,
+} from "@/lib/games/arcade/boosts";
+import {
+  ARCADE_PRODUCTS,
+  assertNoShortcutsForSale,
+} from "@/lib/games/arcade/store";
+import {
   BLOCKED,
   type SevenDaysBoard,
 } from "@/lib/games/seven-days/types";
@@ -460,33 +473,74 @@ describe("Seven Days Match product boundaries", () => {
   const session = sourceOf("SevenDaysLevelSession.tsx");
   const question = sourceOf("SevenDaysQuestionCard.tsx");
   const board = sourceOf("SevenDaysBoard.tsx");
+  const storeSource = readFileSync("src/lib/games/arcade/store.ts", "utf8");
   const all = [screen, session, question, board].join("\n");
 
-  it("sells nothing and takes nothing away for losing", () => {
-    // Match-three usually runs on lives, timers, and boosters. None of those
-    // belong on a surface that also promises every answer for free, so none of
-    // their vocabulary may reach the reader. Comments are stripped first: prose
-    // about where state "lives" is not a life system.
+  it("takes nothing away for losing, whatever it sells", () => {
+    // The arcade sells packs and board helps now, so "nothing to buy" is no
+    // longer the promise. These still are: no lives, no timers, no waiting,
+    // and nothing that charges for being stuck. Comments are stripped first —
+    // prose about where state "lives" is not a life system.
     const copy = all
       .replaceAll(/\/\*[\s\S]*?\*\//g, "")
       .replaceAll(/^\s*\/\/.*$/gm, "")
       .toLocaleLowerCase();
-    for (const word of [
-      "booster",
-      "power-up",
-      "gems",
-      "coins",
-      "purchase",
-      "out of lives",
-      "watch an ad",
-    ]) {
+    for (const word of ["out of lives", "watch an ad", "wait to play"]) {
       expect(copy).not.toContain(word);
     }
-    expect(screen).toContain("nothing to buy");
+    // Running out of moves still offers another go before it offers a help.
+    expect(session).toContain("Try this level again");
     expect(session).toContain("no wait and no cost");
     // The one thing the game does write is a bookmark the reader asked for,
     // and the pause card says so rather than claiming it changes nothing.
     expect(session).toContain("Playing does not change your Journey");
+  });
+
+  it("never sells a way past the Scripture", () => {
+    // The one line the arcade may not cross. Enforced in the catalogue itself
+    // so it fails a build rather than a review, and asserted here so the rule
+    // cannot be quietly removed from the catalogue.
+    expect(storeSource).toContain("assertNoShortcutsForSale");
+    expect(() =>
+      assertNoShortcutsForSale([
+        {
+          id: "test-skip",
+          kind: "pack",
+          title: "Skip a level",
+          description: "Jump past a board.",
+          price: "$1",
+        },
+      ]),
+    ).toThrow(/never a way past it/);
+    for (const product of ARCADE_PRODUCTS) {
+      expect(["pack", "bundle"]).toContain(product.kind);
+    }
+  });
+
+  it("keeps helps on the board and off the Scripture", () => {
+    for (const id of BOOST_IDS) {
+      const boost = BOOSTS[id];
+      const text = `${boost.name} ${boost.description}`.toLocaleLowerCase();
+      for (const word of ["answer", "explanation", "question", "skip"]) {
+        expect(text).not.toContain(word);
+      }
+    }
+  });
+
+  it("lets a reader earn helps by reading rather than paying", () => {
+    // The economy has to work for someone who never spends anything, or the
+    // helps are a paywall with extra steps.
+    expect(boostsEarnedForRound(7, 7).length).toBeGreaterThan(0);
+    expect(boostsEarnedForRound(4, 7).length).toBeGreaterThan(0);
+    expect(boostsEarnedForRound(0, 7)).toEqual([]);
+  });
+
+  it("spends a help only when it has one", () => {
+    const inventory = grantBoost(EMPTY_INVENTORY, "hint", 1);
+    expect(spendBoost(inventory, "hint")?.hint).toBe(0);
+    expect(spendBoost(EMPTY_INVENTORY, "hint")).toBeNull();
+    expect(sanitizeInventory({ hint: -1 })).toBeNull();
+    expect(sanitizeInventory({ "level-skip": 3 })).toBeNull();
   });
 
   it("emits only bounded game-kind lifecycle analytics", () => {

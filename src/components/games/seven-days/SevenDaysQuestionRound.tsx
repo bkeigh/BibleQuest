@@ -4,6 +4,13 @@ import { useRef, useState } from "react";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { IconCheck } from "@/components/design-system/icons";
 import { PaperCard } from "@/components/design-system/PaperCard";
+import {
+  BOOSTS,
+  boostsEarnedForRound,
+  grantBoost,
+  readInventory,
+  writeInventory,
+} from "@/lib/games/arcade/boosts";
 import type { SevenDaysChapter } from "@/lib/games/seven-days/types";
 import { cn } from "@/lib/utils/cn";
 import { SevenDaysQuestionCard } from "./SevenDaysQuestionCard";
@@ -38,6 +45,7 @@ export function SevenDaysQuestionRound({
 
   if (done) {
     const perfect = firstTry.length === total;
+    const earned = boostsEarnedForRound(firstTry.length, total);
     return (
       <PaperCard variant="atmospheric" padding="lg">
         <p className="font-pixel text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
@@ -55,11 +63,39 @@ export function SevenDaysQuestionRound({
             ? `All ${total} answered first time. The next day is open.`
             : `${firstTry.length} of ${total} answered first time — and every explanation is yours to read again. The next day is open.`}
         </p>
+        {earned.length > 0 && (
+          <div className="mt-4 rounded-[var(--radius-button)] border border-gold-500/35 bg-gold-500/10 p-3">
+            <p className="text-small font-medium text-gilt">
+              Earned for the board
+            </p>
+            <ul className="mt-1.5 space-y-0.5">
+              {earned.map((grant) => (
+                <li key={grant.id} className="text-caption text-charcoal">
+                  {grant.count} × {BOOSTS[grant.id].name}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1.5 text-caption leading-relaxed text-ash">
+              Helps are for the board only. Nothing here buys an answer.
+            </p>
+          </div>
+        )}
+
         <GentleButton
           variant="primary"
           fullWidth
           className="mt-5"
-          onClick={() => onComplete(firstTry)}
+          onClick={() => {
+            // Reading is what earns them, so the grant lands with the round.
+            if (earned.length > 0) {
+              let inventory = readInventory();
+              for (const grant of earned) {
+                inventory = grantBoost(inventory, grant.id, grant.count);
+              }
+              writeInventory(inventory);
+            }
+            onComplete(firstTry);
+          }}
         >
           Continue
         </GentleButton>

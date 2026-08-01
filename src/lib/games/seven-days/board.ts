@@ -123,7 +123,7 @@ export function findMatches(board: SevenDaysBoard): Set<number> {
  * refills from its own top. Without that, a board with a hole in the middle
  * would drain through it.
  */
-function settle(
+export function settleBoard(
   board: SevenDaysBoard,
   tiles: readonly SevenDaysTileId[],
   random: Rng,
@@ -183,7 +183,7 @@ export function resolveMatches(
     // tiles would vanish and reappear elsewhere in the same frame.
     const emptied: SevenDaysBoard = { ...current, cells };
     points += matched.size * POINTS_PER_TILE + (cascades - 1) * CASCADE_BONUS;
-    current = settle(emptied, tiles, random);
+    current = settleBoard(emptied, tiles, random);
     steps.push({ cascade: cascades, matched, emptied, settled: current });
   }
 

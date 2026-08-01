@@ -230,11 +230,19 @@ function SevenDaysMatchInner() {
               </GentleButton>
 
               <p className="mt-5 text-caption leading-relaxed text-ash">
-                Every level and every answer is included. There are no lives,
-                no timers, and nothing to buy.
+                All seven days and every answer are included. There are no
+                lives and no timers, running out of moves costs nothing but
+                another go, and nothing sold in the arcade gets you past a
+                level or a question.
                 {!storageAvailable &&
                   " This browser cannot save your place, so the map will start fresh next time."}
               </p>
+              <Link
+                href="/app/games/store"
+                className="mt-2 inline-flex min-h-11 items-center text-caption font-medium text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                Board helps and packs
+              </Link>
             </PaperCard>
         </div>
       )}

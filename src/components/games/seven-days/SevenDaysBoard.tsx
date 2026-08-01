@@ -21,6 +21,8 @@ interface SevenDaysBoardProps {
   disabled: boolean;
   /** Cells about to leave, so they can be seen going rather than just gone. */
   clearing?: ReadonlySet<number>;
+  /** A trade the hint boost is pointing at. */
+  hinted?: { from: number; to: number } | null;
   onSelect: (index: number) => void;
   onSwap: (from: number, to: number) => void;
 }
@@ -38,6 +40,7 @@ export function SevenDaysBoard({
   selected,
   disabled,
   clearing,
+  hinted,
   onSelect,
   onSwap,
 }: SevenDaysBoardProps) {
@@ -138,6 +141,7 @@ export function SevenDaysBoard({
         const art = SEVEN_DAYS_TILES[cell];
         const isSelected = selected === index;
         const isClearing = clearing?.has(index) ?? false;
+        const isHinted = hinted?.from === index || hinted?.to === index;
         const row = rowOf(board, index) + 1;
         const col = colOf(board, index) + 1;
         return (
@@ -150,7 +154,11 @@ export function SevenDaysBoard({
             animate={
               isClearing
                 ? { scale: reduceMotion ? 1 : 0.35, opacity: reduceMotion ? 1 : 0 }
-                : { y: 0, opacity: 1, scale: isSelected ? 1.06 : 1 }
+                : {
+                    y: 0,
+                    opacity: 1,
+                    scale: isSelected ? 1.06 : isHinted && !reduceMotion ? [1, 1.09, 1] : 1,
+                  }
             }
             transition={
               reduceMotion
@@ -174,7 +182,11 @@ export function SevenDaysBoard({
             className={cn(
               "relative flex aspect-square items-center justify-center rounded-[11px] ring-1",
               art.chipClassName,
-              isSelected ? "ring-2 ring-accent" : "hover:brightness-105",
+              isSelected
+                ? "ring-2 ring-accent"
+                : isHinted
+                  ? "ring-2 ring-gilt"
+                  : "hover:brightness-105",
               disabled && "pointer-events-none opacity-70",
               "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
             )}
