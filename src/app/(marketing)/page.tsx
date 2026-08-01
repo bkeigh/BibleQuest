@@ -301,7 +301,7 @@ export default function LandingPage() {
           {RHYTHM.map((r, i) => (
             <Reveal key={r.title} delay={i * 0.06}>
               <PaperCard variant="paper" padding="lg" className="h-full text-center">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-linen ring-1 ring-mist">
+                <div className="mx-auto mb-4 flex items-center justify-center">
                   <PixelIcon name={r.sprite} size={68} />
                 </div>
                 <h3 className="font-display text-[1.25rem] text-graphite">{r.title}</h3>
@@ -395,7 +395,7 @@ export default function LandingPage() {
       <EditorialSection className="bg-linen" spacing="compact">
         <Reveal>
           <PaperCard variant="paper" padding="lg" className="mx-auto max-w-2xl text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-accent-surface">
+            <div className="mx-auto mb-4 flex items-center justify-center">
               <PixelIcon name="chapel" size={68} />
             </div>
             <h2 className="font-display text-editorial text-graphite">
