@@ -346,7 +346,7 @@ function EmptyJournal({
   return (
     <div className="mt-6 space-y-3">
       <PaperCard variant="atmospheric" padding="lg" className="text-center">
-        <PixelMascot name="dove" size={8} className="mb-4" />
+        <PixelMascot name="dove" size={160} className="mb-4" />
         <h2 className="font-display text-[1.25rem] text-graphite">
           Make space for what matters
         </h2>
@@ -381,7 +381,7 @@ function EmptyJournal({
 function EmptyResults({ query, onClear }: { query: string; onClear: () => void }) {
   return (
     <PaperCard variant="quiet" padding="lg" className="mt-6 text-center">
-      <PixelIcon name="leaf" size={6} />
+      <PixelIcon name="leaf" size={60} />
       <h2 className="mt-3 font-display text-[1.125rem] text-graphite">
         No entries here
       </h2>
@@ -448,7 +448,7 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
     <PaperCard as="article" variant="paper" padding="md">
       <div className="flex items-start gap-3">
         <span className="mt-0.5 shrink-0">
-          <PixelIcon name={icon} size={5} />
+          <PixelIcon name={icon} size={52} />
         </span>
         <div className="min-w-0 flex-1">
           {prayer.title && (

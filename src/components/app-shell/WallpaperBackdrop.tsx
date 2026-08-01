@@ -83,7 +83,16 @@ export function WallpaperBackdrop() {
     !saveData &&
     visible;
 
-  if (!hydrated || !wallpaper) return null;
+  // The authoritative answer, once Plus entitlement and hydration are known.
+  // Glass surfaces read this to decide whether their backdrop blur would show
+  // anything — see the `has-wallpaper` note in globals.css.
+  const showing = hydrated && wallpaper !== null;
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("has-wallpaper", showing);
+  }, [showing]);
+
+  if (!showing) return null;
 
   return (
     <div

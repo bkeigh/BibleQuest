@@ -68,8 +68,31 @@ describe("reading surfaces", () => {
       // around the entire sheet. A dialog is not a control.
       expect(css).toContain(':focus-visible:not([id^="verse-"]):not([role="dialog"])');
       // An `outline-none` utility cannot fix this: the rule is unlayered and
-      // utilities are layered, so the rule wins regardless of specificity.
-      expect(floating).not.toContain("outline-none\"");
+      // utilities are layered, so the rule wins regardless of specificity. The
+      // panel therefore must not try — but the launcher *button* is a control
+      // and legitimately trades `outline` for a box-shadow ring, so this looks
+      // at the panel's own class list rather than banning the utility outright.
+      const panelStart = floating.indexOf('id="floating-my-shepherd"');
+      expect(panelStart, "could not find the sheet panel").toBeGreaterThan(-1);
+      const panel = floating.slice(panelStart, floating.indexOf(">", panelStart));
+      expect(panel).not.toContain("outline-none");
+    });
+
+    it("rings the launcher with a shadow so it cannot render as a square", () => {
+      // `outline` with an offset is drawn as a rectangle by some engines no
+      // matter the border-radius, which turned the round launcher into a
+      // square with a green box around it whenever it held focus — most
+      // visibly right after the sheet closed and handed focus back.
+      //
+      // The launcher is the LAST `<button` in the file; the panel above it
+      // carries the same aria-label, so searching by label finds the dialog.
+      const launcherStart = floating.lastIndexOf("<button");
+      expect(launcherStart, "could not find the launcher").toBeGreaterThan(-1);
+      const launcher = floating.slice(launcherStart);
+      expect(launcher).toContain('aria-label="Ask MyShepherd"');
+      expect(launcher).toContain("rounded-full");
+      expect(launcher).toContain("focus-visible:shadow-");
+      expect(launcher).not.toContain("focus-visible:outline-2");
     });
 
     it("is a card on every edge rather than a half-docked sheet", () => {
@@ -176,12 +199,28 @@ describe("reading surfaces", () => {
       "utf8",
     );
 
-    it("groups the collection by category instead of one long column", () => {
-      // Hundreds of cards in one column meant the only way to learn Service
-      // quests existed was to scroll past every Prayer one.
-      expect(browse).toContain("groupedResults");
-      expect(browse).toContain("QUEST_CATEGORIES.flatMap");
-      expect(browse).toContain("CATEGORY_LABEL[groupCategory]");
+    it("shows the collection as one paged list, not a shelf per category", () => {
+      // A shelf per category was meant to make the range of quests visible,
+      // and as rails it did. As columns it did the opposite: seventeen
+      // categories at twenty-four cards each rendered four hundred cards and a
+      // page fifty-six thousand pixels tall. The Filters disclosure already
+      // answers "what kinds are there" in a single screen.
+      expect(browse).not.toContain("groupedResults");
+      expect(browse).toContain("results.slice(0, visibleCount)");
+      expect(browse).toContain("Show 24 more");
+    });
+
+    it("keeps the catalogue a column and gives the switch to the board", () => {
+      // The switch governs Active / Ready / Completed — the reader's own
+      // quests, which are tall cards worth railing. Pointed at the catalogue
+      // it wrapped one card in three cards' worth of chrome.
+      expect(browse).toContain('<QuestLane as="ul" layout={layout}');
+      expect(browse).toContain('<QuestLayoutToggle layout={layout}');
+      for (const shelfCall of browse.matchAll(/<QuestShelf[\s\S]{0,220}?>/g)) {
+        expect(shelfCall[0], "a catalogue shelf is still taking the switch").not.toContain(
+          "layout={layout}",
+        );
+      }
     });
 
     it("opens on rows and remembers the reader's choice", () => {
@@ -193,8 +232,17 @@ describe("reading surfaces", () => {
     it("keeps both layouts a real choice", () => {
       // A rail is worse for comparing options or for a braille display, so the
       // column has to render the same cards rather than a reduced set.
-      expect(shelf).toContain('layout === "list" ?');
+      expect(shelf).toContain('if (layout === "list")');
       expect(shelf).toContain("{children}");
+    });
+
+    it("rails a real list rather than orphaning the cards", () => {
+      // The board's groups are `<ul>`s of `<li>` cards. A lane that always
+      // rendered a `<div>` would leave every card an `<li>` with no list
+      // parent, which is exactly the structure a screen reader reads as "no
+      // list here" while announcing list items.
+      expect(shelf).toContain('as: Tag = "div"');
+      expect(shelf).toContain("<Tag");
     });
 
     it("lets a rail slot size its card", () => {

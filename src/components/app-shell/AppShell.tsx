@@ -13,7 +13,6 @@ import {
   subscribeToAnalyticsConsent,
 } from "@/lib/analytics/events";
 import { WallpaperBackdrop } from "./WallpaperBackdrop";
-import { usePlus } from "@/lib/billing/usePlus";
 import { cn } from "@/lib/utils/cn";
 
 const FloatingMyShepherd = dynamic(
@@ -33,9 +32,8 @@ const FloatingMyShepherd = dynamic(
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { isPlus } = usePlus();
   const floatingMyShepherd = useQuestOS(
-    (state) => state.settings.appearance.myShepherdFloatingButton === true,
+    (state) => state.settings.appearance.myShepherdFloatingButton !== false,
   );
   const hidesFloatingTools =
     pathname === "/app/shepherd" ||
@@ -96,10 +94,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         >
           {children}
         </main>
-        {/* Plus members can opt into a lightweight assistant on safe app routes. */}
-        {isPlus && floatingMyShepherd && !hidesFloatingTools && (
-          <FloatingMyShepherd />
-        )}
+        {/* Present for everyone on safe app routes. Whether asking a question
+            actually works is Plus's business, and the sheet says so on open
+            rather than after a reader has typed one out. */}
+        {floatingMyShepherd && !hidesFloatingTools && <FloatingMyShepherd />}
         <BottomNav />
         <InstallPrompt />
       </div>

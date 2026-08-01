@@ -46,7 +46,7 @@ export function ReflectionPanel() {
       {sorted.length === 0 ? (
         <PaperCard variant="atmospheric" padding="lg" className="text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-linen ring-1 ring-mist">
-            <PixelIcon name="sun" size={6} />
+            <PixelIcon name="sun" size={60} />
           </div>
           <h3 className="font-display text-[1.125rem] text-graphite">
             Notice what’s stirring

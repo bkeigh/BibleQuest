@@ -181,7 +181,7 @@ function SevenDaysMatchInner() {
                   >
                     <PixelIcon
                       name={SEVEN_DAYS_TILES[chapter.signature].sprite}
-                      size={2.5}
+                      size={32}
                     />
                   </span>
                 ))}
@@ -285,7 +285,7 @@ function SevenDaysMatchInner() {
                           !open && "opacity-45 grayscale",
                         )}
                       >
-                        <PixelIcon name={art.sprite} size={3} />
+                        <PixelIcon name={art.sprite} size={36} />
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="font-pixel text-caption uppercase tracking-[0.06em] text-gilt">

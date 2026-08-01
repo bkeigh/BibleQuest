@@ -1179,28 +1179,29 @@ function SettingsInner() {
         <SectionTitle>Plus</SectionTitle>
         <div className="space-y-3">
           <ExplorePlusLink description="Discover every wallpaper and extra ways to deepen your daily practice." />
-          {isPlus && (
-            <PaperCard variant="paper" padding="none" className="px-4">
-              <div className="flex items-center justify-between gap-4 py-3.5">
-                <span className="min-w-0">
-                  <span className="block text-[0.9375rem] text-charcoal">
-                    Floating MyShepherd
-                  </span>
-                  <span className="mt-0.5 block text-caption leading-relaxed text-ash">
-                    Keep a small Scripture assistant available throughout the
-                    app.
-                  </span>
+          {/* Shown to everyone. Hiding the switch from free readers left them
+              with a button they could not explain and could not turn off. */}
+          <PaperCard variant="paper" padding="none" className="px-4">
+            <div className="flex items-center justify-between gap-4 py-3.5">
+              <span className="min-w-0">
+                <span className="block text-[0.9375rem] text-charcoal">
+                  Floating MyShepherd
                 </span>
-                <Toggle
-                  label="Floating MyShepherd"
-                  on={appearance.myShepherdFloatingButton}
-                  onChange={(myShepherdFloatingButton) =>
-                    setAppearance({ myShepherdFloatingButton })
-                  }
-                />
-              </div>
-            </PaperCard>
-          )}
+                <span className="mt-0.5 block text-caption leading-relaxed text-ash">
+                  {isPlus
+                    ? "Keep a small Scripture assistant available throughout the app."
+                    : "Keep the MyShepherd button on screen. Asking questions is part of Plus."}
+                </span>
+              </span>
+              <Toggle
+                label="Floating MyShepherd"
+                on={appearance.myShepherdFloatingButton}
+                onChange={(myShepherdFloatingButton) =>
+                  setAppearance({ myShepherdFloatingButton })
+                }
+              />
+            </div>
+          </PaperCard>
           <SupportLink />
         </div>
 

@@ -153,7 +153,7 @@ function AccountInner() {
     >
       <PixelMascot
         name="key"
-        size={9}
+        size={192}
         title={intent === "create" ? "Create account" : "Sign in"}
         className="mb-6"
       />

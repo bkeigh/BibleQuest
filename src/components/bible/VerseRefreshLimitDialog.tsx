@@ -96,7 +96,7 @@ export function VerseRefreshLimitDialog({
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gold-500/15 text-gilt ring-1 ring-gold-500/30">
-            <PixelIcon name="crown" size={4} />
+            <PixelIcon name="crown" size={44} />
           </div>
           <button
             type="button"

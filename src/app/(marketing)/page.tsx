@@ -131,7 +131,7 @@ function HeroAction({
             : "bg-evergreen-50 ring-evergreen-600/15"
         }`}
       >
-        <PixelIcon name={icon} size={4} />
+        <PixelIcon name={icon} size={44} />
       </span>
       <span className="relative min-w-0 flex-1">
         <span className="block font-display text-[1.125rem] leading-tight lg:text-[1.25rem]">
@@ -208,7 +208,7 @@ export default function LandingPage() {
           <div className="text-center lg:text-left">
             <Reveal>
               <span className="mx-auto inline-flex items-center justify-center gap-2 rounded-full border border-mist bg-paper/70 px-4 py-2 text-[0.875rem] text-accent backdrop-blur lg:mx-0 lg:text-[0.9375rem]">
-                <PixelIcon name="candle" size={3} animate /> A daily guide for living your faith
+                <PixelIcon name="candle" size={36} animate /> A daily guide for living your faith
               </span>
             </Reveal>
             <Reveal delay={0.08}>
@@ -291,7 +291,7 @@ export default function LandingPage() {
       <EditorialSection id="how" className="scroll-mt-20 bg-linen" spacing="compact">
         <Reveal>
           <div className="text-center">
-            <PixelMascot name="map" size={8} className="mb-6" />
+            <PixelMascot name="map" size={160} className="mb-6" />
             <Eyebrow>A daily rhythm</Eyebrow>
             <h2 className="font-display text-editorial text-graphite sm:text-heading">
               Read. Pray. Reflect. Act.
@@ -306,7 +306,7 @@ export default function LandingPage() {
             <Reveal key={r.title} delay={i * 0.06}>
               <PaperCard variant="paper" padding="lg" className="h-full text-center">
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-linen ring-1 ring-mist">
-                  <PixelIcon name={r.sprite} size={5} />
+                  <PixelIcon name={r.sprite} size={52} />
                 </div>
                 <h3 className="font-display text-[1.25rem] text-graphite">{r.title}</h3>
                 <p className="mt-2 text-[0.9375rem] leading-relaxed text-ash">{r.body}</p>
@@ -400,7 +400,7 @@ export default function LandingPage() {
         <Reveal>
           <PaperCard variant="paper" padding="lg" className="mx-auto max-w-2xl text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-accent-surface">
-              <PixelIcon name="chapel" size={5} />
+              <PixelIcon name="chapel" size={52} />
             </div>
             <h2 className="font-display text-editorial text-graphite">
               Your relationship with God is not paywalled
@@ -463,7 +463,7 @@ export default function LandingPage() {
         </div>
         <div className="relative mx-auto max-w-2xl px-5 py-16 text-center sm:px-8 sm:py-20">
           <Reveal>
-            <PixelIcon name="lantern" size={8} animate className="mx-auto" />
+            <PixelIcon name="lantern" size={80} animate className="mx-auto" />
             <h2 className="mt-6 font-display text-editorial text-graphite sm:text-heading">
               Everyone’s walk with God is different.
               <br />

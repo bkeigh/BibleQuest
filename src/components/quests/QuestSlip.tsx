@@ -116,7 +116,7 @@ export function QuestSlip({
           must clear 60px plus a gap or the metadata row runs under it. */}
       <div className={cn("flex items-start gap-3.5", action ? "pr-[4.5rem]" : null)}>
         <span className="mt-0.5 rounded-[10px] bg-linen p-2 ring-1 ring-mist">
-          <PixelIcon name={CATEGORY_SPRITE[quest.category] ?? "leaf"} size={5} />
+          <PixelIcon name={CATEGORY_SPRITE[quest.category] ?? "leaf"} size={52} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.75rem] text-ash">

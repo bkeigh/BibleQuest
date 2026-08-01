@@ -193,7 +193,7 @@ export function QuestBoardCard({
           <span className="mt-0.5 shrink-0 rounded-[10px] bg-linen p-2 ring-1 ring-mist">
             <PixelIcon
               name={CATEGORY_SPRITE[quest.category] ?? "leaf"}
-              size={5}
+              size={52}
             />
           </span>
           <div className="min-w-0 flex-1">

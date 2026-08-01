@@ -641,7 +641,7 @@ export const DEFAULT_SETTINGS: Settings = {
     wallpaperMode: "still",
     glassSurfaces: true,
     glassOpacity: DEFAULT_GLASS_OPACITY,
-    myShepherdFloatingButton: false,
+    myShepherdFloatingButton: true,
   },
   language: "en",
   preferredBibleTranslation: DEFAULT_BIBLE_TRANSLATION_KEY,

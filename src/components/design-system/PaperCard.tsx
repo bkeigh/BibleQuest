@@ -11,11 +11,18 @@ const VARIANTS: Record<PaperVariant, string> = {
   quiet: "bg-paper/60 border border-mist/70",
 };
 
+/**
+ * Every step came down once. On a 375px phone the old `lg` spent 48px of a
+ * 375px-wide card on its own margins, so a card holding one line of text stood
+ * nearly as tall as one holding four and the page read as a column of mostly
+ * empty boxes. The larger breakpoint steps stay generous, because the
+ * complaint is a phone complaint — there is room to breathe on a desktop.
+ */
 const PADDING: Record<PaperPadding, string> = {
   none: "",
-  sm: "p-4",
-  md: "p-5 sm:p-6",
-  lg: "p-6 sm:p-8",
+  sm: "p-3 sm:p-4",
+  md: "p-4 sm:p-5",
+  lg: "p-5 sm:p-7",
 };
 
 interface PaperCardProps extends React.HTMLAttributes<HTMLElement> {

@@ -161,13 +161,13 @@ function MilestoneDialog({
         >
           <PixelIcon
             name={(milestone.iconKey as PixelSpriteName) ?? "star"}
-            size={7}
+            size={68}
             animate
           />
         </motion.div>
         <p className="flex items-center justify-center gap-2 font-pixel text-[0.875rem] uppercase tracking-[0.12em] text-gilt">
-          <PixelIcon name="star" size={2} /> Milestone reached
-          <PixelIcon name="star" size={2} />
+          <PixelIcon name="star" size={28} /> Milestone reached
+          <PixelIcon name="star" size={28} />
         </p>
         <h2
           id={titleId}

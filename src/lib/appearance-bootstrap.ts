@@ -25,6 +25,14 @@ export const APPEARANCE_BOOTSTRAP_SCRIPT = `
     root.classList.toggle("text-bold", appearance.boldText === true);
     root.classList.toggle("force-reduce-motion", appearance.reducedMotion === true);
     root.classList.toggle("glass-surfaces", appearance.glassSurfaces !== false);
+    // Optimistic: a stored Plus wallpaper on a lapsed account resolves to none,
+    // and WallpaperBackdrop corrects this once it knows. Guessing "yes" here
+    // costs one frame of blur; guessing "no" would flash unblurred cards over
+    // a wallpaper on every cold start.
+    root.classList.toggle(
+      "has-wallpaper",
+      !!appearance.wallpaperId && appearance.wallpaperId !== "none",
+    );
     // Match the hydrated theme's material hierarchy during the first paint.
     var requestedOpacity = typeof appearance.glassOpacity === "number" && isFinite(appearance.glassOpacity)
       ? appearance.glassOpacity

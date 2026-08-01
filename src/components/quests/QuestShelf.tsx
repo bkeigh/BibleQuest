@@ -13,18 +13,14 @@ const RAIL_ITEM =
 const EDGE_TOLERANCE = 24;
 
 /**
- * One group of quests, as a side-scrolling rail or a plain column.
+ * One titled group of quests.
  *
- * The whole page used to be one long column: every shelf and every category
- * stacked, so finding the third kind of quest meant scrolling past everything
- * before it. A rail lets a group take one screen's width instead of ten
- * screens' height, and keeps the *number* of groups visible — which is the
- * thing the column hid.
- *
- * The column is still here because a rail is worse for some people and some
- * tasks: comparing options, using a screen reader with a braille display, or
- * simply wanting the whole list. Both render the same cards in the same order,
- * so nothing is only reachable one way.
+ * The catalogue below the board always passes `list`. Rails were tried there
+ * and made it worse: a rail slot stretches every card to the tallest in the
+ * set, so a one-line quest wore three lines of empty box, and seventeen
+ * category shelves turned a page into a maze. The switch now belongs to the
+ * board's own Active / Ready / Completed groups, where the cards are tall and
+ * few and a rail genuinely saves a screen.
  */
 export function QuestShelf({
   title,
@@ -39,6 +35,47 @@ export function QuestShelf({
   children: React.ReactNode;
   action?: React.ReactNode;
 }) {
+  return (
+    <section className="mt-6" aria-label={typeof title === "string" ? title : undefined}>
+      <div className="flex items-end justify-between gap-3">
+        <h2 className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
+          {title}
+          {count !== undefined && (
+            <span className="ms-2 font-sans text-caption normal-case tracking-normal text-ash">
+              {count}
+            </span>
+          )}
+        </h2>
+        {action}
+      </div>
+
+      <QuestLane layout={layout} className="mt-2">
+        {children}
+      </QuestLane>
+    </section>
+  );
+}
+
+/**
+ * The rail-or-column body on its own, without a section heading.
+ *
+ * Split out so the quest board's own Active / Ready / Completed groups can be
+ * railed by the same switch that used to govern the catalogue below them —
+ * which was never what the switch was for. `as` keeps the board's lists real
+ * `<ul>`s rather than turning every card into an orphaned `<li>`.
+ */
+export function QuestLane({
+  layout,
+  children,
+  className,
+  as: Tag = "div",
+  ...rest
+}: {
+  layout: QuestLayout;
+  children: React.ReactNode;
+  className?: string;
+  as?: "div" | "ul";
+} & React.HTMLAttributes<HTMLElement>) {
   const railRef = useRef<HTMLDivElement>(null);
   const reduceMotion = useShouldReduceMotion();
   const [edges, setEdges] = useState({ atStart: true, atEnd: false });
@@ -56,8 +93,11 @@ export function QuestShelf({
     );
   }
 
-  // A rail that fits its content needs no arrows; one that grows past the
-  // viewport does. Both are decided by measurement, not by counting cards.
+  // Depend on how many cards there are, not on the children themselves. A
+  // React element array is a fresh object every render, so listing `children`
+  // tore down and rebuilt a ResizeObserver on every single render of every
+  // rail on the page.
+  const childCount = Array.isArray(children) ? children.length : 1;
   useEffect(() => {
     if (layout !== "rail") return;
     updateEdges();
@@ -66,7 +106,7 @@ export function QuestShelf({
     const observer = new ResizeObserver(updateEdges);
     observer.observe(rail);
     return () => observer.disconnect();
-  }, [layout, children]);
+  }, [layout, childCount]);
 
   function scrollRail(direction: -1 | 1) {
     const rail = railRef.current;
@@ -77,56 +117,47 @@ export function QuestShelf({
     });
   }
 
+  if (layout === "list") {
+    return (
+      <Tag className={cn("grid gap-3", className)} {...rest}>
+        {children}
+      </Tag>
+    );
+  }
+
   return (
-    <section className="mt-6" aria-label={typeof title === "string" ? title : undefined}>
-      <div className="flex items-end justify-between gap-3">
-        <h2 className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
-          {title}
-          {count !== undefined && (
-            <span className="ms-2 font-sans text-caption normal-case tracking-normal text-ash">
-              {count}
-            </span>
-          )}
-        </h2>
-        {action}
-      </div>
+    <div className={cn("relative", className)}>
+      <Tag
+        ref={railRef as React.Ref<never>}
+        onScroll={updateEdges}
+        className="-mx-1 flex snap-x snap-mandatory items-stretch gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        {...rest}
+      >
+        {/* Each child owns one rail slot so the cards read as one set. */}
+        {Array.isArray(children)
+          ? children.map((child, index) => (
+              <div key={index} className={RAIL_ITEM}>
+                {child}
+              </div>
+            ))
+          : <div className={RAIL_ITEM}>{children}</div>}
+      </Tag>
 
-      {layout === "list" ? (
-        <div className="mt-2 space-y-3">{children}</div>
-      ) : (
-        <div className="relative mt-2">
-          <div
-            ref={railRef}
-            onScroll={updateEdges}
-            className="-mx-1 flex snap-x snap-mandatory items-stretch gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          >
-            {/* Each child owns one rail slot so the cards read as one set. */}
-            {Array.isArray(children)
-              ? children.map((child, index) => (
-                  <div key={index} className={RAIL_ITEM}>
-                    {child}
-                  </div>
-                ))
-              : <div className={RAIL_ITEM}>{children}</div>}
-          </div>
-
-          {!(edges.atStart && edges.atEnd) && (
-            <>
-              <RailArrow
-                direction="previous"
-                disabled={edges.atStart}
-                onClick={() => scrollRail(-1)}
-              />
-              <RailArrow
-                direction="next"
-                disabled={edges.atEnd}
-                onClick={() => scrollRail(1)}
-              />
-            </>
-          )}
-        </div>
+      {!(edges.atStart && edges.atEnd) && (
+        <>
+          <RailArrow
+            direction="previous"
+            disabled={edges.atStart}
+            onClick={() => scrollRail(-1)}
+          />
+          <RailArrow
+            direction="next"
+            disabled={edges.atEnd}
+            onClick={() => scrollRail(1)}
+          />
+        </>
       )}
-    </section>
+    </div>
   );
 }
 

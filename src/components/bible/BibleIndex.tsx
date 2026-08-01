@@ -231,7 +231,7 @@ function BibleIndexInner() {
                   ? `/app/bible/${readingPosition.bookSlug}/${readingPosition.chapter}`
                   : "/app/bible/john/1"
               }
-              icon={<PixelIcon name="bookmark" size={4} />}
+              icon={<PixelIcon name="bookmark" size={44} />}
               eyebrow={readingPosition ? "Continue" : "A place to begin"}
               title={
                 readingPosition
@@ -311,7 +311,7 @@ function BibleIndexInner() {
                         className="flex h-full min-h-28 flex-col"
                       >
                         <div className="flex items-center gap-2">
-                          <PixelIcon name="open-book" size={3} />
+                          <PixelIcon name="open-book" size={36} />
                           <p className="font-display text-[1.0625rem] text-graphite">
                             {recentVerse.reference}
                           </p>

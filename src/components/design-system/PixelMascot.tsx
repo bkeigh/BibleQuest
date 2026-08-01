@@ -18,7 +18,7 @@ interface PixelMascotProps {
   name: PixelMascotName;
   /** Optional screen-specific animation that preserves the mascot's layout. */
   src?: string;
-  /** Rendered logical-cell size. Current 7-10 call sites are 128-192px wide. */
+  /** Rendered edge in CSS pixels, same units as `PixelIcon`. */
   size?: number;
   className?: string;
   /** Accessible label. Mascots are decorative by default. */
@@ -28,16 +28,15 @@ interface PixelMascotProps {
 export function PixelMascot({
   name,
   src,
-  size = 9,
+  size = 192,
   className,
   title,
 }: PixelMascotProps) {
   const asset = PIXEL_MASCOTS[name];
   if (!asset) return null;
 
-  const cell = Math.max(1, Math.round(size * (asset.cellScale ?? 1)));
-  const renderedWidth = asset.cols * cell;
-  const renderedHeight = asset.rows * cell;
+  const renderedWidth = Math.round(size);
+  const renderedHeight = Math.round(size * (asset.rows / asset.cols));
 
   return (
     // eslint-disable-next-line @next/next/no-img-element -- local pixel art must stay crisp and load without image optimization
