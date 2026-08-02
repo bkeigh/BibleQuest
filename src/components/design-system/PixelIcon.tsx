@@ -68,6 +68,14 @@ export function PixelIcon({
   // The weight correction makes one `size` mean one visual weight across
   // sprites whose art fills very different amounts of the same canvas — see
   // PIXEL_ART_WEIGHT.
+  //
+  // It grows the layout box along with the art, which is what a caller wants
+  // almost everywhere. Where a row must not grow — a fixed-height banner — the
+  // call site anchors the art instead: a wrapper of the intended size with the
+  // sprite absolutely centred in it. Doing that here with negative margins
+  // looked tempting and does not work: Tailwind's reset gives every image
+  // `max-width: 100%`, so shrinking the parent silently squashes the sprite
+  // rather than letting it overflow.
   const weighted = size * (PIXEL_ART_WEIGHT[name] ?? 1);
   const renderedWidth = Math.round(weighted);
   const renderedHeight = Math.round(weighted * (asset.rows / asset.cols));
