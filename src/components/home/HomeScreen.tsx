@@ -225,10 +225,16 @@ function HomeInner() {
             aria-labelledby="for-today-home-title"
             className="scroll-mt-6"
           >
+            {/* The heading sits above the card, like every other section on
+                this screen. It used to be duplicated *inside* the card — the
+                same pixel h2 and the same caption, nested under "For Today" —
+                so this one row carried two headings while Guided Scripture and
+                the Arcade carried one. "For Today" said nothing the card did
+                not; the count is what a reader actually wants from a label. */}
             <HomeSectionHeading
               id="for-today-home-title"
-              title="For Today"
-              subtitle="Your next step"
+              title={t.nav.quests}
+              subtitle={questSummary || "Choose a quest"}
             />
             <Link href="/app/quests" className="block">
               <PaperCard
@@ -248,17 +254,9 @@ function HomeInner() {
                   />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <h2 className="font-pixel text-[1.75rem] uppercase leading-none tracking-[0.05em] text-accent min-[390px]:text-[2.125rem]">
-                      {t.nav.quests}
-                    </h2>
-                    <p className="text-caption text-ash">
-                      {questSummary || "Choose a quest"}
-                    </p>
-                  </div>
                   {featuredQuest && featuredPick ? (
                     <>
-                      <p className="mt-2 line-clamp-2 font-display text-[1.125rem] leading-snug text-graphite">
+                      <p className="line-clamp-2 font-display text-[1.125rem] leading-snug text-graphite">
                         {featuredQuest.title}
                       </p>
                       <p className="mt-1 text-caption text-ash">
@@ -273,7 +271,7 @@ function HomeInner() {
                       </p>
                     </>
                   ) : (
-                    <p className="mt-2 text-small text-ash">
+                    <p className="text-small text-ash">
                       Find a gentle next step for today.
                     </p>
                   )}

@@ -24,8 +24,19 @@ export function SupportLink({ className }: SupportLinkProps) {
         aria-hidden="true"
         className="ambient absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gold-300/15 blur-2xl [animation:var(--animate-twinkle)]"
       />
-      <span className="relative flex shrink-0 items-center justify-center">
-        <PixelIcon name="service-basket" size={96} />
+      {/* Anchored to a fixed square with the art centred over it. The basket
+          fills only a third of its canvas, so the weight correction draws it
+          half again as large — and left in flow that 101px image pushed this
+          80px banner to 177px. What spills is transparent padding. */}
+      <span className="relative flex h-16 w-16 shrink-0 items-center justify-center">
+        <PixelIcon
+          name="service-basket"
+          size={68}
+          // `max-w-none` because Tailwind's reset caps every image at 100% of
+          // its container, which here is the 4rem anchor — without it the
+          // sprite is squashed to the anchor instead of spilling past it.
+          className="absolute max-w-none"
+        />
       </span>
       <span className="relative min-w-0 flex-1">
         <span className="block font-display text-[1.125rem] leading-tight">

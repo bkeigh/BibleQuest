@@ -23,7 +23,7 @@ describe("Home formation layout", () => {
     expect(bible).not.toContain("<TodayFormation dayKey={dayKey} />");
   });
 
-  it("places the quest component directly under For Today", () => {
+  it("gives the quest section one heading, above its card", () => {
     const forToday = home.indexOf('id="for-today-home-title"');
     const questLink = home.indexOf('href="/app/quests"', forToday);
     const rhythm = home.indexOf("<RhythmTodayCard", questLink);
@@ -39,8 +39,15 @@ describe("Home formation layout", () => {
     expect(shepherd).toBeGreaterThan(guided);
     expect(growth).toBeGreaterThan(shepherd);
     expect(games).toBeGreaterThan(growth);
-    expect(home).toContain('subtitle="Your next step"');
     expect(home).not.toContain("A gentle next step");
+
+    // The heading lives above the card, like every other section here. It used
+    // to be duplicated *inside* the card — the same pixel h2 and the same
+    // caption nested under a "For Today" heading — so this one row carried two
+    // headings while Guided Scripture and the Arcade carried one.
+    expect(home).toContain("<HomeSectionHeading");
+    const card = home.slice(questLink, rhythm);
+    expect(card, "the card is heading its own section again").not.toContain("<h2");
   });
 
   it("aligns dedicated formation headings through one shared component", () => {
