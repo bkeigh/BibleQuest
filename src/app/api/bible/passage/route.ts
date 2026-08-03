@@ -6,8 +6,14 @@ import {
 } from "@/lib/bible/provider-dispatcher";
 import { getBookMeta } from "@/lib/bible";
 import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
+import { guardDistributedRequest } from "@/lib/security/distributed-rate-limit.server";
 
 export const dynamic = "force-dynamic";
+
+const PASSAGE_RATE_LIMITS = [
+  { limit: 50, windowMs: 60_000 },
+  { limit: 300, windowMs: 60 * 60_000 },
+] as const;
 
 function errorResponse(error: unknown) {
   const code = bibleProviderErrorCode(error);
@@ -19,10 +25,11 @@ function errorResponse(error: unknown) {
 }
 
 export async function GET(request: NextRequest) {
-  const blocked = guardProviderRequest(request, "bible-passage", [
-    { limit: 50, windowMs: 60_000 },
-    { limit: 300, windowMs: 60 * 60_000 },
-  ]);
+  const blocked = guardProviderRequest(
+    request,
+    "bible-passage",
+    PASSAGE_RATE_LIMITS,
+  );
   if (blocked) return blocked;
 
   const translation = request.nextUrl.searchParams.get("translation") ?? "";
@@ -55,6 +62,17 @@ export async function GET(request: NextRequest) {
       { status: 400, headers: { "Cache-Control": "private, no-store" } },
     );
   }
+
+  // Claims the same quotas across every serverless instance after cheap validation.
+  const distributedBlocked = await guardDistributedRequest(
+    request,
+    "bible-passage",
+    PASSAGE_RATE_LIMITS.map(({ limit, windowMs }) => ({
+      limit,
+      windowSeconds: windowMs / 1_000,
+    })),
+  );
+  if (distributedBlocked) return distributedBlocked;
 
   try {
     const provider = await fetchBibleProviderPassage(

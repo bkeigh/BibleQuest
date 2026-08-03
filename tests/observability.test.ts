@@ -301,7 +301,7 @@ describe("privacy-safe observability contract", () => {
       NEXT_PUBLIC_APP_URL: observability.canonicalOrigin,
       STRIPE_BILLING_MODE: "coming-soon",
       NEXT_PUBLIC_SUPABASE_URL: "https://project.supabase.co",
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: "publishable-fixture",
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "publishable-fixture",
       NEXT_PUBLIC_ANALYTICS_ENABLED: "true",
       NEXT_PUBLIC_PLAUSIBLE_DOMAIN: "www.biblequest.co",
     };

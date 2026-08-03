@@ -19,6 +19,24 @@ describe("Supabase browser clients", () => {
     ).__biblequestSupabaseBrowserClient;
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://fixture.supabase.co");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "fixture-anon-key");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "");
+  });
+
+  it("prefers the independently rotatable publishable key", async () => {
+    vi.stubEnv(
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+      "fixture-publishable-key",
+    );
+    const authClient = { auth: { getSession: vi.fn() } };
+    mocks.createBrowserClient.mockReturnValue(authClient);
+    const { createClient } = await import("@/lib/supabase/client");
+
+    expect(createClient()).toBe(authClient);
+    expect(mocks.createBrowserClient).toHaveBeenCalledWith(
+      "https://fixture.supabase.co",
+      "fixture-publishable-key",
+      { isSingleton: true },
+    );
   });
 
   it("uses the auth singleton only as the generation-bound data token source", async () => {

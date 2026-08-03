@@ -243,7 +243,7 @@ export default function LandingPage() {
               </div>
             </Reveal>
             <Reveal immediate>
-              <p className="mt-5 text-[0.875rem] text-ash lg:text-[0.9375rem]">
+              <p className="mx-auto mt-5 w-fit rounded-full border border-paper/80 bg-paper/80 px-4 py-2 text-[0.875rem] font-medium text-charcoal shadow-sm backdrop-blur-sm lg:mx-0 lg:text-[0.9375rem]">
                 Free to begin. Made for Christians from every tradition.
               </p>
             </Reveal>

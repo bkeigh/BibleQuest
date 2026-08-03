@@ -1,4 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const rateMocks = vi.hoisted(() => ({
+  guardDistributedRequest: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("@/lib/security/distributed-rate-limit.server", () => ({
+  guardDistributedRequest: rateMocks.guardDistributedRequest,
+}));
+
 import { POST as reportBibleView } from "@/app/api/bible/view/route";
 import {
   guardIdentifiedRequest,
@@ -124,6 +133,7 @@ describe("API.Bible FUMS relay", () => {
 
     expect(response.status).toBe(204);
     expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(rateMocks.guardDistributedRequest).toHaveBeenCalledOnce();
     expect(providerFetch).toHaveBeenCalledOnce();
   });
 

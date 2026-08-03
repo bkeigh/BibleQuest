@@ -198,8 +198,17 @@ export function FloatingMyShepherd() {
       document
         .querySelector<HTMLElement>("[data-app-bottom-nav]")
         ?.getBoundingClientRect().top ?? visibleBottom;
+    const overlayHeight =
+      Number.parseFloat(
+        window
+          .getComputedStyle(document.documentElement)
+          .getPropertyValue("--app-install-prompt-height"),
+      ) || 0;
     const maxY =
-      Math.min(visibleBottom, navTop) - LAUNCHER_GUTTER - LAUNCHER_SIZE;
+      Math.min(visibleBottom, navTop) -
+      overlayHeight -
+      LAUNCHER_GUTTER -
+      LAUNCHER_SIZE;
 
     return {
       viewportWidth: window.innerWidth,
@@ -268,6 +277,22 @@ export function FloatingMyShepherd() {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [getLauncherBounds, mobileOrTablet, pathname]);
+
+  // Re-docks when temporary shell overlays appear so controls never overlap.
+  useEffect(() => {
+    if (!mobileOrTablet || open) return;
+    const reposition = () => {
+      setLauncherPoint(
+        floatingLauncherPoint(
+          launcherPlacementRef.current,
+          getLauncherBounds(),
+        ),
+      );
+    };
+    window.addEventListener("biblequest:app-overlay-layout", reposition);
+    return () =>
+      window.removeEventListener("biblequest:app-overlay-layout", reposition);
+  }, [getLauncherBounds, mobileOrTablet, open]);
 
   const close = useCallback(() => {
     setOpen(false);

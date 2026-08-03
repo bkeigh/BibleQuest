@@ -43,6 +43,12 @@ export const DEFAULT_PUSH_REMINDER_PREFERENCES: PushReminderPreferences = {
 
 const CLOCK = /^(?:[01]\d|2[0-3]):(?:00|15|30|45)$/;
 const BASE64_URL = /^[A-Za-z0-9_-]+={0,2}$/;
+const PUSH_PROVIDER_HOSTS = new Set([
+  "fcm.googleapis.com",
+  "push.services.mozilla.com",
+  "updates.push.services.mozilla.com",
+  "web.push.apple.com",
+]);
 
 function exactKeys(
   value: Record<string, unknown>,
@@ -129,13 +135,19 @@ function decodedBase64UrlLength(value: string): number {
   return Math.floor((unpadded.length * 3) / 4);
 }
 
-/** Validates one opaque HTTPS push endpoint without retaining its host. */
+/** Limits outbound delivery to browser push providers instead of arbitrary hosts. */
 export function isValidPushEndpoint(value: unknown): value is string {
   if (typeof value !== "string" || value.length > 2048) return false;
   try {
     const endpoint = new URL(value);
+    const providerHost =
+      PUSH_PROVIDER_HOSTS.has(endpoint.hostname) ||
+      endpoint.hostname === "notify.windows.com" ||
+      endpoint.hostname.endsWith(".notify.windows.com");
     return (
       endpoint.protocol === "https:" &&
+      providerHost &&
+      !endpoint.port &&
       !endpoint.username &&
       !endpoint.password &&
       !endpoint.hash
@@ -145,7 +157,7 @@ export function isValidPushEndpoint(value: unknown): value is string {
   }
 }
 
-/** Validates one browser subscription without allowlisting provider hosts. */
+/** Validates one browser subscription against supported provider boundaries. */
 export function parseSerializedPushSubscription(
   value: unknown,
 ): SerializedPushSubscription | null {

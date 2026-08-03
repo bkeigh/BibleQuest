@@ -16,7 +16,7 @@ import {
 } from "@/lib/push/delivery.server";
 
 const subscription = {
-  endpoint: "https://push.example.test/send/opaque",
+  endpoint: "https://fcm.googleapis.com/fcm/send/opaque",
   expirationTime: null,
   keys: {
     p256dh: "A".repeat(87),

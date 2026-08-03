@@ -42,7 +42,7 @@ pnpm check:production-readiness
 ```
 
 The command reads `.env.local` when present, uses only
-`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and prints no
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and prints no
 keys, URLs, rows, or user content. A failure is expected until the provider-side
 steps below are complete. It does **not** prove migration history, SMTP delivery,
 Google/email round trips, RLS isolation, backup recovery, or signed account
