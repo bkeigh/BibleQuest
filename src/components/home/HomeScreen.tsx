@@ -130,29 +130,18 @@ function HomeInner() {
           className={cn(
             "app-glass-surface sacred-frame relative mt-4 mb-4 overflow-hidden bg-paper/90 px-5 py-4 max-[380px]:px-4 max-[340px]:px-3 sm:mt-5 sm:px-6 sm:py-5",
             isPlus &&
-              "border-[#b88528]/70 bg-[linear-gradient(135deg,rgba(255,248,218,0.94),rgba(246,225,159,0.9)_48%,rgba(255,249,224,0.94))] shadow-[0_12px_34px_rgba(126,85,24,0.2)] ring-1 ring-[#e2bd62]/65",
+              "plus-nameplate border-[#9f6a1f]/75 bg-[radial-gradient(circle_at_82%_18%,rgba(255,255,244,0.72),transparent_27%),linear-gradient(135deg,rgba(255,249,224,0.97),rgba(241,215,135,0.94)_49%,rgba(255,248,216,0.97))] shadow-[0_14px_38px_rgba(102,68,19,0.23)] ring-1 ring-[#e2bd62]/70",
           )}
         >
-          {/* Active Plus members receive a restrained gold bookplate flourish. */}
+          {/* Active Plus members receive a luminous bookplate highlight while
+              the corner-line ornament is drawn by `.plus-nameplate`. */}
           {isPlus && (
-            <>
-              <span
-                aria-hidden="true"
-                className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#c99635]/80 to-transparent"
-              />
-              <span
-                aria-hidden="true"
-                className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-[#fff4bd]/60 blur-2xl"
-              />
-              <span
-                aria-hidden="true"
-                className="absolute right-3 bottom-2 font-display text-2xl text-[#a66f18]/20"
-              >
-                ✦
-              </span>
-            </>
+            <span
+              aria-hidden="true"
+              className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-[#fff6c7]/55 blur-2xl"
+            />
           )}
-          <div className="relative z-10 flex min-w-0 items-center gap-3 max-[380px]:gap-2 max-[340px]:gap-1.5">
+          <div className="relative z-10 grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 max-[430px]:gap-2 max-[340px]:gap-1.5 sm:gap-4">
             <Link
               href="/app/settings"
               aria-label={t.home.openSettings}
@@ -162,7 +151,7 @@ function HomeInner() {
                 name={profile?.displayName}
                 marker={profileAvatarMarker(profile)}
                 size="lg"
-                className="ring-1 ring-paper/70 shadow-[0_8px_24px_rgb(18_33_27_/_0.14)] max-[380px]:h-[4.5rem] max-[380px]:w-[4.5rem] max-[340px]:h-16 max-[340px]:w-16"
+                className="ring-1 ring-paper/70 shadow-[0_8px_24px_rgb(18_33_27_/_0.14)] max-[430px]:h-[4.5rem] max-[430px]:w-[4.5rem] max-[340px]:h-16 max-[340px]:w-16"
               />
               <span
                 aria-hidden="true"
@@ -177,7 +166,7 @@ function HomeInner() {
                   <span className="sr-only">BibleQuest Plus member</span>
                   <span
                     aria-hidden="true"
-                    className="flex items-center gap-1.5 whitespace-nowrap text-[0.625rem] font-semibold uppercase tracking-[0.2em] text-[#8a5a12] @max-[8rem]:gap-1 @max-[8rem]:tracking-[0.1em]"
+                    className="flex items-center gap-1.5 whitespace-nowrap text-[0.625rem] font-semibold uppercase tracking-[0.2em] text-[#6f430c] @max-[8rem]:gap-1 @max-[8rem]:tracking-[0.1em]"
                   >
                     <span className="@max-[8rem]:hidden">✦</span>
                     <span>
@@ -188,7 +177,12 @@ function HomeInner() {
                   </span>
                 </p>
               )}
-              <p className="font-display text-[1rem] leading-tight text-accent max-[360px]:text-[0.875rem]">
+              <p
+                className={cn(
+                  "font-display text-[1rem] leading-tight max-[360px]:text-[0.875rem]",
+                  isPlus ? "text-[#704713]" : "text-accent",
+                )}
+              >
                 {name ? `${hello},` : season.label}
               </p>
               <h1
@@ -201,7 +195,12 @@ function HomeInner() {
                 {name || `${hello}.`}
               </h1>
               {name && (
-                <p className="mt-1 text-[0.8125rem] uppercase tracking-[0.14em] text-ash max-[360px]:text-[0.6875rem] max-[360px]:tracking-[0.08em]">
+                <p
+                  className={cn(
+                    "mt-1 text-[0.8125rem] uppercase tracking-[0.14em] max-[360px]:text-[0.6875rem] max-[360px]:tracking-[0.08em]",
+                    isPlus ? "text-[#68512b]" : "text-ash",
+                  )}
+                >
                   {season.label}
                 </p>
               )}
@@ -209,6 +208,7 @@ function HomeInner() {
             <StreakCard
               streak={streak}
               dayKey={dayKey}
+              tone={isPlus ? "gold" : "default"}
               className="max-[340px]:w-12"
             />
           </div>
@@ -369,6 +369,7 @@ function HomeInner() {
 
           {/* These equal-width shortcuts form one calm, predictable action row. */}
           <div
+            role="group"
             className="grid grid-cols-3 gap-2.5 sm:gap-4"
             aria-label="Prayer, Bible, and reflection shortcuts"
           >
@@ -471,17 +472,17 @@ function ShepherdCallout({
         {/* The badge leads rather than trailing the title. Sharing a wrapping
             line with it, "Plus" kept being pushed onto a line of its own,
             which read as a heading instead of a label. */}
-        <span className="inline-flex rounded-full bg-white/20 px-2 py-0.5 text-caption font-medium text-white">
+        <span className="inline-flex rounded-full border border-white/25 bg-[#173c52]/55 px-2 py-0.5 text-caption font-medium text-white">
           Plus
         </span>
         <p className="mt-1 font-display text-[1.1875rem] leading-tight text-white">
           Ask MyShepherd AI
         </p>
-        <p className="mt-1 text-caption leading-relaxed text-white/80">
+        <p className="mt-1 text-caption leading-relaxed text-white">
           Explore Scripture and find your next place in BibleQuest.
         </p>
       </div>
-      <IconChevronRight className="shrink-0 text-white/75" />
+      <IconChevronRight className="shrink-0 text-white" />
     </PaperCard>
   );
   if (href) {
