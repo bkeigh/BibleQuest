@@ -30,14 +30,6 @@ function parseCsp(value) {
   return directives;
 }
 
-function assertIncludes(directives, name, expected) {
-  const actual = directives.get(name);
-  assert.ok(actual, `missing ${name}`);
-  for (const source of expected) {
-    assert.ok(actual.includes(source), `${name} must include ${source}`);
-  }
-}
-
 function assertSharedSecurityContract(
   response,
   production,
@@ -54,11 +46,7 @@ function assertSharedSecurityContract(
   assert.equal(csp.get("frame-ancestors").some((source) => source.includes("*")), false);
   assert.equal(response.headers.get("x-frame-options"), expectedXFrameOptions);
 
-  assert.equal(csp.get("script-src").includes("https://tally.so"), false);
-  assertIncludes(csp, "connect-src", [
-    "https://header-fixture.supabase.co",
-  ]);
-  assertIncludes(csp, "frame-src", ["https://tally.so"]);
+  assert.deepEqual(csp.get("frame-src"), ["'self'", "https://tally.so"]);
   assert.deepEqual(csp.get("img-src"), ["'self'", "data:", "blob:"]);
   assert.deepEqual(csp.get("font-src"), ["'self'"]);
   assert.deepEqual(csp.get("media-src"), ["'self'", "blob:"]);
@@ -72,21 +60,25 @@ function assertSharedSecurityContract(
   );
 
   if (production) {
+    assert.deepEqual(csp.get("script-src"), ["'self'", "'unsafe-inline'"]);
     assert.deepEqual(csp.get("connect-src"), [
       "'self'",
       "https://header-fixture.supabase.co",
     ]);
     assert.equal(response.headers.get("strict-transport-security"), "max-age=15552000");
-    assert.equal(csp.get("script-src").includes("'unsafe-eval'"), false);
     assert.deepEqual(csp.get("upgrade-insecure-requests"), []);
   } else {
+    assert.deepEqual(csp.get("script-src"), [
+      "'self'",
+      "'unsafe-inline'",
+      "'unsafe-eval'",
+    ]);
     assert.deepEqual(csp.get("connect-src"), [
       "'self'",
       "https://header-fixture.supabase.co",
       "ws://localhost:*",
     ]);
     assert.equal(response.headers.get("strict-transport-security"), null);
-    assert.ok(csp.get("script-src").includes("'unsafe-eval'"));
     assert.equal(csp.has("upgrade-insecure-requests"), false);
   }
 }
