@@ -39,7 +39,10 @@ function authPosture(
   accountSyncContained: boolean,
 ): AuthPosture {
   const hasUrl = Boolean(env.NEXT_PUBLIC_SUPABASE_URL?.trim());
-  const hasKey = Boolean(env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim());
+  const hasKey = Boolean(
+    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+      env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim(),
+  );
   if (hasUrl && hasKey) {
     return accountSyncContained ? "guest-only" : "configured";
   }

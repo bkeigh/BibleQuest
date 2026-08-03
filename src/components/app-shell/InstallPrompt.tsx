@@ -104,6 +104,7 @@ export function InstallPrompt() {
         "--app-install-prompt-height",
         `${panel.getBoundingClientRect().height + 16}px`,
       );
+      window.dispatchEvent(new Event("biblequest:app-overlay-layout"));
     };
     publishHeight();
     const observer = new ResizeObserver(publishHeight);
@@ -113,6 +114,7 @@ export function InstallPrompt() {
       document.documentElement.style.removeProperty(
         "--app-install-prompt-height",
       );
+      window.dispatchEvent(new Event("biblequest:app-overlay-layout"));
     };
   }, [show, deferred]);
 
@@ -151,10 +153,10 @@ export function InstallPrompt() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 12 }}
           transition={{ duration: 0.4, ease: gentleEase }}
-          className="app-glass-surface fixed inset-x-4 bottom-[calc(var(--app-bottom-nav-height,5rem)+1rem)] z-40 mx-auto max-w-md rounded-[var(--radius-card-lg)] border border-mist bg-paper p-4 paper-shadow-lg"
+          className="fixed inset-x-4 bottom-[calc(var(--app-bottom-nav-height,5rem)+1rem)] z-40 isolate mx-auto max-w-md rounded-[var(--radius-card-lg)] border border-gold-500/30 bg-paper p-4 paper-shadow-lg ring-1 ring-white/40"
         >
-          <div className="flex items-start gap-3">
-            <ArtIcon name="chapel" size={80} />
+          <div className="flex items-start gap-3 pe-10">
+            <ArtIcon name="chapel" size={64} />
             <div className="min-w-0 flex-1">
               <p className="text-[1rem] text-graphite">
                 Use BibleQuest like an app
@@ -169,36 +171,36 @@ export function InstallPrompt() {
                   tap away.
                 </p>
               )}
-              <div className="mt-3 flex flex-col items-stretch gap-2 min-[360px]:flex-row min-[360px]:items-center">
-                {deferred && (
-                  <GentleButton
-                    variant="primary"
-                    size="sm"
-                    onClick={install}
-                    className="w-full min-[360px]:w-auto"
-                  >
-                    Add to home screen
-                  </GentleButton>
-                )}
-                <GentleButton
-                  variant="ghost"
-                  size="sm"
-                  onClick={dismiss}
-                  className="w-full min-[360px]:w-auto"
-                >
-                  Not now
-                </GentleButton>
-              </div>
             </div>
-            <button
-              type="button"
-              onClick={dismiss}
-              aria-label="Dismiss"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ash transition-colors hover:bg-linen hover:text-charcoal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
-              <IconClose size={18} />
-            </button>
           </div>
+          <div className="mt-3 flex items-center gap-2">
+            {deferred && (
+              <GentleButton
+                variant="primary"
+                size="sm"
+                onClick={install}
+                className="min-w-0 flex-1"
+              >
+                Add to home screen
+              </GentleButton>
+            )}
+            <GentleButton
+              variant="ghost"
+              size="sm"
+              onClick={dismiss}
+              className={deferred ? "shrink-0" : "w-full"}
+            >
+              Not now
+            </GentleButton>
+          </div>
+          <button
+            type="button"
+            onClick={dismiss}
+            aria-label="Dismiss"
+            className="absolute end-2 top-2 flex h-11 w-11 items-center justify-center rounded-full text-ash transition-colors hover:bg-linen hover:text-charcoal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <IconClose size={18} />
+          </button>
         </motion.div>
       )}
     </AnimatePresence>

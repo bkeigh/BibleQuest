@@ -34,9 +34,13 @@ function parseClaim(value: unknown): RateLimitClaim {
   };
 }
 
-// Derives an opaque stable bucket without storing the account UUID or client IP.
+// Derives an opaque bucket with a dedicated secret so database-key rotation is isolated.
 function bucketHash(identity: string) {
-  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const secret =
+    process.env.BIBLEQUEST_RATE_LIMIT_SECRET?.trim() ||
+    (process.env.NODE_ENV === "production"
+      ? undefined
+      : process.env.SUPABASE_SERVICE_ROLE_KEY?.trim());
   if (!secret || secret.length < 32) {
     throw new Error("Distributed rate limit unavailable.");
   }

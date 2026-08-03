@@ -48,9 +48,9 @@ describe("push reminder input validation", () => {
     ).toBe(true);
   });
 
-  it("accepts opaque HTTPS provider endpoints and exact browser key sizes", () => {
+  it("accepts supported HTTPS providers and exact browser key sizes", () => {
     const subscription = {
-      endpoint: "https://push.example.test/send/opaque?token=allowed",
+      endpoint: "https://fcm.googleapis.com/fcm/send/opaque?token=allowed",
       expirationTime: null,
       keys: { p256dh: P256DH, auth: AUTH },
     };
@@ -61,15 +61,31 @@ describe("push reminder input validation", () => {
     expect(
       parseSerializedPushSubscription({
         ...subscription,
-        endpoint: "http://push.example.test/send/opaque",
+        endpoint: "http://fcm.googleapis.com/fcm/send/opaque",
       }),
     ).toBeNull();
     expect(
       parseSerializedPushSubscription({
         ...subscription,
-        endpoint: "https://user:pass@push.example.test/send",
+        endpoint: "https://user:pass@fcm.googleapis.com/fcm/send",
       }),
     ).toBeNull();
+    expect(
+      parseSerializedPushSubscription({
+        ...subscription,
+        endpoint: "https://push.example.test/send/opaque",
+      }),
+    ).toBeNull();
+    expect(
+      isValidPushEndpoint(
+        "https://biblequest.notify.windows.com/?token=opaque",
+      ),
+    ).toBe(true);
+    expect(
+      isValidPushEndpoint(
+        "https://notify.windows.com.attacker.example/?token=opaque",
+      ),
+    ).toBe(false);
     expect(
       parseSerializedPushSubscription({
         ...subscription,

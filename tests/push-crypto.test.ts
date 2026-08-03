@@ -11,7 +11,7 @@ import {
 } from "@/lib/push/crypto.server";
 
 const subscription = {
-  endpoint: "https://push.example.test/send/opaque-token",
+  endpoint: "https://fcm.googleapis.com/fcm/send/opaque-token",
   expirationTime: null,
   keys: {
     p256dh: "A".repeat(87),
@@ -36,7 +36,7 @@ describe("encrypted push subscriptions", () => {
       pushEndpointFingerprint(subscription.endpoint),
     );
     expect(encrypted.encryptedSubscription).not.toContain(
-      "push.example.test",
+      "fcm.googleapis.com",
     );
     expect(
       decryptPushSubscription(

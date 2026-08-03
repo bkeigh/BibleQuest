@@ -17,7 +17,7 @@ function adminWithClaims(...claims: unknown[]) {
 
 describe("distributed provider rate limits", () => {
   it("claims every shared window with an opaque stable bucket", async () => {
-    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "s".repeat(48));
+    vi.stubEnv("BIBLEQUEST_RATE_LIMIT_SECRET", "r".repeat(48));
     const { admin, rpc } = adminWithClaims(
       { allowed: true, retry_after: 30, remaining: 2 },
       { allowed: true, retry_after: 3_000, remaining: 10 },
@@ -37,7 +37,7 @@ describe("distributed provider rate limits", () => {
   });
 
   it("stops after a denied window and preserves its retry interval", async () => {
-    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "s".repeat(48));
+    vi.stubEnv("BIBLEQUEST_RATE_LIMIT_SECRET", "r".repeat(48));
     const { admin, rpc } = adminWithClaims({
       allowed: false,
       retry_after: 42,
@@ -54,8 +54,21 @@ describe("distributed provider rate limits", () => {
   });
 
   it("fails closed on malformed database responses", async () => {
-    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "s".repeat(48));
+    vi.stubEnv("BIBLEQUEST_RATE_LIMIT_SECRET", "r".repeat(48));
     const { admin } = adminWithClaims({ allowed: "yes", retry_after: 0 });
+
+    await expect(
+      claimDistributedRateLimits(admin, "ai-quest", "account:user-a", [
+        { limit: 4, windowSeconds: 60 },
+      ]),
+    ).rejects.toThrow("Distributed rate limit unavailable");
+  });
+
+  it("does not reuse the database credential in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("BIBLEQUEST_RATE_LIMIT_SECRET", "");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "s".repeat(48));
+    const { admin } = adminWithClaims({ allowed: true, retry_after: 30 });
 
     await expect(
       claimDistributedRateLimits(admin, "ai-quest", "account:user-a", [

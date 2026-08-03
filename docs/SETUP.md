@@ -35,7 +35,7 @@ supabase start --exclude edge-runtime,imgproxy,logflare,postgres-meta,realtime,s
 ```
 
 Use the local `API_URL` and `ANON_KEY` reported by `supabase status` as
-`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in your private
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in your private
 `.env.local`. Never expose the reported service-role or secret key to the
 browser, and do not commit local keys.
 
@@ -56,10 +56,12 @@ browser, and do not commit local keys.
 3. Copy your keys into `.env.local`:
    ```
    NEXT_PUBLIC_SUPABASE_URL=...
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
+   SUPABASE_SECRET_KEY=...
+   BIBLEQUEST_RATE_LIMIT_SECRET=...
    ```
-   Do not copy a service-role key or direct database URL into the app's local
-   environment; no current application path consumes them.
+   Keep the secret and rate-limit values server-only. Do not copy a legacy
+   service-role key or direct database URL into the application runtime.
 4. Configure Auth → URL configuration. Keep the local callback for development.
    For production, set the Site URL to `https://www.biblequest.co` and allow the
    exact callback URLs (including their encoded `next` values) listed in

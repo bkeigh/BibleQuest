@@ -2,7 +2,7 @@
  * Supabase browser client for authentication and account sync.
  *
  * BibleQuest V1 runs fully in guest mode (local, private-by-default).
- * When NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set,
+ * When the public Supabase URL and publishable key are set,
  * this client enables account sync backed by the schema and RLS policies in
  * supabase/migrations. See docs/SETUP.md for the activation checklist.
  *
@@ -12,6 +12,7 @@
  */
 import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { supabasePublishableKey } from "./config";
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -24,21 +25,21 @@ type BibleQuestClientGlobal = typeof globalThis & {
 export function isSupabaseConfigured(): boolean {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      supabasePublishableKey(),
   );
 }
 
 export function createClient() {
   if (!isSupabaseConfigured()) {
     throw new Error(
-      "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY — see docs/SETUP.md."
+      "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY — see docs/SETUP.md.",
     );
   }
   // Keep one GoTrue owner across route chunks and client navigations.
   const scope = globalThis as BibleQuestClientGlobal;
   scope[BROWSER_CLIENT_KEY] ??= createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabasePublishableKey()!,
     { isSingleton: true },
   );
   return scope[BROWSER_CLIENT_KEY];
@@ -51,13 +52,13 @@ export function createSyncClient(expectedUserId: string, generation: number) {
   }
   if (!isSupabaseConfigured()) {
     throw new Error(
-      "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY — see docs/SETUP.md.",
+      "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY — see docs/SETUP.md.",
     );
   }
   const authClient = createClient();
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabasePublishableKey()!,
     {
       // Sync generations change after destructive operations, so a shared
       // singleton could silently retain stale global headers. Reuse the auth

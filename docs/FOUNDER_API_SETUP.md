@@ -24,14 +24,16 @@ local `.env.local` and to the Vercel Production environment:
 ```dotenv
 NEXT_PUBLIC_APP_URL=https://www.biblequest.co
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+SUPABASE_SECRET_KEY=sb_secret_...
+BIBLEQUEST_RATE_LIMIT_SECRET=at-least-32-random-characters
 ```
 
-The variable name keeps `ANON_KEY` for backwards compatibility, but its value
-may be the newer publishable key. Do **not** add a Supabase secret key,
-`service_role` key, access token, or database password to this app. The browser
-key is safe only because every private table is protected by Row Level
-Security. See [Supabase API key types](https://supabase.com/docs/guides/getting-started/api-keys).
+The publishable key reaches the browser and is safe only because every private
+table is protected by Row Level Security. The independently rotatable secret
+key stays in Vercel's encrypted server environment for sealed routes. Do
+**not** add a legacy `service_role` key, access token, or database password to
+the application runtime. See [Supabase API key types](https://supabase.com/docs/guides/getting-started/api-keys).
 
 ### Magic-link delivery (Resend lives inside Supabase, not Vercel)
 
@@ -216,7 +218,9 @@ API_BIBLE_COMMERCIALLY_LICENSED_BIBLE_IDS=id-one,id-two
 
 ## Final credential check
 
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: publishable/browser-safe; RLS is mandatory.
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: browser-safe; RLS is mandatory.
+- `SUPABASE_SECRET_KEY`: encrypted server-only key for sealed application routes.
+- `BIBLEQUEST_RATE_LIMIT_SECRET`: dedicated server-only HMAC material.
 - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`: non-secret key whose mode must match the
   server-only Stripe key.
 - `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`: server-only secrets used only
@@ -225,8 +229,7 @@ API_BIBLE_COMMERCIALLY_LICENSED_BIBLE_IDS=id-one,id-two
   keep false until the separate support checklist passes.
 - `API_BIBLE_API_KEY`: server-only private key.
 - Supabase SMTP/Resend provider credentials: provider dashboards only.
-- Supabase service-role, Stripe secret/webhook keys, and database passwords:
-  consumed only by server paths and never by a browser bundle.
+- Legacy Supabase service-role keys and database passwords: never add them.
 
 After any provider or environment change, redeploy, run the automated checks,
 then repeat the relevant real-browser QA path. A green build alone does not

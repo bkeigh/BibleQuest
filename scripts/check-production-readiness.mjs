@@ -164,7 +164,11 @@ const POSTURE_CONTRACTS = [
 ];
 
 const supabaseUrlValue = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+const publishableKey =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY?.trim();
+const rateLimitSecret = process.env.BIBLEQUEST_RATE_LIMIT_SECRET?.trim();
 const appUrlValue =
   process.env.BIBLEQUEST_READINESS_APP_URL?.trim() || "https://www.biblequest.co";
 
@@ -198,7 +202,13 @@ const supabaseUrl = configuredUrl(
 const appUrl = configuredUrl(appUrlValue, "BIBLEQUEST_READINESS_APP_URL");
 
 if (!publishableKey) {
-  failures.push("NEXT_PUBLIC_SUPABASE_ANON_KEY is not configured");
+  failures.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not configured");
+}
+if (!supabaseSecretKey || supabaseSecretKey.length < 32) {
+  failures.push("SUPABASE_SECRET_KEY is not configured");
+}
+if (!rateLimitSecret || rateLimitSecret.length < 32) {
+  failures.push("BIBLEQUEST_RATE_LIMIT_SECRET is not configured");
 }
 
 // MyShepherd and Haiku quest matching fail closed with a 503 when the provider

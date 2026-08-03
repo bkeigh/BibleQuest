@@ -109,7 +109,7 @@ jobs:
             account_sync_enabled: "true"
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ matrix.supabase_url }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ matrix.supabase_key }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ matrix.supabase_key }}
       NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED: ${{ matrix.account_sync_enabled }}
       # Every CI bundle exercises the safe production default. Direct Stripe
       # test/live configuration belongs only in encrypted environments.

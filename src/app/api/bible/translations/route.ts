@@ -10,15 +10,33 @@ import {
   type BibleTranslation,
 } from "@/lib/bible/translations";
 import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
+import { guardDistributedRequest } from "@/lib/security/distributed-rate-limit.server";
 
 export const dynamic = "force-dynamic";
 
+const TRANSLATION_RATE_LIMITS = [
+  { limit: 10, windowMs: 60_000 },
+  { limit: 60, windowMs: 60 * 60_000 },
+] as const;
+
 export async function GET(request: Request) {
-  const blocked = guardProviderRequest(request, "bible-translations", [
-    { limit: 10, windowMs: 60_000 },
-    { limit: 60, windowMs: 60 * 60_000 },
-  ]);
+  const blocked = guardProviderRequest(
+    request,
+    "bible-translations",
+    TRANSLATION_RATE_LIMITS,
+  );
   if (blocked) return blocked;
+
+  // Claims the same quotas across every serverless instance before provider work.
+  const distributedBlocked = await guardDistributedRequest(
+    request,
+    "bible-translations",
+    TRANSLATION_RATE_LIMITS.map(({ limit, windowMs }) => ({
+      limit,
+      windowSeconds: windowMs / 1_000,
+    })),
+  );
+  if (distributedBlocked) return distributedBlocked;
 
   let connected: BibleTranslation[] = [];
   let providerError = false;

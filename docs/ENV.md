@@ -9,8 +9,9 @@ template in [`../.env.example`](../.env.example).
 | `BIBLEQUEST_ROLLBACK_SHA` | Launch gate | **Server-only.** Exact approved 40-character rollback commit reported by health; never a branch, URL, or deployment ID. |
 | `BIBLEQUEST_DEPLOYMENT_LABEL` | Staging safety | **Server-only.** Renders a warning only when the value is exactly `SYNC-ENABLED STAGING — NEVER PROMOTE`; leave unset in Production. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Optional | Enables account sync. |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Optional | Publishable client key (safe in browser). |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server feature gate | **Server-only.** Used by sealed push scheduler/test/subscription routes and future billing projection routes. Never use a `NEXT_PUBLIC_*` name. |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Optional | Independently rotatable publishable client key (safe in browser). The legacy anon key remains a local compatibility fallback. |
+| `SUPABASE_SECRET_KEY` | Server feature gate | **Server-only.** Used by sealed push, rate-limit, and billing projection routes. Never use a `NEXT_PUBLIC_*` name. |
+| `BIBLEQUEST_RATE_LIMIT_SECRET` | Server secret | **Server-only.** At least 32 random characters used only to HMAC opaque distributed rate-limit identities. |
 | `NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED` | Launch gate | Must be exactly `true` to expose account auth and sync after the full migration, RLS, provider, restore, and PWA gates pass. Missing or any other value stays guest-only. |
 | `BIBLEQUEST_AVATAR_SYNC_ENABLED` | Launch gate | **Server-only.** Must be exactly `true` after migration `0023`, private-bucket RLS, two-user isolation, and preview checks pass. Missing or any other value blocks avatar reads/uploads while account deletion cleanup remains available. |
 | `BIBLEQUEST_PUSH_ENABLED` | Launch gate | **Server-only.** Must be exactly `true` after migration `0024`, encryption/VAPID configuration, two-user isolation, and preview checks pass. |
@@ -50,8 +51,8 @@ template in [`../.env.example`](../.env.example).
 ## Rules
 
 - The app must **run in development without any AI or payment keys**. It does.
-- The browser bundle never consumes a service-role key or direct database URL.
-  Sealed server routes may use `SUPABASE_SERVICE_ROLE_KEY` from ignored local
+- The browser bundle never consumes a secret key or direct database URL.
+  Sealed server routes may use `SUPABASE_SECRET_KEY` from ignored local
   environment files or encrypted Vercel settings. It must never use a
   `NEXT_PUBLIC_*` name, appear in logs, or be returned to a client. See
   [`../SECURITY.md`](../SECURITY.md).
