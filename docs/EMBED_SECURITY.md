@@ -2,17 +2,19 @@
 
 ## Contract and ownership
 
-BibleQuest permits framing only from these CSP `frame-ancestors` sources:
+BibleQuest permits its public homepage (`/`) to be framed only from these CSP
+`frame-ancestors` sources:
 
 1. `'self'`
 2. `https://winterhill.studio`
 3. `https://www.winterhill.studio`
 
 The list is exact. Wildcards, HTTP origins, broad subdomain patterns,
-localhost production exceptions, and any other origin are denied. Production
-must omit `X-Frame-Options`: that older header cannot represent this
-multi-origin allowlist, and `DENY` or `SAMEORIGIN` would conflict with the
-approved Winterhill preview.
+localhost production exceptions, and any other origin are denied. The homepage
+omits `X-Frame-Options` because that older header cannot represent this
+multi-origin allowlist. Every other route sends `frame-ancestors 'none'` and
+`X-Frame-Options: DENY`, including app, onboarding, auth, console, and API
+routes.
 
 The BibleQuest repository/deployment owner (currently Brendan Kenney) owns the
 exception and its CSP tests. The Winterhill site owner owns the consuming iframe
@@ -33,24 +35,25 @@ does not read the Supabase session, redirect based on authentication, or render
 prayers, reflections, notes, or other persisted user records. This is the only
 page approved as the preview's initial URL.
 
-The CSP header currently applies to all BibleQuest routes. Winterhill is
-therefore a trusted framing origin and must not deep-link its iframe to `/app`,
-`/app/account`, `/onboarding`, or another personal flow. Those routes can use
-browser-local or authenticated data after user action.
+Winterhill must not deep-link its iframe to `/app`, `/app/account`,
+`/onboarding`, or another personal flow. Browsers refuse those framed routes
+even when the ancestor is Winterhill, so private browser-local or authenticated
+data never renders inside the portfolio.
 
-Navigation inside the landing page intentionally remains in the iframe: its
-internal links and calls to action use normal same-frame navigation. Winterhill
-should provide any “open the full project” or new-tab control outside the iframe
-instead of injecting embed detection or privileged query parameters into
-BibleQuest. Do not add a query-string or localhost bypass for framing.
+Public in-page anchors remain usable inside the landing page. App/onboarding
+navigation is intentionally denied inside the frame. Winterhill should provide
+an “open the full project” control outside the iframe rather than injecting
+embed detection or privileged query parameters into BibleQuest. Do not add a
+query-string or localhost bypass for framing.
 
 ## Automated verification
 
 `tests/security-headers.test.ts` loads the production Next.js header rules,
 parses CSP by directive and source token, and verifies:
 
-- the `frame-ancestors` source set is exactly the three entries above;
-- all production Next.js header rules omit `X-Frame-Options`; and
+- the homepage `frame-ancestors` source set is exactly the three entries above;
+- every non-homepage route uses `frame-ancestors 'none'` plus
+  `X-Frame-Options: DENY`; and
 - `vercel.json` does not define a second CSP or frame-policy header.
 
 Run the focused contract test with:
@@ -78,10 +81,13 @@ test:
 ```bash
 curl -sSIL https://www.biblequest.co/ \
   | grep -iE '^(content-security-policy|x-frame-options):'
+curl -sSIL https://www.biblequest.co/app \
+  | grep -iE '^(content-security-policy|x-frame-options):'
 ```
 
-The response must contain the exact `frame-ancestors` set and no
-`X-Frame-Options` line.
+The homepage response must contain the exact Winterhill `frame-ancestors` set
+and no `X-Frame-Options` line. `/app` must contain `frame-ancestors 'none'` and
+`X-Frame-Options: DENY`.
 
 ## Winterhill-side acceptance test
 
@@ -90,8 +96,8 @@ After the corresponding Winterhill page is available, test in a real browser:
 1. Load the preview from `https://winterhill.studio` and from
    `https://www.winterhill.studio`; the public BibleQuest landing page must
    render in both.
-2. Confirm the initial page contains only public demo content and that an
-   internal link stays inside the frame.
+2. Confirm the initial page contains only public demo content, public in-page
+   anchors work, and a direct framed request to `/app` is refused.
 3. Serve the same iframe temporarily from an unrelated HTTPS origin under the
    owner's control (or use the localhost fixture above); it must be blocked.
 4. Inspect the framed BibleQuest response in DevTools and confirm there is one

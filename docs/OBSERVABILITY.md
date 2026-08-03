@@ -70,9 +70,11 @@ The endpoint requires its `Origin` to match the exact deployment being called,
 rejects cross-site Fetch Metadata, and applies per-client limits of 60 requests
 per minute and 300 per 15 minutes inside each reused server instance. The
 client bucket is held only in memory and is never logged or emitted as evidence.
-Vercel Firewall must mirror a deployment-wide bound before launch because
-public browser signals are not authenticated or cryptographically attested;
-they are operational canaries, not unique-user or security-audit counts.
+The current Vercel plan does not expose Firewall rate limiting, so this is not
+yet a deployment-wide counter. Stage and review a log-first platform rule when
+that feature becomes available. Public browser signals are not authenticated or
+cryptographically attested; they are operational canaries, not unique-user or
+security-audit counts.
 
 Never add prayer, reflection, note, or Scripture text; a person’s name or email;
 tokens, cookies, user/record/request/deployment IDs; query strings; routes; or

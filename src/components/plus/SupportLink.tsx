@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { IconArrowRight } from "@/components/design-system/icons";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { cn } from "@/lib/utils/cn";
 import { webCommerceAvailable } from "@/lib/platform/purchases";
 
@@ -29,7 +29,7 @@ export function SupportLink({ className }: SupportLinkProps) {
           half again as large — and left in flow that 101px image pushed this
           80px banner to 177px. What spills is transparent padding. */}
       <span className="relative flex h-16 w-16 shrink-0 items-center justify-center">
-        <PixelIcon
+        <ArtIcon
           name="service-basket"
           size={68}
           // `max-w-none` because Tailwind's reset caps every image at 100% of

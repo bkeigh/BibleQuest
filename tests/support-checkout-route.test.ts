@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   guard: vi.fn(),
+  distributedGuard: vi.fn(),
   configuration: vi.fn(),
   createStripe: vi.fn(),
   claim: vi.fn(),
@@ -17,6 +18,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/bible/provider-request-guard", () => ({
   guardProviderRequest: mocks.guard,
+}));
+vi.mock("@/lib/security/distributed-rate-limit.server", () => ({
+  guardDistributedRequest: mocks.distributedGuard,
 }));
 vi.mock("@/lib/billing/config.server", () => ({
   requireStripeBillingConfiguration: mocks.configuration,
@@ -102,6 +106,7 @@ function session() {
 describe("one-time support Checkout route", () => {
   beforeEach(() => {
     mocks.guard.mockReset().mockReturnValue(null);
+    mocks.distributedGuard.mockReset().mockResolvedValue(null);
     mocks.configuration.mockReset().mockReturnValue(CONFIGURATION);
     mocks.createAdmin.mockReset().mockReturnValue({ role: "admin" });
     mocks.createServer.mockReset();
@@ -151,6 +156,22 @@ describe("one-time support Checkout route", () => {
     mocks.contractReady.mockResolvedValue(false);
     expect(await POST(request())).toMatchObject({ status: 503 });
     expect(mocks.claim).not.toHaveBeenCalled();
+    expect(mocks.createStripe).not.toHaveBeenCalled();
+  });
+
+  it("stops before provider access when shared capacity is exhausted", async () => {
+    mocks.distributedGuard.mockResolvedValue(
+      Response.json(
+        { error: "rate_limited" },
+        { status: 429, headers: { "Retry-After": "60" } },
+      ),
+    );
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("60");
+    expect(mocks.configuration).not.toHaveBeenCalled();
     expect(mocks.createStripe).not.toHaveBeenCalled();
   });
 

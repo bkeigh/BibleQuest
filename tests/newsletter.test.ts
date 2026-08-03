@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   TALLY_NEWSLETTER_EMBED_URL,
-  TALLY_NEWSLETTER_SCRIPT_URL,
   TALLY_NEWSLETTER_URL,
 } from "@/lib/newsletter";
 
@@ -16,12 +15,6 @@ describe("newsletter destinations", () => {
     expect(embedUrl.hostname).toBe("tally.so");
     expect(embedUrl.pathname.split("/").at(-1)).toBe(
       publicUrl.pathname.split("/").at(-1),
-    );
-  });
-
-  it("loads Tally's official embed script over HTTPS", () => {
-    expect(TALLY_NEWSLETTER_SCRIPT_URL).toBe(
-      "https://tally.so/widgets/embed.js",
     );
   });
 });

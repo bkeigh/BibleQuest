@@ -37,7 +37,7 @@ export default async function ConsoleSignInPage() {
             <p className="font-display text-[1.2rem] leading-none text-graphite">
               BibleQuest
             </p>
-            <p className="mt-1 font-pixel text-[0.63rem] tracking-[0.16em] text-evergreen-700">
+            <p className="mt-1 font-art-label text-[0.63rem] tracking-[0.16em] text-evergreen-700">
               CONSOLE
             </p>
           </div>

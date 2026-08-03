@@ -9,7 +9,7 @@ import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton } from "@/components/design-system/GentleButton";
-import { PixelMascot } from "@/components/design-system/PixelMascot";
+import { ArtMascot } from "@/components/design-system/ArtMascot";
 import { useToast } from "@/components/design-system/Toast";
 import { IconCheck } from "@/components/design-system/icons";
 import { SignInMethods } from "./SignInMethods";
@@ -151,7 +151,7 @@ function AccountInner() {
           : "Restore your saved journey."
       }
     >
-      <PixelMascot
+      <ArtMascot
         name="key"
         size={224}
         title={intent === "create" ? "Create account" : "Sign in"}

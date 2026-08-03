@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { GentleLink } from "@/components/design-system/GentleButton";
-import { PixelMascot } from "@/components/design-system/PixelMascot";
+import { ArtMascot } from "@/components/design-system/ArtMascot";
 
 export const metadata: Metadata = {
   title: "Page not found",
@@ -18,7 +18,7 @@ export default function NotFoundPage() {
         height={44}
         className="mb-6 h-11 w-auto"
       />
-      <PixelMascot name="map" size={192} />
+      <ArtMascot name="map" size={192} />
       <p className="mt-5 text-caption uppercase tracking-[0.16em] text-accent">
         Path not found
       </p>

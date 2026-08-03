@@ -19,7 +19,7 @@ export function HomeSectionHeading({
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2
           id={id}
-          className="font-pixel text-[1.75rem] uppercase leading-none tracking-[0.05em] text-accent min-[390px]:text-[2.125rem]"
+          className="font-art-label text-[1.75rem] uppercase leading-none tracking-[0.05em] text-accent min-[390px]:text-[2.125rem]"
         >
           {title}
         </h2>

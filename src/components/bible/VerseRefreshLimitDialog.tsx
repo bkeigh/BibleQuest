@@ -7,7 +7,7 @@ import {
   GentleLink,
 } from "@/components/design-system/GentleButton";
 import { IconClose } from "@/components/design-system/icons";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { FREE_DAILY_VERSE_REFRESH_LIMIT } from "@/lib/questos/verse-engine";
 
 interface VerseRefreshLimitDialogProps {
@@ -96,7 +96,7 @@ export function VerseRefreshLimitDialog({
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gold-500/15 text-gilt ring-1 ring-gold-500/30">
-            <PixelIcon name="crown" size={68} />
+            <ArtIcon name="crown" size={68} />
           </div>
           <button
             type="button"

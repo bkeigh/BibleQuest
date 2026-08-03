@@ -42,7 +42,7 @@ describe("Home formation layout", () => {
     expect(home).not.toContain("A gentle next step");
 
     // The heading lives above the card, like every other section here. It used
-    // to be duplicated *inside* the card — the same pixel h2 and the same
+    // to be duplicated *inside* the card — the same decorative h2 and the same
     // caption nested under a "For Today" heading — so this one row carried two
     // headings while Guided Scripture and the Arcade carried one.
     expect(home).toContain("<HomeSectionHeading");
@@ -79,16 +79,13 @@ describe("Home formation layout", () => {
     expect(Number(tileMinHeight)).toBeGreaterThanOrEqual(6);
   });
 
-  it("uses Instagram artwork and prominent Ithaca type for games", () => {
+  it("uses editorial artwork and display type for games", () => {
     expect(card).toContain("/art/scripture-games-today.webp");
     expect(card).toContain("/art/scripture-games-coming-1.webp");
     expect(card).toContain("/art/scripture-games-coming-2.webp");
-    // Pixel is the app's label face (0.875rem badges and section headings).
-    // Card titles use the display face everywhere, including the guide card in
-    // this same file — a 2rem pixel title was the lone exception and competed
-    // with the pixel section heading directly above it.
+    // Card titles use the display face everywhere, including the guide card.
     expect(card).toContain('font-display text-[1.75rem]');
-    expect(card).not.toContain("font-pixel text-[2rem]");
+    expect(card).not.toContain("font-art-label text-[2rem]");
     expect(formation).toContain("snap-mandatory");
     expect(formation.match(/role=\"listitem\"/g)).toHaveLength(3);
     expect(card).toContain("flex h-full min-h-[17rem] w-full flex-col");

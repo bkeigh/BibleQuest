@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import {
   BOOSTS,
@@ -39,7 +39,7 @@ function ArcadeStoreInner() {
   return (
     <div className="space-y-6">
       <PaperCard variant="atmospheric" padding="lg">
-        <p className="font-pixel text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
+        <p className="font-art-label text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
           What you are holding
         </p>
         <h2 className="mt-2 font-display text-[1.5rem] leading-tight text-graphite">
@@ -57,7 +57,7 @@ function ArcadeStoreInner() {
               className="flex items-center gap-3 rounded-[var(--radius-button)] border border-mist bg-linen/60 px-3 py-2.5"
             >
               <span aria-hidden="true" className="shrink-0">
-                <PixelIcon name={BOOSTS[id].sprite} size={52} />
+                <ArtIcon name={BOOSTS[id].sprite} size={52} />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-small font-medium text-graphite">
@@ -106,7 +106,7 @@ function ShelfSection({
 }) {
   return (
     <section aria-label={title}>
-      <h2 className="font-pixel text-[1.125rem] uppercase tracking-[0.06em] text-accent">
+      <h2 className="font-art-label text-[1.125rem] uppercase tracking-[0.06em] text-accent">
         {title}
       </h2>
       <p className="mt-1 text-small leading-relaxed text-ash">{blurb}</p>

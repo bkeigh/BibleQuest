@@ -197,17 +197,39 @@ the dry run, production readiness, the RLS report, and the two-user guided
 progress proof. Never substitute normal linked `db push`, `--include-all`, or
 migration repair.
 
+### Production 0034 distributed provider-rate packet
+
+Migration `0034` adds one forced-RLS operational bucket table and a service-only
+atomic claim for paid AI and support Checkout. The application HMACs account or
+trusted network identifiers before the database call, so no raw identifier is
+stored. Run the exact history, checksum, backup, and one-packet preflight with:
+
+```bash
+pnpm check:production-provider-rate-limits
+```
+
+Apply only the reviewed long-version packet with the pinned confirmation:
+
+```bash
+BIBLEQUEST_PRODUCTION_MIGRATION_CONFIRM='apply 20260803010000 to iacnjqnssovaaojswjoh' \
+  node scripts/reconcile-production-provider-rate-limits.mjs --apply
+```
+
+The apply must report `"applied":true`. Then rerun the read-only check,
+production readiness, and the `0034` pgTAP file. Never use normal linked
+`db push`, `--include-all`, or migration repair for this production history.
+
 ## Complete public-table inventory
 
 | Classification | Tables | Intended access |
 | --- | --- | --- |
 | Public content | `faith_providers`, `bible_translations`, `bible_books`, `bible_chapters`, `bible_verses`, `daily_verses`, `quest_templates`, `prayer_prompts`, `reflection_prompts`, `milestones`, `feature_flags` | Anonymous and authenticated `SELECT` only. Reads are limited to active/approved content; disabled feature flags are hidden. No client writes. Prompt tables contain generic seed prompts, not a user's prayer or reflection text. |
-| User-owned | `profiles`, `user_sync_state`, `user_settings`, `user_daily_quests`, `user_daily_quest_days`, `user_quests`, `quest_completions`, `prayers`, `reflections`, `verse_bookmarks`, `user_recent_verses`, `reading_progress`, `chapters_read`, `journey_events`, `growth_events`, `user_milestones`, `notification_preferences` | Authenticated owner only. Most tables allow bounded owner operations; sync revisions and destructive account actions stay behind reviewed RPCs. |
+| User-owned | `profiles`, `user_sync_state`, `user_settings`, `user_daily_quests`, `user_daily_quest_days`, `user_quests`, `quest_completions`, `prayers`, `reflections`, `verse_bookmarks`, `user_recent_verses`, `user_guided_movements`, `reading_progress`, `chapters_read`, `journey_events`, `growth_events`, `user_milestones`, `notification_preferences` | Authenticated owner only. Most tables allow bounded owner operations; sync revisions and destructive account actions stay behind reviewed RPCs. |
 | Server-managed user state | `push_reminder_preferences`, `push_subscriptions`, `push_deliveries` | Normal users can reach only the reviewed owner-scoped functions or projections; delivery mutation is service-role only. |
-| Server-owned | `subscriptions`, `push_test_claims`, `stripe_customers`, `stripe_webhook_events`, `stripe_action_claims`, `stripe_billing_signals`, `stripe_support_payments`, `console_audit_logs`, `operator_plus_grants` | Only documented owner projections are client-readable. Provider identifiers, money, webhook state, test claims, operator audit, and manual entitlement history remain sealed behind server boundaries. |
+| Server-owned | `subscriptions`, `push_test_claims`, `stripe_customers`, `stripe_webhook_events`, `stripe_action_claims`, `stripe_billing_signals`, `stripe_support_payments`, `console_audit_logs`, `operator_plus_grants`, `provider_rate_limit_windows` | Only documented owner projections are client-readable. Provider identifiers, money, webhook state, test claims, operational rate buckets, operator audit, and manual entitlement history remain sealed behind server boundaries. |
 | Internal | Supabase-managed schemas remain outside the public-table inventory. Private avatar objects use the sealed `storage.objects` policies and non-public bucket. |
 
-RLS is enabled on all 40 tables. Private prayers, reflections, recent Scripture
+RLS is enabled on all 42 tables. Private prayers, reflections, recent Scripture
 history, notes, and
 journey data have no anonymous policy and every authenticated policy includes
 an `auth.uid()` owner condition.
@@ -221,8 +243,7 @@ commands target the local stack only; do not add `--linked` or `--db-url`.
 supabase start
 supabase db reset
 supabase migration list --local
-supabase test db --local supabase/tests/0014_journey_event_identity.sql
-supabase test db --local supabase/tests/0015_daily_quest_cas.sql
+supabase test db --local
 docker exec -i supabase_db_BibleQuest \
   psql -U postgres -d postgres -v ON_ERROR_STOP=1 -P pager=off \
   < supabase/evidence/rls_policy_report.sql
@@ -260,9 +281,14 @@ Expected migration order:
 0027_console_insights_and_audit.sql
 0028_stripe_lifetime_plus.sql
 0029_user_row_size_and_trigger_privileges.sql
+0030_operator_plus_grants.sql
+0031_stripe_subscription_conflict_key.sql
+0032_stripe_dispute_signal_prefix.sql
+0033_guided_pilgrimage_progress.sql
+0034_distributed_provider_rate_limits.sql
 ```
 
-Evidence must show all 40 expected tables with `rowsecurity = true`, only the
+Evidence must show all 42 expected tables with `rowsecurity = true`, only the
 documented policy names, no `anon` role on user/server-owned policies, and
 `purge_user_data` as `security_definer = true`, `search_path=""`, anonymous
 execute false, authenticated execute true. Table grants must also match the

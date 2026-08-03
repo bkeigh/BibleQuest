@@ -266,7 +266,7 @@ export function SevenDaysLevelSession({
             <PaperCard variant="atmospheric" padding="lg">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="font-pixel text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
+                  <p className="font-art-label text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
                     Day {level.day} · Level {level.level}
                   </p>
                   <h2 className="mt-2 font-display text-[1.75rem] leading-tight text-graphite">
@@ -368,7 +368,7 @@ export function SevenDaysLevelSession({
 
             <div className="app-glass-surface flex items-center justify-between gap-3 rounded-[var(--radius-button)] border border-mist bg-paper px-3.5 py-2">
               <p className="min-w-0 truncate">
-                <span className="font-pixel text-caption uppercase tracking-[0.06em] text-gilt">
+                <span className="font-art-label text-caption uppercase tracking-[0.06em] text-gilt">
                   Day {level.day} · Level {level.level}
                 </span>
                 <span className="ms-2 font-display text-small text-graphite">
@@ -452,7 +452,7 @@ export function SevenDaysLevelSession({
         {phase === "cleared" && (
           <div className="flex-1">
             <PaperCard variant="atmospheric" padding="lg">
-              <p className="font-pixel text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
+              <p className="font-art-label text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
                 Level {level.level} gathered
               </p>
               <h2

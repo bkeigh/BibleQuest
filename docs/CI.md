@@ -16,6 +16,8 @@ guest mode with analytics, payments, and Supabase integrations disabled.
 | `Quality` | `pnpm lint`, `pnpm check:seed`, `git diff --check` over the event changes and working tree | Blocks lint, stale generated Console content, and whitespace errors. |
 | `Types and tests` | `pnpm exec tsc --noEmit`, `pnpm test`, `pnpm test:launch-evidence` | Blocks type/test failures and verifies the sanitized evidence command plus alert thresholds with fixtures. Tests run noninteractively. |
 | `Production build` | `pnpm build` | Blocks a guest-mode production build failure; times out after 20 minutes. |
+| `Browser smoke` | `pnpm test:e2e` | Builds the configured-but-contained release and verifies public privacy/framing plus onboarding landmarks in Chromium. |
+| `Database policies` | `supabase start`, `supabase db reset`, `supabase test db --local` | Applies every migration and seed to an ephemeral local stack, then blocks schema or RLS acceptance failures without remote credentials. |
 | `Dependency risk` | `pnpm audit --prod`, then `pnpm audit --prod --audit-level high` | Reports every production advisory. High and critical advisories block CI; moderate advisories stay visible for triage without blocking. |
 
 The workflow has only `contents: read` permission. Checkout credentials are not
@@ -27,7 +29,7 @@ published.
 In the GitHub ruleset or branch protection rule for `main`:
 
 1. Require a pull request before merging.
-2. Require the four status checks listed above to pass.
+2. Require all six status checks listed above to pass.
 3. Require branches to be up to date before merging so the production build is
    tested against the latest `main`.
 4. Prevent force pushes and branch deletion. Keep bypass access limited to the
@@ -38,19 +40,18 @@ workflow.
 
 ## Migration validation
 
-Database migration validation is deferred. The repository does not currently
-include a credential-free local Supabase CI harness. A later protected job
-should start an ephemeral local Supabase stack, apply every numbered migration
-from a clean database, run schema and RLS checks, and tear the stack down. It
-must never connect to a remote database or receive production credentials. Add
-that job as a required check only after it is deterministic and credential-free.
+The `Database policies` job starts an ephemeral Docker-backed Supabase stack,
+applies every numbered migration and the checked-in seed from a clean database,
+runs all pgTAP acceptance files under `supabase/tests`, and always tears the
+stack down. It has no application secrets, remote project reference, or
+production credentials. The Supabase setup action and CLI version are both
+pinned.
 
-Until then, the database owner must run the clean local reset, migration list,
-schema lint, and RLS evidence procedure in
-[`SUPABASE_SECURITY_ROLLOUT.md`](SUPABASE_SECURITY_ROLLOUT.md) at release
-freeze. After an approved production reconciliation, run
-`pnpm check:production-readiness`; it is a read-only compatibility probe, not
-proof of migration history, SMTP delivery, or cross-account isolation.
+The database owner must still complete the remote reconciliation and two-user
+isolation procedure in [`SUPABASE_SECURITY_ROLLOUT.md`](SUPABASE_SECURITY_ROLLOUT.md)
+at release freeze. `pnpm check:production-readiness` is a read-only compatibility
+probe, not proof of migration history, SMTP delivery, or cross-account
+isolation.
 
 The repository does include deterministic local acceptance files for the
 immutable Journey identity and daily-quest CAS contracts:

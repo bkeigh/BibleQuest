@@ -128,7 +128,7 @@ export function BottomNav() {
                   active ? "text-accent" : "text-ash hover:text-charcoal"
                 )}
               >
-                {/* Pixel-crisp active indicator: a hard-edged bar flush with
+                {/* Crisp active indicator: a hard-edged bar flush with
                     the top hairline — deliberately unrounded. */}
                 <span
                   aria-hidden

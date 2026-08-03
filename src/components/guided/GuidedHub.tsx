@@ -35,7 +35,7 @@ function GuidedHubInner() {
       />
       <PageContainer className="pb-12 pt-4">
         <PaperCard as="section" variant="atmospheric" padding="lg">
-          <p className="font-pixel text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
+          <p className="font-art-label text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
             Today’s guide
           </p>
           <h2 className="mt-2 font-display text-[1.75rem] leading-tight text-graphite">
@@ -74,7 +74,7 @@ function GuidedHubInner() {
 
         {GREEN_FEATURES.pilgrimages && (
           <PaperCard as="section" variant="quiet" padding="md" className="mt-5">
-            <p className="font-pixel text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
+            <p className="font-art-label text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
               Pilgrimages
             </p>
             <h2 className="mt-2 font-display text-[1.375rem] text-graphite">

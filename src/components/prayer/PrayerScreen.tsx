@@ -10,8 +10,8 @@ import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
-import { PixelMascot } from "@/components/design-system/PixelMascot";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
+import { ArtMascot } from "@/components/design-system/ArtMascot";
 import { SearchClearButton } from "@/components/design-system/SearchClearButton";
 import { JournalEntryBody } from "@/components/journal/JournalEntryBody";
 import { JournalPrivacyNote } from "@/components/journal/JournalPrivacyNote";
@@ -346,7 +346,7 @@ function EmptyJournal({
   return (
     <div className="mt-6 space-y-3">
       <PaperCard variant="atmospheric" padding="lg" className="text-center">
-        <PixelMascot name="dove" size={192} className="mb-4" />
+        <ArtMascot name="dove" size={192} className="mb-4" />
         <h2 className="font-display text-[1.25rem] text-graphite">
           Make space for what matters
         </h2>
@@ -381,7 +381,7 @@ function EmptyJournal({
 function EmptyResults({ query, onClear }: { query: string; onClear: () => void }) {
   return (
     <PaperCard variant="quiet" padding="lg" className="mt-6 text-center">
-      <PixelIcon name="leaf" size={92} />
+      <ArtIcon name="leaf" size={92} />
       <h2 className="mt-3 font-display text-[1.125rem] text-graphite">
         No entries here
       </h2>
@@ -448,7 +448,7 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
     <PaperCard as="article" variant="paper" padding="md">
       <div className="flex items-start gap-3">
         <span className="mt-0.5 shrink-0">
-          <PixelIcon name={icon} size={80} />
+          <ArtIcon name={icon} size={80} />
         </span>
         <div className="min-w-0 flex-1">
           {prayer.title && (

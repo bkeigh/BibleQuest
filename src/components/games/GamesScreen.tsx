@@ -8,7 +8,7 @@ import {
   GentleLink,
 } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -108,7 +108,7 @@ export function GamesScreen() {
               <PaperCard variant="paper" padding="md" interactive>
                 <div className="flex items-center gap-3">
                   <span aria-hidden="true" className="shrink-0">
-                    <PixelIcon name="service-basket" size={56} />
+                    <ArtIcon name="service-basket" size={56} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block font-display text-subheading text-graphite">

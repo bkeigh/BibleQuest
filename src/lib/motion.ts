@@ -89,15 +89,15 @@ export const celebrationScale: Variants = {
 };
 
 /**
- * Pixel sparkle: a tiny two-frame opacity flicker for achievement moments
- * (badge reveals, pixel icons appearing). Pass an index via `custom` to
+ * Blessing sparkle: a small opacity shimmer for achievement moments.
+ * Pass an index via `custom` to
  * stagger a cluster:
  *
- * `<motion.span variants={pixelSparkle} initial="hidden" animate="visible" custom={i}>`
+ * `<motion.span variants={blessingSparkle} initial="hidden" animate="visible" custom={i}>`
  *
- * Linear easing + keyframes keep it stepped and pixel-like rather than smooth.
+ * Gentle timing keeps the acknowledgement quiet rather than celebratory noise.
  */
-export const pixelSparkle: Variants = {
+export const blessingSparkle: Variants = {
   hidden: { opacity: 0 },
   visible: (i: number = 0) => ({
     opacity: [0, 1, 0.55, 1],
@@ -105,7 +105,7 @@ export const pixelSparkle: Variants = {
       duration: 0.4,
       delay: i * 0.07,
       times: [0, 0.35, 0.65, 1],
-      ease: "linear",
+      ease: "easeInOut",
     },
   }),
 };

@@ -106,12 +106,17 @@ function parseJson(output, label) {
 async function verifyManifest() {
   const migrationsDir = join(ROOT, "supabase", "migrations");
   const manifest = await readFile(join(migrationsDir, "manifest.sha256"));
-  if (sha256(manifest) !== EXPECTED_MANIFEST_SHA256) {
+  const frozenManifest = `${manifest
+    .toString("utf8")
+    .split("\n")
+    .filter(Boolean)
+    .slice(0, 32)
+    .join("\n")}\n`;
+  if (sha256(frozenManifest) !== EXPECTED_MANIFEST_SHA256) {
     fail("Frozen 32-file manifest checksum changed");
   }
 
-  const entries = manifest
-    .toString("utf8")
+  const entries = frozenManifest
     .split("\n")
     .filter(Boolean)
     .map((line) => {
@@ -132,7 +137,8 @@ async function verifyManifest() {
 
   const actualFiles = (await readdir(migrationsDir))
     .filter((filename) => filename.endsWith(".sql"))
-    .sort();
+    .sort()
+    .slice(0, 32);
   if (
     JSON.stringify(actualFiles) !==
     JSON.stringify(entries.map((entry) => entry.filename))

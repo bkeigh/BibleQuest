@@ -32,7 +32,7 @@ export function ConsoleShell({
             <p className="font-display text-[1.18rem] leading-none text-[#fffdf7]">
               BibleQuest
             </p>
-            <p className="mt-1 font-pixel text-[0.62rem] tracking-[0.16em] text-gold-300">
+            <p className="mt-1 font-art-label text-[0.62rem] tracking-[0.16em] text-gold-300">
               CONSOLE
             </p>
           </div>
@@ -41,7 +41,7 @@ export function ConsoleShell({
         <ConsoleNav cleanUrls={cleanUrls} />
 
         <div className="console-operator">
-          <p className="font-pixel text-[0.62rem] tracking-[0.13em] text-evergreen-300">
+          <p className="font-art-label text-[0.62rem] tracking-[0.13em] text-evergreen-300">
             OPERATOR
           </p>
           <p className="mt-1 truncate text-caption text-evergreen-50">{email}</p>

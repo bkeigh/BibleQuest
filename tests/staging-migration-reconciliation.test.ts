@@ -29,6 +29,11 @@ function sha256(value: string | Buffer) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+// Keeps the historical 0033 packet pinned while later migrations append safely.
+function frozenManifest() {
+  return `${MANIFEST.toString("utf8").trim().split("\n").slice(0, 32).join("\n")}\n`;
+}
+
 describe("staging migration reconciliation", () => {
   it("pins the exact staging identity, 32-file manifest, and packet", () => {
     expect(SCRIPT).toContain(
@@ -36,9 +41,9 @@ describe("staging migration reconciliation", () => {
     );
     expect(SCRIPT).toContain('const PRODUCTION_PROJECT_NAME = "BibleQuest";');
     expect(SCRIPT).toContain('const PACKET_VERSION = "20260729190000";');
-    expect(SCRIPT).toContain(sha256(MANIFEST));
+    expect(SCRIPT).toContain(sha256(frozenManifest()));
     expect(SCRIPT).toContain(sha256(PACKET));
-    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(32);
+    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(33);
   });
 
   it("fails closed on target, manifest, schema, history, and proposal drift", () => {

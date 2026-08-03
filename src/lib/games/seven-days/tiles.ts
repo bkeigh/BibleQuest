@@ -1,12 +1,12 @@
-import type { PixelSpriteName } from "@/components/design-system/pixel-assets";
+import type { ArtSpriteName } from "@/components/design-system/art-assets";
 import { SEVEN_DAYS_TILE_IDS, type SevenDaysTileId } from "./types";
 
 export interface SevenDaysTileArt {
   readonly id: SevenDaysTileId;
   /** Spoken by assistive tech and printed on goal rows. */
   readonly label: string;
-  /** The pixel sprite drawn on the tile. */
-  readonly sprite: PixelSpriteName;
+  /** The painted 2.5D symbol drawn on the tile. */
+  readonly sprite: ArtSpriteName;
   /**
    * Tile chips carry both a colour and a distinct silhouette, so a board is
    * still readable when colour alone is not.
@@ -30,7 +30,7 @@ export interface SevenDaysTileArt {
 /**
  * The one place the board's artwork is chosen.
  *
- * Sprites are looked up by name from the pixel registry, so a sprite overhaul
+ * Illustrations are looked up by name from the art registry, so an art upgrade
  * that keeps these five names needs no change here at all — and a rename is a
  * five-line edit in this file rather than a hunt through the board.
  */

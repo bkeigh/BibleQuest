@@ -25,7 +25,7 @@ import {
   shouldRedirectAppToOnboarding,
 } from "@/lib/auth/onboarding-resume";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
-import { PixelMascot } from "@/components/design-system/PixelMascot";
+import { ArtMascot } from "@/components/design-system/ArtMascot";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { accountSyncResetRequired } from "@/lib/sync/generation";
@@ -106,7 +106,7 @@ function OnboardingRouteGate({ children }: { children: React.ReactNode }) {
 function LoadingVeil() {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-parchment">
-      <PixelMascot name="lantern" size={176} />
+      <ArtMascot name="lantern" size={176} />
       <p
         role="status"
         aria-live="polite"
@@ -158,7 +158,7 @@ function RestoreError({
     <div className="flex min-h-dvh items-center justify-center bg-parchment px-5">
       <div className="w-full max-w-sm">
         <PaperCard variant="paper" padding="lg">
-          <PixelMascot name="lantern" size={176} className="mb-4" />
+          <ArtMascot name="lantern" size={176} className="mb-4" />
           <h1 className="font-display text-[1.375rem] leading-snug text-graphite">
             We couldn’t restore your journey
           </h1>

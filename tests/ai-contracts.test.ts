@@ -61,8 +61,29 @@ describe("Plus AI contracts", () => {
   });
 
   it("intercepts immediate danger without calling a model", () => {
-    expect(isImmediateSafetyQuestion("I want to kill myself")).toBe(true);
-    expect(isImmediateSafetyQuestion("What does grace mean?")).toBe(false);
+    const immediateSafetyQuestions = [
+      "I want to kill myself",
+      "I wish I were dead",
+      "There is no reason for me to live",
+      "I don't want to be alive",
+      "I am planning to overdose",
+      "I just took an overdose",
+      "Someone is attacking me right now",
+      "I am going to hurt someone",
+    ];
+    for (const question of immediateSafetyQuestions) {
+      expect(isImmediateSafetyQuestion(question)).toBe(true);
+    }
+
+    const ordinaryQuestions = [
+      "What does grace mean?",
+      "What happens after we die?",
+      "How can I live with more purpose?",
+      "How do I help someone who is hurting?",
+    ];
+    for (const question of ordinaryQuestions) {
+      expect(isImmediateSafetyQuestion(question)).toBe(false);
+    }
     expect(immediateSafetyAnswer().answer).toContain("safety matters");
     expect(immediateSafetyAnswer().scriptureReferences).toEqual([]);
   });

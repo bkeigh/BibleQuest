@@ -58,7 +58,7 @@ The full configuration fails closed unless:
    without printing or recording it elsewhere, then restart the app.
 9. Set `BIBLEQUEST_STRIPE_PURCHASES_ENABLED=true` only in that test environment.
 
-The application pins Stripe API version `2026-06-24.dahlia` through exact SDK
+The application pins Stripe API version `2026-07-29.dahlia` through exact SDK
 dependency `stripe@22.3.2`. Any SDK or API-version upgrade requires webhook,
 projection, Checkout, Portal, and invoice-payment retesting.
 

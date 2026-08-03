@@ -3,8 +3,8 @@ import Link from "next/link";
 import { EditorialSection, Eyebrow } from "@/components/design-system/EditorialSection";
 import { GentleLink } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
-import { PixelMascot } from "@/components/design-system/PixelMascot";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
+import { ArtMascot } from "@/components/design-system/ArtMascot";
 import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosure";
 import { IconArrowRight } from "@/components/design-system/icons";
 import { SeasonalAtmosphere } from "@/components/design-system/SeasonalAtmosphere";
@@ -127,7 +127,7 @@ function HeroAction({
       {/* The plate is gone, so the light/dark variants it carried go with it —
           the sprite is drawn transparent and reads on either background. */}
       <span className="relative flex shrink-0 items-center justify-center">
-        <PixelIcon name={icon} size={68} />
+        <ArtIcon name={icon} size={68} />
       </span>
       <span className="relative min-w-0 flex-1">
         <span className="block font-display text-[1.125rem] leading-tight lg:text-[1.25rem]">
@@ -152,11 +152,11 @@ function ScrollCue({ mobile = false }: { mobile?: boolean }) {
     <a
       href="#why"
       aria-label="Scroll to learn more about BibleQuest"
-      className={`group flex flex-col items-center gap-1 text-fog transition-colors hover:text-accent ${
+      className={`group flex flex-col items-center gap-1 text-ash transition-colors hover:text-accent ${
         mobile ? "mt-7 lg:hidden" : ""
       }`}
     >
-      <span className="font-pixel text-[0.75rem] uppercase tracking-[0.14em]">
+      <span className="font-art-label text-[0.75rem] uppercase tracking-[0.14em]">
         Scroll
       </span>
       <span className="flex h-10 w-10 items-center justify-center rounded-full border border-mist/80 bg-paper/65 backdrop-blur-sm transition-colors group-hover:border-olive-300">
@@ -202,12 +202,12 @@ export default function LandingPage() {
         <HeroBackdrop />
         <div className="relative mx-auto grid min-h-[100svh] w-full max-w-[90rem] content-start items-start gap-10 px-5 pb-14 pt-24 sm:px-8 sm:pb-20 sm:pt-28 lg:content-center lg:grid-cols-[1.12fr_0.88fr] lg:items-center lg:gap-16 lg:px-12 lg:pb-20 lg:pt-28 xl:gap-20 xl:px-16">
           <div className="text-center lg:text-left">
-            <Reveal>
+            <Reveal immediate>
               <span className="mx-auto inline-flex items-center justify-center gap-2 rounded-full border border-mist bg-paper/70 px-4 py-2 text-[0.875rem] text-accent backdrop-blur lg:mx-0 lg:text-[0.9375rem]">
-                <PixelIcon name="candle" size={56} animate /> A daily guide for living your faith
+                <ArtIcon name="candle" size={56} animate /> A daily guide for living your faith
               </span>
             </Reveal>
-            <Reveal delay={0.08}>
+            <Reveal immediate>
               <h1
                 id="homepage-heading"
                 tabIndex={-1}
@@ -219,13 +219,13 @@ export default function LandingPage() {
                 </span>
               </h1>
             </Reveal>
-            <Reveal delay={0.16}>
+            <Reveal immediate>
               <p className="mx-auto mt-7 max-w-xl text-[1.125rem] leading-relaxed text-charcoal sm:text-[1.25rem] lg:mx-0 lg:max-w-2xl lg:text-[1.375rem]">
                 Read Scripture, make space to pray, and take one meaningful
                 step. BibleQuest helps faith become part of your everyday life.
               </p>
             </Reveal>
-            <Reveal delay={0.24}>
+            <Reveal immediate>
               <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
                 <HeroAction
                   primary
@@ -242,7 +242,7 @@ export default function LandingPage() {
                 />
               </div>
             </Reveal>
-            <Reveal delay={0.3}>
+            <Reveal immediate>
               <p className="mt-5 text-[0.875rem] text-ash lg:text-[0.9375rem]">
                 Free to begin. Made for Christians from every tradition.
               </p>
@@ -250,14 +250,14 @@ export default function LandingPage() {
             <ScrollCue mobile />
           </div>
 
-          <Reveal delay={0.28} className="w-full lg:justify-self-end">
+          <Reveal immediate className="w-full lg:justify-self-end">
             <div className="mx-auto w-full max-w-lg lg:mx-0 lg:max-w-[37rem]">
               <VerseDemo verse={verse} />
             </div>
           </Reveal>
 
           <Reveal
-            delay={0.4}
+            immediate
             className="absolute bottom-8 left-1/2 hidden -translate-x-1/2 lg:block xl:bottom-10"
           >
             <ScrollCue />
@@ -287,7 +287,7 @@ export default function LandingPage() {
       <EditorialSection id="how" className="scroll-mt-20 bg-linen" spacing="compact">
         <Reveal>
           <div className="text-center">
-            <PixelMascot name="map" size={192} className="mb-6" />
+            <ArtMascot name="map" size={192} className="mb-6" />
             <Eyebrow>A daily rhythm</Eyebrow>
             <h2 className="font-display text-editorial text-graphite sm:text-heading">
               Read. Pray. Reflect. Act.
@@ -302,7 +302,7 @@ export default function LandingPage() {
             <Reveal key={r.title} delay={i * 0.06}>
               <PaperCard variant="paper" padding="lg" className="h-full text-center">
                 <div className="mx-auto mb-4 flex items-center justify-center">
-                  <PixelIcon name={r.sprite} size={80} />
+                  <ArtIcon name={r.sprite} size={80} />
                 </div>
                 <h3 className="font-display text-[1.25rem] text-graphite">{r.title}</h3>
                 <p className="mt-2 text-[0.9375rem] leading-relaxed text-ash">{r.body}</p>
@@ -396,7 +396,7 @@ export default function LandingPage() {
         <Reveal>
           <PaperCard variant="paper" padding="lg" className="mx-auto max-w-2xl text-center">
             <div className="mx-auto mb-4 flex items-center justify-center">
-              <PixelIcon name="chapel" size={80} />
+              <ArtIcon name="chapel" size={80} />
             </div>
             <h2 className="font-display text-editorial text-graphite">
               Your relationship with God is not paywalled
@@ -459,7 +459,7 @@ export default function LandingPage() {
         </div>
         <div className="relative mx-auto max-w-2xl px-5 py-16 text-center sm:px-8 sm:py-20">
           <Reveal>
-            <PixelIcon name="lantern" size={120} animate className="mx-auto" />
+            <ArtIcon name="lantern" size={120} className="mx-auto" />
             <h2 className="mt-6 font-display text-editorial text-graphite sm:text-heading">
               Everyone’s walk with God is different.
               <br />

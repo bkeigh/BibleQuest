@@ -20,6 +20,7 @@ describe("one-time Support BibleQuest API boundary", () => {
     expect(route).toContain("export async function POST(request: Request)");
     expect(route).toContain("hasSameOrigin(request)");
     expect(route).toContain("guardProviderRequest(request,");
+    expect(route).toContain("guardDistributedRequest(");
     expect(route).toContain(
       "boundedJson(request, MAX_SUPPORT_REQUEST_BYTES)",
     );

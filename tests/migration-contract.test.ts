@@ -40,6 +40,7 @@ const EXPECTED_MIGRATIONS = [
   "0031_stripe_subscription_conflict_key.sql",
   "0032_stripe_dispute_signal_prefix.sql",
   "0033_guided_pilgrimage_progress.sql",
+  "0034_distributed_provider_rate_limits.sql",
 ];
 
 /** Hash a migration exactly as the release manifest does. */
@@ -118,7 +119,7 @@ describe("release migration contracts", () => {
     const expectedTables = report.match(/    \('[a-z_]+', '[^']+'\)/g) ?? [];
     const worker = readFileSync(join(ROOT, "public", "sw.js"), "utf8");
 
-    expect(expectedTables).toHaveLength(41);
+    expect(expectedTables).toHaveLength(42);
     expect(report).toContain("('user_guided_movements', 'user-owned')");
     expect(report).toContain("('user_daily_quest_days', 'user-owned')");
     expect(report).toContain(
@@ -143,6 +144,11 @@ describe("release migration contracts", () => {
     expect(report).toContain("'claim_stripe_webhook_event'");
     expect(report).toContain("'complete_stripe_webhook_event'");
     expect(report).toContain("'claim_stripe_action'");
+    expect(report).toContain("'claim_provider_rate_limit'");
+    expect(report).toContain("'provider_rate_limit_contract'");
+    expect(report).toContain(
+      "('provider_rate_limit_windows', 'server-owned operational')",
+    );
     expect(report).toContain("'stripe_support_contract'");
     expect(report).toContain("'claim_stripe_support_checkout'");
     expect(report).toContain("'complete_stripe_support_checkout'");

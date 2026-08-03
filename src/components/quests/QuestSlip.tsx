@@ -5,7 +5,7 @@ import type {
   QuestTemplate,
 } from "@/lib/questos/types";
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { PixelIcon, CATEGORY_SPRITE } from "@/components/design-system/PixelIcon";
+import { ArtIcon, CATEGORY_ART } from "@/components/design-system/ArtIcon";
 import {
   IconClock,
   IconCheck,
@@ -85,19 +85,19 @@ export function QuestSlip({
 }: QuestSlipProps) {
   const displayStatus = completed ? "completed" : assignmentStatus;
   const badge = displayStatus === "completed" ? (
-    <span className="pixel-frame ml-auto inline-flex shrink-0 items-center gap-1 bg-accent-surface px-2 py-0.5 font-pixel text-[0.875rem] text-accent-ink">
+    <span className="art-frame ml-auto inline-flex shrink-0 items-center gap-1 bg-accent-surface px-2 py-0.5 font-art-label text-[0.875rem] text-accent-ink">
       <IconCheck size={12} /> Done
     </span>
   ) : displayStatus === "started" ? (
-    <span className="ml-auto inline-flex shrink-0 items-center rounded-full bg-accent-surface px-2 py-0.5 font-pixel text-[0.875rem] text-accent-ink">
+    <span className="ml-auto inline-flex shrink-0 items-center rounded-full bg-accent-surface px-2 py-0.5 font-art-label text-[0.875rem] text-accent-ink">
       In progress
     </span>
   ) : displayStatus === "assigned" || picked ? (
-    <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-surface px-2 py-0.5 font-pixel text-[0.875rem] text-accent">
+    <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-surface px-2 py-0.5 font-art-label text-[0.875rem] text-accent">
       Ready
     </span>
   ) : saved ? (
-    <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-linen px-2 py-0.5 font-pixel text-[0.875rem] text-charcoal ring-1 ring-mist">
+    <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-linen px-2 py-0.5 font-art-label text-[0.875rem] text-charcoal ring-1 ring-mist">
       <IconBookmark size={12} /> Saved
     </span>
   ) : null;
@@ -116,7 +116,7 @@ export function QuestSlip({
           must clear 60px plus a gap or the metadata row runs under it. */}
       <div className={cn("flex items-start gap-3.5", action ? "pr-[4.5rem]" : null)}>
         <span className="-mt-1 shrink-0">
-          <PixelIcon name={CATEGORY_SPRITE[quest.category] ?? "leaf"} size={80} />
+          <ArtIcon name={CATEGORY_ART[quest.category] ?? "leaf"} size={80} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.75rem] text-ash">
@@ -125,7 +125,7 @@ export function QuestSlip({
               {formatDuration(quest.durationMinutes)}
             </span>
             <span className="text-mist">·</span>
-            <span className="font-pixel text-[0.875rem] text-accent">
+            <span className="font-art-label text-[0.875rem] text-accent">
               {CATEGORY_LABEL[quest.category]}
             </span>
             {badge}

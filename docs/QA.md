@@ -51,9 +51,10 @@ The automated suite targets launch-critical behavior rather than UI snapshots:
 - The service worker default-denies sensitive/query-bearing navigations,
   validates responses before caching, and removes only BibleQuest-owned stale
   caches.
-- Live production and development responses preserve the exact Winterhill
-  ancestor list, omit conflicting `X-Frame-Options`, scope HSTS/`unsafe-eval`
-  correctly, and keep hosted Stripe navigation out of the document CSP.
+- Live production and development responses permit the exact Winterhill
+  ancestor list only on `/`, deny framing on every other route with aligned
+  CSP/XFO headers, scope HSTS/`unsafe-eval` correctly, and keep hosted Stripe
+  navigation out of the document CSP.
 
 Tests use deterministic time, UUID, and storage replacements and restore
 modified globals after every case. Fixtures are deliberately fake and tests
@@ -69,7 +70,7 @@ the evidence.
 
 | Scenario | Setup and action | Pass criteria | Owner |
 | --- | --- | --- | --- |
-| Winterhill embed | Open the production BibleQuest iframe from both `https://winterhill.studio` and `https://www.winterhill.studio`; navigate within the preview and inspect the console/network panel. | BibleQuest renders and remains interactive on both hosts; no ancestor/XFO refusal occurs; the response still lists exactly self and those two hosts. | Winterhill integration owner |
+| Winterhill embed | Open the production homepage iframe from both `https://winterhill.studio` and `https://www.winterhill.studio`; use public in-page anchors, then request `/app` in the same frame and inspect the console/network panel. | The homepage renders on both hosts with exactly self and those two hosts; the framed `/app` request is refused by `frame-ancestors 'none'` and `X-Frame-Options: DENY`. | Winterhill integration owner |
 | Unapproved-origin denial | Serve `tests/manual/iframe-denied-origin.html` from an HTTPS origin that is not in the allowlist, point its iframe at the release candidate, and inspect the console. | The browser refuses to render BibleQuest because of `frame-ancestors`; opening BibleQuest directly still works. | Winterhill integration owner |
 | Supabase sign-in and sync (enabled track) | On a clean browser profile, sign in through each enabled method, create one non-sensitive test record, reload, and confirm the same account receives the synced record. | Auth calls reach only the configured Supabase project over HTTPS; the session survives; sync completes; no CSP errors or cross-account data appears. Guest-only records this active behavior `OUT OF SCOPE — APPROVED GUEST-ONLY`, not `PASS`. | Supabase owner |
 | Email sign-in + callback (enabled track) | Request an email for Gmail and iCloud addresses that are not Supabase organization members. Confirm the UI says the email was requested (not delivered), shows the target address, holds resend for 60 seconds, and keeps Google available. In a fresh installed PWA, enter the code without opening the email link; separately open a fresh link in a browser and observe `/auth/callback` through the first-quest hand-off. | Both messages have matching Supabase and SMTP-provider delivery events; the PWA code creates and retains its session inside standalone mode after a full close/reopen; callback stays on the BibleQuest origin, is `private, no-store`, and expired/used/browser-mismatch credentials show a bounded recovery reason with no raw token or provider text. Guest-only records provider delivery/round trips out of scope and runs the containment matrix below. | Supabase owner |
@@ -281,9 +282,10 @@ remains separate from signed journey-restore and CAS evidence.
 
 ## Manual — direct Stripe (test only)
 
-Keep Vercel Production `coming-soon` with purchases disabled. Use only ignored
-local or encrypted preview test credentials; never print them or create/change
-live billing state. Complete the full evidence matrix in
+Production currently uses the separately approved live billing posture recorded
+in `docs/launch-evidence/2026-07-29-stripe-live-production-release.md`. Run this
+matrix only with ignored local or encrypted preview test credentials; never
+print them or create/change live billing state. Complete the full evidence matrix in
 [`STRIPE_TEST_BILLING.md`](STRIPE_TEST_BILLING.md).
 
 - [ ] Coming-soon/no-key: pricing and `/app/plus` show calm coming-soon copy and
@@ -311,7 +313,8 @@ the full matrix in
 
 - [ ] Support-disabled and invalid billing postures show no payment control.
 - [ ] Presets/custom amount bounds, immutable request UUID, same-origin/body
-      guards, per-instance throttles, and Vercel Firewall all fail closed.
+      guards and per-instance throttles fail closed; record the Vercel plan gap
+      until the reviewed deployment-wide rule can be published.
 - [ ] Guest Checkout creates no app account; signed-in Checkout remains
       separate from Plus; both return only an exact hosted Stripe URL.
 - [ ] Cancel/return query manipulation never claims payment.
@@ -399,14 +402,15 @@ change. Never move the production domain for a rehearsal.
 - [ ] Run a production build, open the app, and in DevTools → Application →
       Service Workers confirm `/sw.js` controls the page at scope `/`.
 - [ ] In Application → Cache Storage, confirm only the current
-      `biblequest-v22-shell` and `biblequest-v22-runtime` caches are BibleQuest
+      `biblequest-v25-shell` and `biblequest-v25-runtime` caches are BibleQuest
       owned; unrelated-origin cache names are not touched by activation.
 - [ ] Inspect every shell entry: only `/offline`, `/app`, `/onboarding`,
-      `/manifest.webmanifest`, and the exact `/pixel/` catalogue from `sw.js`
-      may be present.
+      `/manifest.webmanifest`, and the compact `PRECACHE_ART_PATHS` set from
+      `sw.js` may be present. The full art catalogue must not download during
+      worker installation.
 - [ ] Inspect runtime entries: navigation keys must exactly match the allowlist
-      above and contain no query string; asset keys must begin
-      `/_next/static/` and contain no query string.
+      above and contain no query string; asset keys must be an allowlisted
+      `/art/2.5d/` path or begin `/_next/static/`, with no query string.
 - [ ] Visit `/auth/callback?code=fake`, `/app/account`, `/api/health`,
       `/app?qa=1`, and `/app/plus`; refresh Cache Storage and confirm none was
       added.

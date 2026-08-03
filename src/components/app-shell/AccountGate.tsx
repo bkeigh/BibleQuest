@@ -5,7 +5,7 @@ import { PageContainer } from "@/components/app-shell/PageHeader";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { GentleLink } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { useSession } from "@/lib/supabase/useSession";
 import {
   GATED_SURFACE_COPY,
@@ -63,7 +63,7 @@ function AccountGateInner({
     <PageContainer className="pb-8 pt-6">
       <PaperCard variant="atmospheric" padding="lg">
         <span aria-hidden="true" className="inline-block">
-          <PixelIcon name="key" size={56} />
+          <ArtIcon name="key" size={56} />
         </span>
         <h1 className="mt-3 font-display text-[1.75rem] leading-tight text-graphite">
           {copy.title}

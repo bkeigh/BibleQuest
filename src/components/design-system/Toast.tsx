@@ -18,7 +18,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
 import { gentleEase } from "@/lib/motion";
-import { PixelIcon } from "./PixelIcon";
+import { ArtIcon } from "./ArtIcon";
 import { IconClose } from "./icons";
 
 type ToastVariant = "default" | "success" | "celebrate";
@@ -106,7 +106,7 @@ function ToastCard({
       )}
     >
       {variant === "celebrate" && (
-        <PixelIcon name="star" size={56} animate className="shrink-0" />
+        <ArtIcon name="star" size={56} className="shrink-0" />
       )}
       <span className="min-w-0 flex-1">{item.message}</span>
       {item.action && (

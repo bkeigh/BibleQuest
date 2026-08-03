@@ -2,11 +2,10 @@
  * The four themes, and the two independent things a theme decides.
  *
  * BibleQuest's own look is parchment — warm ivory, a hairline mist border, and
- * the Ithaca pixel face on short labels. Paper and Candlelight are that look in
- * daylight and by candle, and they stay the default. Light and Dark are the
- * plain white and near-black that some readers simply prefer; they keep every
- * layout, spacing and accent decision and change only the palette and the
- * pixel face.
+ * a soft editorial display face on short labels. Paper and Candlelight are
+ * that look in daylight and by candle, and they stay the default. Light and
+ * Dark are the plain white and near-black that some readers simply prefer;
+ * they keep every layout, spacing, typography, and accent decision.
  *
  * A theme therefore resolves to two independent switches rather than one name:
  *

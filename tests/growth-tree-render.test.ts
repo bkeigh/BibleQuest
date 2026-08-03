@@ -20,7 +20,7 @@ const decoratedState: GrowthTreeState = {
 };
 
 describe("GrowthTree rendering", () => {
-  it("keeps Journey accents in the decorated tree", () => {
+  it("keeps restrained Journey accents around the painted tree", () => {
     const html = renderToStaticMarkup(
       createElement(GrowthTree, { state: decoratedState, size: 96 }),
     );
@@ -28,7 +28,10 @@ describe("GrowthTree rendering", () => {
     expect(html).toContain('data-growth-accent="sunlight"');
     expect(html).toContain('data-growth-accent="ground"');
     expect(html).toContain('data-growth-accent="flower"');
-    expect(html).toContain('data-growth-accent="fruit"');
+    // Fruit is already painted into the later tree stages; separate block
+    // decorations would reintroduce the retired pixel-art treatment.
+    expect(html).not.toContain('data-growth-accent="fruit"');
+    expect(html).toContain("/art/2.5d/tree-stage-13.webp");
   });
 
   it("renders only the stage sprite in Home tree-only mode", () => {

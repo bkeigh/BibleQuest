@@ -80,7 +80,7 @@ payment identifiers.
 | Dispute | Test created, updated, won, and lost dispute posture; the current Charge and Dispute must match amount, currency, and mode before projection. |
 | Deletion | Deleting the associated test app account sets `user_id` to null and preserves the financial record. |
 | Isolation | Anonymous and authenticated clients cannot select or mutate support rows or call creation RPCs. |
-| Abuse | Same-origin, body ceiling, UUID/amount validation, in-process limits, and the deployment-wide Firewall limit reject abusive requests without provider calls. |
+| Abuse | Same-origin, body ceiling, UUID/amount validation, in-process limits, and an atomic service-only Postgres window reject abusive requests before provider calls. |
 | Devices | Complete test Checkout on desktop Chrome/Firefox/Safari and physical mobile Safari; cancel/back/retry remains clear and accessible. |
 | Redaction | App/Vercel logs, analytics, saved evidence, and issue text contain no payment/contact IDs, URLs, receipt data, or webhook payloads. |
 
@@ -91,11 +91,12 @@ request mapping is exercised.
 
 ## Deployment-wide abuse control
 
-The route has per-instance defense-in-depth limits of five requests per ten
-minutes and twenty per day. Before Preview testing or live enablement, add a
-Vercel Firewall rate-limit rule for `POST /api/support/checkout` using the same
-or stricter effective limits. Verify a blocked request never reaches Stripe.
-Instance memory is not a deployment-wide control.
+The route has both per-instance and deployment-wide limits of five requests per
+ten minutes and twenty per day. The shared Postgres claim stores only an opaque
+HMAC bucket in a forced-RLS, service-only table. The current Vercel plan rejects
+Firewall rate-limit rules; when that outer feature becomes available, stage a
+generous log-first rule, review real traffic, and test Preview enforcement
+before adding another production layer.
 
 ## Bounded database evidence
 

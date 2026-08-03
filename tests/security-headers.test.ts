@@ -36,6 +36,22 @@ function valuesFor(rules: HeaderRule[], key: string) {
   );
 }
 
+// Resolves a route rule without relying on the order of unrelated cache headers.
+function ruleFor(rules: HeaderRule[], source: string) {
+  const rule = rules.find((candidate) => candidate.source === source);
+  if (!rule) throw new Error(`Missing header rule for ${source}`);
+  return rule;
+}
+
+// Reads one required header from a specific route rule.
+function headerValue(rule: HeaderRule, key: string) {
+  const value = rule.headers.find(
+    (header) => header.key.toLowerCase() === key.toLowerCase(),
+  )?.value;
+  if (!value) throw new Error(`Missing ${key} on ${rule.source}`);
+  return value;
+}
+
 async function headerRules(
   nodeEnv: "production" | "development",
 ) {
@@ -59,22 +75,26 @@ async function productionHeaderRules() {
 }
 
 describe("Winterhill iframe security contract", () => {
-  it("allows exactly self and Winterhill's two HTTPS origins", async () => {
+  it("allows Winterhill only on the public homepage", async () => {
     const rules = await productionHeaderRules();
-    const policies = valuesFor(rules, "Content-Security-Policy");
-
-    expect(policies).toHaveLength(1);
-
-    const frameAncestors = parseCsp(policies[0]).get("frame-ancestors");
+    const homepageRule = ruleFor(rules, "/");
+    const privateRule = ruleFor(rules, "/:path+");
+    const frameAncestors = parseCsp(
+      headerValue(homepageRule, "Content-Security-Policy"),
+    ).get("frame-ancestors");
     expect(frameAncestors).toBeDefined();
     expect(frameAncestors).toHaveLength(APPROVED_FRAME_ANCESTORS.size);
     expect(new Set(frameAncestors)).toEqual(APPROVED_FRAME_ANCESTORS);
-  });
 
-  it("omits X-Frame-Options from every production Next.js header rule", async () => {
-    const rules = await productionHeaderRules();
-
-    expect(valuesFor(rules, "X-Frame-Options")).toEqual([]);
+    expect(
+      parseCsp(headerValue(privateRule, "Content-Security-Policy")).get(
+        "frame-ancestors",
+      ),
+    ).toEqual(["'none'"]);
+    expect(headerValue(privateRule, "X-Frame-Options")).toBe("DENY");
+    expect(
+      homepageRule.headers.some((header) => header.key === "X-Frame-Options"),
+    ).toBe(false);
   });
 
   it("keeps CSP and frame policy out of Vercel overrides", () => {
@@ -95,12 +115,14 @@ describe("transport and payment header scope", () => {
   it("serves HSTS while hosted billing needs no client-side origins", async () => {
     const rules = await headerRules("production");
     const policies = valuesFor(rules, "Content-Security-Policy");
-    const csp = parseCsp(policies[0]);
+    const csp = parseCsp(
+      headerValue(ruleFor(rules, "/"), "Content-Security-Policy"),
+    );
 
-    expect(valuesFor(rules, "Strict-Transport-Security")).toEqual([
-      "max-age=15552000",
-    ]);
-    expect(csp.get("script-src")).toContain("https://tally.so");
+    expect(new Set(valuesFor(rules, "Strict-Transport-Security"))).toEqual(
+      new Set(["max-age=15552000"]),
+    );
+    expect(csp.get("script-src")).not.toContain("https://tally.so");
     expect(csp.get("script-src")).not.toContain("'unsafe-eval'");
     expect(csp.get("connect-src")).toContain(
       "https://header-fixture.supabase.co",
@@ -118,8 +140,9 @@ describe("transport and payment header scope", () => {
 
   it("keeps HSTS out of development and scopes unsafe-eval to development", async () => {
     const rules = await headerRules("development");
-    const policies = valuesFor(rules, "Content-Security-Policy");
-    const csp = parseCsp(policies[0]);
+    const csp = parseCsp(
+      headerValue(ruleFor(rules, "/"), "Content-Security-Policy"),
+    );
 
     expect(valuesFor(rules, "Strict-Transport-Security")).toEqual([]);
     expect(csp.get("script-src")).toContain("'unsafe-eval'");
@@ -129,13 +152,11 @@ describe("transport and payment header scope", () => {
   it("keeps all billing origins out of the BibleQuest document policy", async () => {
     const rules = await headerRules("production");
     const policies = valuesFor(rules, "Content-Security-Policy");
-    const csp = parseCsp(policies[0]);
+    const csp = parseCsp(
+      headerValue(ruleFor(rules, "/"), "Content-Security-Policy"),
+    );
 
-    expect(csp.get("script-src")).toEqual([
-      "'self'",
-      "'unsafe-inline'",
-      "https://tally.so",
-    ]);
+    expect(csp.get("script-src")).toEqual(["'self'", "'unsafe-inline'"]);
     expect(csp.get("frame-src")).toEqual(["'self'", "https://tally.so"]);
     expect(policies[0]).not.toMatch(/revenuecat|stripe|link\.com/i);
   });

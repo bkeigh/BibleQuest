@@ -25,7 +25,7 @@ import {
 import { useToast } from "@/components/design-system/Toast";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton } from "@/components/design-system/GentleButton";
-import { PixelIcon, CATEGORY_SPRITE } from "@/components/design-system/PixelIcon";
+import { ArtIcon, CATEGORY_ART } from "@/components/design-system/ArtIcon";
 import {
   IconCheck,
   IconChevronRight,
@@ -147,7 +147,7 @@ export function QuestAccordionCard({
         className="flex w-full items-start gap-3.5 rounded-[var(--radius-card)] px-4 py-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:px-5"
       >
         <span className="-mt-1 shrink-0">
-          <PixelIcon name={CATEGORY_SPRITE[quest.category] ?? "leaf"} size={80} />
+          <ArtIcon name={CATEGORY_ART[quest.category] ?? "leaf"} size={80} />
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.75rem] text-ash">
@@ -156,7 +156,7 @@ export function QuestAccordionCard({
               {formatDuration(quest.durationMinutes)}
             </span>
             <span className="text-mist">·</span>
-            <span className="font-pixel text-[0.875rem] text-accent">
+            <span className="font-art-label text-[0.875rem] text-accent">
               {CATEGORY_LABEL[quest.category]}
             </span>
             {today && <TodayBadge className="ml-auto" />}

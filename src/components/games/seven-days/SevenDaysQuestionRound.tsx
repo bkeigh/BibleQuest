@@ -48,7 +48,7 @@ export function SevenDaysQuestionRound({
     const earned = boostsEarnedForRound(firstTry.length, total);
     return (
       <PaperCard variant="atmospheric" padding="lg">
-        <p className="font-pixel text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
+        <p className="font-art-label text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
           Day {chapter.day} · complete
         </p>
         <h2
@@ -106,7 +106,7 @@ export function SevenDaysQuestionRound({
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
-        <p className="font-pixel text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
+        <p className="font-art-label text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
           Day {chapter.day} questions
         </p>
         <p className="text-caption text-ash tabular-nums">

@@ -1,0 +1,58 @@
+import { expect, test } from "@playwright/test";
+
+test("public marketing remains visible, private, and portfolio-frameable", async ({
+  page,
+}) => {
+  const response = await page.goto("/");
+
+  expect(response?.status()).toBe(200);
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: /Bring faith into the life you live/i,
+    }),
+  ).toBeVisible();
+
+  const csp = response?.headers()["content-security-policy"] ?? "";
+  expect(csp).toContain(
+    "frame-ancestors 'self' https://winterhill.studio https://www.winterhill.studio",
+  );
+  expect(response?.headers()["x-frame-options"]).toBeUndefined();
+
+  // Keeps Tally code isolated from private browser storage in the parent page.
+  await expect(page.locator('script[src*="tally.so"]')).toHaveCount(0);
+  const newsletter = page.getByTitle("Join the BibleQuest newsletter");
+  await expect(newsletter).toHaveAttribute(
+    "sandbox",
+    "allow-forms allow-popups allow-same-origin allow-scripts",
+  );
+  await expect(newsletter).toHaveAttribute("referrerpolicy", "no-referrer");
+
+  // Exercise in-view animation so below-fold release content cannot stay blank.
+  for (const heading of [
+    /Most people don’t lack access to Scripture/i,
+    /Read\. Pray\. Reflect\. Act\./i,
+    /Your journey grows with you/i,
+    /Prayers and reflections, private by default/i,
+    /Everyone’s walk with God is different/i,
+  ]) {
+    const sectionHeading = page.getByRole("heading", { level: 2, name: heading });
+    await sectionHeading.scrollIntoViewIfNeeded();
+    await expect(sectionHeading).toBeVisible();
+  }
+});
+
+test("onboarding exposes landmarks and denies framing", async ({ page }) => {
+  const response = await page.goto("/onboarding");
+
+  expect(response?.status()).toBe(200);
+  await expect(page.getByRole("main")).toBeVisible();
+  await expect(
+    page.getByRole("progressbar", { name: "Onboarding progress" }),
+  ).toBeVisible();
+  await expect(page.locator("img[data-art-mascot]").first()).toBeVisible();
+
+  const csp = response?.headers()["content-security-policy"] ?? "";
+  expect(csp).toContain("frame-ancestors 'none'");
+  expect(response?.headers()["x-frame-options"]).toBe("DENY");
+});

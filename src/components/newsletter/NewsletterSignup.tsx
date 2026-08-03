@@ -1,29 +1,17 @@
-"use client";
-
-import Script from "next/script";
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import {
   TALLY_NEWSLETTER_EMBED_URL,
-  TALLY_NEWSLETTER_SCRIPT_URL,
   TALLY_NEWSLETTER_URL,
 } from "@/lib/newsletter";
-
-// Refreshes embeds when Next.js has already loaded Tally's shared script.
-function loadTallyEmbeds() {
-  const tallyWindow = window as Window & {
-    Tally?: { loadEmbeds: () => void };
-  };
-  tallyWindow.Tally?.loadEmbeds();
-}
 
 /** Public newsletter form shared by marketing links and the in-app invitation. */
 export function NewsletterSignup() {
   return (
     <div className="mx-auto max-w-3xl">
       <header className="mx-auto mb-8 max-w-2xl text-center">
-        <PixelIcon name="scroll" size={104} className="mx-auto mb-5" />
-        <p className="font-pixel text-caption uppercase tracking-[0.16em] text-accent">
+        <ArtIcon name="scroll" size={104} className="mx-auto mb-5" />
+        <p className="font-art-label text-caption uppercase tracking-[0.16em] text-accent">
           Stay connected
         </p>
         <h2 className="mt-3 font-display text-editorial text-graphite sm:text-heading">
@@ -43,18 +31,14 @@ export function NewsletterSignup() {
         aria-label="BibleQuest newsletter signup"
       >
         <iframe
-          data-tally-src={TALLY_NEWSLETTER_EMBED_URL}
+          src={TALLY_NEWSLETTER_EMBED_URL}
           title="Join the BibleQuest newsletter"
           loading="lazy"
+          sandbox="allow-forms allow-popups allow-same-origin allow-scripts"
+          referrerPolicy="no-referrer"
           width="100%"
           height="640"
           className="block w-full border-0 bg-transparent"
-        />
-        <Script
-          src={TALLY_NEWSLETTER_SCRIPT_URL}
-          strategy="lazyOnload"
-          onLoad={loadTallyEmbeds}
-          onReady={loadTallyEmbeds}
         />
         <p className="border-t border-mist bg-linen/70 px-4 py-3 text-center text-caption text-ash">
           Having trouble with the form?{" "}

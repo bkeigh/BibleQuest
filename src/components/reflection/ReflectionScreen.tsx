@@ -14,7 +14,7 @@ import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { expander } from "@/lib/motion";
 import { emptyStates } from "@/lib/questos/copy";
 import { formatShortDate } from "@/lib/utils/dates";
@@ -46,7 +46,7 @@ export function ReflectionPanel() {
       {sorted.length === 0 ? (
         <PaperCard variant="atmospheric" padding="lg" className="text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-linen ring-1 ring-mist">
-            <PixelIcon name="sun" size={92} />
+            <ArtIcon name="sun" size={92} />
           </div>
           <h3 className="font-display text-[1.125rem] text-graphite">
             Notice what’s stirring

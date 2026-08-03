@@ -64,7 +64,7 @@ export function GamesArchiveScreen() {
         ) : (
           <>
             <PaperCard variant="atmospheric" padding="lg" className="mt-4">
-              <p className="font-pixel text-[0.9375rem] uppercase tracking-[0.06em] text-gilt">
+              <p className="font-art-label text-[0.9375rem] uppercase tracking-[0.06em] text-gilt">
                 Optional Plus library
               </p>
               <h2 className="mt-3 font-display text-[1.5rem] text-graphite">

@@ -65,7 +65,7 @@ function PilgrimageCatalogInner() {
               padding="lg"
             >
               <div className="flex items-center justify-between gap-3">
-                <p className="font-pixel text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
+                <p className="font-art-label text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
                   {pilgrimage.access === "plus"
                     ? "Plus Pilgrimage"
                     : "Pilgrimage"}

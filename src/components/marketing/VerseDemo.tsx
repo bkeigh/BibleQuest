@@ -93,7 +93,7 @@ export function VerseDemo({ verse: initial }: { verse: DailyVerse }) {
       </div>
       <div className="relative flex min-w-0 flex-1 flex-col">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <h2 className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent lg:text-[1.75rem]">
+          <h2 className="font-art-label text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent lg:text-[1.75rem]">
             {shuffled ? "From the Word" : "Today’s Verse"}
           </h2>
           <div className="flex items-center gap-1">

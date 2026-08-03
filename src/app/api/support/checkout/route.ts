@@ -1,4 +1,5 @@
 import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
+import { guardDistributedRequest } from "@/lib/security/distributed-rate-limit.server";
 import { requireStripeBillingConfiguration } from "@/lib/billing/config.server";
 import { createStripe } from "@/lib/billing/stripe.server";
 import { boundedJson } from "@/lib/http/json";
@@ -74,6 +75,17 @@ export async function POST(request: Request) {
   ) {
     return privateError("invalid_request", 400);
   }
+
+  // Reserve shared capacity only after the request passes inexpensive validation.
+  const distributedBlocked = await guardDistributedRequest(
+    request,
+    "support-checkout",
+    [
+      { limit: 5, windowSeconds: 10 * 60 },
+      { limit: 20, windowSeconds: 24 * 60 * 60 },
+    ],
+  );
+  if (distributedBlocked) return distributedBlocked;
 
   let admin;
   let configuration;

@@ -349,7 +349,7 @@ function QuestBrowseInner() {
         {/* The board is the one canonical lifecycle surface above discovery. */}
         <section aria-label="Your quest board">
           <div className="flex items-baseline justify-between gap-3">
-            <h2 className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
+            <h2 className="font-art-label text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
               Your quests
             </h2>
             {/* The switch belongs to the board, not to the catalogue below it.

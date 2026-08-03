@@ -25,7 +25,7 @@ import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { VerseCard } from "@/components/bible/VerseCard";
 import { VerseRefreshLimitDialog } from "@/components/bible/VerseRefreshLimitDialog";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { SearchClearButton } from "@/components/design-system/SearchClearButton";
 import {
   IconBookmark,
@@ -215,7 +215,7 @@ function BibleIndexInner() {
           <div className="mb-2.5 flex items-end justify-between gap-3 px-1">
             <h2
               id="reading-shortcuts"
-              className="font-pixel text-[1.375rem] uppercase tracking-[0.05em] text-accent"
+              className="font-art-label text-[1.375rem] uppercase tracking-[0.05em] text-accent"
             >
               Your reading
             </h2>
@@ -231,7 +231,7 @@ function BibleIndexInner() {
                   ? `/app/bible/${readingPosition.bookSlug}/${readingPosition.chapter}`
                   : "/app/bible/john/1"
               }
-              icon={<PixelIcon name="bookmark" size={68} />}
+              icon={<ArtIcon name="bookmark" size={68} />}
               eyebrow={readingPosition ? "Continue" : "A place to begin"}
               title={
                 readingPosition
@@ -282,7 +282,7 @@ function BibleIndexInner() {
             <div className="mb-2.5 flex items-center justify-between gap-3 px-1">
               <h2
                 id="recent-scripture"
-                className="font-pixel text-[1.375rem] uppercase tracking-[0.05em] text-accent"
+                className="font-art-label text-[1.375rem] uppercase tracking-[0.05em] text-accent"
               >
                 Recently read
               </h2>
@@ -311,7 +311,7 @@ function BibleIndexInner() {
                         className="flex h-full min-h-28 flex-col"
                       >
                         <div className="flex items-center gap-2">
-                          <PixelIcon name="open-book" size={56} />
+                          <ArtIcon name="open-book" size={56} />
                           <p className="font-display text-[1.0625rem] text-graphite">
                             {recentVerse.reference}
                           </p>
@@ -336,7 +336,7 @@ function BibleIndexInner() {
           <div className="px-1">
             <h2
               id="find-a-book"
-              className="font-pixel text-[1.5rem] uppercase tracking-[0.05em] text-accent"
+              className="font-art-label text-[1.5rem] uppercase tracking-[0.05em] text-accent"
             >
               Find a book
             </h2>
@@ -498,8 +498,8 @@ function QuickLink({
           padding="sm"
           className="flex h-full min-h-28 flex-col justify-between"
         >
-          {/* No plate. A 36px box was squeezing a 56px sprite, and the pixel
-              art carries its own edges — the Save and Share controls above
+          {/* No plate. A 36px box was squeezing a 56px illustration, and the
+              artwork carries its own silhouette — the Save and Share controls above
               already sit bare on the same page. */}
           <span className="flex items-center text-accent">{icon}</span>
           <span className="mt-3">

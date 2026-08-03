@@ -1,5 +1,5 @@
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { PixelIcon, CATEGORY_SPRITE } from "@/components/design-system/PixelIcon";
+import { ArtIcon, CATEGORY_ART } from "@/components/design-system/ArtIcon";
 import { IconClock } from "@/components/design-system/icons";
 import type { QuestTemplate } from "@/lib/questos/types";
 
@@ -20,14 +20,14 @@ export function QuestDemo({ quest }: { quest: QuestTemplate }) {
     <PaperCard variant="paper" padding="md">
       <div className="flex items-start gap-3.5">
         <span className="-mt-1 shrink-0">
-          <PixelIcon name={CATEGORY_SPRITE[quest.category] ?? "leaf"} size={80} />
+          <ArtIcon name={CATEGORY_ART[quest.category] ?? "leaf"} size={80} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-[0.75rem] text-ash">
             <IconClock size={13} />
             {formatDuration(quest.durationMinutes)}
             <span className="text-mist">·</span>
-            <span className="font-pixel text-[0.875rem] uppercase tracking-wide text-accent">
+            <span className="font-art-label text-[0.875rem] uppercase tracking-wide text-accent">
               {quest.category}
             </span>
           </div>
@@ -50,7 +50,7 @@ export function PrayerDemo() {
   return (
     <PaperCard variant="paper" padding="md">
       <div className="flex items-start gap-3">
-        <PixelIcon name="candle" size={80} />
+        <ArtIcon name="candle" size={80} />
         <div>
           <h3 className="font-display text-[1.125rem] text-graphite">
             Before tomorrow’s conversation

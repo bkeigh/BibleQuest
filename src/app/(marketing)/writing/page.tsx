@@ -1,6 +1,6 @@
 import { MarketingPage, Prose } from "@/components/marketing/MarketingPage";
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { marketingMetadata } from "@/lib/metadata";
 
 export const metadata = marketingMetadata({
@@ -29,7 +29,7 @@ export default function WritingPage() {
       <div className="not-prose space-y-3">
         {PLANNED.map((title) => (
           <PaperCard key={title} variant="quiet" padding="md" className="flex items-center gap-3">
-            <PixelIcon name="book" size={68} />
+            <ArtIcon name="book" size={68} />
             <span className="text-[1rem] text-charcoal">{title}</span>
           </PaperCard>
         ))}

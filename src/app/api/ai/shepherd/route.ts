@@ -1,4 +1,5 @@
 import {
+  AI_REQUEST_MAX_BYTES,
   immediateSafetyAnswer,
   isImmediateSafetyQuestion,
   parseMyShepherdRequest,
@@ -9,7 +10,9 @@ import {
 } from "@/lib/ai/anthropic.server";
 import { requireServerPlus } from "@/lib/billing/plus-entitlement.server";
 import { guardIdentifiedRequest } from "@/lib/bible/provider-request-guard";
+import { boundedJson } from "@/lib/http/json";
 import { hasSameOrigin, privateError } from "@/lib/http/request";
+import { guardDistributedRequest } from "@/lib/security/distributed-rate-limit.server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -24,19 +27,10 @@ export async function POST(request: Request) {
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
   const entitlement = await requireServerPlus();
   if (entitlement instanceof Response) return entitlement;
-  const blocked = guardIdentifiedRequest(
-    request,
-    `ai-shepherd:${entitlement.userId}`,
-    RATE_POLICIES,
-  );
-  if (blocked) return blocked;
 
-  let input: unknown;
-  try {
-    input = await request.json();
-  } catch {
-    return privateError("invalid_request", 400);
-  }
+  // Cap the raw request before parsing or reserving any paid-provider quota.
+  const input = await boundedJson(request, AI_REQUEST_MAX_BYTES);
+  if (input instanceof Response) return input;
   const parsed = parseMyShepherdRequest(input);
   if (!parsed) return privateError("invalid_request", 400);
   if (isImmediateSafetyQuestion(parsed.question)) {
@@ -44,6 +38,23 @@ export async function POST(request: Request) {
       headers: { "Cache-Control": "private, no-store" },
     });
   }
+
+  const blocked = guardIdentifiedRequest(
+    request,
+    `ai-shepherd:${entitlement.userId}`,
+    RATE_POLICIES,
+  );
+  if (blocked) return blocked;
+  const distributedBlocked = await guardDistributedRequest(
+    request,
+    "ai-shepherd",
+    RATE_POLICIES.map((policy) => ({
+      limit: policy.limit,
+      windowSeconds: policy.windowMs / 1_000,
+    })),
+    entitlement.userId,
+  );
+  if (distributedBlocked) return distributedBlocked;
   try {
     return Response.json(
       await answerWithMyShepherd(parsed.question, parsed.currentPath),

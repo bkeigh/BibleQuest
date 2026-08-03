@@ -11,9 +11,9 @@ import { useEffect, useId, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useQuestOS } from "@/lib/questos/store";
 import { seedMilestones } from "@/data/seed/milestones";
-import { PixelIcon, type PixelSpriteName } from "@/components/design-system/PixelIcon";
+import { ArtIcon, type ArtSpriteName } from "@/components/design-system/ArtIcon";
 import { GentleButton } from "@/components/design-system/GentleButton";
-import { celebrationScale, pixelSparkle } from "@/lib/motion";
+import { blessingSparkle, celebrationScale } from "@/lib/motion";
 import { resolvePendingMilestones } from "@/lib/questos/milestone-engine";
 import type { MilestoneSeed } from "@/lib/questos/types";
 
@@ -151,27 +151,26 @@ function MilestoneDialog({
         animate="visible"
         exit={{ opacity: 0, y: 8 }}
         onClick={(e) => e.stopPropagation()}
-        className="pixel-frame-gold w-full max-w-sm bg-paper p-8 text-center paper-shadow-lg"
+        className="art-frame-gold w-full max-w-sm bg-paper p-8 text-center paper-shadow-lg"
       >
         <motion.div
-          variants={pixelSparkle}
+          variants={blessingSparkle}
           initial="hidden"
           animate="visible"
           className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gold-500/15 ring-1 ring-gold-500/30"
         >
-          <PixelIcon
-            name={(milestone.iconKey as PixelSpriteName) ?? "star"}
+          <ArtIcon
+            name={(milestone.iconKey as ArtSpriteName) ?? "star"}
             size={104}
-            animate
           />
         </motion.div>
-        <p className="flex items-center justify-center gap-2 font-pixel text-[0.875rem] uppercase tracking-[0.12em] text-gilt">
-          <PixelIcon name="star" size={44} /> Milestone reached
-          <PixelIcon name="star" size={44} />
+        <p className="flex items-center justify-center gap-2 font-art-label text-[0.875rem] uppercase tracking-[0.12em] text-gilt">
+          <ArtIcon name="star" size={44} /> Milestone reached
+          <ArtIcon name="star" size={44} />
         </p>
         <h2
           id={titleId}
-          className="mt-2 font-pixel text-[1.5rem] leading-tight text-graphite"
+          className="mt-2 font-art-label text-[1.5rem] leading-tight text-graphite"
         >
           {milestone.title}
         </h2>

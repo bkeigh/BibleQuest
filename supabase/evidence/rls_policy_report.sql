@@ -45,7 +45,8 @@ with expected (table_name, classification) as (
     ('stripe_billing_signals', 'server-owned financial'),
     ('stripe_support_payments', 'server-owned financial'),
     ('console_audit_logs', 'server-owned operator audit'),
-    ('operator_plus_grants', 'server-owned entitlement history')
+    ('operator_plus_grants', 'server-owned entitlement history'),
+    ('provider_rate_limit_windows', 'server-owned operational')
 )
 select
   expected.table_name,
@@ -165,6 +166,8 @@ where namespace.nspname = 'public'
     'claim_stripe_webhook_event',
     'complete_stripe_webhook_event',
     'claim_stripe_action',
+    'claim_provider_rate_limit',
+    'provider_rate_limit_contract',
     'stripe_billing_contract',
     'claim_stripe_support_checkout',
     'complete_stripe_support_checkout',

@@ -16,7 +16,7 @@ export function GameShell({
     <article aria-labelledby="daily-game-title">
       <PaperCard variant="atmospheric" padding="lg">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="font-pixel text-[0.9375rem] uppercase tracking-[0.06em] text-accent">
+          <p className="font-art-label text-[0.9375rem] uppercase tracking-[0.06em] text-accent">
             {context === "today" ? "Today’s game" : "Archive study · Plus"}
           </p>
           <p className="inline-flex items-center gap-1.5 text-caption text-ash">

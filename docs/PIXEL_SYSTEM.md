@@ -1,4 +1,8 @@
-# BibleQuest Pixel System
+# Retired BibleQuest Pixel System
+
+> Archived on August 2, 2026. The production app now uses the hand-painted
+> 2.5D system in [`ART_SYSTEM.md`](ART_SYSTEM.md). Everything below is retained
+> only as historical pipeline context and must not be used for new UI work.
 
 Sacred exploration, never retro-arcade. Pixel art is BibleQuest's signature
 accent — a storybook voice for quest, growth, and celebration moments. It is
@@ -8,7 +12,7 @@ rationed on purpose: when everything is pixelated, nothing is special.
 
 | Instrument | Component / utility | Scale | Use |
 |---|---|---|---|
-| Small sprites | `PixelIcon` (`design-system/PixelIcon.tsx`) | 128×128 native art; 32×32 layout grid | Quest category glyphs, milestone marks, tiny decorations |
+| Small sprites | `PixelIcon` (`design-system/PixelIcon.tsx`) | 128×128 physical canvas; authored grid declared per asset; 32×32 layout grid | Quest category glyphs, milestone marks, tiny decorations |
 | Feature sprites | `PixelIcon` (same component) | 128×128 native art; 16×16 candle or 32×32 tree layout grids | The streak candle set, the twenty-stage journey tree |
 | Mascots | `PixelMascot` (`design-system/PixelMascot.tsx`) | 128×128 native art; 32×32 layout grid | One per onboarding / sign-in page, big empty states |
 
@@ -71,10 +75,15 @@ production PNGs:
    The processor supplies binary alpha, transparent padding, capped adaptive
    palette mapping, and nearest-neighbor source fitting. Use `clean-supplied` for
    the approved opaque UI anchors and `qa-sheet` for a review contact sheet.
+   The canonical full-set build then runs
+   `scripts/reconstruct-pixel-catalogue.mjs` as its finishing pass for targeted
+   cleanup, tree simplification, shared-dove consolidation, and GIF stability.
 4. Keep every export at exactly **128×128 physical pixels**. Logical columns
    and rows must both divide 128 evenly. Every production family uses the full
-   128×128 native art grid. Layout grids remain 16×16 for candles and 32×32 for
-   every other family so higher fidelity does not change on-screen size. Use
+   declared authored grid. The shared dove intentionally uses a 64×64 master
+   enlarged to 128×128 as exact 2×2 blocks; other current assets retain their
+   128×128 authored grids. Layout grids remain 16×16 for candles and 32×32 for
+   every other family so fidelity does not change on-screen size. Use
    transparent square padding for narrow or tall subjects instead of
    introducing a non-square file.
 5. Name files after their registry keys:
@@ -91,10 +100,9 @@ production PNGs:
    (for example `"[animation:var(--animate-flicker)]"`), or leave it off for
    stillness.
 
-The service worker precaches the explicit 63-file catalogue, so new registry
-filenames must also be added to `PIXEL_ASSET_NAMES` in `public/sw.js`. When
-replacing bytes behind an existing filename, bump the worker cache version so
-installed clients do not retain the rejected art.
+The retired worker precached the explicit 62-file catalogue. The active 2.5D
+worker instead precaches a compact shell set and runtime-caches other approved
+art; follow `docs/ART_SYSTEM.md` for the current policy.
 
 Nothing else changes: names, sizes, a11y semantics, and every importing
 file stay untouched.
@@ -107,10 +115,11 @@ file stay untouched.
 - Every silhouette carries a single exact-black (`#000000`) outline. Small icons keep it
   sparse; mascots and feature sprites use it continuously so they remain
   recognizable on parchment, linen, and candle-mode surfaces.
-- Every production file uses each native 128×128 pixel directly. There is no
-  16×16, 32×32, or 64×64 reconstruction bottleneck. Gradients may be expressed
-  only as deliberate adjacent flat palette colors, never interpolation within
-  a pixel.
+- Every production file declares its authored grid. The dove's 64×64 grid is a
+  deliberate contour-control choice and enlarges to 128×128 only through
+  nearest-neighbor 2×2 blocks. Other current files use each native 128×128
+  pixel directly. Gradients may be expressed only as deliberate adjacent flat
+  palette colors, never interpolation within a pixel.
 - Light comes from the **upper left**: highlights top-left and shade
   lower-right. Materials may use up to 5–7 deliberate ramp steps where the
   subject needs depth; dithering and within-pixel blending remain forbidden.
@@ -137,8 +146,9 @@ file stay untouched.
   `tree-stage-19`. Every stage shares one olive species, soil base, light
   direction, forked-trunk language, outline, and palette; the silhouette and
   botanical details advance at every step.
-- **Mascots (8, 128×128 native art / 32×32 layout)**: lamb, lantern, scroll, dove, sprout, key,
-  map, campfire.
+- **Mascots (8 registered keys, 7 dedicated files plus shared `dove.png`,
+  128×128 physical canvas / 32×32 layout)**: lamb, lantern, scroll, dove, sprout,
+  key, map, campfire.
 
 ## Where pixel art is allowed
 

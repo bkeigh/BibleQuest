@@ -68,9 +68,10 @@ curl --silent --show-error --dump-header - --output /dev/null https://www.bibleq
 curl --silent --show-error --dump-header - --output /dev/null https://www.biblequest.co/sw.js
 ```
 
-Confirm the document has CSP and six-month HSTS, has no `X-Frame-Options`, and
+Confirm the homepage has CSP and six-month HSTS, has no `X-Frame-Options`, and
 that `frame-ancestors` is exactly self plus the two Winterhill origins. Confirm
-`/sw.js` also retains `Cache-Control: no-cache, no-store, must-revalidate` and
+`/app` has `frame-ancestors 'none'` and `X-Frame-Options: DENY`. Confirm `/sw.js`
+also retains `Cache-Control: no-cache, no-store, must-revalidate` and
 `Service-Worker-Allowed: /`. Header inspection cannot prove iframe behavior;
 complete the browser matrix as well.
 
@@ -95,17 +96,17 @@ needed — just don't remove that config.
       its separate gate enabled in an approved test deployment, verify the
       same-origin POST route returns only the exact Stripe-hosted Checkout URL;
       repeat with the gate disabled and confirm it fails closed.
-- [ ] Vercel Firewall applies a deployment-wide bound to
-      `/api/support/checkout`; the in-process 5/10-minute and 20/day bounds are
-      defense in depth.
+- [ ] Confirm support Checkout's service-only distributed 5/10-minute and
+      20/day database claims pass. Add a reviewed log-first Firewall outer layer
+      only after the Vercel plan supports it.
 - [ ] Add to Home Screen on an iPhone; confirm it opens standalone.
 - [ ] Offline: load the app, go offline, confirm the offline fallback appears.
 - [ ] `/api/health` passes the bounded release contract in
       [`OBSERVABILITY.md`](OBSERVABILITY.md), including deployed/rollback SHA,
       canonical, auth, schema/content, worker, and billing posture.
-- [ ] Vercel Firewall applies a deployment-wide bound to
-      `/api/observability/client`; the in-process 60/minute and 300/15-minute
-      limits are defense in depth and never make public signals authenticated.
+- [ ] After Vercel rate limiting is available, publish a reviewed log-first
+      deployment-wide bound on `/api/observability/client`; the in-process
+      60/minute and 300/15-minute limits remain active meanwhile.
 - [ ] Privacy and Terms pages load.
 - [ ] Save deployed document and `/sw.js` header evidence; confirm HSTS/CSP are
       not changed by Vercel project-level header rules.
@@ -133,13 +134,9 @@ needed — just don't remove that config.
       external uptime check through the content-free operational contract in
       [`OBSERVABILITY.md`](OBSERVABILITY.md) until a separately privacy-reviewed
       error provider exists.
-- [ ] Keep direct Stripe Billing in `coming-soon` with purchases disabled unless
-      every test-to-live gate in
-      [`STRIPE_TEST_BILLING.md`](STRIPE_TEST_BILLING.md) has evidence and
-      explicit approval.
-- [ ] Keep one-time support disabled unless every test-to-live gate in
-      [`STRIPE_ONE_TIME_SUPPORT.md`](STRIPE_ONE_TIME_SUPPORT.md) has evidence
-      and explicit approval.
+- [ ] Preserve the approved live Stripe posture only while every production
+      health, webhook, entitlement, support, and rollback check remains green;
+      fail closed to `coming-soon` if the evidence contract breaks.
 - [ ] Keep the Free Use Bible API catalogue constrained to the reviewed
       public-domain allow-list in `src/lib/bible/translations.ts`. A provider
       catalogue entry is not, by itself, approval to expose that edition.
@@ -147,8 +144,9 @@ needed — just don't remove that config.
       allow-list or pinned upstream SHA-256 changes. An unexpected provider
       revision fails closed until it is reviewed and deployed; WEB remains the
       bundled offline fallback.
-- [ ] Mirror the app's online-Scripture limits in Vercel Firewall (fixed window,
-      per IP, deny on exceed): 60/minute for path prefix `/api/bible/`, plus
+- [ ] When the Vercel plan supports it, mirror the app's online-Scripture limits
+      in Firewall (fixed window, per IP, deny on exceed): 60/minute for path
+      prefix `/api/bible/`, plus
       40/minute for `GET /verse/*` with a `translation` query. If the plan has
       only one custom rate rule, combine both path condition groups at
       40/minute. The app also has per-instance windows; over-limit public share

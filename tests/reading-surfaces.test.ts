@@ -95,7 +95,7 @@ describe("reading surfaces", () => {
       expect(launcher).not.toContain("focus-visible:outline-2");
     });
 
-    it("is the pixel character itself, not a button holding one", () => {
+    it("is the illustrated character itself, not a button holding one", () => {
       // The sprite is drawn with its own transparency and its own edges. A
       // filled disc with a border around it turned the character into a small
       // mark inside a control; separation comes from a drop shadow instead.

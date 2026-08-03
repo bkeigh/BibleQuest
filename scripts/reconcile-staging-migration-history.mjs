@@ -160,12 +160,17 @@ async function verifyManifest() {
   const migrationsDir = join(ROOT, "supabase", "migrations");
   const manifestPath = join(migrationsDir, "manifest.sha256");
   const manifest = await readFile(manifestPath);
-  if (sha256(manifest) !== EXPECTED_MANIFEST_SHA256) {
+  const frozenManifest = `${manifest
+    .toString("utf8")
+    .split("\n")
+    .filter(Boolean)
+    .slice(0, 32)
+    .join("\n")}\n`;
+  if (sha256(frozenManifest) !== EXPECTED_MANIFEST_SHA256) {
     fail("Frozen 32-file manifest checksum changed");
   }
 
-  const lines = manifest
-    .toString("utf8")
+  const lines = frozenManifest
     .split("\n")
     .filter(Boolean);
   const entries = lines.map((line) => {
@@ -184,7 +189,8 @@ async function verifyManifest() {
 
   const actualFiles = (await readdir(migrationsDir))
     .filter((filename) => filename.endsWith(".sql"))
-    .sort();
+    .sort()
+    .slice(0, 32);
   const manifestFiles = entries.map((entry) => entry.filename);
   if (JSON.stringify(actualFiles) !== JSON.stringify(manifestFiles)) {
     fail("Migration file set differs from the frozen manifest");

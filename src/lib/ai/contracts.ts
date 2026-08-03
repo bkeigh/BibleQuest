@@ -12,6 +12,9 @@ import {
 
 export const MY_SHEPHERD_MAX_QUESTION_LENGTH = 400;
 
+// Bounds transport memory independently from the smaller validated fields.
+export const AI_REQUEST_MAX_BYTES = 4_096;
+
 export const MY_SHEPHERD_DESTINATIONS = [
   "home",
   "quests",
@@ -121,12 +124,21 @@ export function isImmediateSafetyQuestion(question: string): boolean {
     /\bkill myself\b/,
     /\bend my life\b/,
     /\bsuicid(?:e|al)\b/,
+    /\b(?:want|wish|hope|plan|planning|going) to die\b/,
+    /\bwish i (?:was|were) dead\b/,
+    /\bbetter off dead\b/,
+    /\bno (?:reason|point) (?:for me )?to (?:live|go on)\b/,
+    /\b(?:do not|don't|cannot|can't) want to (?:be alive|live)\b/,
     /\bhurt myself\b/,
     /\bharm myself\b/,
+    /\b(?:about|going|planning) to (?:overdose|(?:hurt|harm) myself)\b/,
+    /\b(?:just took|have taken|took) (?:an? )?overdose\b/,
     /\bhurt (?:him|her|them|someone)\b/,
     /\bkill (?:him|her|them|someone)\b/,
+    /\b(?:about|going|planning) to (?:hurt|harm|kill) (?:him|her|them|someone)\b/,
     /\bin immediate danger\b/,
-    /\bbeing abused right now\b/,
+    /\b(?:being|am being) (?:abused|attacked|hurt) (?:now|right now)\b/,
+    /\bsomeone is (?:attacking|hurting|abusing) me (?:now|right now)\b/,
   ].some((pattern) => pattern.test(normalized));
 }
 

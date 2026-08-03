@@ -38,7 +38,7 @@ flowchart LR
 | `src/app/(marketing)/` | Public website pages such as home, about, pricing, churches, privacy, and terms. |
 | `src/app/app/` | Private/installable application routes: home, quests, Bible, prayer, reflection, journey, account, Plus, and settings. |
 | `src/components/app-shell/` | Private-app frame, navigation, hydration fallbacks, theme/language application, service-worker registration, and account sync lifecycle. |
-| `src/components/design-system/` | Reusable BibleQuest primitives, icons, paper surfaces, motion affordances, pixel assets, and feedback UI. |
+| `src/components/design-system/` | Reusable BibleQuest primitives, icons, paper surfaces, motion affordances, the hand-painted 2.5D art registry, and feedback UI. |
 | `src/components/<feature>/` | Feature screens and controls. These translate user intent into QuestOS actions; they should not duplicate domain rules. |
 | `src/lib/questos/` | Domain types, pure decision engines, persistence, migrations, and the central local-first store. |
 | `src/lib/sync/` | Supabase row mapping, pull/merge/push coordination, deletion tombstones, and sync status. |
@@ -57,9 +57,9 @@ flowchart LR
 | `src/data/games/` | Reviewed, sourced Scripture Connections and Bible Timeline puzzle catalogs. |
 | `src/data/bible/` | Public-domain World English Bible JSON, loaded on the server. |
 | `supabase/` | Local Supabase configuration, ordered migrations, seed SQL, and policy evidence. |
-| `public/` | PWA icons, brand files, tree sprites, and the production service worker. |
+| `public/` | PWA icons, brand files, optimized 2.5D art, candle loops, and the production service worker. |
 | `tests/` | Domain, sync, analytics, billing, security-header, service-worker, import/export, and asset tests. |
-| `scripts/` | Deterministic import/build utilities for Bible data, seed data, Supabase seed SQL, and icons. |
+| `scripts/` | Deterministic import/build utilities for Bible data, seed data, Supabase seed SQL, 2.5D art, and icons. |
 | `docs/` | Product, setup, security, deployment, content, QA, analytics, and billing runbooks. |
 
 ## Request and rendering flow

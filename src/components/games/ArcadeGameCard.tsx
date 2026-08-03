@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 
 /** The scenes the arcade draws its cards on, shared by Home and the arcade. */
 export const ARCADE_ART = {
@@ -31,7 +31,7 @@ export function ArcadeGameCard({
   eyebrow: string;
   title: string;
   description: string;
-  icon: Parameters<typeof PixelIcon>[0]["name"];
+  icon: Parameters<typeof ArtIcon>[0]["name"];
   footer?: React.ReactNode;
   muted?: boolean;
   className?: string;
@@ -69,7 +69,7 @@ export function ArcadeGameCard({
               draws thin art larger without letting it take more room — so the
               eyebrow sits in the same place whichever game this is. */}
           <span className="relative flex h-16 w-16 shrink-0 items-center justify-center">
-            <PixelIcon
+            <ArtIcon
               name={icon}
               size={72}
               // See SupportLink: the reset would cap this at the anchor's width.
@@ -81,10 +81,8 @@ export function ArcadeGameCard({
           </p>
         </div>
         <div className="mt-auto pt-8">
-          {/* Every other card title in the app uses the display face; pixel is
-              reserved for small labels and badges at 0.875rem. A 2rem pixel
-              title also wrapped long game names across two hard-to-read lines
-              and competed with the pixel section heading directly above it. */}
+          {/* Card titles use the display face so longer game names remain
+              readable and keep a clear hierarchy beneath the section label. */}
           <h3 className="max-w-[20ch] font-display text-[1.75rem] leading-tight text-white min-[390px]:text-[1.875rem]">
             {title}
           </h3>

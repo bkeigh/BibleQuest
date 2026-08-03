@@ -31,7 +31,7 @@ export function SevenDaysQuestionCard({
 
   return (
     <PaperCard variant="paper" padding="lg" aria-live="polite">
-      <p className="font-pixel text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
+      <p className="font-art-label text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
         One question
       </p>
       <h3 className="mt-3 font-display text-[1.375rem] leading-snug text-graphite">

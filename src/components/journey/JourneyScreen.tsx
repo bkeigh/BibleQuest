@@ -14,8 +14,8 @@ import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
-import { PixelIcon, type PixelSpriteName } from "@/components/design-system/PixelIcon";
-import { PixelMascot } from "@/components/design-system/PixelMascot";
+import { ArtIcon, type ArtSpriteName } from "@/components/design-system/ArtIcon";
+import { ArtMascot } from "@/components/design-system/ArtMascot";
 import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosure";
 import { GrowthTree } from "@/components/journey/GrowthTree";
 import { treeStageLabels, emptyStates } from "@/lib/questos/copy";
@@ -45,7 +45,7 @@ interface GrowthFacet {
   meaning: string;
   invitation: string;
   href: string;
-  sprite: PixelSpriteName;
+  sprite: ArtSpriteName;
 }
 
 /** Six symbolic facets make every kind of tending legible without ranking it. */
@@ -94,7 +94,7 @@ const GROWTH_FACETS: Record<GrowthType, GrowthFacet> = {
   },
 };
 
-const EVENT_SPRITE: Record<JourneyEventType, PixelSpriteName> = {
+const EVENT_SPRITE: Record<JourneyEventType, ArtSpriteName> = {
   quest_completed: "leaf",
   reflection_written: "sun",
   prayer_created: "candle",
@@ -181,10 +181,10 @@ function MilestoneHighlight({ view }: { view: MilestoneView }) {
               : "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-paper/85 ring-1 ring-mist/70"
           }
         >
-          <PixelIcon name={(milestone.iconKey as PixelSpriteName) ?? "star"} size={68} />
+          <ArtIcon name={(milestone.iconKey as ArtSpriteName) ?? "star"} size={68} />
         </span>
         <div className="min-w-0">
-          <p className="font-pixel text-[0.875rem] leading-tight text-graphite">
+          <p className="font-art-label text-[0.875rem] leading-tight text-graphite">
             {milestone.title}
           </p>
           <p className="mt-1 text-[0.75rem] leading-snug text-ash">
@@ -225,7 +225,7 @@ function MilestoneListRow({ view }: { view: MilestoneView }) {
             : "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-paper"
         }
       >
-        <PixelIcon name={(milestone.iconKey as PixelSpriteName) ?? "star"} size={56} />
+        <ArtIcon name={(milestone.iconKey as ArtSpriteName) ?? "star"} size={56} />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
@@ -429,7 +429,7 @@ function JourneyScreenInner() {
           <div className="mb-2.5">
             <h2
               id="week-heading"
-              className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent"
+              className="font-art-label text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent"
             >
               This week
             </h2>
@@ -453,7 +453,7 @@ function JourneyScreenInner() {
                         key={type}
                         className="inline-flex min-h-9 items-center gap-2 rounded-full border border-mist bg-paper/80 px-3 text-caption text-charcoal"
                       >
-                        <PixelIcon name={facet.sprite} size={44} />
+                        <ArtIcon name={facet.sprite} size={44} />
                         {facet.label}
                       </span>
                     );
@@ -464,7 +464,7 @@ function JourneyScreenInner() {
               <div className="flex items-start gap-3">
                 {/* The seed sprite sits inside a lot of transparent canvas, so
                     a 28px box drew a seed a few pixels across. */}
-                <PixelIcon
+                <ArtIcon
                   name="tree-stage-0"
                   size={84}
                   className="-mt-2 shrink-0"
@@ -487,7 +487,7 @@ function JourneyScreenInner() {
           <div className="mb-2.5">
             <h2
               id="nourish-heading"
-              className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent"
+              className="font-art-label text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent"
             >
               How your tree grows
             </h2>
@@ -507,7 +507,7 @@ function JourneyScreenInner() {
                 >
                   <span className="flex items-start justify-between gap-2">
                     <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-surface">
-                      <PixelIcon name={facet.sprite} size={56} />
+                      <ArtIcon name={facet.sprite} size={56} />
                     </span>
                     <span
                       className={
@@ -541,7 +541,7 @@ function JourneyScreenInner() {
             <div>
               <h2
                 id="milestones-heading"
-                className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent"
+                className="font-art-label text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent"
               >
                 Milestones
               </h2>
@@ -600,12 +600,12 @@ function JourneyScreenInner() {
 
         {/* Timeline */}
         <section className="mt-7">
-          <h2 className="mb-3 font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
+          <h2 className="mb-3 font-art-label text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
             The road so far
           </h2>
           {timeline.length === 0 ? (
             <div className="py-6 text-center">
-              <PixelMascot name="sprout" size={192} className="mb-4" />
+              <ArtMascot name="sprout" size={192} className="mb-4" />
               <p className="text-[0.9375rem] text-ash">{emptyStates.journey}</p>
             </div>
           ) : (
@@ -625,7 +625,7 @@ function JourneyScreenInner() {
                     {month.events.map((e) => (
                       <li key={e.id} className="relative ms-6 pb-6 last:pb-0">
                         <span className="absolute -start-[2.05rem] top-0 flex h-6 w-6 items-center justify-center rounded-full bg-parchment ring-1 ring-mist">
-                          <PixelIcon name={EVENT_SPRITE[e.type]} size={56} />
+                          <ArtIcon name={EVENT_SPRITE[e.type]} size={56} />
                         </span>
                         <p className="text-[0.9375rem] text-charcoal">{e.title}</p>
                         <p className="mt-0.5 text-[0.75rem] text-ash">
@@ -660,7 +660,7 @@ function JourneyScreenInner() {
             className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4"
           >
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent-surface">
-              <PixelIcon name="star" size={68} />
+              <ArtIcon name="star" size={68} />
             </span>
             <div className="min-w-0 flex-1">
               <h2 className="text-[1rem] font-medium text-graphite">Make the space yours</h2>

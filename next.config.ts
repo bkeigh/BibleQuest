@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 /**
- * Security headers (applied to every route via `headers()` below).
+ * Security headers (applied with route-specific framing via `headers()` below).
  *
  * ONE source of truth: these live here, not in vercel.json, so local `next dev`
  * and Vercel production stay in sync.
@@ -11,8 +11,8 @@ import type { NextConfig } from "next";
  *   - Supabase auth + PostgREST sync → exact configured HTTPS origin
  *   - Plausible Events API       → configured HTTPS origin, when enabled
  *   - Stripe Checkout/Portal → top-level hosted redirects, no CSP source needed
- *   - Tally newsletter widget + iframe → exact HTTPS origin
- *   - Fonts (Fraunces, Inter via next/font; Ithaca local) → self (all self-hosted)
+ *   - Tally newsletter iframe → exact HTTPS origin
+ *   - Fonts (Fraunces and Inter via next/font) → self (both self-hosted)
  *   - Icons / OG image / next/image (local) → self
  *   - Avatars (URL.createObjectURL) → blob:; noise SVG background → data:
  *   - Service worker (/sw.js) + web manifest → self
@@ -26,7 +26,6 @@ const isProduction = process.env.NODE_ENV === "production";
 const scriptSrc = [
   "'self'",
   "'unsafe-inline'",
-  "https://tally.so",
   !isProduction ? "'unsafe-eval'" : "",
 ]
   .filter(Boolean)
@@ -103,27 +102,28 @@ const connectSrc = [
   .filter(Boolean)
   .join(" ");
 
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  `script-src ${scriptSrc}`,
-  "style-src 'self' 'unsafe-inline'", // next/font + Tailwind + framer-motion inline styles
-  "img-src 'self' data: blob:",
-  "font-src 'self'",
-  `connect-src ${connectSrc}`,
-  "frame-src 'self' https://tally.so",
-  "worker-src 'self' blob:", // service worker + any blob workers
-  "manifest-src 'self'", // /manifest.webmanifest
-  "media-src 'self' blob:",
-  "object-src 'none'", // no <object>/<embed>/<applet>
-  "base-uri 'self'", // lock <base> to same origin
-  "form-action 'self'", // forms may only submit to same origin
-  // Keep framing locked down to BibleQuest itself and Winterhill's two canonical
-  // hostnames so the studio portfolio can offer an interactive project preview.
-  "frame-ancestors 'self' https://winterhill.studio https://www.winterhill.studio",
-  isProduction ? "upgrade-insecure-requests" : "",
-]
-  .filter(Boolean)
-  .join("; ");
+// Builds one policy while varying only which parent sites may frame the route.
+function contentSecurityPolicy(frameAncestors: string) {
+  return [
+    "default-src 'self'",
+    `script-src ${scriptSrc}`,
+    "style-src 'self' 'unsafe-inline'", // next/font + Tailwind + framer-motion inline styles
+    "img-src 'self' data: blob:",
+    "font-src 'self'",
+    `connect-src ${connectSrc}`,
+    "frame-src 'self' https://tally.so",
+    "worker-src 'self' blob:", // service worker + any blob workers
+    "manifest-src 'self'", // /manifest.webmanifest
+    "media-src 'self' blob:",
+    "object-src 'none'", // no <object>/<embed>/<applet>
+    "base-uri 'self'", // lock <base> to same origin
+    "form-action 'self'", // forms may only submit to same origin
+    `frame-ancestors ${frameAncestors}`,
+    isProduction ? "upgrade-insecure-requests" : "",
+  ]
+    .filter(Boolean)
+    .join("; ");
+}
 
 // Disable powerful features the app never uses. Hosted Stripe pages run under
 // Stripe's own origin and never need Payment Request access on BibleQuest.
@@ -145,25 +145,39 @@ const permissionsPolicy = [
   "payment=()",
 ].join(", ");
 
-const securityHeaders = [
-  { key: "Content-Security-Policy", value: contentSecurityPolicy },
-  ...(isProduction
-    ? [
-        {
-          // Six months is meaningful transport pinning without committing
-          // unaudited subdomains or the registrable domain to preload.
-          key: "Strict-Transport-Security",
-          value: "max-age=15552000",
-        },
-      ]
-    : []),
-  // CSP frame-ancestors above provides the allowlist. X-Frame-Options cannot
-  // express multiple approved origins and would override the portfolio embed.
-  { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "X-Permitted-Cross-Domain-Policies", value: "none" },
-  { key: "Referrer-Policy", value: "no-referrer" },
-  { key: "Permissions-Policy", value: permissionsPolicy },
-];
+// Builds the common header set and adds legacy clickjacking protection where safe.
+function securityHeaders(frameAncestors: string, denyFraming: boolean) {
+  return [
+    {
+      key: "Content-Security-Policy",
+      value: contentSecurityPolicy(frameAncestors),
+    },
+    ...(isProduction
+      ? [
+          {
+            // Six months is meaningful transport pinning without committing
+            // unaudited subdomains or the registrable domain to preload.
+            key: "Strict-Transport-Security",
+            value: "max-age=15552000",
+          },
+        ]
+      : []),
+    ...(denyFraming ? [{ key: "X-Frame-Options", value: "DENY" }] : []),
+    { key: "X-Content-Type-Options", value: "nosniff" },
+    { key: "X-Permitted-Cross-Domain-Policies", value: "none" },
+    { key: "Referrer-Policy", value: "no-referrer" },
+    { key: "Permissions-Policy", value: permissionsPolicy },
+  ];
+}
+
+// Only the marketing homepage is designed to appear in Winterhill's portfolio.
+const publicHomepageSecurityHeaders = securityHeaders(
+  "'self' https://winterhill.studio https://www.winterhill.studio",
+  false,
+);
+
+// Every non-homepage route denies embedding, including app, auth, console, and APIs.
+const privateRouteSecurityHeaders = securityHeaders("'none'", true);
 
 const privateNoStoreHeader = {
   key: "Cache-Control",
@@ -235,8 +249,12 @@ const nextConfig: NextConfig = {
         headers: [privateNoStoreHeader],
       },
       {
-        source: "/:path*",
-        headers: securityHeaders,
+        source: "/",
+        headers: publicHomepageSecurityHeaders,
+      },
+      {
+        source: "/:path+",
+        headers: privateRouteSecurityHeaders,
       },
     ];
   },
