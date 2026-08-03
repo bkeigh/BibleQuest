@@ -197,12 +197,16 @@ the dry run, production readiness, the RLS report, and the two-user guided
 progress proof. Never substitute normal linked `db push`, `--include-all`, or
 migration repair.
 
-### Production 0034 distributed provider-rate packet
+### Production 0034 and 0035 distributed provider-rate packets
 
 Migration `0034` adds one forced-RLS operational bucket table and a service-only
-atomic claim for paid AI and support Checkout. The application HMACs account or
-trusted network identifiers before the database call, so no raw identifier is
-stored. Run the exact history, checksum, backup, and one-packet preflight with:
+atomic claim for paid AI and support Checkout. Database CI then caught a
+PL/pgSQL variable collision in that claim before the application release;
+forward-only migration `0035` corrects the function and advances its readiness
+identity to `biblequest_provider_rate_limit_v2`. The application HMACs account
+or trusted network identifiers before the database call, so no raw identifier
+is stored. Run the exact history, checksum, backup, and one-packet `0035`
+preflight with:
 
 ```bash
 pnpm check:production-provider-rate-limits
@@ -211,12 +215,12 @@ pnpm check:production-provider-rate-limits
 Apply only the reviewed long-version packet with the pinned confirmation:
 
 ```bash
-BIBLEQUEST_PRODUCTION_MIGRATION_CONFIRM='apply 20260803010000 to iacnjqnssovaaojswjoh' \
+BIBLEQUEST_PRODUCTION_MIGRATION_CONFIRM='apply 20260803170000 to iacnjqnssovaaojswjoh' \
   node scripts/reconcile-production-provider-rate-limits.mjs --apply
 ```
 
 The apply must report `"applied":true`. Then rerun the read-only check,
-production readiness, and the `0034` pgTAP file. Never use normal linked
+production readiness, and the provider-rate pgTAP file. Never use normal linked
 `db push`, `--include-all`, or migration repair for this production history.
 
 ## Complete public-table inventory
@@ -286,6 +290,7 @@ Expected migration order:
 0032_stripe_dispute_signal_prefix.sql
 0033_guided_pilgrimage_progress.sql
 0034_distributed_provider_rate_limits.sql
+0035_fix_provider_rate_limit_claim_timestamp.sql
 ```
 
 Evidence must show all 42 expected tables with `rowsecurity = true`, only the

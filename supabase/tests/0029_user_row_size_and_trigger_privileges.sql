@@ -49,8 +49,8 @@ select is(
       and trigger.tgenabled <> 'D'
       and procedure.proname = 'enforce_user_owned_row_size'
   ),
-  16::bigint,
-  'all sixteen synced resources enforce the row-size cap'
+  17::bigint,
+  'all seventeen synced resources enforce the row-size cap'
 );
 
 select ok(

@@ -13,7 +13,7 @@ const BEFORE = readFileSync(
     ROOT,
     "supabase",
     "production-migrations",
-    "20260803010000_distributed_provider_rate_limits.before.sql",
+    "20260803170000_fix_provider_rate_limit_claim_timestamp.before.sql",
   ),
   "utf8",
 );
@@ -22,7 +22,7 @@ const AFTER = readFileSync(
     ROOT,
     "supabase",
     "production-migrations",
-    "20260803010000_distributed_provider_rate_limits.after.sql",
+    "20260803170000_fix_provider_rate_limit_claim_timestamp.after.sql",
   ),
   "utf8",
 );
@@ -34,7 +34,7 @@ const MIGRATION = readFileSync(
     ROOT,
     "supabase",
     "migrations",
-    "0034_distributed_provider_rate_limits.sql",
+    "0035_fix_provider_rate_limit_claim_timestamp.sql",
   ),
 );
 const PACKAGE = JSON.parse(
@@ -51,13 +51,13 @@ describe("production provider rate-limit migration", () => {
     expect(SCRIPT).toContain('const PROJECT_REF = "iacnjqnssovaaojswjoh";');
     expect(SCRIPT).toContain(sha256(MANIFEST));
     expect(SCRIPT).toContain(sha256(MIGRATION));
-    expect(SCRIPT).toContain('version: "20260803010000"');
-    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(33);
+    expect(SCRIPT).toContain('version: "20260803170000"');
+    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(34);
   });
 
   it("requires exact history, a fresh backup, and a one-packet dry run", () => {
     expect(SCRIPT).toContain(
-      "Production migration history differs from the reviewed 0034 history",
+      "Production migration history differs from the reviewed 0035 history",
     );
     expect(SCRIPT).toContain("No completed physical production backup exists");
     expect(SCRIPT).toContain("Latest physical production backup is stale");
@@ -69,12 +69,18 @@ describe("production provider rate-limit migration", () => {
     expect(SCRIPT).not.toContain("--include-all");
   });
 
-  it("rejects partial state and proves service-only bucket isolation", () => {
+  it("requires 0034 and proves the corrected service-only claim", () => {
     expect(BEFORE).toContain(
-      "production provider rate limit found a partial 0034 schema",
+      "production 0034 provider rate limit prerequisite is invalid",
     );
-    expect(BEFORE).toContain("biblequest_guided_progress_sync_v1");
-    expect(AFTER).toContain("biblequest_provider_rate_limit_v1");
+    expect(BEFORE).toContain("biblequest_provider_rate_limit_v1");
+    expect(MIGRATION.toString("utf8")).toContain("claim_time timestamptz");
+    expect(MIGRATION.toString("utf8")).toContain(
+      "biblequest_provider_rate_limit_v2",
+    );
+    expect(AFTER).toContain("biblequest_provider_rate_limit_v2");
+    expect(AFTER).toContain("migration-probe");
+    expect(AFTER).toContain("claim_provider_rate_limit");
     expect(AFTER).toContain("relforcerowsecurity");
     expect(AFTER).toContain("service_role");
     expect(AFTER).toContain("provider_rate_limit_windows");

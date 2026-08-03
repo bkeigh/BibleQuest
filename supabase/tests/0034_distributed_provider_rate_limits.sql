@@ -9,8 +9,8 @@ select plan(14);
 
 select is(
   public.provider_rate_limit_contract(),
-  '{"ok": true, "contract": "biblequest_provider_rate_limit_v1"}'::jsonb,
-  'the bounded provider rate-limit contract is ready'
+  '{"ok": true, "contract": "biblequest_provider_rate_limit_v2"}'::jsonb,
+  'the corrected bounded provider rate-limit contract is ready'
 );
 select ok(
   (

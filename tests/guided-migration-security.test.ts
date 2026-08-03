@@ -59,7 +59,7 @@ describe("guided progress database boundary", () => {
 
   it("requires the current schema contract before production can be declared ready", () => {
     expect(productionReadiness).toContain(
-      'candidate.schema_contract !== "0034"',
+      'candidate.schema_contract !== "0035"',
     );
     expect(productionReadiness).toContain(
       'table: "user_guided_movements"',

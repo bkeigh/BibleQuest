@@ -41,6 +41,7 @@ const EXPECTED_MIGRATIONS = [
   "0032_stripe_dispute_signal_prefix.sql",
   "0033_guided_pilgrimage_progress.sql",
   "0034_distributed_provider_rate_limits.sql",
+  "0035_fix_provider_rate_limit_claim_timestamp.sql",
 ];
 
 /** Hash a migration exactly as the release manifest does. */

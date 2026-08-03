@@ -9,7 +9,7 @@ deployment-wide provider quotas, unbounded AI request reads, newsletter
 third-party loading, route framing, incomplete browser/database CI coverage,
 above-fold reveal delays, and an oversized PWA art precache.
 
-Production database contract `0034` is applied and reconciled. Before the app
+Production database contract `0035` is applied and reconciled. Before the app
 release, the deployed `/api/health` response still advertises contract `0033`;
 this is the expected and only automated production-readiness failure until the
 matching application build reaches production.
@@ -40,7 +40,7 @@ party and did not attempt destructive traffic or social engineering.
 
 | Severity | Finding | Resolution |
 | --- | --- | --- |
-| High | Paid AI and public support relied on per-instance memory limits, which reset across serverless instances. | Added service-only atomic Supabase fixed-window claims keyed by opaque HMAC buckets. Production migration `0034` is applied. |
+| High | Paid AI and public support relied on per-instance memory limits, which reset across serverless instances. | Added service-only atomic Supabase fixed-window claims keyed by opaque HMAC buckets. Database CI caught a PL/pgSQL timestamp-name collision before application release; forward-only migration `0035` corrects the claim and is applied. |
 | High | Paid AI routes used unbounded `request.json()` reads before validating small fields. | Added a 4 KiB raw-body cap with strict JSON content-type and field validation before quota or provider use. |
 | Medium | The newsletter loaded Tally's parent-page script and allowed default referrer transmission. | Removed the parent script; the direct iframe is sandboxed and uses `Referrer-Policy: no-referrer`. |
 | Medium | The framing policy could not safely support the approved Winterhill homepage embed while denying sensitive routes. | Homepage framing is allowlisted to the two exact Winterhill origins; every other route uses CSP `frame-ancestors 'none'` plus `X-Frame-Options: DENY`. |
@@ -87,7 +87,7 @@ party and did not attempt destructive traffic or social engineering.
 | Production/development header integration | 2 passed |
 | Playwright production browser smoke | 2 passed |
 | Production dependency audit | No known vulnerabilities |
-| Production migration `0034` reconciliation | Pass; applied, no pending proposal |
+| Production migration `0035` reconciliation | Pass; applied, functional postflight claim passed, no pending proposal |
 | Production database/content readiness | All database, auth-provider, and content checks passed |
 | Git whitespace/error check | Pass |
 
@@ -127,6 +127,6 @@ a merge gate rather than waived evidence.
 
 Proceed through pull request and protected CI. Merge only after every required
 check passes. After Vercel promotes the merge, require `/api/health` to report
-schema contract `0034`, rerun production readiness and synthetic health, verify
+schema contract `0035`, rerun production readiness and synthetic health, verify
 route-specific framing headers, and inspect runtime logs before calling the
 release complete.

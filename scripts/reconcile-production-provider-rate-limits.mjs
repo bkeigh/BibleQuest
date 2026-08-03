@@ -1,6 +1,6 @@
 /**
- * Applies only the reviewed 0034 provider-rate packet to the exact production
- * project after history, checksum, dry-run, and physical-backup checks.
+ * Applies only the reviewed 0035 provider-rate correction to exact production
+ * after history, checksum, dry-run, and physical-backup checks.
  */
 
 import { createHash } from "node:crypto";
@@ -13,15 +13,15 @@ import { spawnSync } from "node:child_process";
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const PROJECT_REF = "iacnjqnssovaaojswjoh";
 const EXPECTED_MANIFEST_SHA256 =
-  "fbdb5c241846acd9895473bcacac2dbc18aca479a2674ceee8d80c8d10c7ef21";
-const APPLY_CONFIRMATION = `apply 20260803010000 to ${PROJECT_REF}`;
+  "3e4949bca5fa0756c122955355bc17e600604c2b9e04d74a883ac86dd3a61935";
+const APPLY_CONFIRMATION = `apply 20260803170000 to ${PROJECT_REF}`;
 const MAX_BACKUP_AGE_MS = 30 * 60 * 60 * 1000;
 const PACKET = {
-  version: "20260803010000",
-  name: "distributed_provider_rate_limits",
-  source: "0034_distributed_provider_rate_limits.sql",
+  version: "20260803170000",
+  name: "fix_provider_rate_limit_claim_timestamp",
+  source: "0035_fix_provider_rate_limit_claim_timestamp.sql",
   sourceSha:
-    "bb615ba8fa75199e4185018ffff6ddfefeb1ca2de21bd6ac245ba76ad9404d93",
+    "cc66786a303c391c86b220a43ddd487e32d0576be222f25864fad7bb7d80bd9b",
 };
 const PACKET_FILENAME = `${PACKET.version}_${PACKET.name}.sql`;
 
@@ -55,6 +55,7 @@ const REVIEWED_HISTORY = [
   ["20260729123000", "stripe_subscription_conflict_key"],
   ["20260729123100", "stripe_dispute_signal_prefix"],
   ["20260731011500", "guided_pilgrimage_progress"],
+  ["20260803010000", "distributed_provider_rate_limits"],
 ];
 
 // Fails with a bounded message and never reflects credentials or raw SQL.
@@ -92,16 +93,16 @@ function parseJson(output, label) {
   }
 }
 
-// Verifies the complete 33-file manifest and the immutable 0034 source.
+// Verifies the complete 34-file manifest and the immutable 0035 source.
 async function verifyReleaseInputs() {
   const migrationsDir = join(ROOT, "supabase", "migrations");
   const manifest = await readFile(join(migrationsDir, "manifest.sha256"));
   if (sha256(manifest) !== EXPECTED_MANIFEST_SHA256) {
-    fail("Reviewed 33-file manifest checksum changed");
+    fail("Reviewed 34-file manifest checksum changed");
   }
   const source = await readFile(join(migrationsDir, PACKET.source));
   if (sha256(source) !== PACKET.sourceSha) {
-    fail("Reviewed 0034 source checksum changed");
+    fail("Reviewed 0035 source checksum changed");
   }
   return source.toString("utf8");
 }
@@ -205,13 +206,13 @@ function remoteHistory(workdir) {
     .map((migration) => String(migration.remote));
 }
 
-// Accepts only the reviewed pre-0034 or completely applied history.
+// Accepts only the reviewed pre-0035 or completely applied history.
 function historyState(actual) {
   const reviewed = REVIEWED_HISTORY.map(([version]) => version);
   const complete = [...reviewed, PACKET.version];
   if (JSON.stringify(actual) === JSON.stringify(reviewed)) return "reviewed";
   if (JSON.stringify(actual) === JSON.stringify(complete)) return "applied";
-  fail("Production migration history differs from the reviewed 0034 history");
+  fail("Production migration history differs from the reviewed 0035 history");
 }
 
 // Requires one recent completed physical backup before any write.
