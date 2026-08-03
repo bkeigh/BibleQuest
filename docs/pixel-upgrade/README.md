@@ -1,6 +1,9 @@
-# BibleQuest Production Sprite Pipeline
+# Retired BibleQuest Production Sprite Pipeline
 
-BibleQuest ships a reviewed 63-file transparent PNG catalogue. Art creation and
+> Archived on August 2, 2026. This directory documents the superseded pixel
+> pipeline. Production UI artwork now follows [`../ART_SYSTEM.md`](../ART_SYSTEM.md).
+
+BibleQuest ships a reviewed 62-file transparent PNG catalogue. Art creation and
 runtime delivery are deliberately separate: reference-conditioned ImageGen
 creates editable staging sources, while a deterministic local processor owns
 native-grid reconstruction, alpha, palette, and the uniform 128×128 physical
@@ -69,6 +72,14 @@ node output/imagegen/pixel-v2/process-production-128.mjs \
 cleaning supplied anchors, normalizing one candidate, and building ad-hoc QA
 sheets.
 
+`scripts/reconstruct-pixel-catalogue.mjs` is the deterministic finishing pass.
+It keeps the 128×128 native canvas, cleans the reviewed priority sprites,
+simplifies dense tree foliage without changing tree identity, stabilizes the
+animated lamb and campfire regions, and removes the retired duplicate dove.
+The shared dove is reconstructed from an authoritative 64×64 master as exact
+2×2 production blocks. The canonical production processor invokes the PNG
+portion automatically.
+
 Clean the supplied opaque anchors:
 
 ```sh
@@ -116,7 +127,7 @@ smaller rendered size in the app. A zoomed contact sheet alone is not approval.
 
 Required checks:
 
-- exactly 128×128 physical dimensions for all 63 files;
+- exactly 128×128 physical dimensions for all 62 files;
 - alpha values are only 0 or 255, with transparent corners and safe padding;
 - every opaque RGB value belongs to its reviewed source-faithful indexed
   palette;
@@ -129,6 +140,10 @@ Required checks:
 - all twenty tree stages share olive species, viewpoint, baseline, light,
   palette, soil/trunk language, and genuine incremental development;
 - no readable text or letter-like artifacts on books, scrolls, or maps.
+- smallest-grid renders retain binary alpha, no more than three pinholes, and
+  at least 92% silhouette agreement with the 128×128 master;
+- animated mascot timing remains 150ms per frame, palettes remain capped, and
+  non-animated body/base regions remain byte-identical between frames.
 
 Regenerate or reconstruct a failed asset; do not rename an unrelated image to
 make a sequence appear complete.

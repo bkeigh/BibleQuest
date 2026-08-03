@@ -43,7 +43,7 @@ export function GameLearningCard({ puzzle }: { puzzle: GamePuzzle }) {
       aria-labelledby="game-learning-title"
       className="mt-5 border-gold-500/35"
     >
-      <p className="font-pixel text-[0.9375rem] uppercase tracking-[0.06em] text-gilt">
+      <p className="font-art-label text-[0.9375rem] uppercase tracking-[0.06em] text-gilt">
         Carry this with you
       </p>
       <h3

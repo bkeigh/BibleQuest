@@ -30,32 +30,23 @@ function parseCsp(value) {
   return directives;
 }
 
-function assertIncludes(directives, name, expected) {
-  const actual = directives.get(name);
-  assert.ok(actual, `missing ${name}`);
-  for (const source of expected) {
-    assert.ok(actual.includes(source), `${name} must include ${source}`);
-  }
-}
-
-function assertSharedSecurityContract(response, production) {
+function assertSharedSecurityContract(
+  response,
+  production,
+  expectedFrameAncestors,
+  expectedXFrameOptions,
+) {
   assert.equal(response.headers.get("x-powered-by"), null);
 
   const rawCsp = response.headers.get("content-security-policy");
   assert.ok(rawCsp, "response must include Content-Security-Policy");
   const csp = parseCsp(rawCsp);
 
-  assert.deepEqual(csp.get("frame-ancestors"), approvedFrameAncestors);
+  assert.deepEqual(csp.get("frame-ancestors"), expectedFrameAncestors);
   assert.equal(csp.get("frame-ancestors").some((source) => source.includes("*")), false);
-  assert.equal(response.headers.get("x-frame-options"), null);
+  assert.equal(response.headers.get("x-frame-options"), expectedXFrameOptions);
 
-  assertIncludes(csp, "script-src", [
-    "https://tally.so",
-  ]);
-  assertIncludes(csp, "connect-src", [
-    "https://header-fixture.supabase.co",
-  ]);
-  assertIncludes(csp, "frame-src", ["https://tally.so"]);
+  assert.deepEqual(csp.get("frame-src"), ["'self'", "https://tally.so"]);
   assert.deepEqual(csp.get("img-src"), ["'self'", "data:", "blob:"]);
   assert.deepEqual(csp.get("font-src"), ["'self'"]);
   assert.deepEqual(csp.get("media-src"), ["'self'", "blob:"]);
@@ -69,21 +60,25 @@ function assertSharedSecurityContract(response, production) {
   );
 
   if (production) {
+    assert.deepEqual(csp.get("script-src"), ["'self'", "'unsafe-inline'"]);
     assert.deepEqual(csp.get("connect-src"), [
       "'self'",
       "https://header-fixture.supabase.co",
     ]);
     assert.equal(response.headers.get("strict-transport-security"), "max-age=15552000");
-    assert.equal(csp.get("script-src").includes("'unsafe-eval'"), false);
     assert.deepEqual(csp.get("upgrade-insecure-requests"), []);
   } else {
+    assert.deepEqual(csp.get("script-src"), [
+      "'self'",
+      "'unsafe-inline'",
+      "'unsafe-eval'",
+    ]);
     assert.deepEqual(csp.get("connect-src"), [
       "'self'",
       "https://header-fixture.supabase.co",
       "ws://localhost:*",
     ]);
     assert.equal(response.headers.get("strict-transport-security"), null);
-    assert.ok(csp.get("script-src").includes("'unsafe-eval'"));
     assert.equal(csp.has("upgrade-insecure-requests"), false);
   }
 }
@@ -150,8 +145,9 @@ async function withNextServer(command, callback) {
   child.stderr.on("data", (chunk) => logs.push(chunk.toString()));
 
   try {
-    const response = await waitForResponse(child, `http://127.0.0.1:${port}/`, logs);
-    await callback(response, logs);
+    const origin = `http://127.0.0.1:${port}`;
+    const response = await waitForResponse(child, `${origin}/`, logs);
+    await callback(response, logs, origin);
   } finally {
     await stop(child);
     if (command === "dev") {
@@ -171,9 +167,19 @@ test(
       existsSync(new URL("../.next/BUILD_ID", import.meta.url)),
       "missing production build; run pnpm build first (or pnpm test:headers)",
     );
-    await withNextServer("start", (response) => {
+    await withNextServer("start", async (response, _logs, origin) => {
       assert.ok(response.status >= 200 && response.status < 400);
-      assertSharedSecurityContract(response, true);
+      assertSharedSecurityContract(
+        response,
+        true,
+        approvedFrameAncestors,
+        null,
+      );
+
+      const privateResponse = await fetch(`${origin}/app`, {
+        redirect: "manual",
+      });
+      assertSharedSecurityContract(privateResponse, true, ["'none'"], "DENY");
     });
   },
 );
@@ -182,13 +188,23 @@ test(
   "a development Next.js response keeps HSTS out and unsafe-eval scoped to dev",
   { timeout: 120_000 },
   async () => {
-    await withNextServer("dev", async (response, logs) => {
+    await withNextServer("dev", async (response, logs, origin) => {
       const body = await response.text();
       assert.ok(
         response.status >= 200 && response.status < 400,
         `development server returned ${response.status}\n${body}\n${logs.join("")}`,
       );
-      assertSharedSecurityContract(response, false);
+      assertSharedSecurityContract(
+        response,
+        false,
+        approvedFrameAncestors,
+        null,
+      );
+
+      const privateResponse = await fetch(`${origin}/app`, {
+        redirect: "manual",
+      });
+      assertSharedSecurityContract(privateResponse, false, ["'none'"], "DENY");
     });
   },
 );

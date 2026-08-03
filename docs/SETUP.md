@@ -115,29 +115,22 @@ core-quest override. Its default, authoritative path always emits exactly 150
 reviewed free quests, 180 daily passages, the current milestones, and exact WEB
 scripture snapshots from local source data.
 
-## 5. Pixel sprites
+## 5. Hand-painted 2.5D artwork
 
-The checked-in production catalogue contains 63 reviewed transparent PNGs.
-Sprite generation is an editorial, source-anchored step rather than a runtime
-or build dependency: use the approved BibleQuest reference sheet and subject
-anchors, save raw results under `output/imagegen/pixel-v2/sources/`, and never
-copy unreviewed generator output directly into `public/pixel/`.
-
-The deterministic production processor removes connected backdrops,
-reconstructs binary alpha, maps opaque pixels to the shared BibleQuest palette,
-and writes the complete reviewed 128×128 catalogue:
+The checked-in runtime catalogue contains 58 optimized 512×512 WebP stills and
+six reviewed 16-frame candle GIFs. Rebuild it from the approved external master
+library after an art review:
 
 ```bash
-node output/imagegen/pixel-v2/process-production-128.mjs \
-  /path/to/BibleQuest-Assets/UI-ASSETS
-node scripts/install-imagegen-sprites.mjs
-node scripts/build-sprite-previews.mjs
+pnpm art:install
+# Or provide the library explicitly on another machine:
+pnpm art:install /path/to/Assets-BibleQuest/2.5D
 ```
 
-Inspect the native 128×128 sheets and the sprites at their actual smaller app
-sizes before promotion. The installer refuses non-128px sources. See
-`docs/pixel-upgrade/README.md` for the 63-file contract, logical dimensions,
-promotion checklist, and QA gates.
+The installer rejects an incomplete static catalogue, preserves transparency,
+and copies only the approved candle loops. Dove, lamb, other mascots, objects,
+and all tree stages remain still. See [`ART_SYSTEM.md`](ART_SYSTEM.md) for the
+visual contract, registry, animation policy, and QA gates.
 
 ## 6. App icons
 

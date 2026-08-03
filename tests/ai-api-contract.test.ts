@@ -16,6 +16,12 @@ describe("Plus AI API boundary", () => {
       // Identity-scoped: a metered provider budget belongs to the account, so
       // the bucket must not reset when the caller's IP changes.
       expect(route).toContain("guardIdentifiedRequest(");
+      expect(route).toContain("guardDistributedRequest(");
+      expect(route).toContain("entitlement.userId");
+      expect(route).toContain(
+        "boundedJson(request, AI_REQUEST_MAX_BYTES)",
+      );
+      expect(route).not.toContain("request.json()");
       expect(route).toContain('"Cache-Control": "private, no-store"');
     }
   });

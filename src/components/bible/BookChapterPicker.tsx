@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -94,7 +94,7 @@ export function BookChapterPicker({ book }: { book: BookSummary }) {
       </div>
 
       <header className="mt-2 sm:mt-3">
-        <p className="font-pixel text-caption uppercase tracking-[0.08em] text-accent">
+        <p className="font-art-label text-caption uppercase tracking-[0.08em] text-accent">
           {testamentLabel} Testament
         </p>
         <div className="mt-1 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
@@ -125,7 +125,7 @@ export function BookChapterPicker({ book }: { book: BookSummary }) {
             className="flex items-center gap-4"
           >
             <span className="flex shrink-0 items-center justify-center">
-              <PixelIcon name="open-book" size={80} animate />
+              <ArtIcon name="open-book" size={80} />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-caption uppercase tracking-[0.14em] text-accent">

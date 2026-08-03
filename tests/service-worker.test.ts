@@ -15,7 +15,8 @@ type WorkerPolicy = {
   SHELL_CACHE: string;
   RUNTIME_CACHE: string;
   PRECACHE_PATHS: string[];
-  PIXEL_ASSET_PATHS: string[];
+  ART_ASSET_PATHS: string[];
+  PRECACHE_ART_PATHS: string[];
   PUSH_TITLE: string;
   PUSH_BODY: string;
   PUSH_TARGET: string;
@@ -23,7 +24,7 @@ type WorkerPolicy = {
   isRequestCacheCandidate: (request: Request) => boolean;
   isOfflineSafeNavigationRequest: (request: Request) => boolean;
   isImmutableStaticRequest: (request: Request) => boolean;
-  isPixelAssetRequest: (request: Request) => boolean;
+  isArtAssetRequest: (request: Request) => boolean;
   isResponseCacheable: (response: Response) => boolean;
 };
 
@@ -318,35 +319,57 @@ describe("service-worker cache policy", () => {
     ).toBe(false);
   });
 
-  it("caches only the explicit queryless production sprite catalogue", () => {
+  it("caches only the explicit queryless production 2.5D catalogue", () => {
     const { policy } = loadWorker();
-    expect(policy.PIXEL_ASSET_PATHS).toHaveLength(63);
-    expect(new Set(policy.PIXEL_ASSET_PATHS).size).toBe(63);
+    expect(policy.ART_ASSET_PATHS).toHaveLength(64);
+    expect(new Set(policy.ART_ASSET_PATHS).size).toBe(64);
     expect(
-      policy.isPixelAssetRequest(
-        makeRequest("/pixel/praying-hands.png", { mode: "cors" })
+      policy.isArtAssetRequest(
+        makeRequest("/art/2.5d/hands-praying.webp", { mode: "cors" })
       )
     ).toBe(true);
     expect(
-      policy.isPixelAssetRequest(
-        makeRequest("/pixel/tree-stage-19.png", { mode: "cors" })
+      policy.isArtAssetRequest(
+        makeRequest("/art/2.5d/tree-stage-19.webp", { mode: "cors" })
       )
     ).toBe(true);
     expect(
-      policy.isPixelAssetRequest(
-        makeRequest("/pixel/tree-stage-20.png", { mode: "cors" })
+      policy.isArtAssetRequest(
+        makeRequest("/art/2.5d/candles/candle-halo.gif", { mode: "cors" })
+      )
+    ).toBe(true);
+    expect(
+      policy.isArtAssetRequest(
+        makeRequest("/art/2.5d/tree-stage-20.webp", { mode: "cors" })
       )
     ).toBe(false);
     expect(
-      policy.isPixelAssetRequest(
-        makeRequest("/pixel/praying-hands.png?v=2", { mode: "cors" })
+      policy.isArtAssetRequest(
+        makeRequest("/art/2.5d/hands-praying.webp?v=2", { mode: "cors" })
       )
     ).toBe(false);
     expect(
-      policy.isPixelAssetRequest(
-        makeRequest("/pixel/private-upload.png", { mode: "cors" })
+      policy.isArtAssetRequest(
+        makeRequest("/art/2.5d/private-upload.webp", { mode: "cors" })
       )
     ).toBe(false);
+  });
+
+  it("precaches only the art required by the offline, app, and onboarding shells", () => {
+    const { policy } = loadWorker();
+    expect(policy.PRECACHE_ART_PATHS).toHaveLength(13);
+    expect(policy.PRECACHE_ART_PATHS).toContain(
+      "/art/2.5d/candles/candle.gif",
+    );
+    expect(policy.PRECACHE_ART_PATHS).toContain(
+      "/art/2.5d/mascot-lamb.webp",
+    );
+    expect(policy.PRECACHE_ART_PATHS).not.toContain(
+      "/art/2.5d/candles/candle-halo.gif",
+    );
+    expect(policy.PRECACHE_ART_PATHS).not.toContain(
+      "/art/2.5d/tree-stage-19.webp",
+    );
   });
 
   it("rejects redirects, errors, opaque, private, no-store, and Set-Cookie responses", () => {
@@ -474,17 +497,17 @@ describe("service-worker fetch behavior", () => {
     expect(await (await runtime.match(assetRequest))?.text()).toBe("new asset");
   });
 
-  it("serves a cached production sprite while refreshing it", async () => {
-    const pixelRequest = makeRequest("/pixel/tree-stage-19.png", {
+  it("serves cached production art while refreshing it", async () => {
+    const artRequest = makeRequest("/art/2.5d/tree-stage-19.webp", {
       mode: "cors",
     });
     const harness = loadWorker(async () => makeResponse("refreshed tree"));
     const runtime = await harness.caches.open(harness.policy.RUNTIME_CACHE);
-    await runtime.put(pixelRequest, makeResponse("offline tree"));
+    await runtime.put(artRequest, makeResponse("offline tree"));
 
-    const result = await dispatchFetch(harness, pixelRequest);
+    const result = await dispatchFetch(harness, artRequest);
     expect(await result?.text()).toBe("offline tree");
-    expect(await (await runtime.match(pixelRequest))?.text()).toBe(
+    expect(await (await runtime.match(artRequest))?.text()).toBe(
       "refreshed tree"
     );
   });
@@ -561,7 +584,7 @@ describe("service-worker push privacy", () => {
 });
 
 describe("service-worker lifecycle and upgrades", () => {
-  it("installs the current shell and production sprite catalogue, omitting uncacheable responses", async () => {
+  it("installs the current shell and its core 2.5D art, omitting uncacheable responses", async () => {
     const harness = loadWorker(async (fetchRequest) => {
       if (fetchRequest.url.endsWith("/onboarding")) {
         return makeResponse("private", {
@@ -581,8 +604,11 @@ describe("service-worker lifecycle and upgrades", () => {
     expect(shell.entries.size).toBe(harness.policy.PRECACHE_PATHS.length - 1);
     expect(await shell.match(`${ORIGIN}/onboarding`)).toBeUndefined();
     expect(
-      await shell.match(`${ORIGIN}/pixel/tree-stage-19.png`)
+      await shell.match(`${ORIGIN}/art/2.5d/mascot-lamb.webp`)
     ).toBeDefined();
+    expect(
+      await shell.match(`${ORIGIN}/art/2.5d/tree-stage-19.webp`)
+    ).toBeUndefined();
     expect(harness.state.skipped).toBe(true);
   });
 

@@ -10,7 +10,7 @@ import type { QuestTemplate, ReflectionMood } from "@/lib/questos/types";
 import { useQuestOS } from "@/lib/questos/store";
 import { MoodPicker } from "@/components/reflection/MoodPicker";
 import { GentleButton } from "@/components/design-system/GentleButton";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { IconClose } from "@/components/design-system/icons";
 
 interface QuestCompletionSheetProps {
@@ -117,7 +117,7 @@ export function QuestCompletionSheet({
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent-surface ring-1 ring-accent/20">
-              <PixelIcon name="star" size={68} animate />
+              <ArtIcon name="star" size={68} />
             </span>
             <div className="min-w-0">
               <p className="text-caption uppercase tracking-[0.14em] text-accent">

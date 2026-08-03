@@ -19,7 +19,7 @@ import type { AccountNudgeContext } from "@/lib/questos/types";
 import { useSession } from "@/lib/supabase/useSession";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { useStrings } from "@/lib/i18n";
 import { track } from "@/lib/analytics/events";
 
@@ -94,7 +94,7 @@ export function AccountPrompt() {
     <PaperCard variant="linen" padding="md" role="note" aria-label={t.accountPrompt.title}>
       <div className="flex items-start gap-3.5">
         <span className="-mt-1 shrink-0">
-          <PixelIcon name="lantern" size={80} />
+          <ArtIcon name="lantern" size={80} />
         </span>
         <div className="min-w-0 flex-1">
           <h3 className="font-display text-subheading text-graphite">

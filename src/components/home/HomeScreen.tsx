@@ -28,7 +28,7 @@ import { PaperCard } from "@/components/design-system/PaperCard";
 import { AccountPrompt } from "@/components/account/AccountPrompt";
 import { GrowthTree } from "@/components/journey/GrowthTree";
 import { SeasonalAtmosphere } from "@/components/design-system/SeasonalAtmosphere";
-import { CATEGORY_SPRITE, PixelIcon } from "@/components/design-system/PixelIcon";
+import { CATEGORY_ART, ArtIcon } from "@/components/design-system/ArtIcon";
 import { Avatar } from "@/components/profile/Avatar";
 import { StreakCard } from "@/components/home/StreakCard";
 import {
@@ -227,7 +227,7 @@ function HomeInner() {
           >
             {/* The heading sits above the card, like every other section on
                 this screen. It used to be duplicated *inside* the card — the
-                same pixel h2 and the same caption, nested under "For Today" —
+                same display h2 and the same caption, nested under "For Today" —
                 so this one row carried two headings while Guided Scripture and
                 the Arcade carried one. "For Today" said nothing the card did
                 not; the count is what a reader actually wants from a label. */}
@@ -244,10 +244,10 @@ function HomeInner() {
                 className="flex min-h-24 items-center gap-4"
               >
                 <span className="flex shrink-0 items-center justify-center">
-                  <PixelIcon
+                  <ArtIcon
                     name={
                       featuredQuest
-                        ? CATEGORY_SPRITE[featuredQuest.category] ?? "scroll"
+                        ? CATEGORY_ART[featuredQuest.category] ?? "scroll"
                         : "scroll"
                     }
                     size={80}
@@ -425,7 +425,7 @@ function TodaysVerseLink() {
           className="ambient absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gold-300/15 blur-2xl [animation:var(--animate-twinkle)]"
         />
         <span className="relative flex shrink-0 items-center justify-center">
-          <PixelIcon name="open-book" size={68} animate />
+          <ArtIcon name="open-book" size={68} />
         </span>
         <span className="relative min-w-0 flex-1">
           <span className="block font-display text-[1.125rem] leading-tight">
@@ -461,7 +461,7 @@ function ShepherdCallout({
     >
       <span className="relative flex shrink-0 items-center justify-center">
         {/* Its own character, the same one the floating launcher uses. */}
-        <PixelIcon
+        <ArtIcon
           name="myshepherd"
           size={68}
           className="[filter:drop-shadow(0_2px_4px_rgb(15_40_54/0.35))]"
@@ -513,7 +513,7 @@ function QuickActionTile({
   animate = false,
 }: {
   href: string;
-  sprite: Parameters<typeof PixelIcon>[0]["name"];
+  sprite: Parameters<typeof ArtIcon>[0]["name"];
   title: string;
   ariaLabel?: string;
   /** Play the sprite's hand-animated GIF, reduced-motion switch and all. */
@@ -534,7 +534,7 @@ function QuickActionTile({
         {/* The chip has to be larger than the sprite it holds. At 44px around a
             44px icon the art was flush to all four edges and read as clipped. */}
         <span className="flex shrink-0 items-center justify-center transition-transform duration-300 group-hover:-translate-y-0.5">
-          <PixelIcon name={sprite} size={68} animate={animate} />
+          <ArtIcon name={sprite} size={68} animate={animate} />
         </span>
         <span className="text-[0.75rem] font-medium leading-snug text-graphite min-[390px]:text-[0.8125rem] sm:text-small">
           {title}

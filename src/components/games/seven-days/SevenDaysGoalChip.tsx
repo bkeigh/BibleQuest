@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { IconCheck } from "@/components/design-system/icons";
 import { SEVEN_DAYS_TILES } from "@/lib/games/seven-days/tiles";
 import type { SevenDaysTileId } from "@/lib/games/seven-days/types";
@@ -41,7 +41,7 @@ export function SevenDaysGoalChip({
             art.chipClassName,
           )}
         >
-          <PixelIcon name={art.sprite} size={56} />
+          <ArtIcon name={art.sprite} size={56} />
         </span>
         <span className="min-w-0 flex-1 text-small text-charcoal">
           Gather {need} {art.label}
@@ -68,7 +68,7 @@ export function SevenDaysGoalChip({
           met && "ring-2 ring-accent",
         )}
       >
-        <PixelIcon name={art.sprite} size={44} />
+        <ArtIcon name={art.sprite} size={44} />
       </motion.span>
       <motion.span
         key={have}

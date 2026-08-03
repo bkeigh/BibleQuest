@@ -38,7 +38,7 @@ export function QuestShelf({
   return (
     <section className="mt-6" aria-label={typeof title === "string" ? title : undefined}>
       <div className="flex items-end justify-between gap-3">
-        <h2 className="font-pixel text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
+        <h2 className="font-art-label text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
           {title}
           {count !== undefined && (
             <span className="ms-2 font-sans text-caption normal-case tracking-normal text-ash">

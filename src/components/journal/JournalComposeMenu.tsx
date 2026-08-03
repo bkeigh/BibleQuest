@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { IconClose, IconPlus } from "@/components/design-system/icons";
 import { cn } from "@/lib/utils/cn";
 
@@ -147,7 +147,7 @@ function EntryLink({
         "transition-colors hover:border-accent/45 hover:bg-linen focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
       )}
     >
-      <PixelIcon name={icon} size={80} />
+      <ArtIcon name={icon} size={80} />
       <p className="mt-3 font-medium text-graphite">{title}</p>
       <p className="mt-0.5 text-[0.75rem] leading-relaxed text-ash">{detail}</p>
     </Link>

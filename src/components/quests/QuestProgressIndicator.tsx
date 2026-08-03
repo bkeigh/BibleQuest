@@ -9,7 +9,7 @@ import { useStrings, fmt } from "@/lib/i18n";
 import { cn } from "@/lib/utils/cn";
 
 /**
- * QuestProgressIndicator — one small pixel square per required checklist
+ * QuestProgressIndicator — one small progress mark per required checklist
  * item, or per optional walk movement when the quest has no checklist.
  * The text carries the meaning; the squares are ornament (aria-hidden).
  */

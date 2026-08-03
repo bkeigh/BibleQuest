@@ -1,5 +1,5 @@
 /**
- * Line icons — quiet, hairline UI glyphs (not the pixel sprites).
+ * Line icons — quiet, hairline UI controls distinct from illustrated art.
  * 1.5px strokes, rounded, inheriting currentColor. Kept minimal per the Codex.
  */
 import { cn } from "@/lib/utils/cn";

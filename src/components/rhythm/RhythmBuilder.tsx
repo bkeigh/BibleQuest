@@ -23,7 +23,7 @@ import {
 import { useToast } from "@/components/design-system/Toast";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
 import { track } from "@/lib/analytics/events";
 
@@ -328,7 +328,7 @@ export function RhythmBuilder() {
           return (
             <PaperCard key={block.id} variant="quiet" padding="md">
               <div className="flex items-start gap-3">
-                <PixelIcon name="lantern" size={68} />
+                <ArtIcon name="lantern" size={68} />
                 <div className="min-w-0 flex-1">
                   <h2 className="font-display text-[1.125rem] text-graphite">
                     {block.label}

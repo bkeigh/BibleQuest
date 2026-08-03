@@ -1,3 +1,20 @@
+BibleQuest Codex v1.5 — Hand-painted 2.5D visual update
+
+## v1.5 visual-system update — August 2, 2026
+
+This update supersedes every pixel-art, pixel-font, pixel-frame, sprite-grid,
+and Paper + Pixel + Prayer instruction later in this historical specification.
+The active design language is **Living Editorial — Paper + Painted Wonder +
+Prayer**. BibleQuest now ships 58 reviewed hand-painted 2.5D still illustrations
+on transparent 512×512 runtime canvases plus six cohesive 16-frame candle GIFs.
+All characters—including the dove and lamb—objects, category marks, and the
+20-stage growth tree remain still. Only daily-streak candles use frame-by-frame
+illustrated animation, with an exact matching still for reduced-motion users.
+
+The implementation contract, placement rules, and promotion workflow live in
+[`ART_SYSTEM.md`](ART_SYSTEM.md). Later pixel references remain only as product
+history and must not be used to guide current design or engineering work.
+
 BibleQuest Codex v1.4 — Production Recovery Update
 
 ## v1.4 implementation update — July 19, 2026
@@ -24,9 +41,10 @@ product tone. The production canonical host is `https://www.biblequest.co`.
   thresholds from the first meaningful action through 250 actions.
 - The milestone catalogue contains 38 milestones and includes measurable
   progress for every quest category.
-- The production sprite catalogue contains 63 reviewed transparent PNGs: 30
-  interface/category marks, five candle states, 20 tree stages, and eight
-  feature mascots. Source art is conditioned on the approved BibleQuest
+- The production sprite catalogue contains 62 reviewed transparent PNGs: 30
+  interface/category marks, five candle states, 20 tree stages, and seven
+  dedicated mascot files. Eight mascot keys remain registered because the dove
+  shares the rebuilt `dove.png` master. Source art is conditioned on the approved BibleQuest
   reference sheet and anchors, then reconstructed by the deterministic
   native-grid processor; unreviewed generator output never ships directly.
   The praying-hands mark must always read unmistakably as two hands joined in

@@ -40,7 +40,7 @@ const STYLES: Record<QuestDisplayStatus, string> = {
 };
 
 /**
- * QuestStatusBadge — quiet pixel-voice chip naming where a quest stands.
+ * QuestStatusBadge — quiet editorial chip naming where a quest stands.
  * Follows the existing "Done"/"Picked" chip pattern from QuestSlip.
  */
 export function QuestStatusBadge({
@@ -63,7 +63,7 @@ export function QuestStatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-pixel text-[0.875rem]",
+        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-art-label text-[0.875rem]",
         STYLES[status],
         className
       )}
@@ -80,7 +80,7 @@ export function TodayBadge({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "pixel-frame inline-flex shrink-0 items-center bg-gold-500/15 px-2 py-0.5 font-pixel text-[0.875rem] text-gilt",
+        "art-frame inline-flex shrink-0 items-center bg-gold-500/15 px-2 py-0.5 font-art-label text-[0.875rem] text-gilt",
         className
       )}
     >

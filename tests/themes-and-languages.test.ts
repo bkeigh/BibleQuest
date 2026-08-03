@@ -69,14 +69,12 @@ describe("the four themes", () => {
     }
   });
 
-  it("gives the plain themes their own palette and drops the pixel face", () => {
+  it("gives every theme the same smooth editorial label voice", () => {
     expect(css).toContain("html.theme-plain {");
     expect(css).toContain("html.theme-dark.theme-plain {");
-    // The pixel face is part of the parchment look; a plain theme hands its
-    // short labels to the display face, exactly as the RTL locales already do.
-    const swap = css.indexOf("html.theme-plain .font-pixel");
-    expect(swap).toBeGreaterThan(-1);
-    expect(css.slice(swap, css.indexOf("}", swap))).toContain("--font-display");
+    expect(css).toContain("--font-art-label: var(--font-display)");
+    expect(css).toContain("@utility font-art-label");
+    expect(css).not.toContain("--font-ithaca");
   });
 
   it("agrees between first paint and hydration", () => {

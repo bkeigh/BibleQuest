@@ -48,7 +48,7 @@ const mascots = [
   "mascot-lamb",
   "mascot-lantern",
   "mascot-scroll",
-  "mascot-dove",
+  "dove",
   "mascot-sprout",
   "mascot-key",
   "mascot-map",

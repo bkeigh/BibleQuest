@@ -58,12 +58,12 @@ describe("wrapped-webview readiness", () => {
   });
 
   it("does not offer to save the artwork on a long press", () => {
-    // Sprites and wallpapers are chrome. The callout stays on everywhere else,
+    // Illustrations and wallpapers are chrome. The callout stays on everywhere else,
     // which is what keeps the rule above true.
     expect(css).toContain("-webkit-touch-callout: none");
     const callout = css.indexOf("-webkit-touch-callout");
     const block = css.slice(Math.max(0, callout - 260), callout);
-    expect(block).toContain(".pixelated");
+    expect(block).toContain(".artwork-2-5d");
   });
 
   it("holds the reading size a reader chose", () => {

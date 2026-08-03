@@ -28,9 +28,9 @@ import {
   GentleLink,
 } from "@/components/design-system/GentleButton";
 import {
-  CATEGORY_SPRITE,
-  PixelIcon,
-} from "@/components/design-system/PixelIcon";
+  CATEGORY_ART,
+  ArtIcon,
+} from "@/components/design-system/ArtIcon";
 import {
   IconCheck,
   IconChevronRight,
@@ -194,8 +194,8 @@ export function QuestBoardCard({
       <PaperCard padding="none" className="overflow-hidden">
         <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3.5 px-4 pt-4 sm:px-5">
           <span className="-mt-1 shrink-0">
-            <PixelIcon
-              name={CATEGORY_SPRITE[quest.category] ?? "leaf"}
+            <ArtIcon
+              name={CATEGORY_ART[quest.category] ?? "leaf"}
               size={80}
             />
           </span>
@@ -206,13 +206,13 @@ export function QuestBoardCard({
                 {formatDuration(quest.durationMinutes)}
               </span>
               <span className="text-mist">·</span>
-              <span className="font-pixel text-[0.875rem] text-accent">
+              <span className="font-art-label text-[0.875rem] text-accent">
                 {CATEGORY_LABEL[quest.category]}
               </span>
             </div>
             <span
               className={cn(
-                "mt-2 inline-flex rounded-full px-2 py-0.5 font-pixel text-[0.875rem]",
+                "mt-2 inline-flex rounded-full px-2 py-0.5 font-art-label text-[0.875rem]",
                 state === "completed" || readyToFinish
                   ? "bg-accent-surface text-accent-ink"
                   : expired

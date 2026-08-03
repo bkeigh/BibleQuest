@@ -158,7 +158,7 @@ export function WallpaperPicker({ value, onChange }: WallpaperPickerProps) {
             )}
           >
             <span className="absolute inset-3 rounded-[10px] border border-mist bg-paper/80" />
-            <span className="absolute inset-x-3 bottom-4 text-center font-pixel text-[0.75rem] uppercase tracking-[0.08em] text-accent">
+            <span className="absolute inset-x-3 bottom-4 text-center font-art-label text-[0.75rem] uppercase tracking-[0.08em] text-accent">
               Classic
             </span>
             {effectiveValue === "none" && <SelectedMark />}

@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter } from "next/font/google";
-import localFont from "next/font/local";
 import "./globals.css";
 import { ServiceWorkerRegistrar } from "@/components/app-shell/ServiceWorkerRegistrar";
 import { JournalDraftJanitor } from "@/components/journal/JournalDraftJanitor";
@@ -16,15 +15,6 @@ const fraunces = Fraunces({
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
-});
-
-/* Ithaca (SIL OFL 1.1, by GGBotNet) — the pixel accent voice.
-   Used only for quest labels, badges, unlocks, tiny decorative headings. */
-const ithaca = localFont({
-  src: "../fonts/Ithaca.ttf",
-  variable: "--font-ithaca",
-  display: "swap",
-  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -111,7 +101,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={`${fraunces.variable} ${inter.variable} ${ithaca.variable} glass-surfaces h-full antialiased`}
+      className={`${fraunces.variable} ${inter.variable} glass-surfaces h-full antialiased`}
       suppressHydrationWarning
     >
       <head>
@@ -124,7 +114,7 @@ export default function RootLayout({
         {stagingLabel ? (
           <div
             role="status"
-            className="sticky top-0 z-[100] border-b border-gold-700 bg-dusk px-3 py-2 text-center font-pixel text-xs tracking-[0.12em] text-gold-100"
+            className="sticky top-0 z-[100] border-b border-gold-700 bg-dusk px-3 py-2 text-center font-art-label text-xs tracking-[0.12em] text-gold-100"
           >
             {stagingLabel}
           </div>

@@ -5,7 +5,7 @@ import { resolveSharedVerse } from "@/lib/bible/shared-verse";
 import { translationMetadata } from "@/lib/bible/translations";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleLink } from "@/components/design-system/GentleButton";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { IconArrowRight } from "@/components/design-system/icons";
 
 /** Deduplicates the chapter file read shared by metadata and page rendering. */
@@ -86,7 +86,7 @@ export default async function SharedVersePage({
   return (
     <article className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-5 pb-24 pt-32 sm:px-8">
       <div className="mb-4 flex items-center gap-2 text-caption uppercase tracking-[0.14em] text-accent">
-        <PixelIcon name="open-book" size={56} /> Shared Scripture
+        <ArtIcon name="open-book" size={56} /> Shared Scripture
       </div>
 
       <PaperCard variant="atmospheric" padding="lg" className="relative overflow-hidden">

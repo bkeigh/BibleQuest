@@ -1,5 +1,5 @@
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { SupportCheckout } from "@/components/plus/SupportCheckout";
 import { stripeSupportAvailability } from "@/lib/support/server";
 import { marketingMetadata } from "@/lib/metadata";
@@ -27,7 +27,7 @@ export default async function SupportPage({
   return (
     <div className="mx-auto w-full max-w-2xl px-5 pb-24 pt-32 sm:px-8">
       <div className="flex items-center gap-2 text-caption uppercase tracking-[0.14em] text-accent">
-        <PixelIcon name="service-basket" size={56} /> Support BibleQuest
+        <ArtIcon name="service-basket" size={56} /> Support BibleQuest
       </div>
       <h1 className="mt-2 font-display text-heading text-graphite sm:text-heading-lg">
         Help keep the essentials free.

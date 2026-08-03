@@ -2,7 +2,7 @@
 
 /* ============================================================
    BibleQuest — Living Editorial design tokens
-   Paper + Pixel + Prayer
+   Paper + Painted Wonder + Prayer
    Source: docs/BIBLEQUEST_CODEX.md, Volume III (Brand & Design)
    ============================================================ */
 
@@ -97,8 +97,8 @@
   /* ---- Typography ---- */
   --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
   --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  /* Ithaca (OFL) — pixel accent for quest labels, badges, unlocks. Never body text. */
-  --font-pixel: var(--font-ithaca), "Courier New", monospace;
+  /* Soft editorial display voice for short labels and celebratory headings. */
+  --font-art-label: var(--font-display);
 
   /* ---- Type scale (Codex Vol III §7) ---- */
   --text-caption: 0.8125rem;      /* 13px */
@@ -317,26 +317,15 @@ html.theme-dark.theme-plain {
   --color-mist: #2c3137;
 }
 
-/* The pixel face is part of the parchment look, so the plain themes hand its
-   short labels to the display face instead. Same rule the RTL locales already
-   use, for the same reason: keep the type, drop the texture. */
-html.theme-plain .font-pixel {
+/* Plain themes keep the same editorial voice with slightly quieter tracking. */
+html.theme-plain .font-art-label {
   font-family: var(--font-display);
-  /* Fraunces sets far wider than Ithaca at the same size, and these labels are
-     uppercase with positive tracking — at 1:1 the section headings wrapped to
-     two lines. `em` keeps the correction proportional, so a caption-sized
-     label shrinks by as much as a heading does and no call site needs to know. */
-  font-size: 0.88em;
-  letter-spacing: 0.01em;
-  -webkit-font-smoothing: antialiased;
-  font-smooth: auto;
-  font-weight: 600;
+  letter-spacing: 0.015em;
 }
 
-/* Parchment's frames and stepped shadows are texture too. Flatten them so a
-   plain theme reads as plain rather than as parchment with the colour drained. */
-html.theme-plain .pixel-frame,
-html.theme-plain .pixel-frame-gold {
+/* Plain themes flatten the decorative depth while retaining the new silhouette. */
+html.theme-plain .art-frame,
+html.theme-plain .art-frame-gold {
   border-width: 1px;
   border-color: var(--color-mist);
   border-radius: var(--radius-card);
@@ -365,10 +354,7 @@ html.text-large .verse-text-lead {
   line-height: 1.8;
 }
 
-/* ---- Bold text (accessibility): a gentle weight lift, not a shout.
-   Inter and Fraunces are variable fonts, so intermediate weights render
-   true. Ithaca (font-pixel) is a single 500 weight and opts out via
-   font-synthesis in its utility — synthesized bold smears pixel glyphs. ---- */
+/* ---- Bold text (accessibility): a gentle weight lift, not a shout. ---- */
 html.text-bold body {
   font-weight: 500;
 }
@@ -410,12 +396,11 @@ html {
   scroll-behavior: smooth;
 }
 
-/* RTL (Arabic): letter-spacing breaks cursive joining, and the pixel
-   accent font has no Arabic glyphs — fall back to clean sans, untracked. */
+/* RTL (Arabic): letter-spacing breaks cursive joining, so labels go untracked. */
 [dir="rtl"] [class*="tracking-"] {
   letter-spacing: 0 !important;
 }
-[dir="rtl"] .font-pixel {
+[dir="rtl"] .font-art-label {
   font-family: var(--font-sans);
   letter-spacing: 0 !important;
   -webkit-font-smoothing: antialiased;
@@ -463,7 +448,7 @@ body {
    wallpapers are chrome, not content a reader wants to lift out — but the
    callout stays on for everything else, because a long-press on Scripture is
    how you copy a verse. */
-.pixelated,
+.artwork-2-5d,
 [data-wallpaper-art],
 [aria-hidden="true"] > img {
   -webkit-touch-callout: none;
@@ -700,96 +685,86 @@ html.theme-dark .milestone-glass-surface[data-milestone-state="reached"] {
   max-width: 42rem;
 }
 
-/* Pixel-art rendering for tiny sprites */
-@utility pixelated {
-  image-rendering: crisp-edges;
-  image-rendering: pixelated;
+/* Smooth dimensional rendering with one restrained grounding shadow. */
+@utility artwork-2-5d {
+  image-rendering: auto;
+  filter:
+    drop-shadow(0 1px 1px rgb(30 51 41 / 0.12))
+    drop-shadow(0 5px 8px rgb(30 51 41 / 0.08));
+  transform: translateZ(0);
 }
 
-/* ---- Hand-animated sprites ----
-   A GIF ignores every stylesheet, so PixelIcon renders the moving frame and
+/* Feature companions receive slightly more visual grounding than small marks. */
+.artwork-2-5d-feature {
+  filter:
+    drop-shadow(0 2px 2px rgb(30 51 41 / 0.12))
+    drop-shadow(0 10px 16px rgb(30 51 41 / 0.11));
+}
+html.theme-dark .artwork-2-5d {
+  filter:
+    drop-shadow(0 1px 1px rgb(0 0 0 / 0.32))
+    drop-shadow(0 6px 10px rgb(0 0 0 / 0.22));
+}
+
+/* ---- Hand-animated candles ----
+   A GIF ignores every stylesheet, so ArtIcon renders the moving frame and
    the still one beside each other and lets CSS pick. Motion is the default;
    either the operating system's preference or BibleQuest's own switch puts the
    still in its place. The hidden one is display:none, so only one occupies
    layout and only one is announced. */
-.pixel-at-rest {
+.art-at-rest {
   display: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .pixel-in-motion {
+  .art-in-motion {
     display: none;
   }
-  .pixel-at-rest {
+  .art-at-rest {
     display: block;
   }
 }
-html.force-reduce-motion .pixel-in-motion {
+html.force-reduce-motion .art-in-motion {
   display: none;
 }
-html.force-reduce-motion .pixel-at-rest {
+html.force-reduce-motion .art-at-rest {
   display: block;
 }
 
 /* ============================================================
-   Pixel accent system — sacred exploration, never arcade
-   Rules live in docs/PIXEL_SYSTEM.md. In short:
-   - font-pixel for SHORT labels only (quest tags, badges, unlocks,
-     small decorative headings). Never body text, never Scripture.
-   - pixel-frame for achievement/quest-reward surfaces only.
+   Painted accent system — tactile, devotional, and editorial
    ============================================================ */
-@utility font-pixel {
-  font-family: var(--font-pixel);
-  letter-spacing: 0.03em;
-  -webkit-font-smoothing: none;
-  font-smooth: never;
-  /* Ithaca ships one 500 weight; never let the browser fake a bold —
-     synthesized bold blurs pixel glyphs (incl. under html.text-bold). */
-  font-weight: 500;
-  font-synthesis-weight: none;
+@utility font-art-label {
+  font-family: var(--font-art-label);
+  font-weight: 620;
+  letter-spacing: 0.02em;
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: "SOFT" 80, "WONK" 0;
 }
 
-/* Chunky stepped edge for achievement cards + unlocked states.
-   A hard 2px offset shadow — quiet retro, still premium. */
-@utility pixel-frame {
-  border: 2px solid var(--color-twilight);
-  border-radius: 6px;
-  box-shadow: 3px 3px 0 0 color-mix(in srgb, var(--color-twilight) 22%, transparent);
+/* Soft sculptural frames echo the rounded painted assets without heavy chrome. */
+@utility art-frame {
+  border: 1px solid color-mix(in srgb, var(--color-twilight) 36%, var(--color-mist));
+  border-radius: var(--radius-card);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.5),
+    0 8px 22px rgb(30 51 41 / 0.08);
 }
-@utility pixel-frame-gold {
-  border: 2px solid var(--color-gold-500);
-  border-radius: 6px;
-  box-shadow: 3px 3px 0 0 color-mix(in srgb, var(--color-gold-500) 30%, transparent);
+@utility art-frame-gold {
+  border: 1px solid color-mix(in srgb, var(--color-gold-500) 78%, var(--color-mist));
+  border-radius: var(--radius-card-lg);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.62),
+    0 12px 30px rgb(111 83 29 / 0.14);
 }
 
-/* A quiet, stepped devotional frame for the personal welcome. The clipped
-   corners and inset rule echo a Bible bookplate without turning the whole UI
-   into pixel chrome. */
+/* A softly rounded devotional bookplate for the personal welcome. */
 .sacred-frame {
   position: relative;
   border: 1px solid color-mix(in srgb, var(--color-gold-500) 76%, var(--color-mist));
-  clip-path: polygon(
-    8px 0,
-    calc(100% - 8px) 0,
-    calc(100% - 8px) 3px,
-    calc(100% - 3px) 3px,
-    calc(100% - 3px) 8px,
-    100% 8px,
-    100% calc(100% - 8px),
-    calc(100% - 3px) calc(100% - 8px),
-    calc(100% - 3px) calc(100% - 3px),
-    calc(100% - 8px) calc(100% - 3px),
-    calc(100% - 8px) 100%,
-    8px 100%,
-    8px calc(100% - 3px),
-    3px calc(100% - 3px),
-    3px calc(100% - 8px),
-    0 calc(100% - 8px),
-    0 8px,
-    3px 8px,
-    3px 3px,
-    8px 3px
-  );
-  box-shadow: 0 4px 18px rgb(30 51 41 / 0.045);
+  border-radius: 20px;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.58),
+    0 10px 28px rgb(30 51 41 / 0.08);
 }
 .sacred-frame::before {
   content: "";
@@ -797,7 +772,7 @@ html.force-reduce-motion .pixel-at-rest {
   inset: 5px;
   pointer-events: none;
   border: 1px solid color-mix(in srgb, var(--color-gold-500) 48%, transparent);
-  clip-path: inherit;
+  border-radius: 14px;
 }
 
 /* ============================================================
@@ -1037,7 +1012,7 @@ html.theme-dark .verse-mark.verse-mark-selected {
 
 .console-eyebrow,
 .console-preview-label {
-  font-family: var(--font-pixel);
+  font-family: var(--font-art-label);
   color: var(--color-evergreen-700);
   font-size: 0.67rem;
   font-weight: 500;
@@ -1437,7 +1412,7 @@ html.theme-dark .verse-mark.verse-mark-selected {
   background: rgb(244 238 221 / 0.58);
   padding: 0.7rem 0.9rem;
   color: var(--color-ash);
-  font-family: var(--font-pixel);
+  font-family: var(--font-art-label);
   font-size: 0.62rem;
   font-weight: 500;
   letter-spacing: 0.1em;
@@ -1486,7 +1461,7 @@ html.theme-dark .verse-mark.verse-mark-selected {
 .console-editorial-preview .console-preview-label {
   margin-top: 1.6rem;
   margin-bottom: 0.45rem;
-  font-family: var(--font-pixel);
+  font-family: var(--font-art-label);
 }
 
 .console-editorial-preview .console-preview-label:first-child {

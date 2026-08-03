@@ -25,16 +25,16 @@ template in [`../.env.example`](../.env.example).
 | `BIBLEQUEST_MONITOR_SUPABASE_ANON_KEY` | Monitor secret | Production publishable key stored as a GitHub Actions secret; used only for anonymous public-content and auth-settings probes. |
 | `BIBLEQUEST_MONITOR_EXPECTED_SHA` | Monitor gate | Non-secret 40-character deployed commit, stored as a repository variable after each approved release. |
 | `BIBLEQUEST_MONITOR_EXPECTED_AUTH_POSTURE` | Monitor gate | Expected bounded health posture; production default is `configured`. |
-| `BIBLEQUEST_MONITOR_EXPECTED_BILLING_MODE` | Monitor gate | Expected bounded billing posture; remains `coming-soon` until approved live billing. |
-| `BIBLEQUEST_MONITOR_EXPECTED_BILLING_PURCHASES_ENABLED` | Monitor gate | Expected public purchase-UI posture; remains `false` until an approved live rollout. |
-| `BIBLEQUEST_MONITOR_EXPECTED_BILLING_SUPPORT_ENABLED` | Monitor gate | Expected one-time support posture; remains `false` until an approved live rollout. |
+| `BIBLEQUEST_MONITOR_EXPECTED_BILLING_MODE` | Monitor gate | Expected bounded billing posture; production currently pins `live`. |
+| `BIBLEQUEST_MONITOR_EXPECTED_BILLING_PURCHASES_ENABLED` | Monitor gate | Expected public purchase-UI posture; production currently pins `true`. |
+| `BIBLEQUEST_MONITOR_EXPECTED_BILLING_SUPPORT_ENABLED` | Monitor gate | Expected one-time support posture; production currently pins `true`. |
 | `BIBLEQUEST_MONITOR_VERCEL_PROJECT_ID` | Optional monitor secret | Vercel project identifier for aggregate runtime 5xx inspection. |
 | `BIBLEQUEST_MONITOR_VERCEL_TEAM_ID` | Optional monitor secret | Matching Vercel team identifier. All three Vercel monitor values must be present together. |
 | `BIBLEQUEST_MONITOR_VERCEL_TOKEN` | Optional monitor secret | Narrow, expiring Vercel access token. Log messages and response bodies are never archived. |
 | `NEXT_PUBLIC_ANALYTICS_ENABLED` | Optional | Must be exactly `true`; otherwise analytics is a silent no-op. |
 | `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | Optional | Plausible site domain. Required when analytics is enabled. |
 | `NEXT_PUBLIC_PLAUSIBLE_HOST` | Optional | HTTPS Plausible API origin; defaults to `https://plausible.io`. Paths, credentials, query strings, hashes, and HTTP are rejected. |
-| `STRIPE_BILLING_MODE` | Billing gate | `coming-soon` (default/off), `test`, or `live`. Production stays `coming-soon` until explicit approval. |
+| `STRIPE_BILLING_MODE` | Billing gate | `coming-soon` (safe default/off), `test`, or explicitly approved `live`; production currently uses the approved live posture. |
 | `BIBLEQUEST_STRIPE_PURCHASES_ENABLED` | Purchase gate | Must be exactly `true` in addition to a complete test/live configuration before subscription Checkout appears. |
 | `BIBLEQUEST_STRIPE_SUPPORT_ENABLED` | Support gate | Must be exactly `true` in addition to a complete test/live configuration before one-time support Checkout appears. |
 | `STRIPE_LIVE_BILLING_APPROVED` | Live gate | Must be exactly `true` before a matching live key set is accepted. This is not a substitute for owner approval and evidence. |
@@ -77,8 +77,8 @@ template in [`../.env.example`](../.env.example).
   closed. Subscription Checkout additionally requires the purchase gate;
   one-time Checkout requires its separate support gate. Follow
   [`STRIPE_TEST_BILLING.md`](STRIPE_TEST_BILLING.md) and
-  [`STRIPE_ONE_TIME_SUPPORT.md`](STRIPE_ONE_TIME_SUPPORT.md); keep Vercel
-  Production `coming-soon` until both live checklists are explicitly approved.
+  [`STRIPE_ONE_TIME_SUPPORT.md`](STRIPE_ONE_TIME_SUPPORT.md). Production is live
+  only under the recorded approval and must fail closed if that contract breaks.
 - Stripe secrets belong only in ignored `.env.local` files and encrypted Vercel
   settings. Use the Stripe CLI environment directly for local webhook tests;
   never copy a secret into evidence, logs, source, an issue, or chat.

@@ -57,9 +57,9 @@ describe("guided progress database boundary", () => {
     expect(twoUserProof).toContain("purge preserves owner B guided progress");
   });
 
-  it("requires migration 0033 before production can be declared ready", () => {
+  it("requires the current schema contract before production can be declared ready", () => {
     expect(productionReadiness).toContain(
-      'candidate.schema_contract !== "0033"',
+      'candidate.schema_contract !== "0035"',
     );
     expect(productionReadiness).toContain(
       'table: "user_guided_movements"',

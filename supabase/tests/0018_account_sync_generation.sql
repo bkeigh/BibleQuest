@@ -123,8 +123,8 @@ select is(
    where trigger.tgname = 'enforce_user_sync_generation'
      and not trigger.tgisinternal and trigger.tgenabled <> 'D'
      and procedure.proname = 'enforce_user_sync_generation'),
-  16::bigint,
-  'all sixteen synced tables enforce the retained generation'
+  17::bigint,
+  'all seventeen synced tables enforce the retained generation'
 );
 select is(
   (select count(*)

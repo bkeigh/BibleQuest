@@ -100,7 +100,7 @@ export function GuidedPracticeRunner({
           <IconArrowLeft size={16} /> {backLabel}
         </Link>
         <PaperCard variant="atmospheric" padding="lg" className="mt-5">
-          <p className="font-pixel text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
+          <p className="font-art-label text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
             {contextLabel}
           </p>
           <h1 className="mt-2 font-display text-[2rem] leading-tight text-graphite">
@@ -156,7 +156,7 @@ export function GuidedPracticeRunner({
           <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-olive-500/15 text-accent">
             <IconCheck size={26} />
           </span>
-          <p className="mt-4 font-pixel text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
+          <p className="mt-4 font-art-label text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
             Practice complete
           </p>
           <h1
@@ -252,7 +252,7 @@ export function GuidedPracticeRunner({
       </ol>
 
       <PaperCard as="article" variant="paper" padding="lg" className="mt-4">
-        <p className="font-pixel text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
+        <p className="font-art-label text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
           {movement.label}
         </p>
         <h1 className="mt-2 font-display text-[1.75rem] leading-tight text-graphite">

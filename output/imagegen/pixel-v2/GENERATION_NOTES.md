@@ -2,7 +2,7 @@
 
 Generated with the built-in `image_gen` workflow. PixelLab was not used.
 The original mixed-size staging outputs remain as provenance. The canonical
-`process-production-128.mjs` pass now reconstructs all 63 sprites from the
+`process-production-128.mjs` pass now reconstructs all 62 production files from the
 high-resolution masters onto one exact 128×128 physical canvas and writes the
 reviewed candidates to `production-128/`. The guarded installer promotes that
 directory to `public/pixel/` after review.
@@ -19,12 +19,13 @@ there is no lower-resolution intermediary. The reference-preserving black
 outline refinement is stored as `sources/mascot-atlas-rich-black-source.png`,
 with its complete edit prompt in `sources/mascot-atlas-rich-black-prompt.txt`.
 
-The final catalogue pass applies exact-black (`#000000`) contours and preserves
-the full 128×128 native art grid for all 63 files. Every family retains native
-one-pixel detail with a source-faithful capped palette; no asset passes through
-a 16×16, 32×32, or 64×64 intermediary. Connected-component cleanup runs before
-export. PixelLab upload copies live in `pixellab-ready/catalogue/`, with the
-mascot subset duplicated in `pixellab-ready/mascots/`.
+The final catalogue pass applies exact-black (`#000000`) contours. Most files
+retain the full 128×128 authored grid. The shared dove is the reviewed
+exception: it is deliberately authored on `sources/dove-master-64.png` so its
+contour is exactly one logical cell, then enlarged to 128×128 as uniform 2×2
+blocks. Connected-component cleanup runs before export. PixelLab upload copies
+live in `pixellab-ready/catalogue/`, with the mascot subset duplicated in
+`pixellab-ready/mascots/`.
 
 ## References
 
@@ -80,10 +81,11 @@ mascot subset duplicated in `pixellab-ready/mascots/`.
 - `sources/tree-progression-atlas.png` — untouched built-in result, SHA-256 `284dafc83cd423130394499d5a33504f80eb8f4b0c4fe7b37fb230686147bec3`
 - `sources/candle-states-atlas.png` — untouched built-in result, SHA-256 `9f4e903b1a207de20885d8df41fad0e1da6025f56718257af587d870540da3e2`
 - `sources/*-chroma-normalized.png` — exact `#ff00ff` background plus fixed subject palette
+- `sources/dove-master-64.png` — authoritative eight-color dove grid with binary alpha and a one-cell exact-black contour
 - `staging/trees/tree-stage-0.png` through `tree-stage-19.png` — legacy 64×64 indexed PNG
 - `staging/candles/candle-unlit.png` through `candle-halo.png` — legacy 32×36 indexed PNG
 - `process-atlases.mjs` — deterministic hard-key, component extraction, nearest-neighbor normalization, fixed-palette encoder, and preview builder
-- `process-production-128.mjs` — canonical 63-file reconstruction, promotion,
+- `process-production-128.mjs` — canonical 62-file reconstruction, promotion,
   preview, and physical-QA pass
 - `production-128/` — reviewed 128×128 indexed PNG source for promotion
 
@@ -116,11 +118,11 @@ deterministically.
 
 ## Current production QA
 
-- 63/63 distinct indexed PNGs at exactly 128×128
+- 62/62 distinct indexed PNGs at exactly 128×128
 - binary alpha only, fully transparent outer borders, and at most 32 opaque
   colors per file
-- all four families use reviewed source-faithful local palettes at native
-  128×128 resolution
+- all four families use reviewed source-faithful local palettes; the dove uses
+  a declared 64×64 master and exact 2× nearest-neighbor production scale
 - the guarded installer makes `production-128/` and `public/pixel/`
   byte-identical after review
 - all twenty tree stages, five candle states, and eight mascots remain distinct

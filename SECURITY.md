@@ -71,28 +71,29 @@ only after every app hostname serving a production build is HTTPS-only; see
 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md). Development responses never send
 HSTS and keep `unsafe-eval` limited to React/Next development tooling.
 
-### Intentional Winterhill framing exception
+### Intentional homepage-only Winterhill framing exception
 
-The app may be framed by exactly these ancestors:
+Only the public homepage may be framed by exactly these ancestors:
 
 - `'self'`
 - `https://winterhill.studio`
 - `https://www.winterhill.studio`
 
 This is an intentional portfolio integration, not a general framing opt-in.
-There is no wildcard ancestor and no `X-Frame-Options`: that legacy header
-cannot express the two approved external origins and can conflict with the CSP
-allowlist. Adding an ancestor requires repository-owner approval, a documented
-business reason, and both allowed- and denied-origin browser tests.
+There is no wildcard ancestor. The homepage omits `X-Frame-Options` because it
+cannot express the external allowlist; every other route sends
+`frame-ancestors 'none'` and `X-Frame-Options: DENY`. Adding an ancestor requires
+repository-owner approval, a documented business reason, and allowed/private/
+denied-origin browser tests.
 
 ### Browser origin inventory
 
 | Directive / behavior | External origin | Repository justification |
 | --- | --- | --- |
-| `frame-ancestors` | `https://winterhill.studio`, `https://www.winterhill.studio` | Intentional Winterhill project preview; no other site may embed BibleQuest. |
+| Homepage `frame-ancestors` | `https://winterhill.studio`, `https://www.winterhill.studio` | Intentional public Winterhill project preview; no other site or BibleQuest route may use the exception. |
 | `connect-src` | The exact validated `NEXT_PUBLIC_SUPABASE_URL` origin | Supabase Auth and PostgREST calls from `src/lib/supabase/*` and `src/lib/sync/engine.ts`; the source is absent when no URL is configured. No Realtime subscription exists, so no wildcard or `wss:` origin is allowed. |
 | `connect-src` | The validated HTTPS `NEXT_PUBLIC_PLAUSIBLE_HOST` origin | Consent-gated event POSTs in `src/lib/analytics/events.ts`; absent when analytics/domain/host validation is not enabled. Default is `https://plausible.io`. |
-| `script-src`, `frame-src` | `https://tally.so` | BibleQuest newsletter widget and its dynamically sized form iframe on the public homepage. |
+| `frame-src` | `https://tally.so` | Sandboxed newsletter form iframe. No Tally script executes in the BibleQuest parent page, so private `localStorage` is outside the third party's JavaScript context. |
 | Top-level navigation | `https://checkout.stripe.com`, `https://billing.stripe.com` | Server-created hosted Checkout and Customer Portal redirects are validated to these exact origins. They are navigations, not BibleQuest subresources, so they add no CSP source. |
 | `Permissions-Policy: payment` | none | BibleQuest embeds no payment element. Hosted Stripe pages run under Stripe’s own origin. |
 
@@ -119,6 +120,11 @@ CSP source allowances.
 
 ## Other measures
 
+- Paid AI and support Checkout keep their existing per-instance limits and also
+  claim service-only atomic Postgres windows. Account IDs and trusted Vercel
+  client addresses are HMACed before storage; the sealed bucket table has forced
+  RLS and no client grants. Vercel Firewall remains an optional outer layer when
+  the plan supports it.
 - The Winterhill portfolio iframe exception is an exact, tested origin
   allowlist. Ownership, manual checks, and removal steps are documented in
   [`docs/EMBED_SECURITY.md`](docs/EMBED_SECURITY.md).

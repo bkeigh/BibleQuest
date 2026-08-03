@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { IconArrowRight } from "@/components/design-system/icons";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { cn } from "@/lib/utils/cn";
 
 interface NewsletterLinkProps {
@@ -22,7 +22,7 @@ export function NewsletterLink({ className }: NewsletterLinkProps) {
         className="ambient absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gold-300/20 blur-2xl [animation:var(--animate-twinkle)]"
       />
       <span className="relative flex shrink-0 items-center justify-center">
-        <PixelIcon name="scroll" size={68} />
+        <ArtIcon name="scroll" size={68} />
       </span>
       <span className="relative min-w-0 flex-1">
         <span className="block font-display text-[1.125rem] leading-tight">

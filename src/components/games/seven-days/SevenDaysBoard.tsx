@@ -2,7 +2,7 @@
 
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { motion } from "framer-motion";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { colOf, rowOf } from "@/lib/games/seven-days/board";
 import { SEVEN_DAYS_TILES } from "@/lib/games/seven-days/tiles";
 import {
@@ -282,7 +282,7 @@ export function SevenDaysBoard({
                 a dimension, so the cell is square because the grid says so and
                 for no other reason. */}
             <span className="pointer-events-none absolute inset-0 grid place-items-center">
-              <PixelIcon
+              <ArtIcon
                 name={art.sprite}
                 size={56}
                 className="max-h-full max-w-full"

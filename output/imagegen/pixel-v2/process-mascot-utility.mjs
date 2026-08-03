@@ -33,14 +33,13 @@ const PALETTE = [
 ];
 
 const MASCOTS = [
-  ["mascot-lamb", "bottom"],
-  ["mascot-lantern", "bottom"],
-  ["mascot-scroll", "bottom"],
-  ["mascot-dove", "center"],
-  ["mascot-sprout", "bottom"],
-  ["mascot-key", "center"],
-  ["mascot-map", "bottom"],
-  ["mascot-campfire", "bottom"],
+  ["mascot-lamb", "bottom", 0],
+  ["mascot-lantern", "bottom", 1],
+  ["mascot-scroll", "bottom", 2],
+  ["mascot-sprout", "bottom", 4],
+  ["mascot-key", "center", 5],
+  ["mascot-map", "bottom", 6],
+  ["mascot-campfire", "bottom", 7],
 ];
 
 const UTILITIES = [
@@ -73,7 +72,6 @@ const ALLOWED_BY_NAME = {
   "mascot-lamb": materialSet("outline", "parchment", "leather", "skin"),
   "mascot-lantern": materialSet("outline", "leather", "gold", "parchment", "flame"),
   "mascot-scroll": materialSet("outline", "leather", "gold", "parchment", "green"),
-  "mascot-dove": materialSet("outline", "parchment", "gold", "green"),
   "mascot-sprout": materialSet("outline", "green", "leather", "gold"),
   "mascot-key": materialSet("outline", "gold", "leather"),
   "mascot-map": materialSet("outline", "leather", "gold", "parchment", "green"),
@@ -277,8 +275,8 @@ async function processAtlas({ source, normalizedSource, outputDir, columns, rows
   await fs.mkdir(outputDir, { recursive: true });
   const results = [];
   for (let index = 0; index < entries.length; index += 1) {
-    const [name, alignment] = entries[index];
-    const cell = await extractCell(keyed, columns, rows, index);
+    const [name, alignment, atlasIndex = index] = entries[index];
+    const cell = await extractCell(keyed, columns, rows, atlasIndex);
     const cleaned = removeSmallComponents(
         await fitSprite(cell, target, maxVisible, alignment),
         target,
@@ -292,7 +290,10 @@ async function processAtlas({ source, normalizedSource, outputDir, columns, rows
     await writeIndexed(fitted, target, target, output);
     results.push({ name, output, width: target, height: target });
   }
-  for (let index = entries.length; index < columns * rows; index += 1) {
+  const occupied = new Set(entries.map((entry, index) => entry[2] ?? index));
+  occupied.add(3); // Retired duplicate dove source remains as atlas provenance only.
+  for (let index = 0; index < columns * rows; index += 1) {
+    if (occupied.has(index)) continue;
     const empty = await extractCell(keyed, columns, rows, index);
     const count = await opaqueCount(empty);
     if (count !== 0) throw new Error(`${source}: expected empty cell ${index}, found ${count} opaque pixels`);

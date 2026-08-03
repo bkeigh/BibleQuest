@@ -14,7 +14,7 @@ import {
   IconCheck,
 } from "@/components/design-system/icons";
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { track } from "@/lib/analytics/events";
 import { GREEN_FEATURES } from "@/lib/features/green";
 import { scriptureSourceHref } from "@/lib/games/links";
@@ -179,14 +179,14 @@ function SevenDaysMatchInner() {
                       SEVEN_DAYS_TILES[chapter.signature].chipClassName,
                     )}
                   >
-                    <PixelIcon
+                    <ArtIcon
                       name={SEVEN_DAYS_TILES[chapter.signature].sprite}
                       size={52}
                     />
                   </span>
                 ))}
               </div>
-              <p className="mt-5 font-pixel text-[0.875rem] uppercase tracking-[0.08em] text-gilt">
+              <p className="mt-5 font-art-label text-[0.875rem] uppercase tracking-[0.08em] text-gilt">
                 Genesis 1:1 – 2:3
               </p>
               <h2 className="mt-2 font-display text-[2rem] leading-tight text-graphite">
@@ -285,10 +285,10 @@ function SevenDaysMatchInner() {
                           !open && "opacity-45 grayscale",
                         )}
                       >
-                        <PixelIcon name={art.sprite} size={56} />
+                        <ArtIcon name={art.sprite} size={56} />
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="font-pixel text-caption uppercase tracking-[0.06em] text-gilt">
+                        <p className="font-art-label text-caption uppercase tracking-[0.06em] text-gilt">
                           Day {chapter.day} · {clearedCount}/{levels.length}
                           {answered && " · answered"}
                         </p>

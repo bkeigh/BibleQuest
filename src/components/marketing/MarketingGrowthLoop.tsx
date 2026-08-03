@@ -2,11 +2,11 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { PixelIcon, type PixelSpriteName } from "@/components/design-system/PixelIcon";
+import { ArtIcon, type ArtSpriteName } from "@/components/design-system/ArtIcon";
 
 // These five checkpoints tell the full growth story without rushing the loop.
 const GROWTH_STAGES: ReadonlyArray<{
-  sprite: PixelSpriteName;
+  sprite: ArtSpriteName;
   label: string;
 }> = [
   { sprite: "tree-stage-0", label: "A seed is planted" },
@@ -55,7 +55,7 @@ export function MarketingGrowthLoop() {
             exit={reduceMotion ? undefined : { opacity: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.85, ease: "easeInOut" }}
           >
-            <PixelIcon name={stage.sprite} size={104} className="mx-auto" />
+            <ArtIcon name={stage.sprite} size={104} className="mx-auto" />
           </motion.div>
         </AnimatePresence>
       </div>

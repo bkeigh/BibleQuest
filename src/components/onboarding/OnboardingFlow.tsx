@@ -20,10 +20,10 @@ import {
 import { cn } from "@/lib/utils/cn";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import {
-  PixelMascot,
-  type PixelMascotName,
-} from "@/components/design-system/PixelMascot";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+  ArtMascot,
+  type ArtMascotName,
+} from "@/components/design-system/ArtMascot";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { SignInMethods } from "@/components/account/SignInMethods";
 import { QuestSlip } from "@/components/quests/QuestSlip";
 import {
@@ -72,12 +72,6 @@ const PLUS_STEP = 10;
 const TOTAL_STEPS = PLUS_STEP + 1;
 
 const STEP_HEADING_ID = "onboarding-step-heading";
-
-// Uses animated companions only in onboarding while preserving static mascots elsewhere.
-const ONBOARDING_MASCOT_ANIMATIONS: Partial<Record<PixelMascotName, string>> = {
-  lamb: "/pixel/mascot-lamb-walk.gif",
-  campfire: "/pixel/mascot-campfire-burn.gif",
-};
 
 // Uses retained stills only, giving the guide a taste of app artwork without video cost.
 const STEP_BACKGROUNDS: Partial<Record<number, string>> = {
@@ -202,7 +196,7 @@ function OnboardingInner({
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="relative flex min-h-dvh flex-col overflow-x-hidden overflow-y-auto bg-parchment px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-safe">
+      <main className="relative flex min-h-dvh flex-col overflow-x-hidden overflow-y-auto bg-parchment px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-safe">
         {background && (
           <>
             <div
@@ -223,6 +217,7 @@ function OnboardingInner({
           aria-valuemax={TOTAL_STEPS}
           aria-valuenow={visibleStep + 1}
           aria-valuetext={`Step ${visibleStep + 1} of ${TOTAL_STEPS}`}
+          aria-label="Onboarding progress"
           className="relative z-10 mx-auto flex w-full max-w-md items-center justify-center gap-1.5 pt-6"
         >
           {Array.from({ length: TOTAL_STEPS }).map((_, index) => (
@@ -428,7 +423,7 @@ function OnboardingInner({
             onClose={() => setLegalDocument(null)}
           />
         )}
-      </div>
+      </main>
     </MotionConfig>
   );
 }
@@ -438,17 +433,13 @@ function StepMascot({
   name,
   size = 160,
 }: {
-  /** Rendered edge in CSS pixels, same units as `PixelMascot`. */
-  name: PixelMascotName;
+  /** Rendered edge in CSS pixels, same units as `ArtMascot`. */
+  name: ArtMascotName;
   size?: number;
 }) {
   return (
     <motion.div variants={riseIn} initial="hidden" animate="visible" className="mb-4">
-      <PixelMascot
-        name={name}
-        src={ONBOARDING_MASCOT_ANIMATIONS[name]}
-        size={size}
-      />
+      <ArtMascot name={name} size={size} priority />
     </motion.div>
   );
 }
@@ -620,7 +611,7 @@ function StepLanguage({
       </p>
 
       <fieldset className="mt-6 text-start">
-        <legend className="font-pixel text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
+        <legend className="font-art-label text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
           The app
         </legend>
         <div className="mt-2 max-h-52 overflow-y-auto rounded-[var(--radius-button)] border border-mist bg-paper">
@@ -664,7 +655,7 @@ function StepLanguage({
       </fieldset>
 
       <fieldset className="mt-5 text-start">
-        <legend className="font-pixel text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
+        <legend className="font-art-label text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
           The Bible
         </legend>
         <div className="mt-2 rounded-[var(--radius-button)] border border-mist bg-paper">
@@ -793,7 +784,7 @@ function StepGuide({
   onNext,
   footer,
 }: {
-  mascot: PixelMascotName;
+  mascot: ArtMascotName;
   eyebrow: string;
   title: string;
   body: string;
@@ -906,7 +897,7 @@ function StepPlus({
         animate="visible"
         className="mb-4 flex justify-center"
       >
-        <PixelIcon name="crown" size={120} />
+        <ArtIcon name="crown" size={120} />
       </motion.div>
       <p className="text-caption uppercase tracking-[0.16em] text-gilt">
         BibleQuest Plus
@@ -1093,7 +1084,7 @@ export function OnboardingFlow({
     <ClientOnly
       fallback={
         <div className="flex min-h-dvh items-center justify-center bg-parchment">
-          <PixelMascot name="lantern" size={176} />
+          <ArtMascot name="lantern" size={176} />
         </div>
       }
     >

@@ -25,8 +25,9 @@ at [`docs/BIBLEQUEST_CODEX.md`](docs/BIBLEQUEST_CODEX.md) — read it first.
 - **Private by default.** Prayers and reflections are sacred. They never appear
   in analytics or logs.
 
-The design language is **Living Editorial — Paper + Pixel + Prayer**: warm
-parchment, literary serif, hairline borders, gentle pixel art, calm motion.
+The design language is **Living Editorial — Paper + Painted Wonder + Prayer**:
+warm parchment, literary serif, hairline borders, tactile hand-painted 2.5D
+illustrations, and calm motion reserved for the daily candle.
 
 ---
 
@@ -68,6 +69,7 @@ you're ready to wire up Supabase, analytics, or payments.
 | --- | --- |
 | `pnpm dev` | Start the dev server (Turbopack) |
 | `pnpm build` | Production build |
+| `pnpm art:install [source-dir]` | Rebuild the optimized 2.5D runtime catalogue from approved masters |
 | `pnpm start` | Serve the production build |
 | `pnpm lint` | ESLint |
 | `pnpm test` | Noninteractive unit tests |
@@ -77,7 +79,6 @@ you're ready to wire up Supabase, analytics, or payments.
 | `node scripts/build-seed.mjs <json>` | Rebuild typed seed content |
 | `node scripts/build-quest-expansion.mjs` | Rebuild the reviewed 66-quest expansion from local WEB text |
 | `node scripts/build-daily-verses.mjs` | Rebuild the 180-passage daily rotation from local WEB text |
-| `node scripts/process-pixel-sprites.mjs clean-supplied [source-dir] [out-dir]` | Normalize approved source-anchored art onto the production pixel grids |
 | `node scripts/build-icons.mjs` | Rebuild the icon set, favicon, + OG image from the brand art |
 | `node scripts/build-supabase-seed.mjs` | Emit the canonical 150-quest/180-passage `supabase/seed.sql` |
 
@@ -93,7 +94,7 @@ theology lenses) before it ships:
 - **32 prayer prompts**, **32 reflection prompts**, **38 milestones**
 - **180 curated daily passages** across all 66 books, with exact
   public-domain WEB text
-- **63 reviewed production sprites**, including a 20-stage growth tree
+- **58 reviewed hand-painted 2.5D stills** plus six cohesive, 16-frame candle loops, including a 20-stage growth tree
 
 Seed data lives in `src/data/seed/` (typed) and mirrors to `supabase/seed.sql`.
 See [`docs/CONTENT_GUIDE.md`](docs/CONTENT_GUIDE.md) for the writing guardrails.
@@ -137,7 +138,9 @@ docs/                   # Codex + setup/deployment/security/content/QA guides
 - [`docs/STRIPE_TEST_BILLING.md`](docs/STRIPE_TEST_BILLING.md) — direct Stripe test billing, webhook evidence, and production gates
 - [`docs/STRIPE_ONE_TIME_SUPPORT.md`](docs/STRIPE_ONE_TIME_SUPPORT.md) — one-time support Checkout, refund, and rollout gates
 - [`SECURITY.md`](SECURITY.md) — RLS, sensitive data, disclosure
+- [`docs/SECURITY_AUDIT_2026-08-02.md`](docs/SECURITY_AUDIT_2026-08-02.md) — release audit, remediations, evidence, and residual risk
 - [`docs/CONTENT_GUIDE.md`](docs/CONTENT_GUIDE.md) — quest/prayer/theology rules
+- [`docs/ART_SYSTEM.md`](docs/ART_SYSTEM.md) — 2.5D art, candle motion, and asset-promotion rules
 - [`docs/QA.md`](docs/QA.md) — manual QA checklist
 - [`docs/CI.md`](docs/CI.md) — pull request checks and branch protection
 
@@ -150,9 +153,10 @@ docs/                   # Codex + setup/deployment/security/content/QA guides
   custom auth email, and two-user isolation gates in the recovery runbook pass.
 - Notification delivery and external quest-generation providers are not
   enabled for V1.
-- Plus billing uses a server-authoritative direct Stripe projection and remains
-  coming-soon in Production pending explicit live approval. One-time support
-  uses a separate deny-by-default server-created Checkout gate.
+- Plus billing and one-time support use server-authoritative Stripe projections
+  and currently run under the explicitly approved live production posture.
+  Both remain separately gated and fail closed when configuration or evidence
+  is incomplete.
 - Guest data lives in the browser (`localStorage`). After an explicit account
   connection, supported journey data also syncs to the user's RLS-protected
   Supabase rows. Export/clear controls are in Settings.

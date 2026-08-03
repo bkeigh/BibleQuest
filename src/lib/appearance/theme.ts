@@ -17,8 +17,7 @@ export function applyAppearance(a: AppearanceSettings) {
 
   root.classList.toggle("theme-dark", dark);
   // The palette layer. Every existing `html.theme-dark` rule keeps working;
-  // `theme-plain` only swaps parchment for neutral and the pixel face for the
-  // display face.
+  // `theme-plain` swaps parchment for a neutral reading palette.
   root.classList.toggle("theme-plain", plain);
   root.classList.toggle("text-large", a.textSize === "large");
   // !! guards pre-v5 persisted appearance objects that lack the field.

@@ -22,7 +22,7 @@ import { useVisualViewport } from "@/lib/platform/keyboard-inset";
 import { useCompactViewport } from "@/lib/platform/media-query";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 import { cn } from "@/lib/utils/cn";
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import {
   IconArrowRight,
   IconArrowUp,
@@ -617,7 +617,7 @@ export function FloatingMyShepherd() {
       >
         {/* A soft drop shadow does the separating a plate used to, so the
             shepherd stays legible over parchment, a wallpaper, or a card. */}
-        <PixelIcon
+        <ArtIcon
           name="myshepherd"
           size={108}
           className="[filter:drop-shadow(0_3px_6px_rgb(32_70_94/0.34))]"

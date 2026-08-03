@@ -30,7 +30,7 @@ export default function SevenDaysMatchPage() {
         >
           <IconArrowLeft size={16} /> Arcade
         </Link>
-        <p className="font-pixel text-caption uppercase tracking-[0.08em] text-gilt">
+        <p className="font-art-label text-caption uppercase tracking-[0.08em] text-gilt">
           Seven Days Match
         </p>
       </div>

@@ -132,7 +132,7 @@ export function VerseCard({
       </div>
       <div className="flex items-center justify-between gap-1.5 min-[380px]:gap-3">
         <h2
-          className={`font-pixel leading-tight uppercase tracking-[0.05em] text-accent ${
+          className={`font-art-label leading-tight uppercase tracking-[0.05em] text-accent ${
             preview
               ? "text-[1.25rem]"
               : "text-[1.0625rem] min-[380px]:text-[1.25rem]"

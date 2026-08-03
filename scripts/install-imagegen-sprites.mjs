@@ -5,7 +5,7 @@
  * never replace a production sprite by accident.
  */
 
-import { copyFile, mkdir, readdir } from "node:fs/promises";
+import { copyFile, mkdir, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 
@@ -73,7 +73,6 @@ const reviewedMascots = [
   "mascot-lamb.png",
   "mascot-lantern.png",
   "mascot-scroll.png",
-  "mascot-dove.png",
   "mascot-sprout.png",
   "mascot-key.png",
   "mascot-map.png",
@@ -90,8 +89,8 @@ const copies = [
   ...reviewedMascots.map((file) => [file, file]),
 ];
 
-if (copies.length !== 63 || new Set(copies.map(([target]) => target)).size !== 63) {
-  throw new Error("The reviewed production sprite contract must contain 63 unique files.");
+if (copies.length !== 62 || new Set(copies.map(([target]) => target)).size !== 62) {
+  throw new Error("The reviewed production sprite contract must contain 62 unique files.");
 }
 
 const expectedSources = copies.map(([, source]) => source).sort();
@@ -99,7 +98,7 @@ const productionSources = (await readdir(productionRoot))
   .filter((file) => file.endsWith(".png"))
   .sort();
 if (JSON.stringify(productionSources) !== JSON.stringify(expectedSources)) {
-  throw new Error("production-128 must contain exactly the reviewed 63-file contract");
+  throw new Error("production-128 must contain exactly the reviewed 62-file contract");
 }
 
 await Promise.all([
@@ -107,6 +106,14 @@ await Promise.all([
   mkdir(pixelLabCatalogueRoot, { recursive: true }),
   mkdir(pixelLabMascotRoot, { recursive: true }),
 ]);
+
+// Removes the retired duplicate from every install destination.
+await Promise.all([
+  rm(path.join(publicRoot, "mascot-dove.png"), { force: true }),
+  rm(path.join(pixelLabCatalogueRoot, "mascot-dove.png"), { force: true }),
+  rm(path.join(pixelLabMascotRoot, "mascot-dove.png"), { force: true }),
+]);
+
 for (const [target, source] of copies) {
   const sourcePath = path.join(productionRoot, source);
   const metadata = await sharp(sourcePath).metadata();
@@ -116,7 +123,7 @@ for (const [target, source] of copies) {
   await Promise.all([
     copyFile(sourcePath, path.join(publicRoot, target)),
     copyFile(sourcePath, path.join(pixelLabCatalogueRoot, target)),
-    ...(reviewedMascots.includes(target)
+    ...(reviewedMascots.includes(target) || target === "dove.png"
       ? [copyFile(sourcePath, path.join(pixelLabMascotRoot, target))]
       : []),
   ]);

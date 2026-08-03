@@ -13,7 +13,7 @@ export function createStripe(
     requireStripeBillingConfiguration(),
 ): Stripe {
   return new Stripe(configuration.secretKey, {
-    apiVersion: "2026-06-24.dahlia",
+    apiVersion: "2026-07-29.dahlia",
     maxNetworkRetries: 2,
     timeout: 10_000,
     appInfo: {

@@ -4,9 +4,9 @@
  * BibleQuest supports guest reading, so these routes cannot require an account.
  * Fetch Metadata blocks browser hot-linking, while a bounded per-IP window
  * limits scraping/quota exhaustion within each reused serverless instance.
- * Production should still mirror these limits in Vercel Firewall for a
- * deployment-wide counter; this local guard is the fail-closed application
- * layer and also protects development/preview deployments.
+ * A Vercel plan with Firewall rate limiting should mirror these limits for a
+ * deployment-wide counter. This local guard remains the application layer and
+ * also protects development/preview deployments when that feature is absent.
  */
 
 interface RateWindow {

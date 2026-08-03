@@ -60,7 +60,7 @@ function PilgrimageDayInner({
     return (
       <PageContainer className="pb-12 pt-safe">
         <PaperCard variant="atmospheric" padding="lg" className="mt-8 text-center">
-          <p className="font-pixel text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
+          <p className="font-art-label text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
             Plus Pilgrimage
           </p>
           <h1 className="mt-2 font-display text-[1.75rem] text-graphite">
@@ -90,7 +90,7 @@ function PilgrimageDayInner({
     return (
       <PageContainer className="pb-12 pt-safe">
         <PaperCard variant="quiet" padding="lg" className="mt-8 text-center">
-          <p className="font-pixel text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
+          <p className="font-art-label text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
             Day {dayNumber}
           </p>
           <h1 className="mt-2 font-display text-[1.625rem] text-graphite">

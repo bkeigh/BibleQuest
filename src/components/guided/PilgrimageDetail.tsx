@@ -52,7 +52,7 @@ function PilgrimageDetailInner({
       </Link>
 
       <PaperCard variant="atmospheric" padding="lg" className="mt-5">
-        <p className="font-pixel text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
+        <p className="font-art-label text-[0.8125rem] uppercase tracking-[0.1em] text-accent">
           {pilgrimage.access === "plus" ? "Plus Pilgrimage" : "Pilgrimage"}
         </p>
         <h1 className="mt-2 font-display text-[2rem] leading-tight text-graphite">
@@ -111,7 +111,7 @@ function PilgrimageDetailInner({
       <section aria-labelledby="pilgrimage-days" className="mt-7">
         <h2
           id="pilgrimage-days"
-          className="font-pixel text-[1.375rem] uppercase tracking-[0.05em] text-accent"
+          className="font-art-label text-[1.375rem] uppercase tracking-[0.05em] text-accent"
         >
           The path
         </h2>
@@ -143,7 +143,7 @@ function PilgrimageDetailInner({
               <li key={day.id}>
                 <PaperCard variant="paper" padding="md">
                   <div className="flex items-start gap-3">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent-surface font-pixel text-[0.8125rem] text-accent">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent-surface font-art-label text-[0.8125rem] text-accent">
                       {entry?.completedAt ? <IconCheck size={18} /> : index + 1}
                     </span>
                     <div className="min-w-0 flex-1">

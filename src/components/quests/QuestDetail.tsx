@@ -36,9 +36,9 @@ import {
   GentleLink,
 } from "@/components/design-system/GentleButton";
 import {
-  PixelIcon,
-  CATEGORY_SPRITE,
-} from "@/components/design-system/PixelIcon";
+  ArtIcon,
+  CATEGORY_ART,
+} from "@/components/design-system/ArtIcon";
 import {
   IconArrowLeft,
   IconClock,
@@ -211,15 +211,15 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
         <div className="pb-8">
           <div className="mt-5 flex items-center gap-3">
             <span className="shrink-0">
-              <PixelIcon
-                name={CATEGORY_SPRITE[quest.category] ?? "leaf"}
+              <ArtIcon
+                name={CATEGORY_ART[quest.category] ?? "leaf"}
                 size={92}
               />
             </span>
             <span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-ash">
               <IconClock size={14} /> {formatDuration(quest.durationMinutes)}
               <span className="text-mist">·</span>
-              <span className="font-pixel text-[0.875rem] text-accent">
+              <span className="font-art-label text-[0.875rem] text-accent">
                 {CATEGORY_LABEL[quest.category]}
               </span>
             </span>

@@ -9,9 +9,11 @@
  * `node scripts/install-imagegen-sprites.mjs` after visual approval.
  */
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { deflateSync } from "node:zlib";
 import sharp from "sharp";
+import { reconstructCatalogue } from "../../../scripts/reconstruct-pixel-catalogue.mjs";
 
 const ROOT = path.resolve("output/imagegen/pixel-v2");
 const SOURCE_ROOT = path.join(ROOT, "sources");
@@ -33,10 +35,22 @@ const SMALL_SPRITES = [
 ];
 
 const MASCOTS = [
-  "mascot-lamb", "mascot-lantern", "mascot-scroll", "mascot-dove",
+  "mascot-lamb", "mascot-lantern", "mascot-scroll", "mascot-sprout",
+  "mascot-key", "mascot-map", "mascot-campfire",
+];
+const REGISTERED_MASCOT_PREVIEW = [
+  "mascot-lamb", "mascot-lantern", "mascot-scroll", "dove",
   "mascot-sprout", "mascot-key", "mascot-map", "mascot-campfire",
 ];
-const MASCOT_DOVE_INDEX = MASCOTS.indexOf("mascot-dove");
+const MASCOT_ATLAS_CELLS = [
+  ["mascot-lamb", 0],
+  ["mascot-lantern", 1],
+  ["mascot-scroll", 2],
+  ["mascot-sprout", 4],
+  ["mascot-key", 5],
+  ["mascot-map", 6],
+  ["mascot-campfire", 7],
+];
 
 const CANDLES = [
   "candle-unlit", "candle-small", "candle-steady", "candle-sparks", "candle-halo",
@@ -45,8 +59,8 @@ const CANDLES = [
 const TREES = Array.from({ length: 20 }, (_, index) => `tree-stage-${index}`);
 const EXPECTED = [...SMALL_SPRITES, ...CANDLES, ...TREES, ...MASCOTS];
 
-if (EXPECTED.length !== 63 || new Set(EXPECTED).size !== 63) {
-  throw new Error("Production contract must contain exactly 63 unique sprite names.");
+if (EXPECTED.length !== 62 || new Set(EXPECTED).size !== 62) {
+  throw new Error("Production contract must contain exactly 62 unique sprite files.");
 }
 
 const SUPPLIED = {
@@ -520,17 +534,15 @@ async function processSmallSprites() {
     path.join(SOURCE_ROOT, "quest-category-atlas-imagegen-original.png")
   );
   const prayer = await magentaToAlpha(path.join(SOURCE_ROOT, "praying-hands-chroma.png"));
-  const mascots = await magentaToAlpha(
-    path.join(SOURCE_ROOT, "mascot-atlas-chroma-normalized.png")
-  );
 
   for (const name of SMALL_SPRITES) {
     let source;
     if (name === "dove") {
-      // This chroma-backed dove was art-directed from SUPPLIED.dove. Using the
-      // keyed atlas cell keeps its white body opaque; flood-keying the supplied
-      // white-background reference erases feathers that meet the backdrop.
-      source = await extractCell(mascots, 3, 3, MASCOT_DOVE_INDEX);
+      // The reviewed rebuilt dove is the shared sprite and mascot master.
+      source = await sharp(path.join(SOURCE_ROOT, "dove-clean-alpha.png"))
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
     } else if (name === "praying-hands") {
       source = prayer;
     } else if (Object.hasOwn(SUPPLIED, name)) {
@@ -676,10 +688,9 @@ async function processCandles() {
 
 async function processMascots() {
   const source = await magentaToAlpha(path.join(SOURCE_ROOT, MASCOT_SOURCE));
-  for (let index = 0; index < MASCOTS.length; index += 1) {
-    const name = MASCOTS[index];
-    const alignment = name === "mascot-dove" || name === "mascot-key" ? "center" : "bottom";
-    const cell = await extractCell(source, 3, 3, index);
+  for (const [name, atlasIndex] of MASCOT_ATLAS_CELLS) {
+    const alignment = name === "mascot-key" ? "center" : "bottom";
+    const cell = await extractCell(source, 3, 3, atlasIndex);
     const frame = await normalizeStrictMascot(cell, alignment);
     await writeProduction(name, frame);
   }
@@ -778,7 +789,7 @@ async function physicalQa() {
   const files = (await fs.readdir(PRODUCTION_ROOT)).filter((file) => file.endsWith(".png")).sort();
   const expectedFiles = EXPECTED.map((name) => `${name}.png`).sort();
   if (JSON.stringify(files) !== JSON.stringify(expectedFiles)) {
-    throw new Error("public/pixel does not match the exact 63-file production contract");
+    throw new Error("production output does not match the exact 62-file contract");
   }
   const black = BLACK.join(",");
   const hashes = new Set();
@@ -847,7 +858,7 @@ async function physicalQa() {
     const digest = await sharp(full).raw().toBuffer();
     hashes.add(digest.toString("base64"));
   }
-  if (hashes.size !== 63) throw new Error(`Expected 63 distinct sprites; found ${hashes.size}`);
+  if (hashes.size !== 62) throw new Error(`Expected 62 distinct sprites; found ${hashes.size}`);
   console.log(`Physical QA passed: ${files.length} distinct 128x128 indexed sprites.`);
 }
 
@@ -855,12 +866,36 @@ await processSmallSprites();
 await processCandles();
 await processTrees();
 await processMascots();
+
+// Removes the retired duplicate now that the shared dove is the mascot master.
+await fs.rm(path.join(PRODUCTION_ROOT, "mascot-dove.png"), { force: true });
+
+// Applies the reviewed cleanup and tree simplification as the final reproducible pass.
+const reconstructedRoot = await fs.mkdtemp(
+  path.join(os.tmpdir(), "biblequest-pixel-production-")
+);
+try {
+  await reconstructCatalogue(PRODUCTION_ROOT, reconstructedRoot, {
+    includeAnimations: false,
+  });
+  await Promise.all(
+    EXPECTED.map((name) =>
+      fs.copyFile(
+        path.join(reconstructedRoot, `${name}.png`),
+        path.join(PRODUCTION_ROOT, `${name}.png`)
+      )
+    )
+  );
+} finally {
+  await fs.rm(reconstructedRoot, { recursive: true, force: true });
+}
+
 await physicalQa();
 await Promise.all([
   buildPreview(SMALL_SPRITES, "production-128-icons-preview.png", 6, "#f6e9d1"),
   buildPreview(SMALL_SPRITES, "production-128-icons-green-preview.png", 6, "#173e2b"),
   buildPreview(TREES, "production-128-trees-preview.png", 5, "#f6e9d1"),
-  buildPreview(MASCOTS, "production-128-mascots-preview.png", 4, "#f6e9d1"),
+  buildPreview(REGISTERED_MASCOT_PREVIEW, "production-128-mascots-preview.png", 4, "#f6e9d1"),
   buildPreview(CANDLES, "production-128-candles-preview.png", 5, "#f6e9d1"),
 ]);
 

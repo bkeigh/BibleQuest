@@ -1,6 +1,6 @@
 "use client";
 
-import { PixelIcon } from "@/components/design-system/PixelIcon";
+import { ArtIcon } from "@/components/design-system/ArtIcon";
 import {
   BOOSTS,
   BOOST_IDS,
@@ -68,7 +68,7 @@ export function SevenDaysBoostBar({
             )}
           >
             <span aria-hidden="true" className={cn(!usable && "opacity-45")}>
-              <PixelIcon name={boost.sprite} size={52} />
+              <ArtIcon name={boost.sprite} size={52} />
             </span>
             <span aria-hidden="true" className="text-caption font-medium">
               {count > 0 ? count : "none"}

@@ -8,7 +8,7 @@
  *    the next candle at 1 — there is no "lost streak" state, no shame copy,
  *    and nothing in the UI ever counts down or turns red.
  *  - The candle visual has five states so the art stays replaceable
- *    (see pixel-assets registry: candle-unlit … candle-halo).
+ *    (see the 2.5D art registry: candle-unlit … candle-halo).
  */
 import { daysBetween, toDateKey } from "@/lib/utils/dates";
 import type { StreakState } from "./types";

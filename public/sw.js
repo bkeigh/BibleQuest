@@ -4,7 +4,7 @@
  * validated build assets. Prayers, reflections, and other user data continue
  * to live in the persisted Zustand store; this worker never handles that data.
  */
-const CACHE_VERSION = "biblequest-v23";
+const CACHE_VERSION = "biblequest-v25";
 const CACHE_OWNER_PREFIX = "biblequest-";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
@@ -12,7 +12,7 @@ const CURRENT_CACHES = [SHELL_CACHE, RUNTIME_CACHE];
 
 // These are generic, client-rendered shells. Fetch without credentials during
 // install so an authenticated response can never become a shared offline shell.
-const PIXEL_ASSET_NAMES = [
+const ART_ASSET_NAMES = [
   "candle",
   "leaf",
   "star",
@@ -20,15 +20,12 @@ const PIXEL_ASSET_NAMES = [
   "flower",
   "chapel",
   "book",
-  "open-book",
+  "book-open",
   "bookmark",
   "lantern",
-  "path",
   "tree",
   "sun",
-  "heart",
-  "hands",
-  "praying-hands",
+  "hands-praying",
   "wheat",
   "dove",
   "cross",
@@ -43,35 +40,64 @@ const PIXEL_ASSET_NAMES = [
   "links",
   "people",
   "fountain",
+  "map",
+  "sprout",
+  "stone",
+  "myshepherd",
   "candle-unlit",
   "candle-small",
   "candle-steady",
   "candle-sparks",
   "candle-halo",
   "mascot-lamb",
-  "mascot-lantern",
-  "mascot-scroll",
-  "mascot-dove",
-  "mascot-sprout",
-  "mascot-key",
-  "mascot-map",
   "mascot-campfire",
 ];
 
-const PIXEL_ASSET_PATHS = [
-  ...PIXEL_ASSET_NAMES.map((name) => `/pixel/${name}.png`),
+// Cache only the six approved candle loops; every character remains still.
+const CANDLE_ANIMATION_NAMES = [
+  "candle",
+  "candle-unlit",
+  "candle-small",
+  "candle-steady",
+  "candle-sparks",
+  "candle-halo",
+];
+
+const ART_ASSET_PATHS = [
+  ...ART_ASSET_NAMES.map((name) => `/art/2.5d/${name}.webp`),
   ...Array.from({ length: 20 }, (_, stage) =>
-    `/pixel/tree-stage-${stage}.png`
+    `/art/2.5d/tree-stage-${stage}.webp`
+  ),
+  ...CANDLE_ANIMATION_NAMES.map(
+    (name) => `/art/2.5d/candles/${name}.gif`
   ),
 ];
-const PIXEL_ASSET_PATH_SET = new Set(PIXEL_ASSET_PATHS);
+const ART_ASSET_PATH_SET = new Set(ART_ASSET_PATHS);
+
+// Keep first-install transfer small while covering the three precached shells.
+// The complete catalogue still enters the runtime cache when a screen uses it.
+const PRECACHE_ART_PATHS = [
+  "candle",
+  "crown",
+  "dove",
+  "key",
+  "lantern",
+  "map",
+  "book-open",
+  "scroll",
+  "sprout",
+  "tree-stage-0",
+  "mascot-lamb",
+  "mascot-campfire",
+].map((name) => `/art/2.5d/${name}.webp`);
+PRECACHE_ART_PATHS.push("/art/2.5d/candles/candle.gif");
 
 const PRECACHE_PATHS = [
   "/offline",
   "/app",
   "/onboarding",
   "/manifest.webmanifest",
-  ...PIXEL_ASSET_PATHS,
+  ...PRECACHE_ART_PATHS,
 ];
 
 const OFFLINE_PATH = "/offline";
@@ -159,10 +185,10 @@ function isImmutableStaticRequest(request, url = new URL(request.url)) {
   );
 }
 
-function isPixelAssetRequest(request, url = new URL(request.url)) {
+function isArtAssetRequest(request, url = new URL(request.url)) {
   return (
     isRequestCacheCandidate(request, url) &&
-    PIXEL_ASSET_PATH_SET.has(url.pathname)
+    ART_ASSET_PATH_SET.has(url.pathname)
   );
 }
 
@@ -400,7 +426,7 @@ self.addEventListener("fetch", (event) => {
 
   if (
     isImmutableStaticRequest(request, url) ||
-    isPixelAssetRequest(request, url)
+    isArtAssetRequest(request, url)
   ) {
     event.respondWith(staleWhileRevalidate(event, request));
   }
@@ -416,7 +442,8 @@ if (self.__BIBLEQUEST_SW_TESTING__) {
     RUNTIME_CACHE,
     CURRENT_CACHES,
     PRECACHE_PATHS,
-    PIXEL_ASSET_PATHS,
+    ART_ASSET_PATHS,
+    PRECACHE_ART_PATHS,
     PUSH_KINDS,
     PUSH_TITLE,
     PUSH_BODY,
@@ -427,7 +454,7 @@ if (self.__BIBLEQUEST_SW_TESTING__) {
     isOfflineSafeNavigationPath,
     isOfflineSafeNavigationRequest,
     isImmutableStaticRequest,
-    isPixelAssetRequest,
+    isArtAssetRequest,
     isResponseCacheable,
     pushKind,
   });
