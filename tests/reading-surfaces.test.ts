@@ -89,7 +89,7 @@ describe("reading surfaces", () => {
       const launcherStart = floating.lastIndexOf("<button");
       expect(launcherStart, "could not find the launcher").toBeGreaterThan(-1);
       const launcher = floating.slice(launcherStart);
-      expect(launcher).toContain('aria-label="Ask MyShepherd"');
+      expect(launcher).toContain(': "Ask MyShepherd"');
       expect(launcher).toContain("rounded-full");
       expect(launcher).toContain("focus-visible:shadow-");
       expect(launcher).not.toContain("focus-visible:outline-2");
@@ -100,10 +100,22 @@ describe("reading surfaces", () => {
       // filled disc with a border around it turned the character into a small
       // mark inside a control; separation comes from a drop shadow instead.
       const launcher = floating.slice(floating.lastIndexOf("<button"));
+      const launcherTag = launcher.slice(0, launcher.indexOf(">"));
       expect(launcher).toContain("drop-shadow");
-      expect(launcher).not.toContain("border border-");
-      expect(launcher).not.toMatch(/\bbg-(marian|paper|white|accent)/);
-      expect(launcher).not.toContain("SHEPHERD_INK");
+      expect(launcherTag).not.toContain("border border-");
+      expect(launcherTag).not.toMatch(/\bbg-(marian|paper|white|accent)/);
+      expect(launcherTag).not.toContain("SHEPHERD_INK");
+    });
+
+    it("moves, docks, and peeks on mobile without shrinking its touch target away", () => {
+      const launcher = floating.slice(floating.lastIndexOf("<button"));
+      expect(floating).toContain("useMobileOrTabletViewport");
+      expect(floating).toContain("dockFloatingLauncher");
+      expect(floating).toContain("LAUNCHER_PEEK = 24");
+      expect(floating).toContain("LAUNCHER_ART_SIZE = 97");
+      expect(launcher).toContain("onPointerDown={startLauncherDrag}");
+      expect(launcher).toContain('"Show MyShepherd button"');
+      expect(launcher).toContain("my-shepherd-launcher-pulse");
     });
 
     it("is a card on every edge rather than a half-docked sheet", () => {

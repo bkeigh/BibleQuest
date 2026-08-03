@@ -5,6 +5,10 @@ import { useCallback, useSyncExternalStore } from "react";
 /** Phones, where a panel owns the screen instead of sharing it. */
 export const COMPACT_VIEWPORT_QUERY = "(max-width: 39.9375rem)";
 
+/** Phones and tablets receive touch-first movable floating controls. */
+export const MOBILE_OR_TABLET_VIEWPORT_QUERY =
+  "(max-width: 74.9375rem), (any-pointer: coarse)";
+
 /**
  * Subscribes to a media query so behaviour — not only styling — can follow the
  * breakpoint. Modality is the case that matters: a sheet that covers a phone
@@ -36,4 +40,9 @@ export function useMediaQuery(query: string): boolean {
 /** True on phone-width screens, where sheets are modal. */
 export function useCompactViewport(): boolean {
   return useMediaQuery(COMPACT_VIEWPORT_QUERY);
+}
+
+/** True when a launcher should behave like a movable mobile overlay. */
+export function useMobileOrTabletViewport(): boolean {
+  return useMediaQuery(MOBILE_OR_TABLET_VIEWPORT_QUERY);
 }

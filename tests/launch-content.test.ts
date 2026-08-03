@@ -106,8 +106,12 @@ describe("launch content catalog", () => {
     expect(home).toContain('className="@max-[8rem]:hidden">✦</span>');
     expect(home).toContain('"@container min-w-0 flex-1"');
     expect(home).toContain('className="max-[340px]:w-12"');
-    expect(home).toContain("border-[#b88528]/70");
+    expect(home).toContain("plus-nameplate");
+    expect(home).toContain("border-[#9f6a1f]/75");
     expect(home).toContain("from-[#7d5013]");
+    expect(home).toContain('tone={isPlus ? "gold" : "default"}');
+    expect(home).toContain('isPlus ? "text-[#704713]" : "text-accent"');
+    expect(home).toContain('isPlus ? "text-[#68512b]" : "text-ash"');
     expect(home).not.toContain("subscription.status");
   });
 
@@ -139,7 +143,7 @@ describe("launch content catalog", () => {
     expect(generator).toContain('contentClassName="pt-4"');
   });
 
-  it("uses the exact MyShepherd blue for AI-assisted entry points", () => {
+  it("uses an accessible MyShepherd blue for AI-assisted entry points", () => {
     const disclosure = readFileSync(
       path.join(
         process.cwd(),
@@ -162,7 +166,9 @@ describe("launch content catalog", () => {
       "utf8",
     );
     const rule = css.slice(css.indexOf("[data-app-shell] .app-glass-shepherd"));
-    expect(rule.slice(0, 200).toLowerCase()).toContain("#3f7ea3");
+    expect(rule.slice(0, 240)).toContain("var(--color-marian-700)");
+    expect(home).toContain("bg-[#173c52]/55");
+    expect(home).not.toContain("text-white/80");
   });
 
   it("describes the external quest matcher without exposing private writing", () => {

@@ -17,8 +17,8 @@ allowBuilds:
   unrs-resolver: true
 verifyDepsBeforeRun: false
 overrides:
-  # Pin the patched source-map path validation release.
-  postcss: 8.5.18
+  # Pin the complete source-map path validation fix (GHSA-fxqj-rqcc-2cmp).
+  postcss: 8.5.23
   # Keep Next's optional image runtime on the audited libvips build.
   next>sharp: 0.35.3
   # Collapse legacy minimatch callers onto the patched brace parser.

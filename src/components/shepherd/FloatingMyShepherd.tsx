@@ -19,7 +19,21 @@ import {
 } from "@/lib/ai/contracts";
 import { apiFetch } from "@/lib/platform/api";
 import { useVisualViewport } from "@/lib/platform/keyboard-inset";
-import { useCompactViewport } from "@/lib/platform/media-query";
+import {
+  useCompactViewport,
+  useMobileOrTabletViewport,
+} from "@/lib/platform/media-query";
+import {
+  DEFAULT_FLOATING_LAUNCHER_PLACEMENT,
+  FLOATING_LAUNCHER_STORAGE_KEY,
+  clampFloatingLauncherPoint,
+  dockFloatingLauncher,
+  floatingLauncherPoint,
+  parseFloatingLauncherPlacement,
+  type FloatingLauncherBounds,
+  type FloatingLauncherPlacement,
+  type FloatingLauncherPoint,
+} from "@/lib/platform/floating-launcher";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 import { cn } from "@/lib/utils/cn";
 import { ArtIcon } from "@/components/design-system/ArtIcon";
@@ -51,6 +65,16 @@ const FOCUSABLE_SELECTOR =
 const RESTING_GUTTER =
   "max(var(--app-bottom-nav-height, 4.5rem), calc(env(safe-area-inset-bottom) + 0.75rem))";
 
+/** Ten percent smaller than the former 108px art request. */
+const LAUNCHER_ART_SIZE = 97;
+/** MyShepherd's optical weight renders the requested art into this square. */
+const LAUNCHER_SIZE = 85;
+const LAUNCHER_GUTTER = 12;
+const LAUNCHER_PEEK = 24;
+const LAUNCHER_DRAG_THRESHOLD = 6;
+const LAUNCHER_HIDE_EDGE = 18;
+const LAUNCHER_HIDE_VELOCITY = 0.45; // px per ms
+
 /**
  * MyShepherd's blue, one step deeper than the marian-500 it used to be.
  *
@@ -65,6 +89,19 @@ interface ChatTurn {
   id: string;
   question: string;
   answer: MyShepherdAnswer;
+}
+
+/** Pointer details stay in a ref so a drag does not re-render every frame. */
+interface LauncherDragState {
+  pointerId: number;
+  originPointer: FloatingLauncherPoint;
+  originPoint: FloatingLauncherPoint;
+  point: FloatingLauncherPoint;
+  moved: boolean;
+  lastX: number;
+  lastAt: number;
+  velocityX: number;
+  bounds: FloatingLauncherBounds;
 }
 
 /** Converts bounded API failures into calm, actionable feedback. */
@@ -110,6 +147,7 @@ export function FloatingMyShepherd() {
   const pathname = usePathname();
   const viewport = useVisualViewport();
   const compact = useCompactViewport();
+  const mobileOrTablet = useMobileOrTabletViewport();
   const reduceMotion = useShouldReduceMotion();
   // Asking is Plus's. The sheet still opens for everyone, because a button
   // that does nothing when pressed is worse than one that explains itself —
@@ -120,6 +158,12 @@ export function FloatingMyShepherd() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
+  const launcherDragRef = useRef<LauncherDragState | null>(null);
+  const launcherPlacementRef = useRef<FloatingLauncherPlacement>(
+    DEFAULT_FLOATING_LAUNCHER_PLACEMENT,
+  );
+  const launcherRestoredRef = useRef(false);
+  const suppressLauncherClickRef = useRef(false);
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [turns, setTurns] = useState<ChatTurn[]>([]);
@@ -127,8 +171,103 @@ export function FloatingMyShepherd() {
   const [error, setError] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
+  const [launcherDragging, setLauncherDragging] = useState(false);
+  const [launcherReady, setLauncherReady] = useState(false);
+  const [launcherPoint, setLauncherPoint] =
+    useState<FloatingLauncherPoint>({ x: 0, y: 0 });
+  const [launcherPlacement, setLauncherPlacement] =
+    useState<FloatingLauncherPlacement>(
+      DEFAULT_FLOATING_LAUNCHER_PLACEMENT,
+    );
   const dragOrigin = useRef<{ y: number; at: number } | null>(null);
   const working = asking !== null;
+  const launcherPeeked = mobileOrTablet && launcherPlacement.hidden;
+
+  /** Keeps the launcher above system chrome, the keyboard, and the app nav. */
+  const getLauncherBounds = useCallback((): FloatingLauncherBounds => {
+    const visibleTop = viewport.offsetTop;
+    const visibleBottom =
+      visibleTop + (viewport.height || window.innerHeight);
+    const safeAreaTop =
+      Number.parseFloat(
+        window
+          .getComputedStyle(document.documentElement)
+          .getPropertyValue("--app-safe-area-top"),
+      ) || 0;
+    const navTop =
+      document
+        .querySelector<HTMLElement>("[data-app-bottom-nav]")
+        ?.getBoundingClientRect().top ?? visibleBottom;
+    const maxY =
+      Math.min(visibleBottom, navTop) - LAUNCHER_GUTTER - LAUNCHER_SIZE;
+
+    return {
+      viewportWidth: window.innerWidth,
+      minY: Math.max(visibleTop, safeAreaTop) + LAUNCHER_GUTTER,
+      maxY: Math.max(
+        Math.max(visibleTop, safeAreaTop) + LAUNCHER_GUTTER,
+        maxY,
+      ),
+      size: LAUNCHER_SIZE,
+      gutter: LAUNCHER_GUTTER,
+      peek: LAUNCHER_PEEK,
+    };
+  }, [viewport.height, viewport.offsetTop]);
+
+  /** Saves an edge-relative position and animates the launcher into it. */
+  const commitLauncherPlacement = useCallback(
+    (placement: FloatingLauncherPlacement) => {
+      launcherPlacementRef.current = placement;
+      setLauncherPlacement(placement);
+      setLauncherPoint(floatingLauncherPoint(placement, getLauncherBounds()));
+      try {
+        window.localStorage.setItem(
+          FLOATING_LAUNCHER_STORAGE_KEY,
+          JSON.stringify(placement),
+        );
+      } catch {
+        // Storage is optional; the in-memory placement still works this visit.
+      }
+    },
+    [getLauncherBounds],
+  );
+
+  // Restore once, then resolve the relative position again whenever the
+  // visible viewport changes through rotation, resizing, or keyboard movement.
+  useLayoutEffect(() => {
+    // A frame callback treats viewport measurement as an external update and
+    // avoids a synchronous effect-to-render cascade during hydration.
+    const frame = window.requestAnimationFrame(() => {
+      if (!mobileOrTablet) {
+        setLauncherReady(true);
+        return;
+      }
+
+      if (!launcherRestoredRef.current) {
+        launcherRestoredRef.current = true;
+        let restored: FloatingLauncherPlacement | null = null;
+        try {
+          restored = parseFloatingLauncherPlacement(
+            window.localStorage.getItem(FLOATING_LAUNCHER_STORAGE_KEY),
+          );
+        } catch {
+          // Private browsing can deny storage while the launcher remains usable.
+        }
+        const placement = restored ?? DEFAULT_FLOATING_LAUNCHER_PLACEMENT;
+        launcherPlacementRef.current = placement;
+        setLauncherPlacement(placement);
+      }
+
+      setLauncherPoint(
+        floatingLauncherPoint(
+          launcherPlacementRef.current,
+          getLauncherBounds(),
+        ),
+      );
+      setLauncherReady(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [getLauncherBounds, mobileOrTablet, pathname]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -308,6 +447,103 @@ export function FloatingMyShepherd() {
     ) {
       close();
     }
+  }
+
+  /** Begins a touch-first launcher drag without changing its stored position. */
+  function startLauncherDrag(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!mobileOrTablet || open) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const point = { x: rect.left, y: rect.top };
+    const bounds = getLauncherBounds();
+    launcherDragRef.current = {
+      pointerId: event.pointerId,
+      originPointer: { x: event.clientX, y: event.clientY },
+      originPoint: point,
+      point,
+      moved: false,
+      lastX: event.clientX,
+      lastAt: event.timeStamp,
+      velocityX: 0,
+      bounds,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setLauncherDragging(true);
+  }
+
+  /** Follows the pointer directly while clamping to a recoverable side peek. */
+  function moveLauncherDrag(event: ReactPointerEvent<HTMLButtonElement>) {
+    const drag = launcherDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const dx = event.clientX - drag.originPointer.x;
+    const dy = event.clientY - drag.originPointer.y;
+    if (!drag.moved && Math.hypot(dx, dy) < LAUNCHER_DRAG_THRESHOLD) return;
+
+    drag.moved = true;
+    event.preventDefault();
+    const elapsed = Math.max(1, event.timeStamp - drag.lastAt);
+    drag.velocityX = (event.clientX - drag.lastX) / elapsed;
+    drag.lastX = event.clientX;
+    drag.lastAt = event.timeStamp;
+    drag.point = clampFloatingLauncherPoint(
+      {
+        x: drag.originPoint.x + dx,
+        y: drag.originPoint.y + dy,
+      },
+      drag.bounds,
+    );
+
+    // Direct style updates keep a high-frequency pointer move out of React's
+    // render path; state catches up once the launcher docks.
+    const launcher = launcherRef.current;
+    if (launcher) {
+      launcher.style.left = `${drag.point.x}px`;
+      launcher.style.top = `${drag.point.y}px`;
+    }
+  }
+
+  /** Snaps to the nearest side and hides to a peek after an outward edge drag. */
+  function endLauncherDrag(
+    event: ReactPointerEvent<HTMLButtonElement>,
+    cancelled = false,
+  ) {
+    const drag = launcherDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    launcherDragRef.current = null;
+    setLauncherDragging(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (!drag.moved) return;
+
+    suppressLauncherClickRef.current = true;
+    window.setTimeout(() => {
+      suppressLauncherClickRef.current = false;
+    }, 0);
+
+    const bounds = drag.bounds;
+    const leftSide = drag.point.x + bounds.size / 2 < bounds.viewportWidth / 2;
+    const reachedEdge = leftSide
+      ? event.clientX <= LAUNCHER_HIDE_EDGE
+      : event.clientX >= bounds.viewportWidth - LAUNCHER_HIDE_EDGE;
+    const flickedOutward = leftSide
+      ? drag.velocityX < -LAUNCHER_HIDE_VELOCITY
+      : drag.velocityX > LAUNCHER_HIDE_VELOCITY;
+    const placement = dockFloatingLauncher(
+      drag.point,
+      bounds,
+      !cancelled && (reachedEdge || flickedOutward),
+    );
+    commitLauncherPlacement(placement);
+  }
+
+  /** A tap on a side peek restores the launcher before a later tap opens it. */
+  function activateLauncher() {
+    if (suppressLauncherClickRef.current) return;
+    if (launcherPeeked) {
+      commitLauncherPlacement({ ...launcherPlacement, hidden: false });
+      return;
+    }
+    setOpen(true);
   }
 
   const horizontalOffset = "max(1rem, calc((100vw - 48rem) / 2))";
@@ -592,13 +828,27 @@ export function FloatingMyShepherd() {
         ref={launcherRef}
         type="button"
         hidden={open}
-        onClick={() => setOpen(true)}
-        aria-label="Ask MyShepherd"
+        onClick={activateLauncher}
+        onPointerDown={startLauncherDrag}
+        onPointerMove={moveLauncherDrag}
+        onPointerUp={endLauncherDrag}
+        onPointerCancel={(event) => endLauncherDrag(event, true)}
+        aria-label={
+          launcherPeeked ? "Show MyShepherd button" : "Ask MyShepherd"
+        }
+        aria-describedby={
+          mobileOrTablet ? "my-shepherd-launcher-help" : undefined
+        }
         aria-expanded={open}
         aria-controls="floating-my-shepherd"
         className={cn(
-          "fixed z-50 grid place-items-center rounded-full",
-          "transition-transform hover:-translate-y-0.5 active:translate-y-0",
+          "fixed z-50 grid place-items-center rounded-full select-none",
+          "transition-[left,top,transform,opacity] duration-500 [transition-timing-function:var(--ease-gentle)]",
+          !launcherDragging && !launcherPeeked &&
+            "hover:-translate-y-0.5 active:translate-y-0",
+          mobileOrTablet && "cursor-grab touch-none",
+          launcherDragging && "cursor-grabbing transition-none",
+          launcherReady ? "opacity-100" : "pointer-events-none opacity-0",
           // No plate behind it. The sprite is drawn with its own transparency
           // and reads as a character standing on the page; a blue disc around
           // it turned that character into a small mark inside a button.
@@ -610,18 +860,58 @@ export function FloatingMyShepherd() {
           // back to it.
           "outline-none focus-visible:shadow-[0_0_0_3px_var(--color-paper),0_0_0_5px_var(--color-accent)]",
         )}
-        style={{
-          insetInlineEnd: horizontalOffset,
-          bottom: `calc(${RESTING_GUTTER} + 1rem)`,
-        }}
+        style={
+          mobileOrTablet
+            ? {
+                left: launcherPoint.x,
+                top: launcherPoint.y,
+                width: LAUNCHER_SIZE,
+                height: LAUNCHER_SIZE,
+                touchAction: "none",
+              }
+            : {
+                insetInlineEnd: horizontalOffset,
+                bottom: `calc(${RESTING_GUTTER} + 1rem)`,
+                width: LAUNCHER_SIZE,
+                height: LAUNCHER_SIZE,
+              }
+        }
       >
+        <span id="my-shepherd-launcher-help" className="sr-only">
+          Drag to move. Drag into either edge to hide.
+        </span>
+        {!launcherPeeked && (
+          <span
+            aria-hidden="true"
+            className="my-shepherd-launcher-pulse pointer-events-none absolute bottom-1 left-1/2 -z-10 h-4 w-[72%] rounded-full bg-marian-700/30 blur-md"
+          />
+        )}
         {/* A soft drop shadow does the separating a plate used to, so the
             shepherd stays legible over parchment, a wallpaper, or a card. */}
         <ArtIcon
           name="myshepherd"
-          size={108}
-          className="[filter:drop-shadow(0_3px_6px_rgb(32_70_94/0.34))]"
+          size={LAUNCHER_ART_SIZE}
+          className={cn(
+            "[filter:drop-shadow(0_3px_6px_rgb(32_70_94/0.34))] transition-opacity duration-300",
+            launcherPeeked && "opacity-45",
+          )}
         />
+        {launcherPeeked && (
+          <span
+            aria-hidden="true"
+            className={cn(
+              "absolute z-10 flex h-12 w-7 items-center justify-center rounded-full border border-white/35 bg-marian-700/95 text-white shadow-[0_4px_16px_rgb(22_47_65/0.35)] backdrop-blur-sm",
+              launcherPlacement.side === "left" ? "right-0" : "left-0",
+            )}
+          >
+            <IconArrowRight
+              size={16}
+              className={
+                launcherPlacement.side === "right" ? "rotate-180" : undefined
+              }
+            />
+          </span>
+        )}
       </button>
     </>
   );

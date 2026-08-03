@@ -182,12 +182,20 @@
   from { opacity: 0; transform: translateY(-6px) rotate(-0.4deg); }
   to { opacity: 1; transform: translateY(0) rotate(0); }
 }
+/* A slow grounded pulse makes the companion read as interactive without
+   animating the illustrated character itself. */
+@keyframes shepherd-launcher-pulse {
+  0%, 100% { opacity: 0.2; transform: translateX(-50%) scale(0.78); }
+  50% { opacity: 0.48; transform: translateX(-50%) scale(1.08); }
+}
 
 /* ============================================================
    Base
    ============================================================ */
 :root {
   color-scheme: light;
+  /* JavaScript drag bounds mirror the same safe-area inset as CSS utilities. */
+  --app-safe-area-top: env(safe-area-inset-top, 0px);
   /* These defaults preserve the original hierarchy before persisted settings
      load. Theme code updates the full set from one user-controlled value. */
   --glass-surface-opacity: 54%;
@@ -239,30 +247,31 @@ html.theme-dark ::selection {
    Deliberately the most opaque surface in the app. Every other card sits
    around 54% and lets the canvas through; this one is an invitation rather
    than a container, and at that transparency it stopped reading as the one
-   blue thing on a parchment page. 88% keeps the blue unmistakable while still
+   blue thing on a parchment page. 92% keeps the blue unmistakable while still
    admitting what is behind it — glass, not paint.
 
    The solid base is first so a reader who has turned glass off still gets the
-   blue rather than a transparent card. */
+   blue rather than a transparent card. The deeper marian ink also holds white
+   text above the WCAG contrast floor after transparency is composited. */
 [data-app-shell] .app-glass-shepherd {
-  background-color: #3f7ea3;
-  border-color: #3f7ea3;
+  background-color: var(--color-marian-700);
+  border-color: var(--color-marian-500);
 }
 html.theme-dark [data-app-shell] .app-glass-shepherd {
-  background-color: #35708f;
-  border-color: #35708f;
+  background-color: #1d3e52;
+  border-color: var(--color-marian-500);
 }
 html.glass-surfaces [data-app-shell] .app-glass-shepherd {
-  background-color: color-mix(in srgb, #3f7ea3 88%, transparent) !important;
-  border-color: color-mix(in srgb, #3f7ea3 92%, white) !important;
+  background-color: color-mix(in srgb, var(--color-marian-700) 92%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-marian-500) 76%, white) !important;
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.22),
     0 12px 32px rgb(23 54 72 / 0.24);
 }
 html.theme-dark.glass-surfaces [data-app-shell] .app-glass-shepherd {
-  /* The same blue reads heavier against a dark canvas, so it gives a little
-     more back rather than glowing. */
-  background-color: color-mix(in srgb, #35708f 84%, transparent) !important;
+  /* The same ink remains dense against a dark canvas so small white copy keeps
+     its contrast instead of picking up the wallpaper underneath. */
+  background-color: color-mix(in srgb, #1d3e52 92%, transparent) !important;
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.1),
     0 12px 32px rgb(0 0 0 / 0.3);
@@ -700,6 +709,12 @@ html.theme-dark .milestone-glass-surface[data-milestone-state="reached"] {
     drop-shadow(0 2px 2px rgb(30 51 41 / 0.12))
     drop-shadow(0 10px 16px rgb(30 51 41 / 0.11));
 }
+
+/* The launcher shadow breathes beneath the art and disappears in its peek state. */
+.my-shepherd-launcher-pulse {
+  animation: shepherd-launcher-pulse 3.8s ease-in-out infinite;
+  transform-origin: center;
+}
 html.theme-dark .artwork-2-5d {
   filter:
     drop-shadow(0 1px 1px rgb(0 0 0 / 0.32))
@@ -773,6 +788,38 @@ html.force-reduce-motion .art-at-rest {
   pointer-events: none;
   border: 1px solid color-mix(in srgb, var(--color-gold-500) 48%, transparent);
   border-radius: 14px;
+}
+
+/* Plus restores a brighter double-rule and eight restrained corner strokes.
+   The ornament stays behind content and does not crowd the candle column. */
+.plus-nameplate::before {
+  inset: 6px;
+  border-color: rgb(161 105 27 / 0.48);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.58),
+    0 0 0 1px rgb(255 249 220 / 0.28);
+}
+.plus-nameplate::after {
+  content: "";
+  position: absolute;
+  inset: 11px;
+  pointer-events: none;
+  border-radius: 10px;
+  background:
+    linear-gradient(90deg, rgb(139 88 17 / 0.62), transparent) top left / 3.5rem 1px no-repeat,
+    linear-gradient(270deg, rgb(139 88 17 / 0.62), transparent) top right / 3.5rem 1px no-repeat,
+    linear-gradient(90deg, rgb(139 88 17 / 0.5), transparent) bottom left / 3rem 1px no-repeat,
+    linear-gradient(270deg, rgb(139 88 17 / 0.5), transparent) bottom right / 3rem 1px no-repeat,
+    linear-gradient(180deg, rgb(139 88 17 / 0.56), transparent) top left / 1px 2rem no-repeat,
+    linear-gradient(180deg, rgb(139 88 17 / 0.56), transparent) top right / 1px 2rem no-repeat,
+    linear-gradient(0deg, rgb(139 88 17 / 0.45), transparent) bottom left / 1px 1.75rem no-repeat,
+    linear-gradient(0deg, rgb(139 88 17 / 0.45), transparent) bottom right / 1px 1.75rem no-repeat;
+}
+
+/* A Plus nameplate keeps its membership ornament even in the flatter theme. */
+html.theme-plain .sacred-frame.plus-nameplate::before,
+html.theme-plain .sacred-frame.plus-nameplate::after {
+  display: block;
 }
 
 /* ============================================================
