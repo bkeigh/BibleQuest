@@ -41,7 +41,7 @@ import { cn } from "@/lib/utils/cn";
 import { SevenDaysBoard } from "./SevenDaysBoard";
 import { SevenDaysBoostBar } from "./SevenDaysBoostBar";
 import { SevenDaysGoalChip } from "./SevenDaysGoalChip";
-import { SevenDaysScene, sceneById } from "./SevenDaysScene";
+import { SevenDaysScene } from "./SevenDaysScene";
 import { SevenDaysVerseStrip } from "./SevenDaysVerseStrip";
 
 /**
@@ -101,7 +101,6 @@ export function SevenDaysLevelSession({
   const { state } = session;
   const goals = goalProgress(state);
   const verse = verseForLevel(level);
-  const scene = sceneById(level.sceneId);
   const phase: Phase =
     state.status === "cleared"
       ? "cleared"
@@ -247,7 +246,7 @@ export function SevenDaysLevelSession({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <SevenDaysScene sceneId={level.sceneId} />
+      <SevenDaysScene />
       <p role="status" aria-live="polite" className="sr-only">
         {announcement}
       </p>
@@ -304,13 +303,6 @@ export function SevenDaysLevelSession({
                 >
                   Read {chapter.source.reference} <IconArrowRight size={15} />
                 </Link>
-              )}
-
-              {scene && (
-                <p className="mt-4 text-caption leading-relaxed text-ash">
-                  Scene: {scene.title} — one of the living wallpapers in Plus.
-                  It plays here for everyone.
-                </p>
               )}
 
               <GentleButton

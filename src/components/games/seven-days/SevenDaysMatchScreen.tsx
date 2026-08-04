@@ -30,10 +30,12 @@ import {
 import {
   isDayAnswered,
   isDayReadyForQuestions,
+  isDaySkipped,
   isDayUnlocked,
   isLevelCleared,
   isLevelUnlocked,
   markDayAnswered,
+  markDaySkipped,
   markLevelCleared,
   pendingQuestionDay,
   nextLevel,
@@ -43,6 +45,7 @@ import {
   writeSevenDaysProgress,
   type SevenDaysProgress,
 } from "@/lib/games/seven-days/progress";
+import { useArcadeAccess } from "@/lib/games/arcade/useArcadeAccess";
 import { SEVEN_DAYS_TILES } from "@/lib/games/seven-days/tiles";
 import type {
   SevenDaysChapter,
@@ -61,6 +64,7 @@ type View =
 
 function SevenDaysMatchInner() {
   const reduceMotion = useShouldReduceMotion();
+  const arcade = useArcadeAccess();
   // ClientOnly holds this component back until after hydration, so the map can
   // be read straight from the device instead of flashing an empty one first.
   const [progress, setProgress] = useState<SevenDaysProgress>(
@@ -70,8 +74,12 @@ function SevenDaysMatchInner() {
   const [storageAvailable] = useState(sevenDaysStorageAvailable);
   const [view, setView] = useState<View>({ kind: "hub" });
   const [started, setStarted] = useState(false);
+  const [purchaseNotice, setPurchaseNotice] = useState<string | null>(null);
 
-  const summary = useMemo(() => summarize(progress), [progress]);
+  const summary = useMemo(
+    () => summarize(progress, arcade.gamePass),
+    [arcade.gamePass, progress],
+  );
   const resume = useMemo(() => nextLevel(progress), [progress]);
 
   const openLevel = useCallback(
@@ -92,19 +100,25 @@ function SevenDaysMatchInner() {
       writeSevenDaysProgress(updated);
       // The last level of a day hands over to that day's questions; every
       // other level runs straight into the next board.
-      const waiting = pendingQuestionDay(updated);
+      const waiting = arcade.gamePass ? null : pendingQuestionDay(updated);
       if (waiting && waiting.id === level.chapterId) {
         setView({ kind: "questions", chapter: waiting });
         return;
       }
+      if (arcade.gamePass && summarize(updated, true).complete) {
+        track("scripture_game_completed", { kind: "seven-days-match" });
+      }
       const following = SEVEN_DAYS_LEVELS[levelOrdinal(level) + 1];
-      if (following && isLevelUnlocked(updated, following)) {
+      if (
+        following &&
+        isLevelUnlocked(updated, following, arcade.gamePass)
+      ) {
         setView({ kind: "level", level: following });
       } else {
         setView({ kind: "map" });
       }
     },
-    [progress],
+    [arcade.gamePass, progress],
   );
 
   const handleRoundComplete = useCallback(
@@ -115,12 +129,42 @@ function SevenDaysMatchInner() {
       // One completion for the whole week, not one per level: forty-nine
       // "completed" events would say almost nothing about whether the game
       // works, and would be the only place this app counted play that closely.
-      if (summarize(updated).complete) {
+      if (summarize(updated, arcade.gamePass).complete) {
         track("scripture_game_completed", { kind: "seven-days-match" });
       }
       setView({ kind: "map" });
     },
-    [progress],
+    [arcade.gamePass, progress],
+  );
+
+  /** Uses one durable skip, or the permanent pass, without recording answers. */
+  const bypassQuestions = useCallback(
+    async (chapter: SevenDaysChapter) => {
+      setPurchaseNotice(null);
+      if (!arcade.gamePass) {
+        const consumed = await arcade.consumeQuestionSkip(chapter.id);
+        if (!consumed) {
+          setPurchaseNotice(
+            "A Question Skip couldn’t be used. Refresh the store and try again.",
+          );
+          return;
+        }
+      }
+      const updated = arcade.gamePass
+        ? progress
+        : markDaySkipped(progress, chapter);
+      if (updated !== progress) {
+        setProgress(updated);
+        writeSevenDaysProgress(updated);
+      }
+      setPurchaseNotice(
+        arcade.gamePass
+          ? "Game Pass active — questions are optional."
+          : "Question Skip used — the next chapter is open.",
+      );
+      setView({ kind: "map" });
+    },
+    [arcade, progress],
   );
 
   const transition = reduceMotion
@@ -162,6 +206,14 @@ function SevenDaysMatchInner() {
       transition={transition}
       className="flex min-h-0 flex-1 flex-col"
     >
+      {purchaseNotice && (
+        <p
+          role="status"
+          className="mb-3 rounded-[var(--radius-button)] border border-accent/35 bg-accent-surface px-3 py-2 text-small text-accent-ink"
+        >
+          {purchaseNotice}
+        </p>
+      )}
       {view.kind === "hub" && (
         <div className="flex-1">
             <PaperCard variant="atmospheric" padding="lg" className="text-center">
@@ -175,13 +227,15 @@ function SevenDaysMatchInner() {
                   <span
                     key={chapter.id}
                     className={cn(
-                      "flex h-11 w-11 items-center justify-center rounded-[11px] ring-1",
+                      "relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-[11px] ring-1",
                       SEVEN_DAYS_TILES[chapter.signature].chipClassName,
                     )}
                   >
                     <ArtIcon
                       name={SEVEN_DAYS_TILES[chapter.signature].sprite}
                       size={52}
+                      // Oversized weighted sprites share the exact box centre.
+                      className="absolute left-1/2 top-1/2 max-h-full max-w-full -translate-x-1/2 -translate-y-1/2 object-center"
                     />
                   </span>
                 ))}
@@ -232,8 +286,8 @@ function SevenDaysMatchInner() {
               <p className="mt-5 text-caption leading-relaxed text-ash">
                 All seven days and every answer are included. There are no
                 lives and no timers, running out of moves costs nothing but
-                another go, and nothing sold in the arcade gets you past a
-                level or a question.
+                another go, and every question and explanation remain
+                available when a store option makes the question gate optional.
                 {!storageAvailable &&
                   " This browser cannot save your place, so the map will start fresh next time."}
               </p>
@@ -241,7 +295,7 @@ function SevenDaysMatchInner() {
                 href="/app/games/store"
                 className="mt-2 inline-flex min-h-11 items-center text-caption font-medium text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
-                Board helps and packs
+                Question Skips and Game Pass
               </Link>
             </PaperCard>
         </div>
@@ -262,8 +316,13 @@ function SevenDaysMatchInner() {
                 const clearedCount = levels.filter((level) =>
                   isLevelCleared(progress, level),
                 ).length;
-                const open = isDayUnlocked(progress, chapter);
+                const open = isDayUnlocked(
+                  progress,
+                  chapter,
+                  arcade.gamePass,
+                );
                 const answered = isDayAnswered(progress, chapter);
+                const skipped = isDaySkipped(progress, chapter);
                 const questionsWaiting = isDayReadyForQuestions(
                   progress,
                   chapter,
@@ -280,17 +339,23 @@ function SevenDaysMatchInner() {
                       <span
                         aria-hidden="true"
                         className={cn(
-                          "flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] ring-1",
+                          "relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[12px] ring-1",
                           art.chipClassName,
                           !open && "opacity-45 grayscale",
                         )}
                       >
-                        <ArtIcon name={art.sprite} size={56} />
+                        <ArtIcon
+                          name={art.sprite}
+                          size={56}
+                          // Match the board's centred tile treatment on the map.
+                          className="absolute left-1/2 top-1/2 max-h-full max-w-full -translate-x-1/2 -translate-y-1/2 object-center"
+                        />
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="font-art-label text-caption uppercase tracking-[0.06em] text-gilt">
                           Day {chapter.day} · {clearedCount}/{levels.length}
                           {answered && " · answered"}
+                          {skipped && " · skipped"}
                         </p>
                         <h3 className="mt-1 font-display text-subheading text-graphite">
                           {chapter.title}
@@ -299,7 +364,9 @@ function SevenDaysMatchInner() {
                           {!open
                             ? "Answer the day before this one to open it."
                             : questionsWaiting
-                              ? "Every level is gathered. Seven questions open the next day."
+                              ? arcade.gamePass
+                                ? "Every level is gathered. Questions are optional with your Game Pass."
+                                : "Every level is gathered. Answer the questions or use a Question Skip to open the next day."
                               : chapter.summary}
                         </p>
                         {open && (
@@ -317,19 +384,35 @@ function SevenDaysMatchInner() {
                     {/* Seven across, always — the row is the day, and a set
                         that wrapped to five-and-two stopped reading as one. */}
                     {questionsWaiting && (
-                      <GentleButton
-                        variant="primary"
-                        fullWidth
-                        className="mt-3"
-                        onClick={() => setView({ kind: "questions", chapter })}
-                      >
-                        Answer Day {chapter.day}&apos;s questions
-                      </GentleButton>
+                      <div className="mt-3 grid gap-2">
+                        <GentleButton
+                          variant="primary"
+                          fullWidth
+                          onClick={() => setView({ kind: "questions", chapter })}
+                        >
+                          Answer Day {chapter.day}&apos;s questions
+                        </GentleButton>
+                        {(arcade.gamePass || arcade.questionSkips > 0) && (
+                          <GentleButton
+                            variant="outline"
+                            fullWidth
+                            onClick={() => void bypassQuestions(chapter)}
+                          >
+                            {arcade.gamePass
+                              ? "Continue with Game Pass"
+                              : `Use Question Skip (${arcade.questionSkips})`}
+                          </GentleButton>
+                        )}
+                      </div>
                     )}
 
                     <ol className="mt-3 grid grid-cols-7 gap-1.5">
                       {levels.map((level) => {
-                        const unlocked = isLevelUnlocked(progress, level);
+                        const unlocked = isLevelUnlocked(
+                          progress,
+                          level,
+                          arcade.gamePass,
+                        );
                         const cleared = isLevelCleared(progress, level);
                         const firstTry = progress.firstTry.includes(level.id);
                         return (
@@ -390,6 +473,13 @@ function SevenDaysMatchInner() {
             key={view.chapter.id}
             chapter={view.chapter}
             onComplete={(marks) => handleRoundComplete(view.chapter, marks)}
+            canBypass={arcade.gamePass || arcade.questionSkips > 0}
+            bypassLabel={
+              arcade.gamePass
+                ? "Continue with Game Pass"
+                : `Use Question Skip (${arcade.questionSkips})`
+            }
+            onBypass={() => bypassQuestions(view.chapter)}
             onExit={() => setView({ kind: "map" })}
           />
         </div>
@@ -404,7 +494,11 @@ function SevenDaysMatchInner() {
               level={view.level}
               nextLabel={
                 view.level.level === SEVEN_DAYS_LEVELS_PER_CHAPTER
-                  ? `Day ${view.level.day} questions`
+                  ? arcade.gamePass
+                    ? view.level.day === SEVEN_DAYS_CHAPTERS.length
+                      ? "The seven days"
+                      : `Day ${view.level.day + 1}, Level 1`
+                    : `Day ${view.level.day} questions`
                   : `Level ${view.level.level + 1}`
               }
               onExit={() => setView({ kind: "map" })}

@@ -33,6 +33,20 @@ const PRICE_DEFINITIONS = [
     recurring: null,
   },
 ];
+const ARCADE_PRICE_DEFINITIONS = [
+  {
+    key: "questionSkip",
+    lookupKey: "biblequest_arcade_question_skip",
+    nickname: "BibleQuest Arcade Question Skip",
+    unitAmount: 99,
+  },
+  {
+    key: "gamePass",
+    lookupKey: "biblequest_arcade_game_pass",
+    nickname: "BibleQuest Arcade Seven Days Game Pass",
+    unitAmount: 299,
+  },
+];
 const WEBHOOK_EVENTS = [
   "checkout.session.completed",
   "checkout.session.async_payment_succeeded",
@@ -126,6 +140,40 @@ async function ensureProduct(stripe) {
   return { product, created: true };
 }
 
+// Reuses the single BibleQuest Arcade product or creates it idempotently.
+async function ensureArcadeProduct(stripe) {
+  const result = await stripe.products.search({
+    query: "metadata['biblequest_catalog']:'arcade' AND active:'true'",
+    limit: 10,
+  });
+  if (result.data.length > 1) {
+    throw new Error("Multiple active BibleQuest Arcade products found.");
+  }
+  const existing = result.data[0];
+  if (existing) {
+    if (
+      existing.name !== "BibleQuest Arcade" ||
+      existing.metadata.biblequest_environment !== "live"
+    ) {
+      throw new Error("Existing BibleQuest Arcade product does not match.");
+    }
+    return { product: existing, created: false };
+  }
+  const product = await stripe.products.create(
+    {
+      name: "BibleQuest Arcade",
+      description:
+        "Optional Question Skips and permanent game access for BibleQuest Arcade.",
+      metadata: {
+        biblequest_catalog: "arcade",
+        biblequest_environment: "live",
+      },
+    },
+    { idempotencyKey: "biblequest-live-arcade-product-v1" },
+  );
+  return { product, created: true };
+}
+
 // Proves an existing lookup key or creates the exact approved Price.
 async function ensurePrice(stripe, productId, definition) {
   const result = await stripe.prices.list({
@@ -170,6 +218,48 @@ async function ensurePrice(stripe, productId, definition) {
       },
     },
     { idempotencyKey: `biblequest-live-plus-${definition.key}-price-v1` },
+  );
+  return { price, created: true };
+}
+
+// Proves or creates one exact one-time Arcade Price under its own product.
+async function ensureArcadePrice(stripe, productId, definition) {
+  const result = await stripe.prices.list({
+    lookup_keys: [definition.lookupKey],
+    active: true,
+    limit: 10,
+  });
+  if (result.data.length > 1) {
+    throw new Error(`Multiple active Prices found for ${definition.key}.`);
+  }
+  const existing = result.data[0];
+  if (existing) {
+    if (
+      existing.product !== productId ||
+      existing.currency !== "usd" ||
+      existing.unit_amount !== definition.unitAmount ||
+      existing.type !== "one_time" ||
+      existing.recurring !== null
+    ) {
+      throw new Error(`Existing Arcade ${definition.key} Price does not match.`);
+    }
+    return { price: existing, created: false };
+  }
+  const price = await stripe.prices.create(
+    {
+      product: productId,
+      currency: "usd",
+      unit_amount: definition.unitAmount,
+      lookup_key: definition.lookupKey,
+      nickname: definition.nickname,
+      metadata: {
+        biblequest_arcade_product: definition.key,
+        biblequest_environment: "live",
+      },
+    },
+    {
+      idempotencyKey: `biblequest-live-arcade-${definition.key}-price-v1`,
+    },
   );
   return { price, created: true };
 }
@@ -222,7 +312,7 @@ async function ensurePortal(stripe) {
   return { created: true };
 }
 
-// Creates the exact live webhook endpoint and preserves its one-time secret.
+// Reuses the exact live webhook endpoint or creates it with a one-time secret.
 async function ensureWebhook(stripe) {
   const url = `${APP_ORIGIN}/api/billing/webhook`;
   const endpoints = await stripe.webhookEndpoints.list({ limit: 100 });
@@ -241,9 +331,7 @@ async function ensureWebhook(stripe) {
         description: "BibleQuest production billing projection",
       });
     }
-    throw new Error(
-      "Live webhook already exists; its signing secret cannot be recovered.",
-    );
+    return { endpoint: matching[0], created: false };
   }
   const endpoint = await stripe.webhookEndpoints.create(
     {
@@ -262,20 +350,23 @@ async function ensureWebhook(stripe) {
   return { endpoint, created: true };
 }
 
-// Writes the six provider values to an operator-only file for Vercel import.
+// Writes provider values and includes a webhook secret only when newly issued.
 async function writeOutput(
   outputFile,
   publishableKey,
   webhookSecret,
   prices,
+  arcadePrices,
 ) {
   const body = [
     `STRIPE_SECRET_KEY_FILE=${path.resolve(option("secret-file"))}`,
     `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${publishableKey}`,
-    `STRIPE_WEBHOOK_SECRET=${webhookSecret}`,
+    ...(webhookSecret ? [`STRIPE_WEBHOOK_SECRET=${webhookSecret}`] : []),
     `STRIPE_PLUS_MONTHLY_PRICE_ID=${prices.monthly.id}`,
     `STRIPE_PLUS_ANNUAL_PRICE_ID=${prices.annual.id}`,
     `STRIPE_PLUS_LIFETIME_PRICE_ID=${prices.lifetime.id}`,
+    `STRIPE_ARCADE_QUESTION_SKIP_PRICE_ID=${arcadePrices.questionSkip.id}`,
+    `STRIPE_ARCADE_GAME_PASS_PRICE_ID=${arcadePrices.gamePass.id}`,
     "",
   ].join("\n");
   await fs.writeFile(outputFile, body, { mode: 0o600, flag: "wx" });
@@ -307,6 +398,7 @@ async function main() {
   });
   await requireReadyAccount(stripe);
   const product = await ensureProduct(stripe);
+  const arcadeProduct = await ensureArcadeProduct(stripe);
   const priceResults = await Promise.all(
     PRICE_DEFINITIONS.map((definition) =>
       ensurePrice(stripe, product.product.id, definition),
@@ -318,21 +410,37 @@ async function main() {
       result.price,
     ]),
   );
+  const arcadePriceResults = await Promise.all(
+    ARCADE_PRICE_DEFINITIONS.map((definition) =>
+      ensureArcadePrice(stripe, arcadeProduct.product.id, definition),
+    ),
+  );
+  const arcadePrices = Object.fromEntries(
+    arcadePriceResults.map((result, index) => [
+      ARCADE_PRICE_DEFINITIONS[index].key,
+      result.price,
+    ]),
+  );
   const portal = await ensurePortal(stripe);
   const webhook = await ensureWebhook(stripe);
   await writeOutput(
     outputFile,
     publishableKey,
-    webhook.endpoint.secret,
+    webhook.endpoint.secret ?? null,
     prices,
+    arcadePrices,
   );
   process.stdout.write(
     JSON.stringify({
       accountReady: true,
       productCreated: product.created,
+      arcadeProductCreated: arcadeProduct.created,
       pricesCreated: priceResults.filter((result) => result.created).length,
+      arcadePricesCreated: arcadePriceResults.filter((result) => result.created)
+        .length,
       portalCreated: portal.created,
       webhookCreated: webhook.created,
+      webhookSecretWritten: Boolean(webhook.endpoint.secret),
       webhookEvents: WEBHOOK_EVENTS.length,
       protectedOutputWritten: true,
     }),

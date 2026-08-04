@@ -19,6 +19,7 @@
     "test:headers:built": "node --test tests/security-headers.integration.test.mjs",
     "test:e2e": "playwright test",
     "test:service-worker": "vitest run tests/service-worker.test.ts",
+    "check:supabase-browser-bundle": "node scripts/check-supabase-browser-bundle.mjs",
     "check:seed": "node scripts/build-supabase-seed.mjs && git diff --exit-code -- supabase/seed.sql supabase/seed-manifest.json",
     "check:production-readiness": "node --env-file-if-exists=.env.local scripts/check-production-readiness.mjs",
     "check:production-lifetime-migration": "node scripts/reconcile-production-lifetime-migration.mjs --dry-run",

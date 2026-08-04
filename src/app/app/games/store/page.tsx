@@ -9,7 +9,7 @@ import { GREEN_FEATURES } from "@/lib/features/green";
 export const metadata: Metadata = {
   title: "Arcade Store",
   description:
-    "More days to play and board helps for BibleQuest Arcade. Answers and explanations are always free.",
+    "Question Skips and the Seven Days Game Pass for BibleQuest Arcade.",
 };
 
 export default function ArcadeStorePage() {
@@ -19,7 +19,7 @@ export default function ArcadeStorePage() {
     <>
       <PageHeader
         title="Arcade Store"
-        subtitle="More days to play, and helps for the board."
+        subtitle="Question Skips and a permanent Seven Days Game Pass."
       />
       <PageContainer className="pb-8 pt-2">
         <Link

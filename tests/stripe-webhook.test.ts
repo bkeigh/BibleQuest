@@ -13,6 +13,10 @@ vi.mock("@/lib/support/records.server", () => ({
   synchronizeSupportRefund: vi.fn(),
   synchronizeSupportDispute: vi.fn(),
 }));
+vi.mock("@/lib/games/arcade/records.server", () => ({
+  synchronizeArcadeSession: vi.fn(),
+  synchronizeArcadeCharge: vi.fn(),
+}));
 
 import {
   synchronizeLifetimeCharge,
@@ -24,6 +28,10 @@ import {
   synchronizeSupportRefund,
   synchronizeSupportSession,
 } from "@/lib/support/records.server";
+import {
+  synchronizeArcadeCharge,
+  synchronizeArcadeSession,
+} from "@/lib/games/arcade/records.server";
 import {
   processStripeWebhookEvent,
   StripeWebhookProcessingError,
@@ -66,6 +74,8 @@ describe("order-tolerant Stripe webhook processing", () => {
     vi.mocked(synchronizeSupportSession).mockReset();
     vi.mocked(synchronizeSupportRefund).mockReset();
     vi.mocked(synchronizeSupportDispute).mockReset();
+    vi.mocked(synchronizeArcadeSession).mockReset();
+    vi.mocked(synchronizeArcadeCharge).mockReset();
   });
 
   it("rehydrates the current subscription instead of trusting event payload", async () => {
@@ -254,6 +264,49 @@ describe("order-tolerant Stripe webhook processing", () => {
       lifetimeEvent,
     );
     expect(synchronizeSubscription).not.toHaveBeenCalled();
+  });
+
+  it("rehydrates and projects a paid arcade Checkout event", async () => {
+    const current = {
+      id: "cs_test_ArcadeSession123",
+      mode: "payment",
+      status: "complete",
+      payment_status: "paid",
+      payment_intent: "pi_ArcadeIntent123",
+      metadata: { purpose: "biblequest_arcade" },
+    };
+    const paymentIntent = {
+      id: "pi_ArcadeIntent123",
+      latest_charge: { id: "ch_ArcadeCharge123" },
+    };
+    const stripe = {
+      checkout: {
+        sessions: { retrieve: vi.fn().mockResolvedValue(current) },
+      },
+      paymentIntents: {
+        retrieve: vi.fn().mockResolvedValue(paymentIntent),
+      },
+    } as unknown as Stripe;
+    const admin = {} as SupabaseClient;
+    const arcadeEvent = event("checkout.session.completed", {
+      id: current.id,
+    });
+
+    await expect(
+      processStripeWebhookEvent(
+        admin,
+        stripe,
+        CONFIGURATION,
+        arcadeEvent,
+      ),
+    ).resolves.toBe("processed");
+    expect(synchronizeArcadeSession).toHaveBeenCalledWith(
+      admin,
+      current,
+      paymentIntent,
+      CONFIGURATION,
+      arcadeEvent,
+    );
   });
 
   it("projects one-time support refunds from the current Charge", async () => {

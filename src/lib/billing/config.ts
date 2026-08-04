@@ -14,6 +14,11 @@ export interface StripeBillingConfiguration {
   livemode: boolean;
   purchasesEnabled: boolean;
   supportEnabled: boolean;
+  arcadeEnabled?: boolean;
+  arcadePriceIds?: {
+    questionSkip: string;
+    gamePass: string;
+  } | null;
 }
 
 export type StripeBillingAvailability =
@@ -78,6 +83,11 @@ export function stripeBillingAvailability(
   const monthly = env.STRIPE_PLUS_MONTHLY_PRICE_ID?.trim() || "";
   const annual = env.STRIPE_PLUS_ANNUAL_PRICE_ID?.trim() || "";
   const lifetime = env.STRIPE_PLUS_LIFETIME_PRICE_ID?.trim() || "";
+  const questionSkip =
+    env.STRIPE_ARCADE_QUESTION_SKIP_PRICE_ID?.trim() || "";
+  const gamePass = env.STRIPE_ARCADE_GAME_PASS_PRICE_ID?.trim() || "";
+  const arcadeRequested =
+    env.BIBLEQUEST_STRIPE_ARCADE_ENABLED === "true";
   const origin = applicationOrigin(env.NEXT_PUBLIC_APP_URL, rawMode);
   const secretMatch = secretKey.match(STRIPE_SECRET);
   const publishableMatch = publishableKey.match(STRIPE_PUBLISHABLE);
@@ -91,6 +101,15 @@ export function stripeBillingAvailability(
     new Set([monthly, annual, lifetime]).size !== 3 ||
     !origin
   ) {
+    return { status: "invalid", mode: rawMode };
+  }
+  const arcadePricesValid =
+    STRIPE_PRICE.test(questionSkip) &&
+    STRIPE_PRICE.test(gamePass) &&
+    questionSkip !== gamePass &&
+    !new Set([monthly, annual, lifetime]).has(questionSkip) &&
+    !new Set([monthly, annual, lifetime]).has(gamePass);
+  if (arcadeRequested && !arcadePricesValid) {
     return { status: "invalid", mode: rawMode };
   }
 
@@ -107,5 +126,9 @@ export function stripeBillingAvailability(
       env.BIBLEQUEST_STRIPE_PURCHASES_ENABLED === "true",
     supportEnabled:
       env.BIBLEQUEST_STRIPE_SUPPORT_ENABLED === "true",
+    arcadeEnabled: arcadeRequested && arcadePricesValid,
+    arcadePriceIds: arcadePricesValid
+      ? { questionSkip, gamePass }
+      : null,
   };
 }

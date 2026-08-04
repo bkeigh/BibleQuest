@@ -1,145 +1,182 @@
 "use client";
 
-import { useState } from "react";
-import { GentleButton } from "@/components/design-system/GentleButton";
-import { PaperCard } from "@/components/design-system/PaperCard";
-import { ArtIcon } from "@/components/design-system/ArtIcon";
+import { useEffect, useState } from "react";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import {
-  BOOSTS,
-  BOOST_IDS,
-  readInventory,
-} from "@/lib/games/arcade/boosts";
-import {
-  ARCADE_PRODUCTS,
-  ARCADE_STORE_CHECKOUT_READY,
-} from "@/lib/games/arcade/store";
-import { cn } from "@/lib/utils/cn";
+  GentleButton,
+  GentleLink,
+} from "@/components/design-system/GentleButton";
+import { PaperCard } from "@/components/design-system/PaperCard";
+import { ARCADE_PRODUCTS } from "@/lib/games/arcade/store";
+import { useArcadeAccess } from "@/lib/games/arcade/useArcadeAccess";
 
-/**
- * The arcade shelf.
- *
- * It sells more Scripture — extra days to play — and board helps a reader can
- * also earn by answering well. It sells no way past a level, no answer, and no
- * explanation, and the catalogue is checked at build time to keep that true.
- *
- * Nothing charges yet. One-time purchases need their own products and webhooks
- * behind the existing subscription checkout, which is a server change rather
- * than a screen — so the shelf says so plainly instead of putting a price on a
- * button that would fail. What a reader *can* do today is earn the helps, and
- * that path is the one the page leads with.
- */
+type ReturnNotice = "returned" | "cancelled" | null;
+
+/** Reads only bounded Checkout copy; ownership still comes from the server. */
+function checkoutReturnNotice(): ReturnNotice {
+  if (typeof window === "undefined") return null;
+  const value = new URLSearchParams(window.location.search).get("checkout");
+  return value === "returned" || value === "cancelled" ? value : null;
+}
+
+/** The purchasable, server-authoritative Seven Days Match shelf. */
 function ArcadeStoreInner() {
-  const [inventory] = useState(readInventory);
-  const packs = ARCADE_PRODUCTS.filter((product) => product.kind === "pack");
-  const bundles = ARCADE_PRODUCTS.filter(
-    (product) => product.kind === "bundle",
-  );
+  const access = useArcadeAccess();
+  const refresh = access.refresh;
+  const [notice] = useState<ReturnNotice>(checkoutReturnNotice);
+  const [purchasing, setPurchasing] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  // Stripe normally delivers the webhook before redirecting, while these
+  // retries cover the small window where the account projection arrives later.
+  useEffect(() => {
+    if (notice !== "returned") return;
+    const first = window.setTimeout(() => void refresh(), 1_000);
+    const second = window.setTimeout(() => void refresh(), 3_000);
+    return () => {
+      window.clearTimeout(first);
+      window.clearTimeout(second);
+    };
+  }, [notice, refresh]);
 
   return (
     <div className="space-y-6">
-      <PaperCard variant="atmospheric" padding="lg">
+      {notice === "returned" && (
+        <PaperCard as="section" role="status" variant="atmospheric" padding="lg">
+          <p className="font-art-label text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
+            Thank you for your purchase
+          </p>
+          <h2 className="mt-2 font-display text-[1.5rem] text-graphite">
+            Your arcade item is being added
+          </h2>
+          <p className="mt-2 text-body leading-relaxed text-charcoal">
+            Stripe is confirming the payment. Your item will appear here and
+            inside Seven Days Match as soon as that confirmation arrives.
+          </p>
+        </PaperCard>
+      )}
+
+      {notice === "cancelled" && (
+        <p role="status" className="text-small text-ash">
+          Checkout was cancelled. Nothing was charged.
+        </p>
+      )}
+
+      <PaperCard variant="paper" padding="lg">
         <p className="font-art-label text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
-          What you are holding
+          Seven Days Match
         </p>
         <h2 className="mt-2 font-display text-[1.5rem] leading-tight text-graphite">
-          Board helps
+          Choose how you want to play
         </h2>
         <p className="mt-2 text-body leading-relaxed text-charcoal">
-          Helps change the board and nothing else. Every level can be finished
-          without them, and answering a day&apos;s questions well earns them —
-          reading is how you get them, not the thing they get you past.
+          Questions remain available with either purchase. A Question Skip
+          opens one next chapter; the Game Pass permanently removes every
+          question gate from this game.
         </p>
-        <ul className="mt-4 grid gap-2">
-          {BOOST_IDS.map((id) => (
-            <li
-              key={id}
-              className="flex items-center gap-3 rounded-[var(--radius-button)] border border-mist bg-linen/60 px-3 py-2.5"
-            >
-              <span aria-hidden="true" className="shrink-0">
-                <ArtIcon name={BOOSTS[id].sprite} size={52} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-small font-medium text-graphite">
-                  {BOOSTS[id].name}
-                </span>
-                <span className="block text-caption leading-relaxed text-ash">
-                  {BOOSTS[id].description}
-                </span>
-              </span>
-              <span className="shrink-0 text-small font-medium tabular-nums text-accent">
-                {inventory[id]}
-              </span>
-            </li>
-          ))}
-        </ul>
       </PaperCard>
 
-      <ShelfSection
-        title="More days to play"
-        blurb="Each pack is another seven days of boards and questions, drawn from a passage of its own."
-        products={packs}
-      />
-      <ShelfSection
-        title="Helps by the handful"
-        blurb="The same helps you earn by answering well, if you would rather have more of them to hand."
-        products={bundles}
-      />
+      <section aria-labelledby="arcade-products-title">
+        <h2
+          id="arcade-products-title"
+          className="font-art-label text-[1.125rem] uppercase tracking-[0.06em] text-accent"
+        >
+          Game items
+        </h2>
+        <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+          {ARCADE_PRODUCTS.map((product) => {
+            const owned =
+              product.id === "game-pass" && access.gamePass;
+            const held =
+              product.id === "question-skip" ? access.questionSkips : 0;
+            const busy = purchasing === product.id;
+            const disabled =
+              access.loading ||
+              !access.signedIn ||
+              !access.available ||
+              owned ||
+              purchasing !== null;
+            return (
+              <PaperCard as="li" key={product.id} variant="paper" padding="md">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className="font-display text-subheading text-graphite">
+                    {product.title}
+                  </h3>
+                  <span className="shrink-0 text-small font-medium text-gilt">
+                    {product.price}
+                  </span>
+                </div>
+                <p className="mt-2 text-small leading-relaxed text-charcoal">
+                  {product.description}
+                </p>
+                {(owned || held > 0) && (
+                  <p className="mt-2 text-caption font-medium text-accent">
+                    {owned
+                      ? "Owned — every chapter is unlocked"
+                      : `${held} Question Skip${held === 1 ? "" : "s"} ready`}
+                  </p>
+                )}
+                <GentleButton
+                  variant="primary"
+                  size="sm"
+                  fullWidth
+                  className="mt-4"
+                  disabled={disabled}
+                  onClick={async () => {
+                    setPurchasing(product.id);
+                    setCheckoutError(null);
+                    const redirected = await access.startCheckout(product.id);
+                    if (!redirected) {
+                      setCheckoutError(
+                        "Checkout couldn’t be opened. Please try again.",
+                      );
+                      setPurchasing(null);
+                    }
+                  }}
+                >
+                  {owned ? "Owned" : busy ? "Opening checkout…" : "Buy"}
+                </GentleButton>
+              </PaperCard>
+            );
+          })}
+        </ul>
+      </section>
 
-      <p className="text-caption leading-relaxed text-ash">
-        The arcade never sells a level skip, an answer, or an explanation. Every
-        question shows its reasoning and its passage the moment you answer it,
-        right or wrong, and always will.
-      </p>
+      {!access.signedIn && !access.loading && (
+        <PaperCard variant="quiet" padding="md">
+          <p className="text-small leading-relaxed text-charcoal">
+            Sign in before purchasing so your Game Pass and Question Skips stay
+            attached to your account.
+          </p>
+          <GentleLink href="/app/account" variant="outline" size="sm" className="mt-3">
+            Sign in or create an account
+          </GentleLink>
+        </PaperCard>
+      )}
+
+      {access.signedIn && !access.loading && !access.available && (
+        <p className="text-small leading-relaxed text-ash">
+          Arcade purchases are not available on this deployment yet.
+        </p>
+      )}
+
+      {(checkoutError || access.error) && (
+        <p role="alert" className="text-small text-rose-700">
+          {checkoutError ?? access.error}
+        </p>
+      )}
+
+      <PaperCard variant="atmospheric" padding="md">
+        <p className="text-small font-medium text-graphite">
+          Your purchase also gives back
+        </p>
+        <p className="mt-1 text-caption leading-relaxed text-charcoal">
+          BibleQuest pledges 5% of arcade purchase revenue to nonprofit
+          organizations and local communities. Thank you for helping the game
+          reach beyond the screen.
+        </p>
+      </PaperCard>
     </div>
-  );
-}
-
-function ShelfSection({
-  title,
-  blurb,
-  products,
-}: {
-  title: string;
-  blurb: string;
-  products: readonly (typeof ARCADE_PRODUCTS)[number][];
-}) {
-  return (
-    <section aria-label={title}>
-      <h2 className="font-art-label text-[1.125rem] uppercase tracking-[0.06em] text-accent">
-        {title}
-      </h2>
-      <p className="mt-1 text-small leading-relaxed text-ash">{blurb}</p>
-      <ul className="mt-3 grid gap-3 sm:grid-cols-2">
-        {products.map((product) => (
-          <PaperCard as="li" key={product.id} variant="paper" padding="md">
-            <div className="flex items-baseline justify-between gap-3">
-              <h3 className="font-display text-subheading text-graphite">
-                {product.title}
-              </h3>
-              <span className="shrink-0 text-small font-medium text-gilt">
-                {product.price}
-              </span>
-            </div>
-            <p className="mt-2 text-small leading-relaxed text-charcoal">
-              {product.description}
-            </p>
-            {product.adds && (
-              <p className="mt-2 text-caption text-ash">{product.adds}</p>
-            )}
-            <GentleButton
-              variant={ARCADE_STORE_CHECKOUT_READY ? "primary" : "outline"}
-              size="sm"
-              fullWidth
-              className={cn("mt-4")}
-              disabled={!ARCADE_STORE_CHECKOUT_READY}
-            >
-              {ARCADE_STORE_CHECKOUT_READY ? "Buy" : "Not on sale yet"}
-            </GentleButton>
-          </PaperCard>
-        ))}
-      </ul>
-    </section>
   );
 }
 

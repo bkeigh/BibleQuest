@@ -13,6 +13,10 @@ import {
   synchronizeSupportRefund,
   synchronizeSupportSession,
 } from "@/lib/support/records.server";
+import {
+  synchronizeArcadeCharge,
+  synchronizeArcadeSession,
+} from "@/lib/games/arcade/records.server";
 
 const HANDLED_SUBSCRIPTION_EVENTS = new Set([
   "customer.subscription.created",
@@ -210,6 +214,31 @@ async function processCheckout(
   }
   if (
     session.mode === "payment" &&
+    session.metadata?.purpose === "biblequest_arcade"
+  ) {
+    // Expired and failed sessions are acknowledged but never fulfilled.
+    if (session.status !== "complete" || session.payment_status !== "paid") {
+      return;
+    }
+    const paymentIntentId = id(session.payment_intent);
+    if (!paymentIntentId) {
+      throw new StripeWebhookProcessingError("invalid");
+    }
+    const paymentIntent = await stripe.paymentIntents.retrieve(
+      paymentIntentId,
+      { expand: ["latest_charge"] },
+    );
+    await synchronizeArcadeSession(
+      admin,
+      session,
+      paymentIntent,
+      configuration,
+      event,
+    );
+    return;
+  }
+  if (
+    session.mode === "payment" &&
     session.metadata?.purpose === "biblequest_plus" &&
     session.metadata?.billing_interval === "lifetime"
   ) {
@@ -261,7 +290,10 @@ async function processRefund(
       currentCharge,
       event,
     );
-    const supportPayment = lifetimePayment
+    const arcadePayment = lifetimePayment
+      ? false
+      : await synchronizeArcadeCharge(admin, currentCharge, event);
+    const supportPayment = lifetimePayment || arcadePayment
       ? false
       : await synchronizeSupportRefund(
           admin,
@@ -269,7 +301,7 @@ async function processRefund(
           event,
         );
     const recoveredSupportPayment =
-      !lifetimePayment && !supportPayment
+      !lifetimePayment && !arcadePayment && !supportPayment
         ? await synchronizeSupportRefund(
             admin,
             currentCharge,
@@ -277,7 +309,7 @@ async function processRefund(
             await supportRequestIdFromCharge(stripe, currentCharge),
           )
         : supportPayment;
-    if (!lifetimePayment && !recoveredSupportPayment) {
+    if (!lifetimePayment && !arcadePayment && !recoveredSupportPayment) {
       const context = await subscriptionContextFromCharge(
         stripe,
         currentCharge,
@@ -328,7 +360,15 @@ async function processDispute(
       event,
       dispute,
     );
-    const supportPayment = lifetimePayment
+    const arcadePayment = lifetimePayment
+      ? false
+      : await synchronizeArcadeCharge(
+          admin,
+          currentCharge,
+          event,
+          dispute,
+        );
+    const supportPayment = lifetimePayment || arcadePayment
       ? false
       : await synchronizeSupportDispute(
           admin,
@@ -337,7 +377,7 @@ async function processDispute(
           event,
         );
     const recoveredSupportPayment =
-      !lifetimePayment && !supportPayment
+      !lifetimePayment && !arcadePayment && !supportPayment
         ? await synchronizeSupportDispute(
             admin,
             currentCharge,
@@ -346,7 +386,7 @@ async function processDispute(
             await supportRequestIdFromCharge(stripe, currentCharge),
           )
         : supportPayment;
-    if (!lifetimePayment && !recoveredSupportPayment) {
+    if (!lifetimePayment && !arcadePayment && !recoveredSupportPayment) {
       const context = await subscriptionContextFromCharge(
         stripe,
         currentCharge,
@@ -420,7 +460,8 @@ export async function processStripeWebhookEvent(
       error instanceof Error &&
       (
         error.name === "StripeSupportProjectionError" ||
-        error.name === "StripeLifetimeProjectionError"
+        error.name === "StripeLifetimeProjectionError" ||
+        error.name === "StripeArcadeProjectionError"
       )
     ) {
       throw new StripeWebhookProcessingError("invalid");

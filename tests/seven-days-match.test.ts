@@ -31,10 +31,13 @@ import {
 } from "@/lib/games/seven-days/play";
 import {
   emptySevenDaysProgress,
+  isDayAnswered,
   isDayReadyForQuestions,
+  isDaySkipped,
   isDayUnlocked,
   isLevelUnlocked,
   markDayAnswered,
+  markDaySkipped,
   markLevelCleared,
   nextLevel,
   pendingQuestionDay,
@@ -56,7 +59,6 @@ import {
 } from "@/lib/games/arcade/boosts";
 import {
   ARCADE_PRODUCTS,
-  assertNoShortcutsForSale,
 } from "@/lib/games/arcade/store";
 import {
   BLOCKED,
@@ -273,6 +275,14 @@ describe("Seven Days Match levels", () => {
     expect(last.tiles).toHaveLength(5);
   });
 
+  it("starts with a firmer move budget and goal", () => {
+    const first = SEVEN_DAYS_LEVELS[0];
+    // These bounds keep the opening intentional without making it a late-game wall.
+    expect(first.moves).toBeLessThanOrEqual(28);
+    expect(first.moves).toBeGreaterThanOrEqual(24);
+    expect(first.goals[0].count).toBeGreaterThanOrEqual(12);
+  });
+
   it("gives every level its own shape and scene", () => {
     for (const chapter of SEVEN_DAYS_CHAPTERS) {
       const shapes = levelsForChapter(chapter.id).map((level) =>
@@ -422,6 +432,47 @@ describe("Seven Days Match progress", () => {
     expect(progress.firstTry).toHaveLength(0);
   });
 
+  it("opens one next day with a consumed Question Skip", () => {
+    let progress = emptySevenDaysProgress();
+    for (const level of levelsForChapter(SEVEN_DAYS_CHAPTERS[0].id)) {
+      progress = markLevelCleared(progress, level);
+    }
+    progress = markDaySkipped(progress, SEVEN_DAYS_CHAPTERS[0]);
+    expect(isDaySkipped(progress, SEVEN_DAYS_CHAPTERS[0])).toBe(true);
+    expect(isDayAnswered(progress, SEVEN_DAYS_CHAPTERS[0])).toBe(false);
+    expect(isDayUnlocked(progress, SEVEN_DAYS_CHAPTERS[1])).toBe(true);
+    expect(summarize(progress)).toMatchObject({ daysSkipped: 1 });
+  });
+
+  it("lets Game Pass bypass chapter questions without changing progress", () => {
+    const progress = emptySevenDaysProgress();
+    expect(isDayUnlocked(progress, SEVEN_DAYS_CHAPTERS[6], true)).toBe(true);
+    expect(
+      isLevelUnlocked(
+        progress,
+        levelsForChapter(SEVEN_DAYS_CHAPTERS[6].id)[0],
+        true,
+      ),
+    ).toBe(true);
+    expect(progress.daysSkipped).toEqual([]);
+  });
+
+  it("migrates valid version-two progress without losing cleared levels", () => {
+    const migrated = sanitizeSevenDaysProgress({
+      version: 2,
+      contentVersion: 1,
+      cleared: [SEVEN_DAYS_LEVELS[0].id],
+      daysAnswered: [],
+      firstTry: [],
+      updatedAt: 1,
+    });
+    expect(migrated).toMatchObject({
+      version: 3,
+      cleared: [SEVEN_DAYS_LEVELS[0].id],
+      daysSkipped: [],
+    });
+  });
+
   it("round-trips through storage", () => {
     const storage = memoryStorage();
     const progress = markLevelCleared(
@@ -477,9 +528,9 @@ describe("Seven Days Match product boundaries", () => {
   const all = [screen, session, question, board].join("\n");
 
   it("takes nothing away for losing, whatever it sells", () => {
-    // The arcade sells packs and board helps now, so "nothing to buy" is no
-    // longer the promise. These still are: no lives, no timers, no waiting,
-    // and nothing that charges for being stuck. Comments are stripped first —
+    // The arcade sells optional question-gate access, so "nothing to buy" is
+    // no longer the promise. These still are: no lives, timers, or waiting.
+    // Comments are stripped first —
     // prose about where state "lives" is not a life system.
     const copy = all
       .replaceAll(/\/\*[\s\S]*?\*\//g, "")
@@ -526,45 +577,33 @@ describe("Seven Days Match product boundaries", () => {
     expect(board).toContain("row ${row}, column ${col}");
   });
 
-  it("never sells a way past the Scripture", () => {
-    // The one line the arcade may not cross. Enforced in the catalogue itself
-    // so it fails a build rather than a review, and asserted here so the rule
-    // cannot be quietly removed from the catalogue.
-    expect(storeSource).toContain("assertNoShortcutsForSale");
-    expect(() =>
-      assertNoShortcutsForSale([
-        {
-          id: "test-skip",
-          kind: "pack",
-          title: "Skip a level",
-          description: "Jump past a board.",
-          price: "$1",
-        },
-      ]),
-    ).toThrow(/never a way past it/);
-    for (const product of ARCADE_PRODUCTS) {
-      expect(["pack", "bundle"]).toContain(product.kind);
-    }
+  it("offers only the two server-priced question-gate products", () => {
+    expect(ARCADE_PRODUCTS).toMatchObject([
+      {
+        id: "question-skip",
+        kind: "consumable",
+        price: "$0.99",
+        unitAmount: 99,
+      },
+      {
+        id: "game-pass",
+        kind: "entitlement",
+        price: "$2.99",
+        unitAmount: 299,
+      },
+    ]);
   });
 
-  it("cannot put a live Buy button on a shelf that cannot charge", () => {
-    // The latch only swaps a label and a `disabled` attribute. Flipped without
-    // a checkout handler behind it, "Not on sale yet" becomes a Buy button
-    // that does nothing when tapped — and a button that does nothing is
-    // indistinguishable from one that is merely slow, so nobody would report
-    // it. This fails the build in exactly that state.
+  it("connects every Buy button to server-created Checkout", () => {
     const storeScreen = readFileSync(
       "src/components/games/ArcadeStore.tsx",
       "utf8",
     );
-    const wired = /onClick=|onSubmit=|formAction=/.test(storeScreen);
-    const enabled = process.env.NEXT_PUBLIC_ARCADE_STORE_ENABLED === "true";
-    expect(
-      !enabled || wired,
-      "NEXT_PUBLIC_ARCADE_STORE_ENABLED is on but no product has a checkout handler",
-    ).toBe(true);
-    // And the prerequisites stay written down next to the latch itself.
-    expect(storeSource).toContain("ARCADE_STORE_CHECKOUT_PREREQUISITES");
+    expect(storeScreen).toContain("access.startCheckout(product.id)");
+    expect(storeScreen).toContain("Thank you for your purchase");
+    expect(storeScreen).toContain("pledges 5% of arcade purchase revenue");
+    expect(storeSource).toContain("unitAmount: 99");
+    expect(storeSource).toContain("unitAmount: 299");
   });
 
   it("keeps helps on the board and off the Scripture", () => {

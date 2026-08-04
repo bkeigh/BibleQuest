@@ -37,11 +37,17 @@ export function SevenDaysGoalChip({
             // Sized to the sprite it holds. The colour here is tile identity — how
             // you tell Light from Waters at a glance — so the chip stays; it just
             // stopped clipping a 48px sprite into 36px.
-            "flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] ring-1",
+            "relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[12px] ring-1",
             art.chipClassName,
           )}
         >
-          <ArtIcon name={art.sprite} size={56} />
+          <ArtIcon
+            name={art.sprite}
+            size={56}
+            // Keep every goal symbol centred even when its weighted art box
+            // is larger than the chip that contains it.
+            className="absolute left-1/2 top-1/2 max-h-full max-w-full -translate-x-1/2 -translate-y-1/2 object-center"
+          />
         </span>
         <span className="min-w-0 flex-1 text-small text-charcoal">
           Gather {need} {art.label}
@@ -63,12 +69,17 @@ export function SevenDaysGoalChip({
         animate={met ? { scale: [1, 1.18, 1] } : { scale: 1 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
         className={cn(
-          "flex h-7 w-7 items-center justify-center rounded-[8px] ring-1",
+          "relative flex h-7 w-7 items-center justify-center overflow-hidden rounded-[8px] ring-1",
           art.chipClassName,
           met && "ring-2 ring-accent",
         )}
       >
-        <ArtIcon name={art.sprite} size={44} />
+        <ArtIcon
+          name={art.sprite}
+          size={44}
+          // The compact HUD uses the same geometric centre as the board.
+          className="absolute left-1/2 top-1/2 max-h-full max-w-full -translate-x-1/2 -translate-y-1/2 object-center"
+        />
       </motion.span>
       <motion.span
         key={have}
