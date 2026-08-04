@@ -1,5 +1,6 @@
 import "server-only";
 
+import { recordServerFailure } from "@/lib/observability/server-failures";
 import { createAdminSupabase } from "@/lib/supabase/admin.server";
 import {
   sanitizeAuditDetails,
@@ -48,8 +49,12 @@ export async function appendConsoleAuditLog(
       p_outcome: input.outcome ?? "succeeded",
       p_details: sanitizeAuditDetails(input.details),
     });
+    // A dropped operator event leaves the append-only trail incomplete, which
+    // no caller can detect later, so the failure is always recorded.
+    if (error) recordServerFailure("console", "audit", error);
     return !error;
-  } catch {
+  } catch (error) {
+    recordServerFailure("console", "audit", error);
     return false;
   }
 }
@@ -68,6 +73,7 @@ export async function loadConsoleAuditLogs(): Promise<ConsoleAuditResult> {
       .limit(100);
 
     if (error) {
+      recordServerFailure("console", "read", error);
       return {
         source: {
           status: "degraded",
@@ -107,7 +113,8 @@ export async function loadConsoleAuditLogs(): Promise<ConsoleAuditResult> {
         ];
       }),
     };
-  } catch {
+  } catch (error) {
+    recordServerFailure("console", "read", error);
     return {
       source: {
         status: "setup_required",

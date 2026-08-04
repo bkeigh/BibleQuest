@@ -123,7 +123,10 @@ export function InstallPrompt() {
     setShow(false);
     try {
       localStorage.setItem(DISMISS_KEY, String(Date.now()));
-    } catch {}
+    } catch {
+      // Storage can be unavailable (Safari private mode); the in-session latch
+      // above still keeps the dismissed prompt down for this visit.
+    }
   }
 
   async function install() {

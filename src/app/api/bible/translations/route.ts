@@ -10,6 +10,7 @@ import {
   type BibleTranslation,
 } from "@/lib/bible/translations";
 import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
+import { recordServerFailure } from "@/lib/observability/server-failures";
 import { guardDistributedRequest } from "@/lib/security/distributed-rate-limit.server";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +44,10 @@ export async function GET(request: Request) {
   if (apiBibleConfigured()) {
     try {
       connected = await listApprovedApiBibles();
-    } catch {
+    } catch (error) {
+      // The catalogue still answers from open translations, so the degraded
+      // provider is only visible to the operator through this signal.
+      recordServerFailure("bible", "translations", error);
       providerError = true;
     }
   }

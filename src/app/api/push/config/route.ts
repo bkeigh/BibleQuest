@@ -7,6 +7,10 @@ import {
   type PushPreferenceRow,
 } from "@/lib/push/server";
 import { privateError } from "@/lib/http/request";
+import {
+  recordServerFailure,
+  recordServerFailureReason,
+} from "@/lib/observability/server-failures";
 import { createAdminSupabase } from "@/lib/supabase/admin.server";
 import { authenticatedServerContext } from "@/lib/supabase/authenticated.server";
 
@@ -19,6 +23,7 @@ export async function GET() {
   if (context instanceof Response) return context;
   if (!pushFeatureEnabled()) return privateError("unavailable", 503);
   if (!(await pushContractReady(context.supabase))) {
+    recordServerFailureReason("push", "config", "schema");
     return privateError("unavailable", 503);
   }
 
@@ -38,6 +43,11 @@ export async function GET() {
         .eq("user_id", context.user.id),
     ]);
     if (preferencesResult.error || subscriptionsResult.error) {
+      recordServerFailure(
+        "push",
+        "config",
+        preferencesResult.error ?? subscriptionsResult.error,
+      );
       return privateError("unavailable", 503);
     }
     return Response.json(
@@ -54,7 +64,8 @@ export async function GET() {
         headers: { "Cache-Control": "private, no-store" },
       },
     );
-  } catch {
+  } catch (error) {
+    recordServerFailure("push", "config", error);
     return privateError("unavailable", 503);
   }
 }

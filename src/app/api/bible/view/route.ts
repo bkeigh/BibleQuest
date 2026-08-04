@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
 import { API_BIBLE_FUMS_TOKEN } from "@/lib/bible/fums";
 import { boundedJson } from "@/lib/http/json";
+import {
+  recordServerFailure,
+  recordServerFailureReason,
+} from "@/lib/observability/server-failures";
 import { guardDistributedRequest } from "@/lib/security/distributed-rate-limit.server";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +59,7 @@ export async function POST(request: Request) {
       signal: AbortSignal.timeout(5_000),
     });
     if (!response.ok) {
+      recordServerFailureReason("bible", "view_report", "provider");
       return NextResponse.json(
         { error: "report_unavailable" },
         {
@@ -63,7 +68,8 @@ export async function POST(request: Request) {
         },
       );
     }
-  } catch {
+  } catch (error) {
+    recordServerFailure("bible", "view_report", error);
     return NextResponse.json(
       { error: "report_unavailable" },
       { status: 503, headers: { "Cache-Control": "private, no-store" } },

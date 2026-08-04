@@ -6,6 +6,10 @@ import {
 } from "@/lib/bible/provider-dispatcher";
 import { getBookMeta } from "@/lib/bible";
 import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
+import {
+  classifyServerFailure,
+  recordServerFailureReason,
+} from "@/lib/observability/server-failures";
 import { guardDistributedRequest } from "@/lib/security/distributed-rate-limit.server";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +22,17 @@ const PASSAGE_RATE_LIMITS = [
 function errorResponse(error: unknown) {
   const code = bibleProviderErrorCode(error);
   const status = code === "provider_not_configured" ? 503 : code === "translation_unavailable" ? 404 : 502;
+  // Missing catalogue coverage is normal; provider and configuration failures
+  // are the branches an operator otherwise cannot see.
+  if (status !== 404) {
+    recordServerFailureReason(
+      "bible",
+      "passage",
+      code === "provider_not_configured"
+        ? "configuration"
+        : classifyServerFailure(error),
+    );
+  }
   return NextResponse.json(
     { error: code },
     { status, headers: { "Cache-Control": "private, no-store" } },
