@@ -1,5 +1,6 @@
 import "server-only";
 
+import { recordServerFailure } from "@/lib/observability/server-failures";
 import { createServerSupabase, isSupabaseConfigured } from "@/lib/supabase/server";
 import {
   consoleAllowedEmails,
@@ -63,7 +64,10 @@ export async function getConsoleAccess(): Promise<ConsoleAccess> {
       email,
       role: "owner",
     };
-  } catch {
+  } catch (error) {
+    // The console reports this as configuration work, so the real cause has to
+    // be recorded or a dependency outage looks like a missing setting.
+    recordServerFailure("console", "session", error);
     return { state: "configuration_required" };
   }
 }

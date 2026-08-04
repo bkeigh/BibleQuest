@@ -115,8 +115,7 @@ export function GamesScreen() {
                       Arcade Store
                     </span>
                     <span className="block text-small leading-relaxed text-ash">
-                      More days to play and helps for the board. Answers stay
-                      free.
+                      Question Skips and a permanent Seven Days Game Pass.
                     </span>
                   </span>
                   <IconArrowRight size={16} className="shrink-0 text-accent" />

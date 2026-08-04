@@ -18,6 +18,10 @@ import {
   optionalSupportUser,
   stripeSupportContractReady,
 } from "@/lib/support/server";
+import {
+  recordServerFailure,
+  recordServerFailureReason,
+} from "@/lib/observability/server-failures";
 import { createAdminSupabase } from "@/lib/supabase/admin.server";
 import { createServerSupabase } from "@/lib/supabase/server";
 
@@ -43,8 +47,10 @@ async function recordCreationFailure(
       outcome: "failed",
       errorCategory: values.category,
     });
-  } catch {
-    // The caller still returns the same bounded unavailable response.
+  } catch (error) {
+    // The caller still returns the same bounded unavailable response, but a
+    // claim that cannot be released blocks the next attempt on this request.
+    recordServerFailure("support", "complete", error);
   }
 }
 
@@ -98,6 +104,7 @@ export async function POST(request: Request) {
     }
     admin = createAdminSupabase();
     if (!(await stripeSupportContractReady(admin))) {
+      recordServerFailureReason("support", "claim", "schema");
       return privateError("unavailable", 503);
     }
     user = await optionalSupportUser(createServerSupabase);
@@ -107,10 +114,12 @@ export async function POST(request: Request) {
       amount: values.amount,
       livemode: configuration.livemode,
     });
-  } catch {
+  } catch (error) {
+    recordServerFailure("support", "claim", error);
     return privateError("unavailable", 503);
   }
   if (claim.status === "unavailable") {
+    recordServerFailureReason("support", "claim", "conflict");
     return Response.json(
       { error: "retry_later" },
       {
@@ -174,6 +183,7 @@ export async function POST(request: Request) {
       livemode: configuration.livemode,
     });
     if (!url) {
+      recordServerFailureReason("support", "checkout", "invalid");
       if (claim.status === "claimed") {
         await recordCreationFailure(admin, {
           requestId: values.requestId,
@@ -192,6 +202,7 @@ export async function POST(request: Request) {
         sessionId: session.id,
       }))
     ) {
+      recordServerFailureReason("support", "complete", "dependency");
       return privateError("unavailable", 503);
     }
     return Response.json(
@@ -201,7 +212,8 @@ export async function POST(request: Request) {
         headers: { "Cache-Control": "private, no-store" },
       },
     );
-  } catch {
+  } catch (error) {
+    recordServerFailure("support", "checkout", error);
     if (claim.status === "claimed") {
       await recordCreationFailure(admin, {
         requestId: values.requestId,

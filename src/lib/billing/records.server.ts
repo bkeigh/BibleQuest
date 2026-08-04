@@ -44,6 +44,20 @@ export async function claimStripeAction(
   return parseActionClaim(data);
 }
 
+/** The private 429 response returned when a Stripe action claim is throttled. */
+export function stripeActionRateLimited(retryAfterSeconds: number): Response {
+  return Response.json(
+    { error: "rate_limited" },
+    {
+      status: 429,
+      headers: {
+        "Cache-Control": "private, no-store",
+        "Retry-After": String(retryAfterSeconds),
+      },
+    },
+  );
+}
+
 /** Finds or idempotently creates the one Stripe Customer for an account. */
 export async function customerForUser(
   admin: SupabaseClient,

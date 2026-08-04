@@ -42,6 +42,7 @@ const EXPECTED_MIGRATIONS = [
   "0033_guided_pilgrimage_progress.sql",
   "0034_distributed_provider_rate_limits.sql",
   "0035_fix_provider_rate_limit_claim_timestamp.sql",
+  "0036_arcade_store_purchases.sql",
 ];
 
 /** Hash a migration exactly as the release manifest does. */
@@ -120,7 +121,7 @@ describe("release migration contracts", () => {
     const expectedTables = report.match(/    \('[a-z_]+', '[^']+'\)/g) ?? [];
     const worker = readFileSync(join(ROOT, "public", "sw.js"), "utf8");
 
-    expect(expectedTables).toHaveLength(42);
+    expect(expectedTables).toHaveLength(44);
     expect(report).toContain("('user_guided_movements', 'user-owned')");
     expect(report).toContain("('user_daily_quest_days', 'user-owned')");
     expect(report).toContain(
@@ -158,6 +159,14 @@ describe("release migration contracts", () => {
     expect(report).toContain("'operator_plus_grant_contract'");
     expect(report).toContain("'grant_operator_plus'");
     expect(report).toContain("'revoke_operator_plus'");
+    expect(report).toContain("'consume_arcade_question_skip'");
+    expect(report).toContain("'arcade_store_contract'");
+    expect(report).toContain(
+      "('arcade_orders', 'server-owned financial')",
+    );
+    expect(report).toContain(
+      "('arcade_question_skip_redemptions', 'server-owned entitlement history')",
+    );
     expect(report).toContain("'enforce_user_owned_row_size'");
     expect(report).toContain("'ensure_journey_event_date_key'");
     expect(report).toContain(

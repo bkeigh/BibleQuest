@@ -13,7 +13,7 @@ import { spawnSync } from "node:child_process";
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const PROJECT_REF = "iacnjqnssovaaojswjoh";
 const EXPECTED_MANIFEST_SHA256 =
-  "3e4949bca5fa0756c122955355bc17e600604c2b9e04d74a883ac86dd3a61935";
+  "7f6f4ba507d4f314fe3965a0ed9602cce854fd370e63f1e892d34e2f08d0fa04";
 const APPLY_CONFIRMATION = `apply 20260803170000 to ${PROJECT_REF}`;
 const MAX_BACKUP_AGE_MS = 30 * 60 * 60 * 1000;
 const PACKET = {
@@ -93,12 +93,12 @@ function parseJson(output, label) {
   }
 }
 
-// Verifies the complete 34-file manifest and the immutable 0035 source.
+// Verifies the complete 35-file manifest and the immutable 0035 source.
 async function verifyReleaseInputs() {
   const migrationsDir = join(ROOT, "supabase", "migrations");
   const manifest = await readFile(join(migrationsDir, "manifest.sha256"));
   if (sha256(manifest) !== EXPECTED_MANIFEST_SHA256) {
-    fail("Reviewed 34-file manifest checksum changed");
+    fail("Reviewed 35-file manifest checksum changed");
   }
   const source = await readFile(join(migrationsDir, PACKET.source));
   if (sha256(source) !== PACKET.sourceSha) {

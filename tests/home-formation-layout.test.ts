@@ -81,7 +81,7 @@ describe("Home formation layout", () => {
 
   it("uses editorial artwork and display type for games", () => {
     expect(card).toContain("/art/scripture-games-today.webp");
-    expect(card).toContain("/art/scripture-games-coming-1.webp");
+    expect(card).toContain("/art/seven-days-match-poster.webp");
     expect(card).toContain("/art/scripture-games-coming-2.webp");
     // Card titles use the display face everywhere, including the guide card.
     expect(card).toContain('font-display text-[1.75rem]');

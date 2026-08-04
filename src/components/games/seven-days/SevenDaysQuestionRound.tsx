@@ -23,17 +23,22 @@ import { SevenDaysQuestionCard } from "./SevenDaysQuestionCard";
  * rather than as the point. Gathered into one round at the end of the day, they
  * become the thing the day was for.
  *
- * The round opens the next day however it goes. Every answer shows its
- * explanation and its passage, so a wrong one is where the reading happens —
- * blocking there would stop exactly the reader who most needs the next screen.
+ * The round opens the next day however it goes. A server-owned Question Skip
+ * or Game Pass can also make it optional without hiding any question or answer.
  */
 export function SevenDaysQuestionRound({
   chapter,
   onComplete,
+  canBypass,
+  bypassLabel,
+  onBypass,
   onExit,
 }: {
   chapter: SevenDaysChapter;
   onComplete: (firstTryQuestionIds: string[]) => void;
+  canBypass: boolean;
+  bypassLabel: string;
+  onBypass: () => Promise<void>;
   onExit: () => void;
 }) {
   const [index, setIndex] = useState(0);
@@ -148,6 +153,17 @@ export function SevenDaysQuestionRound({
           }}
         />
       </div>
+
+      {canBypass && (
+        <GentleButton
+          variant="outline"
+          fullWidth
+          className="mt-3"
+          onClick={() => void onBypass()}
+        >
+          {bypassLabel}
+        </GentleButton>
+      )}
 
       <button
         type="button"

@@ -4,6 +4,7 @@ import { requireStripeBillingConfiguration } from "@/lib/billing/config.server";
 import {
   claimStripeAction,
   customerForUser,
+  stripeActionRateLimited,
 } from "@/lib/billing/records.server";
 import { stripeBillingContractReady } from "@/lib/billing/server";
 import {
@@ -14,6 +15,7 @@ import {
   isBillingInterval,
   MAX_BILLING_REQUEST_BYTES,
 } from "@/lib/billing/validation";
+import { recordServerFailure } from "@/lib/observability/server-failures";
 import { createAdminSupabase } from "@/lib/supabase/admin.server";
 import { authenticatedServerContext } from "@/lib/supabase/authenticated.server";
 
@@ -52,18 +54,7 @@ export async function POST(request: Request) {
       "checkout",
       30,
     );
-    if (!claim.claimed) {
-      return Response.json(
-        { error: "rate_limited" },
-        {
-          status: 429,
-          headers: {
-            "Cache-Control": "private, no-store",
-            "Retry-After": "30",
-          },
-        },
-      );
-    }
+    if (!claim.claimed) return stripeActionRateLimited(30);
     const { count, error: subscriptionError } = await admin
       .from("subscriptions")
       .select("id", { count: "exact", head: true })
@@ -77,7 +68,10 @@ export async function POST(request: Request) {
         "unpaid",
         "paused",
       ]);
-    if (subscriptionError) return privateError("unavailable", 503);
+    if (subscriptionError) {
+      recordServerFailure("billing", "checkout", subscriptionError);
+      return privateError("unavailable", 503);
+    }
     if ((count ?? 0) > 0) return privateError("manage_existing", 409);
 
     const stripe = createStripe(configuration);
@@ -136,7 +130,8 @@ export async function POST(request: Request) {
         headers: { "Cache-Control": "private, no-store" },
       },
     );
-  } catch {
+  } catch (error) {
+    recordServerFailure("billing", "checkout", error);
     return privateError("unavailable", 503);
   }
 }

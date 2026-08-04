@@ -281,11 +281,14 @@ export function SevenDaysBoard({
                 first. Absolute positioning means the art can never contribute
                 a dimension, so the cell is square because the grid says so and
                 for no other reason. */}
-            <span className="pointer-events-none absolute inset-0 grid place-items-center">
+            <span className="pointer-events-none absolute inset-0 overflow-hidden">
               <ArtIcon
                 name={art.sprite}
                 size={56}
-                className="max-h-full max-w-full"
+                // Pin the sprite's own box to the geometric centre. Safari can
+                // otherwise resolve an oversized intrinsic image against the
+                // cell's aspect ratio and leave it sitting on the bottom edge.
+                className="absolute left-1/2 top-1/2 max-h-full max-w-full -translate-x-1/2 -translate-y-1/2 object-center"
               />
             </span>
           </motion.button>

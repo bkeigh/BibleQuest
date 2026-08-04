@@ -1,4 +1,5 @@
 import { privateError } from "@/lib/http/request";
+import { recordServerFailure } from "@/lib/observability/server-failures";
 import { stripeBillingAvailability } from "@/lib/billing/config.server";
 import {
   createStripe,
@@ -62,7 +63,8 @@ export async function GET() {
       },
       { headers: { "Cache-Control": "public, max-age=300" } },
     );
-  } catch {
+  } catch (error) {
+    recordServerFailure("billing", "plans", error);
     return privateError("unavailable", 503);
   }
 }

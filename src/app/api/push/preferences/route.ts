@@ -9,6 +9,10 @@ import {
   MAX_PUSH_REQUEST_BYTES,
   parsePushReminderPreferences,
 } from "@/lib/push/validation";
+import {
+  recordServerFailure,
+  recordServerFailureReason,
+} from "@/lib/observability/server-failures";
 import { createAdminSupabase } from "@/lib/supabase/admin.server";
 import { authenticatedServerContext } from "@/lib/supabase/authenticated.server";
 
@@ -22,6 +26,7 @@ export async function PATCH(request: Request) {
   const context = await authenticatedServerContext();
   if (context instanceof Response) return context;
   if (!(await pushContractReady(context.supabase))) {
+    recordServerFailureReason("push", "preferences", "schema");
     return privateError("unavailable", 503);
   }
   const body = await boundedJson(request, MAX_PUSH_REQUEST_BYTES);
@@ -35,13 +40,16 @@ export async function PATCH(request: Request) {
       .upsert(pushPreferencesToRow(context.user.id, preferences), {
         onConflict: "user_id",
       });
-    return error
-      ? privateError("unavailable", 503)
-      : new Response(null, {
-          status: 204,
-          headers: { "Cache-Control": "private, no-store" },
-        });
-  } catch {
+    if (error) {
+      recordServerFailure("push", "preferences", error);
+      return privateError("unavailable", 503);
+    }
+    return new Response(null, {
+      status: 204,
+      headers: { "Cache-Control": "private, no-store" },
+    });
+  } catch (error) {
+    recordServerFailure("push", "preferences", error);
     return privateError("unavailable", 503);
   }
 }

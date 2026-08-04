@@ -27,6 +27,7 @@ describe("deny-by-default direct Stripe configuration", () => {
       livemode: false,
       purchasesEnabled: false,
       supportEnabled: false,
+      arcadeEnabled: false,
     });
     expect(
       stripeBillingAvailability({
@@ -39,6 +40,31 @@ describe("deny-by-default direct Stripe configuration", () => {
       mode: "test",
       purchasesEnabled: true,
       supportEnabled: true,
+      arcadeEnabled: false,
+    });
+  });
+
+  it("requires two distinct server-only arcade Prices before enabling the store", () => {
+    expect(
+      stripeBillingAvailability({
+        ...TEST_ENVIRONMENT,
+        BIBLEQUEST_STRIPE_ARCADE_ENABLED: "true",
+      }).status,
+    ).toBe("invalid");
+    expect(
+      stripeBillingAvailability({
+        ...TEST_ENVIRONMENT,
+        BIBLEQUEST_STRIPE_ARCADE_ENABLED: "true",
+        STRIPE_ARCADE_QUESTION_SKIP_PRICE_ID: "price_QuestionSkip123",
+        STRIPE_ARCADE_GAME_PASS_PRICE_ID: "price_GamePass123",
+      }),
+    ).toMatchObject({
+      status: "configured",
+      arcadeEnabled: true,
+      arcadePriceIds: {
+        questionSkip: "price_QuestionSkip123",
+        gamePass: "price_GamePass123",
+      },
     });
   });
 

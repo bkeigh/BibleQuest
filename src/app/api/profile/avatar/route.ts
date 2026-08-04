@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   InvalidAvatarImageError,
   normalizeAvatarImage,
@@ -14,7 +14,12 @@ import {
 } from "@/lib/avatar/validation";
 import { boundedBytes, boundedJson } from "@/lib/http/json";
 import { hasSameOrigin, privateError } from "@/lib/http/request";
-import { createServerSupabase } from "@/lib/supabase/server";
+import {
+  recordServerFailure,
+  recordServerFailureReason,
+  type ServerFailureStage,
+} from "@/lib/observability/server-failures";
+import { authenticatedServerContext } from "@/lib/supabase/authenticated.server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -69,29 +74,25 @@ function ownedAvatarPath(userId: string, value: unknown): value is string {
   );
 }
 
-/** Creates one RLS-bound server client and verifies its current user. */
-async function authenticatedContext(): Promise<
-  { supabase: SupabaseClient; user: User } | Response
-> {
-  try {
-    const supabase = await createServerSupabase();
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-    if (error || !user) return privateError("unauthorized", 401);
-    return { supabase, user };
-  } catch {
-    return privateError("unavailable", 503);
-  }
-}
-
-/** Proves the private bucket and dedicated RPC boundary before media access. */
+/**
+ * Proves the private bucket and dedicated RPC boundary before media access. A
+ * null stage means the surface is deliberately dormant, where a missing
+ * contract is expected rather than an operational failure.
+ */
 async function avatarContractReady(
   supabase: SupabaseClient,
+  stage: ServerFailureStage | null,
 ): Promise<boolean> {
   const { data, error } = await supabase.rpc("profile_avatar_contract");
-  return !error && isAvatarContract(data);
+  if (error) {
+    if (stage) recordServerFailure("avatar", stage, error);
+    return false;
+  }
+  if (!isAvatarContract(data)) {
+    if (stage) recordServerFailureReason("avatar", stage, "schema");
+    return false;
+  }
+  return true;
 }
 
 /** Reads only the authenticated user's avatar pointer. */
@@ -104,7 +105,7 @@ async function avatarProfile(
     .select("avatar_path,avatar_version,avatar_updated_at")
     .eq("id", userId)
     .maybeSingle();
-  if (error) throw new Error("avatar profile unavailable");
+  if (error) throw new Error("avatar profile unavailable", { cause: error });
   return data as AvatarProfileRow | null;
 }
 
@@ -126,10 +127,10 @@ function avatarResponse(
 /** Serves the current private object through the user's authenticated session. */
 export async function GET() {
   if (!featureEnabled()) return privateError("unavailable", 503);
-  const context = await authenticatedContext();
+  const context = await authenticatedServerContext();
   if (context instanceof Response) return context;
   const { supabase, user } = context;
-  if (!(await avatarContractReady(supabase))) {
+  if (!(await avatarContractReady(supabase, "read"))) {
     return privateError("unavailable", 503);
   }
 
@@ -163,7 +164,8 @@ export async function GET() {
       profile.avatar_version,
       profile.avatar_updated_at,
     );
-  } catch {
+  } catch (error) {
+    recordServerFailure("avatar", "read", error);
     return privateError("unavailable", 503);
   }
 }
@@ -180,10 +182,10 @@ export async function POST(request: Request) {
     return privateError("invalid_avatar", 400);
   }
 
-  const context = await authenticatedContext();
+  const context = await authenticatedServerContext();
   if (context instanceof Response) return context;
   const { supabase, user } = context;
-  if (!(await avatarContractReady(supabase))) {
+  if (!(await avatarContractReady(supabase, "write"))) {
     return privateError("unavailable", 503);
   }
 
@@ -228,7 +230,10 @@ export async function POST(request: Request) {
       contentType: "image/webp",
       upsert: false,
     });
-  if (uploadError) return privateError("upload_failed", 503);
+  if (uploadError) {
+    recordServerFailure("avatar", "write", uploadError);
+    return privateError("upload_failed", 503);
+  }
 
   const { data, error: pointerError } = await supabase.rpc(
     "set_profile_avatar",
@@ -246,7 +251,13 @@ export async function POST(request: Request) {
     !result.avatar_updated_at ||
     Number.isNaN(Date.parse(result.avatar_updated_at))
   ) {
-    await supabase.storage.from(AVATAR_BUCKET).remove([path]);
+    recordServerFailure("avatar", "write", pointerError);
+    const { error: rollbackError } = await supabase.storage
+      .from(AVATAR_BUCKET)
+      .remove([path]);
+    // A stranded object is invisible to the account but still consumes the
+    // private bucket, so the operator needs the failed rollback recorded.
+    if (rollbackError) recordServerFailure("avatar", "delete", rollbackError);
     return privateError("upload_failed", 503);
   }
 
@@ -255,10 +266,12 @@ export async function POST(request: Request) {
     result.previous_path !== path &&
     ownedAvatarPath(user.id, result.previous_path)
   ) {
-    // The new pointer is already authoritative; obsolete cleanup is best effort.
-    await supabase.storage
+    // The new pointer is already authoritative; obsolete cleanup is best effort
+    // and only recorded so repeated leaks are visible to the operator.
+    const { error: cleanupError } = await supabase.storage
       .from(AVATAR_BUCKET)
       .remove([result.previous_path]);
+    if (cleanupError) recordServerFailure("avatar", "delete", cleanupError);
   }
 
   return avatarResponse(normalized, version, result.avatar_updated_at);
@@ -277,7 +290,10 @@ async function removeAllOwnedObjects(
         offset: 0,
         sortBy: { column: "name", order: "asc" },
       });
-    if (error) return false;
+    if (error) {
+      recordServerFailure("avatar", "delete", error);
+      return false;
+    }
     // Storage RLS confines the list to this folder. Remove every plain child
     // name so stale objects cannot keep Auth account deletion from succeeding.
     const paths = (data ?? [])
@@ -295,7 +311,10 @@ async function removeAllOwnedObjects(
     const { error: removeError } = await supabase.storage
       .from(AVATAR_BUCKET)
       .remove(paths);
-    if (removeError) return false;
+    if (removeError) {
+      recordServerFailure("avatar", "delete", removeError);
+      return false;
+    }
     if ((data ?? []).length < 100) return true;
   }
 }
@@ -303,10 +322,13 @@ async function removeAllOwnedObjects(
 /** Deletes remote media before clearing its profile pointer. */
 export async function DELETE(request: Request) {
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
-  const context = await authenticatedContext();
+  const context = await authenticatedServerContext();
   if (context instanceof Response) return context;
   const { supabase, user } = context;
-  const contractReady = await avatarContractReady(supabase);
+  const contractReady = await avatarContractReady(
+    supabase,
+    featureEnabled() ? "delete" : null,
+  );
   if (!contractReady) {
     return featureEnabled()
       ? privateError("unavailable", 503)
@@ -345,20 +367,27 @@ export async function DELETE(request: Request) {
       const { error } = await supabase.storage
         .from(AVATAR_BUCKET)
         .remove([profile.avatar_path]);
-      if (error) return privateError("delete_failed", 503);
+      if (error) {
+        recordServerFailure("avatar", "delete", error);
+        return privateError("delete_failed", 503);
+      }
     }
 
     const { data, error } = await supabase.rpc("clear_profile_avatar", {
       p_expected_path: profile?.avatar_path ?? null,
     });
     const result = data as AvatarClearResult | null;
-    if (error || !result) return privateError("delete_failed", 503);
+    if (error || !result) {
+      recordServerFailure("avatar", "delete", error);
+      return privateError("delete_failed", 503);
+    }
     if (!result.cleared) return privateError("avatar_changed", 409);
     return new NextResponse(null, {
       status: 204,
       headers: { "Cache-Control": "private, no-store" },
     });
-  } catch {
+  } catch (error) {
+    recordServerFailure("avatar", "delete", error);
     return privateError("delete_failed", 503);
   }
 }

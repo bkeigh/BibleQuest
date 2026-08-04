@@ -133,6 +133,9 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build ${{ matrix.mode }} bundle
         run: pnpm build
+      - name: Verify configured auth browser bundle
+        if: matrix.mode != 'guest'
+        run: pnpm check:supabase-browser-bundle
       - name: Exercise production and development security headers
         if: matrix.mode == 'configured-auth-contained'
         run: pnpm test:headers:built

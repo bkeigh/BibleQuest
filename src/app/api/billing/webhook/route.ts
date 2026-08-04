@@ -7,6 +7,11 @@ import {
   processStripeWebhookEvent,
   StripeWebhookProcessingError,
 } from "@/lib/billing/webhook.server";
+import {
+  recordServerFailure,
+  recordServerFailureReason,
+  type ServerFailureReason,
+} from "@/lib/observability/server-failures";
 import { createAdminSupabase } from "@/lib/supabase/admin.server";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +25,13 @@ type WebhookClaim =
   | { status: "claimed"; token: string }
   | { status: "processed" }
   | { status: "unavailable" };
+
+/** Maps the reviewed processing category onto the bounded failure reason. */
+function reviewedFailureReason(
+  category: "provider" | "database" | "invalid",
+): ServerFailureReason {
+  return category === "database" ? "dependency" : category;
+}
 
 function webhookClaim(value: unknown): WebhookClaim {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -74,7 +86,10 @@ export async function POST(request: Request) {
     if (event.livemode !== configuration.livemode) {
       return privateError("invalid_request", 400);
     }
-  } catch {
+  } catch (error) {
+    // A rejected signature is expected traffic, while a missing or malformed
+    // Stripe deployment secret is not; only the reason separates them.
+    recordServerFailure("billing_webhook", "verify", error);
     return privateError("invalid_request", 400);
   }
 
@@ -84,6 +99,7 @@ export async function POST(request: Request) {
   try {
     admin = createAdminSupabase();
     if (!(await stripeBillingContractReady(admin))) {
+      recordServerFailureReason("billing_webhook", "claim", "schema");
       return privateError("unavailable", 503);
     }
     ({ data, error } = await admin.rpc("claim_stripe_webhook_event", {
@@ -92,9 +108,11 @@ export async function POST(request: Request) {
       p_event_created: event.created,
       p_livemode: event.livemode,
     }));
-  } catch {
+  } catch (claimError) {
+    recordServerFailure("billing_webhook", "claim", claimError);
     return privateError("unavailable", 503);
   }
+  if (error) recordServerFailure("billing_webhook", "claim", error);
   const claim = error
     ? { status: "unavailable" as const }
     : webhookClaim(data);
@@ -104,7 +122,12 @@ export async function POST(request: Request) {
       { headers: { "Cache-Control": "private, no-store" } },
     );
   }
-  if (claim.status !== "claimed") return privateError("unavailable", 503);
+  if (claim.status !== "claimed") {
+    if (!error) {
+      recordServerFailureReason("billing_webhook", "claim", "conflict");
+    }
+    return privateError("unavailable", 503);
+  }
 
   try {
     const outcome = await processStripeWebhookEvent(
@@ -123,6 +146,7 @@ export async function POST(request: Request) {
       },
     );
     if (completionError || completed !== true) {
+      recordServerFailure("billing_webhook", "complete", completionError);
       return privateError("unavailable", 503);
     }
     return Response.json(
@@ -134,12 +158,29 @@ export async function POST(request: Request) {
       processingError instanceof StripeWebhookProcessingError
         ? processingError.category
         : "invalid";
-    await admin.rpc("complete_stripe_webhook_event", {
-      p_event_id: event.id,
-      p_claim_token: claim.token,
-      p_outcome: "failed",
-      p_error_category: category,
-    });
+    recordServerFailureReason(
+      "billing_webhook",
+      "process",
+      reviewedFailureReason(category),
+    );
+    try {
+      // Releasing the claim is best effort: Stripe retries either way, and a
+      // throw here would replace the bounded 503 with an unrecorded 500.
+      const { data: released, error: releaseError } = await admin.rpc(
+        "complete_stripe_webhook_event",
+        {
+          p_event_id: event.id,
+          p_claim_token: claim.token,
+          p_outcome: "failed",
+          p_error_category: category,
+        },
+      );
+      if (releaseError || released !== true) {
+        recordServerFailure("billing_webhook", "complete", releaseError);
+      }
+    } catch (releaseError) {
+      recordServerFailure("billing_webhook", "complete", releaseError);
+    }
     return privateError("unavailable", 503);
   }
 }

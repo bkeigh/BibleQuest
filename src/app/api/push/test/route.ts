@@ -11,6 +11,10 @@ import {
   isValidPushEndpoint,
   MAX_PUSH_REQUEST_BYTES,
 } from "@/lib/push/validation";
+import {
+  recordServerFailure,
+  recordServerFailureReason,
+} from "@/lib/observability/server-failures";
 import { createAdminSupabase } from "@/lib/supabase/admin.server";
 import { authenticatedServerContext } from "@/lib/supabase/authenticated.server";
 
@@ -24,6 +28,7 @@ export async function POST(request: Request) {
   const context = await authenticatedServerContext();
   if (context instanceof Response) return context;
   if (!(await pushContractReady(context.supabase))) {
+    recordServerFailureReason("push", "test_delivery", "schema");
     return privateError("unavailable", 503);
   }
   const body = await boundedJson(request, MAX_PUSH_REQUEST_BYTES);
@@ -49,6 +54,7 @@ export async function POST(request: Request) {
       .eq("user_id", context.user.id)
       .eq("endpoint_fingerprint", pushEndpointFingerprint(endpoint))
       .maybeSingle();
+    if (error) recordServerFailure("push", "test_delivery", error);
     if (error || !data) return privateError("not_found", 404);
 
     const { data: claim, error: claimError } = await admin.rpc(
@@ -56,6 +62,7 @@ export async function POST(request: Request) {
       { p_user_id: context.user.id },
     );
     if (claimError || !claim || typeof claim !== "object") {
+      recordServerFailure("push", "test_delivery", claimError);
       return privateError("unavailable", 503);
     }
     if ((claim as { claimed?: unknown }).claimed !== true) {
@@ -78,13 +85,16 @@ export async function POST(request: Request) {
       new Date().toISOString().slice(0, 10),
       new Date().toISOString(),
     );
-    return result.sent
-      ? new Response(null, {
-          status: 204,
-          headers: { "Cache-Control": "private, no-store" },
-        })
-      : privateError("delivery_failed", 503);
-  } catch {
+    if (!result.sent) {
+      recordServerFailureReason("push", "test_delivery", "provider");
+      return privateError("delivery_failed", 503);
+    }
+    return new Response(null, {
+      status: 204,
+      headers: { "Cache-Control": "private, no-store" },
+    });
+  } catch (error) {
+    recordServerFailure("push", "test_delivery", error);
     return privateError("delivery_failed", 503);
   }
 }

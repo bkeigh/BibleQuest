@@ -4,7 +4,10 @@ const rateMocks = vi.hoisted(() => ({
   guardDistributedRequest: vi.fn().mockResolvedValue(null),
 }));
 
-vi.mock("@/lib/security/distributed-rate-limit.server", () => ({
+vi.mock("@/lib/security/distributed-rate-limit.server", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/lib/security/distributed-rate-limit.server")
+  >()),
   guardDistributedRequest: rateMocks.guardDistributedRequest,
 }));
 

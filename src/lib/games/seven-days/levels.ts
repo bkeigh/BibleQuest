@@ -1,4 +1,3 @@
-import { WALLPAPER_CATALOG } from "@/lib/wallpapers/catalog";
 import { hashString } from "@/lib/utils/dates";
 import {
   SEVEN_DAYS_CHAPTERS,
@@ -23,8 +22,11 @@ export const BOARD_COLS = 7;
  *  reader has the rhythm, and makes every later board a little sparser. */
 const FOUR_TILE_CHAPTERS = 3;
 
-const BASE_MOVES = 32;
-const BASE_GOAL = 10;
+// The opening used to allow thirty-two moves for only ten tiles. A smaller
+// budget and a slightly fuller goal ask the player to plan without feeling
+// punitive, while the stepped deductions protect the later week from a cliff.
+const BASE_MOVES = 28;
+const BASE_GOAL = 12;
 
 /**
  * One shape per level, so a day is seven boards rather than the same board
@@ -49,8 +51,8 @@ const MASKS: readonly SevenDaysMask[] = [
   ["#######", "#######", "##...##", "##...##", "##...##", "#######", "#######"],
 ];
 
-/** Every level plays over a different scene, cycling the catalogue. */
-const SCENES = WALLPAPER_CATALOG.map((wallpaper) => wallpaper.id);
+/** Every level now shares the game's purpose-built poster. */
+const SCENE_ID = "seven-days-match-poster";
 
 function tilesForChapter(chapter: SevenDaysChapter): SevenDaysTileId[] {
   const all = [...SEVEN_DAYS_TILE_IDS];
@@ -121,17 +123,19 @@ export function buildLevel(
   // Rotate the shapes by day so day two's first level is not day one's first
   // board again; every day still sees all seven.
   const mask = MASKS[(levelIndex + chapter.day - 1) % MASKS.length];
-  const ordinal = (chapter.day - 1) * SEVEN_DAYS_LEVELS_PER_CHAPTER + levelIndex;
   return {
     id: `${chapter.id}-level-${levelIndex + 1}`,
     chapterId: chapter.id,
     day: chapter.day,
     level: levelIndex + 1,
-    moves: BASE_MOVES - (chapter.day - 1) - levelIndex,
+    moves:
+      BASE_MOVES -
+      Math.floor((chapter.day - 1) / 2) -
+      Math.floor(levelIndex / 2),
     goals: goalsFor(chapter, levelIndex, tiles, countOpen(mask)),
     tiles,
     mask,
-    sceneId: SCENES[ordinal % SCENES.length],
+    sceneId: SCENE_ID,
   };
 }
 

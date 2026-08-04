@@ -1,6 +1,7 @@
 import "server-only";
 
 import { buildReleaseHealth, type ReleaseHealth } from "@/lib/observability/release";
+import { recordServerFailure } from "@/lib/observability/server-failures";
 import { createAdminSupabase } from "@/lib/supabase/admin.server";
 import { seedQuests } from "@/data/seed/quests";
 import dailyVerses from "@/data/seed/daily-verses.json";
@@ -125,7 +126,8 @@ const SETUP_SOURCE: ConsoleDataSource = {
 function adminClient() {
   try {
     return createAdminSupabase();
-  } catch {
+  } catch (error) {
+    recordServerFailure("console", "config", error);
     return null;
   }
 }

@@ -7,6 +7,10 @@ import {
   type OperatorPlusGrantRow,
   type SubscriptionProjectionRow,
 } from "@/lib/billing/server";
+import {
+  recordServerFailure,
+  recordServerFailureReason,
+} from "@/lib/observability/server-failures";
 import { createAdminSupabase } from "@/lib/supabase/admin.server";
 import { authenticatedServerContext } from "@/lib/supabase/authenticated.server";
 
@@ -53,6 +57,15 @@ export async function GET() {
       customer.error ||
       grants.error
     ) {
+      if (!stripeReady || !operatorReady) {
+        recordServerFailureReason("billing", "status", "schema");
+      } else {
+        recordServerFailure(
+          "billing",
+          "status",
+          subscriptions.error ?? customer.error ?? grants.error,
+        );
+      }
       return privateError("unavailable", 503);
     }
     return Response.json(
@@ -75,7 +88,8 @@ export async function GET() {
       },
       { headers: { "Cache-Control": "private, no-store" } },
     );
-  } catch {
+  } catch (error) {
+    recordServerFailure("billing", "status", error);
     return privateError("unavailable", 503);
   }
 }

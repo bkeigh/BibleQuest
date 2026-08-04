@@ -12,6 +12,10 @@ import {
   type PushPreferenceRow,
 } from "@/lib/push/server";
 import { anyPushReminderEnabled } from "@/lib/push/validation";
+import {
+  recordServerFailure,
+  recordServerFailureReason,
+} from "@/lib/observability/server-failures";
 import { createAdminSupabase } from "@/lib/supabase/admin.server";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +48,7 @@ export async function POST(request: Request) {
     pushVapidPublicKey();
     const admin = createAdminSupabase();
     if (!(await pushContractReady(admin))) {
+      recordServerFailureReason("push", "schedule", "schema");
       return privateError("unavailable", 503);
     }
     const now = new Date();
@@ -53,7 +58,10 @@ export async function POST(request: Request) {
       .select("*")
       .order("user_id", { ascending: true })
       .limit(MAX_PREFERENCES);
-    if (preferenceError) return privateError("unavailable", 503);
+    if (preferenceError) {
+      recordServerFailure("push", "schedule", preferenceError);
+      return privateError("unavailable", 503);
+    }
 
     const due = (rawPreferences as PushPreferenceRow[])
       .map((row) => {
@@ -91,7 +99,10 @@ export async function POST(request: Request) {
       .in("user_id", userIds)
       .order("id", { ascending: true })
       .limit(MAX_SUBSCRIPTIONS);
-    if (subscriptionError) return privateError("unavailable", 503);
+    if (subscriptionError) {
+      recordServerFailure("push", "schedule", subscriptionError);
+      return privateError("unavailable", 503);
+    }
     const subscriptions = rawSubscriptions as EncryptedSubscriptionRow[];
     const byUser = new Map<string, EncryptedSubscriptionRow[]>();
     for (const subscription of subscriptions) {
@@ -140,7 +151,8 @@ export async function POST(request: Request) {
       { ok: true, candidates, claimed, sent, failed },
       { headers: { "Cache-Control": "private, no-store" } },
     );
-  } catch {
+  } catch (error) {
+    recordServerFailure("push", "schedule", error);
     return privateError("unavailable", 503);
   }
 }

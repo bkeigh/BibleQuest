@@ -47,6 +47,21 @@ export function bibleProviderErrorCode(
   return "content_unavailable";
 }
 
+/** Maps a provider failure to its private JSON response without leaking details. */
+export function bibleProviderErrorResponse(error: unknown): Response {
+  const code = bibleProviderErrorCode(error);
+  const status =
+    code === "provider_not_configured"
+      ? 503
+      : code === "translation_unavailable"
+        ? 404
+        : 502;
+  return Response.json(
+    { error: code },
+    { status, headers: { "Cache-Control": "private, no-store" } },
+  );
+}
+
 function isApiBiblePreference(key: string): boolean {
   if (bibleTranslationKey(key) !== key) return false;
   if (key.startsWith("api:")) return true;

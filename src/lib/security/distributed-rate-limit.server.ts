@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHmac } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { recordServerFailure } from "@/lib/observability/server-failures";
 import { createAdminSupabase } from "@/lib/supabase/admin.server";
 
 export interface DistributedRateLimitPolicy {
@@ -9,15 +10,36 @@ export interface DistributedRateLimitPolicy {
   windowSeconds: number;
 }
 
+/** Converts millisecond-windowed guard policies to the distributed limiter shape. */
+export function distributedPoliciesFromWindows(
+  policies: readonly { limit: number; windowMs: number }[],
+): DistributedRateLimitPolicy[] {
+  return policies.map(({ limit, windowMs }) => ({
+    limit,
+    windowSeconds: windowMs / 1_000,
+  }));
+}
+
 interface RateLimitClaim {
   allowed: boolean;
   retryAfter: number;
 }
 
+/** Separates "this deployment is misconfigured" from "the claim store failed". */
+export class DistributedRateLimitError extends Error {
+  readonly reason: "configuration" | "dependency" | "invalid";
+
+  constructor(reason: DistributedRateLimitError["reason"]) {
+    super(`Distributed rate limit unavailable: ${reason}.`);
+    this.name = "DistributedRateLimitError";
+    this.reason = reason;
+  }
+}
+
 // Accepts only the bounded response emitted by the service-only database RPC.
 function parseClaim(value: unknown): RateLimitClaim {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("Distributed rate limit unavailable.");
+    throw new DistributedRateLimitError("invalid");
   }
   const claim = value as { allowed?: unknown; retry_after?: unknown };
   if (
@@ -26,7 +48,7 @@ function parseClaim(value: unknown): RateLimitClaim {
     Number(claim.retry_after) < 1 ||
     Number(claim.retry_after) > 86_400
   ) {
-    throw new Error("Distributed rate limit unavailable.");
+    throw new DistributedRateLimitError("invalid");
   }
   return {
     allowed: claim.allowed,
@@ -42,7 +64,7 @@ function bucketHash(identity: string) {
       ? undefined
       : process.env.SUPABASE_SERVICE_ROLE_KEY?.trim());
   if (!secret || secret.length < 32) {
-    throw new Error("Distributed rate limit unavailable.");
+    throw new DistributedRateLimitError("configuration");
   }
   return createHmac("sha256", secret)
     .update(`biblequest-provider-rate:v1:${identity}`)
@@ -89,7 +111,7 @@ export async function claimDistributedRateLimits(
       p_limit: policy.limit,
       p_window_seconds: policy.windowSeconds,
     });
-    if (error) throw new Error("Distributed rate limit unavailable.");
+    if (error) throw new DistributedRateLimitError("dependency");
     const claim = parseClaim(data);
     retryAfter = Math.max(retryAfter, claim.retryAfter);
     if (!claim.allowed) return { allowed: false, retryAfter: claim.retryAfter };
@@ -113,7 +135,10 @@ export async function guardDistributedRequest(
     );
     if (claim.allowed) return null;
     return privateRateResponse("rate_limited", 429, claim.retryAfter);
-  } catch {
+  } catch (error) {
+    // Failing closed without a signal makes a missing rate-limit secret look
+    // exactly like a database outage, so record the bounded reason.
+    recordServerFailure("rate_limit", "claim", error);
     return privateRateResponse("rate_limit_unavailable", 503);
   }
 }
