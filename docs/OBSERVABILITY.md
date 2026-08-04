@@ -81,6 +81,29 @@ tokens, cookies, user/record/request/deployment IDs; query strings; routes; or
 URLs to this schema. A new field requires privacy review and deterministic
 redaction tests first.
 
+## Server failure signal contract
+
+Server routes answer callers with generic bounded errors (`unavailable`,
+`invalid_request`, `delete_failed`) that deliberately reveal nothing about the
+cause. So that a misconfigured deployment cannot be indistinguishable from an
+ordinary dependency outage, the paths returning those responses emit one
+`console.error` line built only from fixed enums:
+
+| Field | Values |
+| --- | --- |
+| `kind` | `server_failure` |
+| `surface` | `billing`, `billing_webhook`, `support`, `push`, `avatar`, `bible`, `rate_limit`, `console`, `auth`, `unknown` |
+| `stage` | bounded stages for that surface, such as `checkout`, `verify`, `claim`, `complete`, `entitlement`, `schedule`, `deliver`, `read`, `write`, `delete`, `passage`, `session`, `audit`, `unknown` |
+| `reason` | `configuration`, `timeout`, `rate_limited`, `auth`, `permission`, `schema`, `conflict`, `provider`, `dependency`, `invalid`, `unknown` |
+
+The reason is derived from the caught value's shape (error name, database or
+HTTP code, wrapped `cause`) and the log object is reconstructed from the fixed
+enums before it is written, so a provider message, stack, SQL detail, identifier,
+route, or user content can never reach the log. Unrecognized members collapse to
+`unknown` rather than passing through. Intentionally best-effort paths — browser
+storage availability, offline queues, and a disabled feature answering its inert
+no-op — stay silent by design and are not instrumented.
+
 ## One evidence command
 
 Use the same command at every required checkpoint:

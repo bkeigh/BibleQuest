@@ -345,10 +345,15 @@ function usePlusCoordinator(): PlusState {
     reconciledReturn.current = true;
     // Deferred like the initial load so no state cascades in the effect body.
     const timer = window.setTimeout(() => {
-      void refresh().catch(() => {});
+      void refresh().catch(() => {
+        // A failed reconcile must not leave the returning member on the stale
+        // pre-checkout status: fall back to the server projection, which
+        // surfaces its own error state when it is unreachable too.
+        void load();
+      });
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [refresh, session.loading, session.user]);
+  }, [load, refresh, session.loading, session.user]);
 
   const startCheckout = useCallback(
     async (interval: BillingInterval) => {

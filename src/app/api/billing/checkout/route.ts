@@ -15,6 +15,7 @@ import {
   isBillingInterval,
   MAX_BILLING_REQUEST_BYTES,
 } from "@/lib/billing/validation";
+import { recordServerFailure } from "@/lib/observability/server-failures";
 import { createAdminSupabase } from "@/lib/supabase/admin.server";
 import { authenticatedServerContext } from "@/lib/supabase/authenticated.server";
 
@@ -67,7 +68,10 @@ export async function POST(request: Request) {
         "unpaid",
         "paused",
       ]);
-    if (subscriptionError) return privateError("unavailable", 503);
+    if (subscriptionError) {
+      recordServerFailure("billing", "checkout", subscriptionError);
+      return privateError("unavailable", 503);
+    }
     if ((count ?? 0) > 0) return privateError("manage_existing", 409);
 
     const stripe = createStripe(configuration);
@@ -126,7 +130,8 @@ export async function POST(request: Request) {
         headers: { "Cache-Control": "private, no-store" },
       },
     );
-  } catch {
+  } catch (error) {
+    recordServerFailure("billing", "checkout", error);
     return privateError("unavailable", 503);
   }
 }

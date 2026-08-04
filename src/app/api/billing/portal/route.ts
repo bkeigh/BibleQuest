@@ -6,6 +6,7 @@ import {
 } from "@/lib/billing/records.server";
 import { stripeBillingContractReady } from "@/lib/billing/server";
 import { createStripe } from "@/lib/billing/stripe.server";
+import { recordServerFailure } from "@/lib/observability/server-failures";
 import { createAdminSupabase } from "@/lib/supabase/admin.server";
 import { authenticatedServerContext } from "@/lib/supabase/authenticated.server";
 
@@ -36,7 +37,10 @@ export async function POST(request: Request) {
       .select("stripe_customer_id,livemode")
       .eq("user_id", context.user.id)
       .maybeSingle();
-    if (error) return privateError("unavailable", 503);
+    if (error) {
+      recordServerFailure("billing", "portal", error);
+      return privateError("unavailable", 503);
+    }
     if (!data) return privateError("not_found", 404);
     if (data.livemode !== configuration.livemode) {
       return privateError("unavailable", 503);
@@ -62,7 +66,8 @@ export async function POST(request: Request) {
         headers: { "Cache-Control": "private, no-store" },
       },
     );
-  } catch {
+  } catch (error) {
+    recordServerFailure("billing", "portal", error);
     return privateError("unavailable", 503);
   }
 }

@@ -8,6 +8,10 @@ import {
   type SubscriptionProjectionRow,
 } from "@/lib/billing/server";
 import { privateError } from "@/lib/http/request";
+import {
+  recordServerFailure,
+  recordServerFailureReason,
+} from "@/lib/observability/server-failures";
 import { createAdminSupabase } from "@/lib/supabase/admin.server";
 import { authenticatedServerContext } from "@/lib/supabase/authenticated.server";
 
@@ -43,6 +47,17 @@ export async function requireServerPlus(): Promise<
       subscriptions.error ||
       grants.error
     ) {
+      // A paying member denied access by an unreadable projection must not be
+      // indistinguishable from a member who simply has no entitlement.
+      if (!stripeReady || !operatorReady) {
+        recordServerFailureReason("billing", "entitlement", "schema");
+      } else {
+        recordServerFailure(
+          "billing",
+          "entitlement",
+          subscriptions.error ?? grants.error,
+        );
+      }
       return privateError("unavailable", 503);
     }
     const status = billingStatusFromRows(
@@ -52,7 +67,8 @@ export async function requireServerPlus(): Promise<
     );
     if (!status.isPlus) return privateError("plus_required", 403);
     return { userId: context.user.id };
-  } catch {
+  } catch (error) {
+    recordServerFailure("billing", "entitlement", error);
     return privateError("unavailable", 503);
   }
 }

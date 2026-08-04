@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { recordServerFailure } from "@/lib/observability/server-failures";
 import { decryptPushSubscription } from "./crypto.server";
 import { sendNeutralPush } from "./delivery.server";
 import type { EncryptedSubscriptionRow } from "./server";
@@ -54,7 +55,9 @@ export async function deliverPushRecord(
     p_reminder_date: reminderDate,
     p_scheduled_for: scheduledFor,
   });
-  if (error) throw new Error("Push delivery claim unavailable.");
+  if (error) {
+    throw new Error("Push delivery claim unavailable.", { cause: error });
+  }
   const claim = parseClaim(data);
   if (!claim.claimed) return { claimed: false, sent: false };
 
@@ -66,7 +69,10 @@ export async function deliverPushRecord(
       subscription.endpoint_fingerprint,
     );
     outcome = await sendNeutralPush(decrypted, kind);
-  } catch {
+  } catch (error) {
+    // This branch also permanently deletes the subscription, so a rotated key
+    // or misconfigured provider must not silently unsubscribe accounts.
+    recordServerFailure("push", "deliver", error);
     outcome = {
       outcome: "permanent_failure",
       statusCodeClass: null,
@@ -88,7 +94,9 @@ export async function deliverPushRecord(
     },
   );
   if (completionError || completed !== true) {
-    throw new Error("Push delivery completion unavailable.");
+    throw new Error("Push delivery completion unavailable.", {
+      cause: completionError,
+    });
   }
   return {
     claimed: true,

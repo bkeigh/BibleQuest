@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { providerBookId } from "@/lib/bible/provider-books";
 import {
+  bibleProviderErrorCode,
   bibleProviderErrorResponse,
   fetchBibleProviderPassage,
 } from "@/lib/bible/provider-dispatcher";
 import { getBookMeta } from "@/lib/bible";
 import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
+import {
+  classifyServerFailure,
+  recordServerFailureReason,
+} from "@/lib/observability/server-failures";
 import {
   distributedPoliciesFromWindows,
   guardDistributedRequest,
@@ -17,6 +22,23 @@ const PASSAGE_RATE_LIMITS = [
   { limit: 50, windowMs: 60_000 },
   { limit: 300, windowMs: 60 * 60_000 },
 ] as const;
+
+/** Records operational provider failures before returning the shared response. */
+function observedErrorResponse(error: unknown) {
+  const code = bibleProviderErrorCode(error);
+  // Missing catalogue coverage is normal; provider and configuration failures
+  // are the branches an operator otherwise cannot see.
+  if (code !== "translation_unavailable") {
+    recordServerFailureReason(
+      "bible",
+      "passage",
+      code === "provider_not_configured"
+        ? "configuration"
+        : classifyServerFailure(error),
+    );
+  }
+  return bibleProviderErrorResponse(error);
+}
 
 export async function GET(request: NextRequest) {
   const blocked = guardProviderRequest(
@@ -77,6 +99,6 @@ export async function GET(request: NextRequest) {
       headers: { "Cache-Control": "private, no-store" },
     });
   } catch (error) {
-    return bibleProviderErrorResponse(error);
+    return observedErrorResponse(error);
   }
 }

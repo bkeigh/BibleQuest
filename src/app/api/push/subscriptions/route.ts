@@ -18,6 +18,10 @@ import {
   parsePushReminderPreferences,
   parseSerializedPushSubscription,
 } from "@/lib/push/validation";
+import {
+  recordServerFailure,
+  recordServerFailureReason,
+} from "@/lib/observability/server-failures";
 import { createAdminSupabase } from "@/lib/supabase/admin.server";
 import { authenticatedServerContext } from "@/lib/supabase/authenticated.server";
 
@@ -35,6 +39,7 @@ export async function POST(request: Request) {
   const context = await authenticatedServerContext();
   if (context instanceof Response) return context;
   if (!(await pushContractReady(context.supabase))) {
+    recordServerFailureReason("push", "subscribe", "schema");
     return privateError("unavailable", 503);
   }
   const body = await boundedJson(request, MAX_PUSH_REQUEST_BYTES);
@@ -65,20 +70,29 @@ export async function POST(request: Request) {
       .upsert(pushPreferencesToRow(context.user.id, preferences), {
         onConflict: "user_id",
       });
-    if (preferenceWrite.error) return privateError("unavailable", 503);
+    if (preferenceWrite.error) {
+      recordServerFailure("push", "subscribe", preferenceWrite.error);
+      return privateError("unavailable", 503);
+    }
 
     const { data: existing, error: lookupError } = await admin
       .from("push_subscriptions")
       .select("id,user_id")
       .eq("endpoint_fingerprint", encrypted.endpointFingerprint)
       .maybeSingle();
-    if (lookupError) return privateError("unavailable", 503);
+    if (lookupError) {
+      recordServerFailure("push", "subscribe", lookupError);
+      return privateError("unavailable", 503);
+    }
     if (existing && existing.user_id !== context.user.id) {
       const { error } = await admin
         .from("push_subscriptions")
         .delete()
         .eq("id", existing.id);
-      if (error) return privateError("unavailable", 503);
+      if (error) {
+        recordServerFailure("push", "subscribe", error);
+        return privateError("unavailable", 503);
+      }
     }
 
     const { error } = await admin.from("push_subscriptions").upsert(
@@ -97,13 +111,16 @@ export async function POST(request: Request) {
       },
       { onConflict: "endpoint_fingerprint" },
     );
-    return error
-      ? privateError("unavailable", 503)
-      : new Response(null, {
-          status: 204,
-          headers: { "Cache-Control": "private, no-store" },
-        });
-  } catch {
+    if (error) {
+      recordServerFailure("push", "subscribe", error);
+      return privateError("unavailable", 503);
+    }
+    return new Response(null, {
+      status: 204,
+      headers: { "Cache-Control": "private, no-store" },
+    });
+  } catch (error) {
+    recordServerFailure("push", "subscribe", error);
     return privateError("unavailable", 503);
   }
 }
@@ -115,9 +132,9 @@ export async function DELETE(request: Request) {
   if (context instanceof Response) return context;
   const contractReady = await pushContractReady(context.supabase);
   if (!contractReady) {
-    return pushFeatureEnabled()
-      ? privateError("unavailable", 503)
-      : new Response(null, { status: 204 });
+    if (!pushFeatureEnabled()) return new Response(null, { status: 204 });
+    recordServerFailureReason("push", "unsubscribe", "schema");
+    return privateError("unavailable", 503);
   }
   const body = await boundedJson(request, MAX_PUSH_REQUEST_BYTES);
   if (body instanceof Response) return body;
@@ -142,13 +159,16 @@ export async function DELETE(request: Request) {
       );
     }
     const { error } = await operation;
-    return error
-      ? privateError("unavailable", 503)
-      : new Response(null, {
-          status: 204,
-          headers: { "Cache-Control": "private, no-store" },
-        });
-  } catch {
+    if (error) {
+      recordServerFailure("push", "unsubscribe", error);
+      return privateError("unavailable", 503);
+    }
+    return new Response(null, {
+      status: 204,
+      headers: { "Cache-Control": "private, no-store" },
+    });
+  } catch (error) {
+    recordServerFailure("push", "unsubscribe", error);
     return privateError("unavailable", 503);
   }
 }
