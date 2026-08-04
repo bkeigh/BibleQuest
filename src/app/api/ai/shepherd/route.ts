@@ -12,7 +12,10 @@ import { requireServerPlus } from "@/lib/billing/plus-entitlement.server";
 import { guardIdentifiedRequest } from "@/lib/bible/provider-request-guard";
 import { boundedJson } from "@/lib/http/json";
 import { hasSameOrigin, privateError } from "@/lib/http/request";
-import { guardDistributedRequest } from "@/lib/security/distributed-rate-limit.server";
+import {
+  distributedPoliciesFromWindows,
+  guardDistributedRequest,
+} from "@/lib/security/distributed-rate-limit.server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -48,10 +51,7 @@ export async function POST(request: Request) {
   const distributedBlocked = await guardDistributedRequest(
     request,
     "ai-shepherd",
-    RATE_POLICIES.map((policy) => ({
-      limit: policy.limit,
-      windowSeconds: policy.windowMs / 1_000,
-    })),
+    distributedPoliciesFromWindows(RATE_POLICIES),
     entitlement.userId,
   );
   if (distributedBlocked) return distributedBlocked;

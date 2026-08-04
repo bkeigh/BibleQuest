@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   InvalidAvatarImageError,
   normalizeAvatarImage,
@@ -14,7 +14,7 @@ import {
 } from "@/lib/avatar/validation";
 import { boundedBytes, boundedJson } from "@/lib/http/json";
 import { hasSameOrigin, privateError } from "@/lib/http/request";
-import { createServerSupabase } from "@/lib/supabase/server";
+import { authenticatedServerContext } from "@/lib/supabase/authenticated.server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -69,23 +69,6 @@ function ownedAvatarPath(userId: string, value: unknown): value is string {
   );
 }
 
-/** Creates one RLS-bound server client and verifies its current user. */
-async function authenticatedContext(): Promise<
-  { supabase: SupabaseClient; user: User } | Response
-> {
-  try {
-    const supabase = await createServerSupabase();
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-    if (error || !user) return privateError("unauthorized", 401);
-    return { supabase, user };
-  } catch {
-    return privateError("unavailable", 503);
-  }
-}
-
 /** Proves the private bucket and dedicated RPC boundary before media access. */
 async function avatarContractReady(
   supabase: SupabaseClient,
@@ -126,7 +109,7 @@ function avatarResponse(
 /** Serves the current private object through the user's authenticated session. */
 export async function GET() {
   if (!featureEnabled()) return privateError("unavailable", 503);
-  const context = await authenticatedContext();
+  const context = await authenticatedServerContext();
   if (context instanceof Response) return context;
   const { supabase, user } = context;
   if (!(await avatarContractReady(supabase))) {
@@ -180,7 +163,7 @@ export async function POST(request: Request) {
     return privateError("invalid_avatar", 400);
   }
 
-  const context = await authenticatedContext();
+  const context = await authenticatedServerContext();
   if (context instanceof Response) return context;
   const { supabase, user } = context;
   if (!(await avatarContractReady(supabase))) {
@@ -303,7 +286,7 @@ async function removeAllOwnedObjects(
 /** Deletes remote media before clearing its profile pointer. */
 export async function DELETE(request: Request) {
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
-  const context = await authenticatedContext();
+  const context = await authenticatedServerContext();
   if (context instanceof Response) return context;
   const { supabase, user } = context;
   const contractReady = await avatarContractReady(supabase);

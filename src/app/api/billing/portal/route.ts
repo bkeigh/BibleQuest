@@ -1,6 +1,9 @@
 import { hasSameOrigin, privateError } from "@/lib/http/request";
 import { requireStripeBillingConfiguration } from "@/lib/billing/config.server";
-import { claimStripeAction } from "@/lib/billing/records.server";
+import {
+  claimStripeAction,
+  stripeActionRateLimited,
+} from "@/lib/billing/records.server";
 import { stripeBillingContractReady } from "@/lib/billing/server";
 import { createStripe } from "@/lib/billing/stripe.server";
 import { createAdminSupabase } from "@/lib/supabase/admin.server";
@@ -27,18 +30,7 @@ export async function POST(request: Request) {
       "portal",
       10,
     );
-    if (!claim.claimed) {
-      return Response.json(
-        { error: "rate_limited" },
-        {
-          status: 429,
-          headers: {
-            "Cache-Control": "private, no-store",
-            "Retry-After": "10",
-          },
-        },
-      );
-    }
+    if (!claim.claimed) return stripeActionRateLimited(10);
     const { data, error } = await admin
       .from("stripe_customers")
       .select("stripe_customer_id,livemode")
