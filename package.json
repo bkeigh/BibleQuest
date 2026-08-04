@@ -34,7 +34,8 @@
     "test:launch-evidence": "pnpm evidence:launch --phase=preflight --fixture",
     "synthetic:health": "node --env-file-if-exists=.env.local scripts/run-synthetic-health.mjs",
     "test:synthetic-health": "vitest run tests/synthetic-health.test.ts",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
@@ -57,6 +58,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@types/web-push": "3.6.4",
+    "@vitest/coverage-v8": "4.1.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
     "png-to-ico": "^3.0.2",

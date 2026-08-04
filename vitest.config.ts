@@ -17,6 +17,12 @@ export default defineConfig({
       "tests/observability-evidence.test.mjs",
     ],
     setupFiles: ["./tests/setup.ts"],
+    coverage: {
+      provider: "v8",
+      include: ["src/lib/**/*.ts"],
+      reporter: ["text", "json-summary"],
+      reportsDirectory: "./coverage",
+    },
     clearMocks: true,
     restoreMocks: true,
   },
