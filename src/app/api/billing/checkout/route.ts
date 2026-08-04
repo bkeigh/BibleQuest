@@ -4,6 +4,7 @@ import { requireStripeBillingConfiguration } from "@/lib/billing/config.server";
 import {
   claimStripeAction,
   customerForUser,
+  stripeActionRateLimited,
 } from "@/lib/billing/records.server";
 import { stripeBillingContractReady } from "@/lib/billing/server";
 import {
@@ -52,18 +53,7 @@ export async function POST(request: Request) {
       "checkout",
       30,
     );
-    if (!claim.claimed) {
-      return Response.json(
-        { error: "rate_limited" },
-        {
-          status: 429,
-          headers: {
-            "Cache-Control": "private, no-store",
-            "Retry-After": "30",
-          },
-        },
-      );
-    }
+    if (!claim.claimed) return stripeActionRateLimited(30);
     const { count, error: subscriptionError } = await admin
       .from("subscriptions")
       .select("id", { count: "exact", head: true })

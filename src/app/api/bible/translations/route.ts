@@ -10,7 +10,10 @@ import {
   type BibleTranslation,
 } from "@/lib/bible/translations";
 import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
-import { guardDistributedRequest } from "@/lib/security/distributed-rate-limit.server";
+import {
+  distributedPoliciesFromWindows,
+  guardDistributedRequest,
+} from "@/lib/security/distributed-rate-limit.server";
 
 export const dynamic = "force-dynamic";
 
@@ -31,10 +34,7 @@ export async function GET(request: Request) {
   const distributedBlocked = await guardDistributedRequest(
     request,
     "bible-translations",
-    TRANSLATION_RATE_LIMITS.map(({ limit, windowMs }) => ({
-      limit,
-      windowSeconds: windowMs / 1_000,
-    })),
+    distributedPoliciesFromWindows(TRANSLATION_RATE_LIMITS),
   );
   if (distributedBlocked) return distributedBlocked;
 

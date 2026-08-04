@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { providerBookId } from "@/lib/bible/provider-books";
 import {
-  bibleProviderErrorCode,
+  bibleProviderErrorResponse,
   fetchBibleProviderChapter,
   serializeBibleProviderChapter,
 } from "@/lib/bible/provider-dispatcher";
 import { getBookMeta } from "@/lib/bible";
 import { loadChapter } from "@/lib/bible/server";
 import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
-import { guardDistributedRequest } from "@/lib/security/distributed-rate-limit.server";
+import {
+  distributedPoliciesFromWindows,
+  guardDistributedRequest,
+} from "@/lib/security/distributed-rate-limit.server";
 
 export const dynamic = "force-dynamic";
 
@@ -16,15 +19,6 @@ const CHAPTER_RATE_LIMITS = [
   { limit: 30, windowMs: 60_000 },
   { limit: 180, windowMs: 60 * 60_000 },
 ] as const;
-
-function errorResponse(error: unknown) {
-  const code = bibleProviderErrorCode(error);
-  const status = code === "provider_not_configured" ? 503 : code === "translation_unavailable" ? 404 : 502;
-  return NextResponse.json(
-    { error: code },
-    { status, headers: { "Cache-Control": "private, no-store" } },
-  );
-}
 
 export async function GET(request: NextRequest) {
   const blocked = guardProviderRequest(
@@ -58,10 +52,7 @@ export async function GET(request: NextRequest) {
   const distributedBlocked = await guardDistributedRequest(
     request,
     "bible-chapter",
-    CHAPTER_RATE_LIMITS.map(({ limit, windowMs }) => ({
-      limit,
-      windowSeconds: windowMs / 1_000,
-    })),
+    distributedPoliciesFromWindows(CHAPTER_RATE_LIMITS),
   );
   if (distributedBlocked) return distributedBlocked;
 
@@ -88,6 +79,6 @@ export async function GET(request: NextRequest) {
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
-    return errorResponse(error);
+    return bibleProviderErrorResponse(error);
   }
 }

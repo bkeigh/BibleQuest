@@ -9,6 +9,16 @@ export interface DistributedRateLimitPolicy {
   windowSeconds: number;
 }
 
+/** Converts millisecond-windowed guard policies to the distributed limiter shape. */
+export function distributedPoliciesFromWindows(
+  policies: readonly { limit: number; windowMs: number }[],
+): DistributedRateLimitPolicy[] {
+  return policies.map(({ limit, windowMs }) => ({
+    limit,
+    windowSeconds: windowMs / 1_000,
+  }));
+}
+
 interface RateLimitClaim {
   allowed: boolean;
   retryAfter: number;
