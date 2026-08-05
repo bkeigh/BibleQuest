@@ -81,8 +81,9 @@ async function nativeApiFetch(
  * Reads the current session token, or null for guests, misconfiguration, and
  * every failure — a request without a token simply answers 401 server-side.
  * The dynamic import keeps supabase-js out of web chunks that only route API
- * calls (chunking hygiene, not a security boundary: the branch folds out of
- * web bundles entirely because isNativeTarget() is a build-time constant).
+ * calls (chunking hygiene, not a security boundary: on web the guarantee is
+ * the runtime no-op — isNativeTarget() is false, so this import never
+ * executes; whether the minifier also drops the branch is minifier-dependent).
  */
 async function nativeSessionAccessToken(): Promise<string | null> {
   try {

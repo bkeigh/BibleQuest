@@ -151,6 +151,9 @@ describe("path eligibility", () => {
     expect(corsEligibleApiPath("/api/profile/avatar")).toBe(true);
     expect(corsEligibleApiPath("/api/billing/plans")).toBe(false);
     expect(corsEligibleApiPath("/api/billing/plans/")).toBe(false);
+    expect(corsEligibleApiPath("/api/billing/plans//")).toBe(false);
+    expect(corsEligibleApiPath("/api/billing/plans///")).toBe(false);
+    expect(corsEligibleApiPath("/api//billing/plans")).toBe(false);
     expect(corsEligibleApiPath("/api")).toBe(false);
     expect(corsEligibleApiPath("/app/journey")).toBe(false);
     expect(corsEligibleApiPath("/")).toBe(false);

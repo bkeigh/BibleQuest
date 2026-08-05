@@ -277,8 +277,10 @@ Supabase is the same staging project, with the origin latch and
 `BIBLEQUEST_AVATAR_SYNC_ENABLED` on) and
 `BIBLEQUEST_CONFIRM_NATIVE_BEARER_TEST=staging-only-native-bearer-isolation`.
 Before enabling the latch on that Preview, probe that its edge agrees with the
-local router: `/api/billing/%70lans` must 404 and `/api/billing/plans/` must
-308, so no decode/normalize disagreement can reach the excluded plans route.
+local router: `/api/billing/%70lans` must 404, and `/api/billing/plans/` plus
+`/api/billing/plans//` must 308, so no decode/normalize disagreement can reach
+the excluded plans route (the exclusion itself collapses duplicate and
+trailing slashes before comparing).
 
 **Cheapest CORS proof, no auth needed.** In the simulator: Home → tap the avatar
 top-left (Settings is *not* in the bottom nav) → the "Bible translation"
@@ -335,6 +337,15 @@ blocker rationale instead of adding a second, divergent deletion mechanism.
   partial rollout is visible in logs. **`tests/native-origin.test.ts` asserts
   the literal source line in `support/checkout/route.ts`** — update it in the
   same commit.
+- **The plans CORS exclusion keeps `usePlus` erroring on native, by design for
+  now.** Every cross-origin fetch of `/api/billing/plans` rejects (no CORS
+  headers), the guest branch fetches only plans, and the signed-in branch
+  pairs plans with status in one `Promise.all` — so the in-app billing
+  projection reads `status: "error"` / free even while a bearer-authenticated
+  `/api/billing/status` succeeds. During sign-in verification do NOT read that
+  as a bearer-transport failure. Resolve by fixing the plans Cache-Control
+  conflict and admitting the route to CORS, or by making `usePlus` tolerate a
+  failed plans fetch on native.
 - Document `BIBLEQUEST_NATIVE_API_ORIGIN_ENABLED` in `.env.example`, noting it
   must never be scoped to "All Environments" in Vercel.
 - Offline entitlement grace — a web `usePlus` change; probably belongs in its

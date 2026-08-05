@@ -39,9 +39,12 @@ const EXPOSED_RESPONSE_HEADERS =
 /** True for API paths the native CORS decoration may touch. */
 export function corsEligibleApiPath(pathname: string): boolean {
   if (!pathname.startsWith("/api/")) return false;
-  const normalized = pathname.endsWith("/")
-    ? pathname.slice(0, -1)
-    : pathname;
+  // Collapse duplicate and trailing slashes before comparing, so the
+  // exclusion cannot be sidestepped by a spelling the router would normalize
+  // (every collapsed spelling 308s or 404s and never serves the plans
+  // payload; excluding them anyway keeps the comparison independent of
+  // router behavior).
+  const normalized = pathname.replace(/\/{2,}/g, "/").replace(/\/+$/, "");
   return normalized !== EXCLUDED_API_PATH;
 }
 

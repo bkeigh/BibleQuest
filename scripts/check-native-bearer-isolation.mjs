@@ -75,8 +75,11 @@ function requireEnvironment() {
       "BIBLEQUEST_NATIVE_BEARER_TARGET_ORIGIN must be a bare HTTPS origin",
     );
   }
-  if (target.hostname === "www.biblequest.co") {
-    throw new Error("Refusing to probe production");
+  if (
+    target.hostname === "biblequest.co" ||
+    target.hostname.endsWith(".biblequest.co")
+  ) {
+    throw new Error("Refusing to probe production or any production alias");
   }
   return target.origin;
 }
@@ -333,16 +336,23 @@ async function verifyAvatarIsolation(targetOrigin, owner, other) {
   );
 }
 
-/** Grants one REAL operator Plus entitlement, honoring the table constraints. */
-async function grantPlus(admin, actor) {
-  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+/**
+ * Grants one REAL operator Plus entitlement through the sealed RPC.
+ *
+ * A direct table insert cannot work: migration 0030 revokes writes on
+ * operator_plus_grants from service_role (SELECT only) and seals them behind
+ * grant_operator_plus, which service_role may execute. The RPC validates the
+ * operator against auth.users with a matching lowercase email, so the other
+ * disposable actor serves as the granting operator.
+ */
+async function grantPlus(admin, actor, operator) {
   requireResult(
-    await admin.from("operator_plus_grants").insert({
-      user_id: actor.id,
-      duration_key: "7d",
-      reason: "native bearer isolation probe",
-      granted_by_email: "synthetic-bearer-probe@example.invalid",
-      expires_at: expires.toISOString(),
+    await admin.rpc("grant_operator_plus", {
+      p_target_user_id: actor.id,
+      p_duration_key: "7d",
+      p_reason: "native bearer isolation probe",
+      p_operator_user_id: operator.id,
+      p_operator_email: operator.email,
     }),
     "operator plus grant fixture",
   );
@@ -402,7 +412,7 @@ try {
   actors.push(actorA);
   const actorB = await createActor(admin, "b");
   actors.push(actorB);
-  await grantPlus(admin, actorB);
+  await grantPlus(admin, actorB, actorA);
 
   await verifyCorsLayer(targetOrigin);
   await verifyBillingIsolation(targetOrigin, actorB, actorA);

@@ -14,9 +14,11 @@
  * fail closed here (401) rather than reach the verifier.
  */
 
+// Exactly one space after the scheme, per RFC 6750's credentials syntax; the
+// scheme itself stays case-insensitive per RFC 7235.
 const MAX_HEADER_LENGTH = 4096;
 const BEARER_JWT =
-  /^Bearer +([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/i;
+  /^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/i;
 
 /** Returns the token when the header is exactly one bearer-shaped JWT. */
 export function parsedBearerToken(header: string | null): string | null {

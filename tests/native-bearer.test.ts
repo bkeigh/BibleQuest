@@ -47,6 +47,7 @@ describe("parsedBearerToken", () => {
       "Bearer a/b.c.d", // / likewise
       "Bearer a=.b.c", // padding
       "Bearer a.b .c", // interior whitespace
+      `Bearer  ${TOKEN}`, // two spaces — RFC 6750 allows exactly one
       `Bearer ${TOKEN} ${TOKEN}`, // two tokens
       // What Headers.get returns for a smuggled duplicate header pair — the
       // join must stay fail-closed against any future lenient comma split.
