@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { rateLimitProviderRequest } from "@/lib/bible/provider-request-guard";
 import { translationMetadata } from "@/lib/bible/translations";
+import {
+  applyNativeCorsHeaders,
+  nativeCorsPreflightResponse,
+} from "@/lib/http/native-cors";
 import { updateSession } from "@/lib/supabase/middleware";
 import {
   consoleRewritePath,
@@ -9,6 +13,9 @@ import {
 
 /** Refresh the optional Supabase session before matched app requests. */
 export async function proxy(request: NextRequest) {
+  const preflight = nativeCorsPreflightResponse(request);
+  if (preflight) return preflight;
+
   const consolePath = consoleRewritePath(
     request.headers.get("host"),
     request.nextUrl.pathname,
@@ -56,6 +63,9 @@ export async function proxy(request: NextRequest) {
     consoleSessionRequest,
   );
   if (consoleUrl) response.headers.set("Cache-Control", "private, no-store");
+  // On the object updateSession RETURNS — it reassigns its response while
+  // refreshing cookies, so anything set earlier can be silently dropped.
+  applyNativeCorsHeaders(request, response);
   return response;
 }
 
