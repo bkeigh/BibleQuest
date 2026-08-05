@@ -3,6 +3,7 @@ import {
   platformRuntime,
   type PlatformRuntime,
 } from "./runtime";
+import { isNativeTarget } from "./target";
 
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 
@@ -50,7 +51,52 @@ export function apiFetch(
   path: string,
   init?: RequestInit,
 ): Promise<Response> {
-  return fetch(buildApiUrl(path), init);
+  // Validate before branching so an invalid path throws synchronously on both
+  // targets, exactly as before. The web branch stays one verbatim fetch with
+  // the caller's own init reference.
+  const url = buildApiUrl(path);
+  if (!isNativeTarget()) return fetch(url, init);
+  return nativeApiFetch(url, init);
+}
+
+/**
+ * Native requests are cross-origin, so the cookie session never rides; the
+ * account travels as a bearer token instead. Headers MERGE via the caller's
+ * init — never set Content-Type here, because the avatar upload deliberately
+ * omits it so the browser generates the multipart boundary.
+ */
+async function nativeApiFetch(
+  url: string,
+  init?: RequestInit,
+): Promise<Response> {
+  const headers = new Headers(init?.headers);
+  if (!headers.has("authorization")) {
+    const token = await nativeSessionAccessToken();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+  }
+  return fetch(url, { ...init, headers });
+}
+
+/**
+ * Reads the current session token, or null for guests, misconfiguration, and
+ * every failure — a request without a token simply answers 401 server-side.
+ * The dynamic import keeps supabase-js out of web chunks that only route API
+ * calls (chunking hygiene, not a security boundary: the branch folds out of
+ * web bundles entirely because isNativeTarget() is a build-time constant).
+ */
+async function nativeSessionAccessToken(): Promise<string | null> {
+  try {
+    const { createClient, isSupabaseConfigured } = await import(
+      "@/lib/supabase/client"
+    );
+    if (!isSupabaseConfigured()) return null;
+    // getSession refreshes an expired access token before returning it.
+    const { data, error } = await createClient().auth.getSession();
+    if (error) return null;
+    return data.session?.access_token ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** Builds share-safe public links against the web page or the native hosted origin. */

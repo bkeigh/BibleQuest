@@ -305,6 +305,14 @@ native with a direct `supabase.storage.from('profile-avatars').remove()`.
 `docs/IOS_RELEASE_READINESS.md` names this as a hard release stop — it cannot
 ride under "nice to have".
 
+*Premise update (post-4b):* once the CORS layer, bearer transport, and
+`apiFetch` injection landed, the "unreachable cross-origin" premise above is
+expected to be false — the avatar `DELETE` preflights, carries the bearer
+token, and deletion runs storage-before-identity while the session is still
+valid. Re-measure on device before implementing the direct-storage
+replacement; if the `apiFetch` path now works, update the readiness doc's
+blocker rationale instead of adding a second, divergent deletion mechanism.
+
 ## Deferred — separate changes
 
 - Split the two 403s into `forbidden_origin` / `forbidden_fetch_site` so a
