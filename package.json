@@ -32,6 +32,7 @@
     "check:production-arcade-store": "node scripts/reconcile-production-arcade-store.mjs --dry-run",
     "check:staging-migration-history": "node scripts/reconcile-staging-migration-history.mjs --dry-run",
     "check:staging-isolation": "node --env-file-if-exists=.env.staging.local scripts/check-staging-two-user-isolation.mjs",
+    "check:native-bearer-isolation": "node --env-file-if-exists=.env.staging.local scripts/check-native-bearer-isolation.mjs",
     "evidence:launch": "node --env-file-if-exists=.env.local scripts/collect-launch-evidence.mjs",
     "test:launch-evidence": "pnpm evidence:launch --phase=preflight --fixture",
     "synthetic:health": "node --env-file-if-exists=.env.local scripts/run-synthetic-health.mjs",

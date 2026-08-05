@@ -264,6 +264,22 @@ There is no `.xcworkspace` — the project uses Swift Package Manager.
 construction are all unit-testable; the suite runs `environment: "node"` with a
 hand-rolled DOM in `tests/setup.ts`.
 
+**Two-account bearer isolation (Done when #4).** `pnpm
+check:native-bearer-isolation` — a sibling of the staging two-user RLS check —
+creates two disposable staging users, grants one a real operator Plus
+entitlement, and probes a latch-enabled Preview with real bearer tokens under
+`Origin: capacitor://localhost`: preflights (including the plans exclusion),
+billing projections resolving to exactly their own account, missing/malformed/
+tampered tokens failing closed, and all three avatar handlers in both
+directions. Requires `.env.staging.local` plus
+`BIBLEQUEST_NATIVE_BEARER_TARGET_ORIGIN` (a bare HTTPS Preview origin whose
+Supabase is the same staging project, with the origin latch and
+`BIBLEQUEST_AVATAR_SYNC_ENABLED` on) and
+`BIBLEQUEST_CONFIRM_NATIVE_BEARER_TEST=staging-only-native-bearer-isolation`.
+Before enabling the latch on that Preview, probe that its edge agrees with the
+local router: `/api/billing/%70lans` must 404 and `/api/billing/plans/` must
+308, so no decode/normalize disagreement can reach the excluded plans route.
+
 **Cheapest CORS proof, no auth needed.** In the simulator: Home → tap the avatar
 top-left (Settings is *not* in the bottom nav) → the "Bible translation"
 disclosure. Success renders a search field listing non-English editions, which
