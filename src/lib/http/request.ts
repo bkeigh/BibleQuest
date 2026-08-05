@@ -1,5 +1,14 @@
+import { isNativeAppOrigin } from "./native-origin";
+
 /** Requires browser mutations to originate from the exact request origin. */
 export function hasSameOrigin(request: Request): boolean {
+  // The iOS bundle is a legitimate caller from a different origin. This is an
+  // ADDITIONAL allow placed above the existing checks, never a relaxation of
+  // them: every rejection below still applies to every other caller, and the
+  // allowance is inert unless its server-only latch is on. Passing here is not
+  // authentication — it only lets the request reach the real identity check.
+  if (isNativeAppOrigin(request)) return true;
+
   const origin = request.headers.get("origin");
   if (!origin) return false;
   try {

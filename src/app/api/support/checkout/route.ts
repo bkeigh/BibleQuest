@@ -4,6 +4,7 @@ import { requireStripeBillingConfiguration } from "@/lib/billing/config.server";
 import { createStripe } from "@/lib/billing/stripe.server";
 import { boundedJson } from "@/lib/http/json";
 import { hasSameOrigin, privateError } from "@/lib/http/request";
+import { isNativeAppOrigin } from "@/lib/http/native-origin";
 import {
   isSupportAmount,
   MAX_SUPPORT_REQUEST_BYTES,
@@ -56,6 +57,16 @@ async function recordCreationFailure(
 
 /** Creates one rate-limited, idempotent, server-priced support Checkout. */
 export async function POST(request: Request) {
+  // This route stays WEB-ONLY, deliberately.
+  //
+  // It is the only route where the origin check is the sole protection —
+  // everywhere else `hasSameOrigin` is followed by an authenticated context.
+  // Support checkout allows guests by design, so extending the native
+  // allowance here would hand unauthenticated Stripe Checkout session creation
+  // to any client that sets an Origin header, which carries no authentication
+  // weight. Nothing is lost: `webCommerceAvailable()` already hides every
+  // support-checkout entry point on native.
+  if (isNativeAppOrigin(request)) return privateError("forbidden", 403);
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
   const blocked = guardProviderRequest(request, "support-checkout", [
     { limit: 5, windowMs: 10 * 60_000 },
