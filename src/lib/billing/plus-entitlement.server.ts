@@ -16,10 +16,10 @@ import { createAdminSupabase } from "@/lib/supabase/admin.server";
 import { authenticatedServerContext } from "@/lib/supabase/authenticated.server";
 
 /** Verifies account identity and Plus access from sealed server records. */
-export async function requireServerPlus(): Promise<
-  { userId: string } | Response
-> {
-  const context = await authenticatedServerContext();
+export async function requireServerPlus(
+  request: Request,
+): Promise<{ userId: string } | Response> {
+  const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;
   try {
     const admin = createAdminSupabase();

@@ -28,7 +28,7 @@ const RATE_POLICIES = [
 /** Returns one bounded study answer and keeps all conversation history off-server. */
 export async function POST(request: Request) {
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
-  const entitlement = await requireServerPlus();
+  const entitlement = await requireServerPlus(request);
   if (entitlement instanceof Response) return entitlement;
 
   // Cap the raw request before parsing or reserving any paid-provider quota.

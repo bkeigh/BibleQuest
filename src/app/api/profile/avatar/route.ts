@@ -125,9 +125,9 @@ function avatarResponse(
 }
 
 /** Serves the current private object through the user's authenticated session. */
-export async function GET() {
+export async function GET(request: Request) {
   if (!featureEnabled()) return privateError("unavailable", 503);
-  const context = await authenticatedServerContext();
+  const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;
   const { supabase, user } = context;
   if (!(await avatarContractReady(supabase, "read"))) {
@@ -182,7 +182,7 @@ export async function POST(request: Request) {
     return privateError("invalid_avatar", 400);
   }
 
-  const context = await authenticatedServerContext();
+  const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;
   const { supabase, user } = context;
   if (!(await avatarContractReady(supabase, "write"))) {
@@ -322,7 +322,7 @@ async function removeAllOwnedObjects(
 /** Deletes remote media before clearing its profile pointer. */
 export async function DELETE(request: Request) {
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
-  const context = await authenticatedServerContext();
+  const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;
   const { supabase, user } = context;
   const contractReady = await avatarContractReady(

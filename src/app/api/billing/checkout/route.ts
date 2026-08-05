@@ -25,7 +25,7 @@ export const runtime = "nodejs";
 /** Creates one server-allowlisted hosted subscription Checkout Session. */
 export async function POST(request: Request) {
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
-  const context = await authenticatedServerContext();
+  const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;
   const body = await boundedJson(request, MAX_BILLING_REQUEST_BYTES);
   if (body instanceof Response) return body;

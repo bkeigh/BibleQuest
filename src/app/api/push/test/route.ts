@@ -25,7 +25,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   if (!pushFeatureEnabled()) return privateError("unavailable", 503);
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
-  const context = await authenticatedServerContext();
+  const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;
   if (!(await pushContractReady(context.supabase))) {
     recordServerFailureReason("push", "test_delivery", "schema");

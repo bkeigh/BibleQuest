@@ -21,7 +21,7 @@ describe("private push API boundary", () => {
       "src/app/api/push/config/route.ts",
       ...mutationRoutes,
     ]) {
-      expect(source(path)).toContain("authenticatedServerContext()");
+      expect(source(path)).toContain("authenticatedServerContext(request)");
       expect(source(path)).toContain("pushContractReady(");
     }
     for (const path of mutationRoutes) {

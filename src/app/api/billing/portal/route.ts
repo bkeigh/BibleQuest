@@ -16,7 +16,7 @@ export const runtime = "nodejs";
 /** Creates a hosted Customer Portal only for the current account mapping. */
 export async function POST(request: Request) {
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
-  const context = await authenticatedServerContext();
+  const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;
 
   try {

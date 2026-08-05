@@ -20,7 +20,7 @@ describe("direct Stripe API boundary", () => {
 
   it("authenticates every account route and origin-protects mutations", () => {
     for (const path of accountRoutes) {
-      expect(source(path)).toContain("authenticatedServerContext()");
+      expect(source(path)).toContain("authenticatedServerContext(request)");
       expect(source(path)).toContain("stripeBillingContractReady(");
     }
     for (const path of mutationRoutes) {
@@ -75,9 +75,14 @@ describe("direct Stripe API boundary", () => {
     );
     expect(status).toContain('from("operator_plus_grants")');
     expect(status).toContain("operatorPlusGrantContractReady(admin)");
-    expect(status.indexOf("authenticatedServerContext()")).toBeLessThan(
-      status.indexOf("stripeBillingAvailability()"),
-    );
+    // Both markers must exist before comparing: indexOf returns -1 for a
+    // missing needle, which is less than any hit, so a renamed call would
+    // otherwise let this ordering pin pass vacuously.
+    const authIndex = status.indexOf("authenticatedServerContext(request)");
+    const availabilityIndex = status.indexOf("stripeBillingAvailability()");
+    expect(authIndex).toBeGreaterThanOrEqual(0);
+    expect(availabilityIndex).toBeGreaterThanOrEqual(0);
+    expect(authIndex).toBeLessThan(availabilityIndex);
     expect(client.indexOf("if (value.isPlus)")).toBeLessThan(
       client.indexOf('value.availability === "coming-soon"'),
     );

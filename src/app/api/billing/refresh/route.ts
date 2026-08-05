@@ -17,7 +17,7 @@ export const runtime = "nodejs";
 /** Reconciles current Stripe objects after Checkout or Portal return. */
 export async function POST(request: Request) {
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
-  const context = await authenticatedServerContext();
+  const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;
 
   try {
