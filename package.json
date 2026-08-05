@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:native": "node --env-file-if-exists=.env.local scripts/build-native.mjs",
     "art:install": "node scripts/install-2_5d-art.mjs",
     "start": "next start",
     "lint": "eslint",
@@ -40,6 +41,12 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/keyboard": "^8.0.5",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.111.0",
     "framer-motion": "^12.43.0",
@@ -52,6 +59,8 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/ios": "^8.5.0",
     "@playwright/test": "1.62.1",
     "@swc/helpers": "^0.5.23",
     "@tailwindcss/postcss": "^4.3.3",

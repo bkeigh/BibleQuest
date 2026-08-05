@@ -13,8 +13,16 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Keep repository-local Codex worktrees outside the root lint scope.
+    // Keep repository-local agent worktrees outside the root lint scope. Each
+    // carries its own .next build output, which would otherwise be linted.
     ".codex-worktrees/**",
+    ".claude/worktrees/**",
+    // The Xcode project, the staged native source copy, and the exported
+    // native bundle. `cap sync` copies the whole web build into
+    // ios/App/App/public/, so without this ESLint lints minified chunks.
+    "ios/**",
+    ".native/**",
+    "out-native/**",
   ]),
 ]);
 

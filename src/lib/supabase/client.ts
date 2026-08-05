@@ -13,6 +13,7 @@
 import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabasePublishableKey } from "./config";
+import { nativeAuthClientOptions } from "./native-cookie-storage";
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -40,7 +41,9 @@ export function createClient() {
   scope[BROWSER_CLIENT_KEY] ??= createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     supabasePublishableKey()!,
-    { isSingleton: true },
+    // `document.cookie` is a measured no-op inside the iOS WebView, so the
+    // native build supplies its own cookie store. Empty on web.
+    { isSingleton: true, ...nativeAuthClientOptions() },
   );
   return scope[BROWSER_CLIENT_KEY];
 }
@@ -65,6 +68,10 @@ export function createSyncClient(expectedUserId: string, generation: number) {
       // singleton only as the token source so data clients do not create
       // competing GoTrue instances under the same browser storage key.
       isSingleton: false,
+      // The data client reads its token from the auth singleton rather than
+      // storage, but it still constructs a cookie adapter internally — give it
+      // the working one so it cannot fall back to the no-op on native.
+      ...nativeAuthClientOptions(),
       accessToken: async () => {
         const { data, error } = await authClient.auth.getSession();
         if (error) throw error;

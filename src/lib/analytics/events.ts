@@ -339,6 +339,7 @@ const SAFE_STATIC_PATHS = new Set([
   "/app",
   "/app/account",
   "/app/bible",
+  "/app/bible/read",
   "/app/bible/saved",
   "/app/games",
   "/app/games/archive",
@@ -358,9 +359,27 @@ const SAFE_STATIC_PATHS = new Set([
   "/app/settings",
 ]);
 
+/**
+ * The native bundle's flat reader route, without the export build's trailing
+ * slash. Kept as a literal because this module is deliberately import-free;
+ * `tests/bible-native-reader.test.ts` asserts it still matches
+ * `FLAT_READER_PATH` in lib/bible/links.ts.
+ */
+const FLAT_READER_PATHNAME = "/app/bible/read";
+
 /** Replaces every dynamic route segment so record IDs and slugs cannot leak. */
-function safePathname(pathname: string): string {
+function safePathname(pathname: string, search = ""): string {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  // The native bundle's reader carries book and chapter in the query rather
+  // than the path, so without this every chapter open would be reported as the
+  // Bible hub. Report the same bucket as the web route so both targets
+  // aggregate together. Only the two slug names are read — never the query.
+  if (path === FLAT_READER_PATHNAME) {
+    const params = new URLSearchParams(search);
+    if (params.get("book") && params.get("chapter")) {
+      return "/app/bible/[book]/[chapter]";
+    }
+  }
   if (SAFE_STATIC_PATHS.has(path)) return path;
   if (/^\/app\/quests\/[^/]+$/.test(path)) return "/app/quests/[quest]";
   if (/^\/app\/bible\/[^/]+\/[^/]+$/.test(path)) {
@@ -385,7 +404,7 @@ function sanitizeUrl(value: unknown): string | null {
   try {
     const url = new URL(value);
     if (url.origin !== window.location.origin) return null;
-    return `${url.origin}${safePathname(url.pathname)}`;
+    return `${url.origin}${safePathname(url.pathname, url.search)}`;
   } catch {
     return null;
   }

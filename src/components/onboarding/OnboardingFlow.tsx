@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MotionConfig, motion } from "framer-motion";
 import { useQuestOS } from "@/lib/questos/store";
+import { isNativeTarget } from "@/lib/platform/target";
 import { useSession } from "@/lib/supabase/useSession";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { GentleButton } from "@/components/design-system/GentleButton";
@@ -69,7 +70,9 @@ const BIBLE_STEP = 7;
 const PRAYER_STEP = 8;
 const FIRST_QUEST_STEP = 9;
 const PLUS_STEP = 10;
-const TOTAL_STEPS = PLUS_STEP + 1;
+// The native build ends at the first quest — see startFirstQuest — so the
+// progress dots must not promise a step that never arrives.
+const TOTAL_STEPS = isNativeTarget() ? PLUS_STEP : PLUS_STEP + 1;
 
 const STEP_HEADING_ID = "onboarding-step-heading";
 
@@ -177,10 +180,17 @@ function OnboardingInner({
 
   // Adds the suggested quest before showing the optional membership invitation.
   function startFirstQuest() {
-    setOnboardingResumeStage("plus");
     if (!alreadyDone) saveProfile();
     if (suggestedQuest) pickQuest(suggestedQuest.slug);
     markAccountNudgeShown("onboarding");
+    // Plus cannot be purchased on iOS until a StoreKit path exists, so the
+    // invitation would end on a page the reader can never act on. Finish
+    // straight into the app instead.
+    if (isNativeTarget()) {
+      finish("/app");
+      return;
+    }
+    setOnboardingResumeStage("plus");
     goTo(PLUS_STEP);
   }
 

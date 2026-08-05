@@ -14,6 +14,7 @@ import type { VerseBookmark } from "@/lib/questos/types";
 import { usePreferredBiblePassage } from "@/lib/bible/use-preferred-scripture";
 import { ApiBibleViewTracker } from "@/components/bible/ApiBibleViewTracker";
 import { LOCAL_WEB_TRANSLATION_KEY } from "@/lib/bible/translations";
+import { chapterHref } from "@/lib/bible/links";
 
 function SavedVerseCard({
   bookmark,
@@ -38,7 +39,11 @@ function SavedVerseCard({
     savedTranslationKey,
     savedTranslationKey,
   );
-  const href = `/app/bible/${bookmark.bookSlug}/${bookmark.chapter}?translation=${encodeURIComponent(savedTranslationKey)}&verse=${bookmark.verse}#verse-${bookmark.verse}`;
+  const href = chapterHref(bookmark.bookSlug, bookmark.chapter, {
+    translation: savedTranslationKey,
+    verse: bookmark.verse,
+    anchor: bookmark.verse,
+  });
 
   return (
     <PaperCard variant="paper" padding="md">

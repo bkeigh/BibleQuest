@@ -16,6 +16,7 @@ import { useQuestOS } from "@/lib/questos/store";
 import type { BibleBookMeta } from "@/lib/questos/types";
 import { cn } from "@/lib/utils/cn";
 import { useHydrated } from "@/lib/utils/useHydrated";
+import { chapterHref } from "@/lib/bible/links";
 
 type BookSummary = Pick<
   BibleBookMeta,
@@ -114,7 +115,7 @@ export function BookChapterPicker({ book }: { book: BookSummary }) {
         className="mt-5"
       >
         <Link
-          href={`/app/bible/${book.slug}/${actionChapter}`}
+          href={chapterHref(book.slug, actionChapter)}
           aria-label={`${actionLabel}: ${book.name} chapter ${actionChapter}`}
           className="group block rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
@@ -212,7 +213,7 @@ export function BookChapterPicker({ book }: { book: BookSummary }) {
               return (
                 <li key={chapter}>
                   <Link
-                    href={`/app/bible/${book.slug}/${chapter}`}
+                    href={chapterHref(book.slug, chapter)}
                     aria-label={`${book.name} chapter ${chapter}${stateLabel}`}
                     aria-current={isCurrent ? "step" : undefined}
                     className={cn(

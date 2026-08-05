@@ -18,6 +18,7 @@ import {
   isStandaloneWebApp,
   type InstallPlatform,
 } from "@/lib/pwa/install-guidance";
+import { isNativeTarget } from "@/lib/platform/target";
 
 interface BIPEvent extends Event {
   prompt: () => Promise<void>;
@@ -59,6 +60,13 @@ export function InstallPrompt() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (isDismissed()) return;
+
+    // The native app IS the installed app. `isStandaloneWebApp()` only reads
+    // display-mode and navigator.standalone, neither of which a Capacitor
+    // WebView sets, so without this the fallback timer below would show
+    // "Tap Share, then Add to Home Screen" inside the iOS app — the classic
+    // web-wrapper tell that App Store review rejects under guideline 4.2.
+    if (isNativeTarget()) return;
 
     if (isStandaloneWebApp()) return;
 

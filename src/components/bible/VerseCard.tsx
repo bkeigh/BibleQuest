@@ -19,6 +19,7 @@ import { useStrings } from "@/lib/i18n";
 import { VerseShareSheet } from "@/components/bible/VerseShareSheet";
 import { ApiBibleViewTracker } from "@/components/bible/ApiBibleViewTracker";
 import { usePreferredBiblePassage } from "@/lib/bible/use-preferred-scripture";
+import { chapterHref } from "@/lib/bible/links";
 import {
   isRedistributableBibleTranslation,
   LOCAL_WEB_TRANSLATION_KEY,
@@ -101,7 +102,10 @@ export function VerseCard({
       ? `?translation=${encodeURIComponent(resolved.effectiveTranslation.key)}`
       : ""
   }`;
-  const chapterPath = `/app/bible/${verse.bookSlug}/${verse.chapter}?verse=${verseSegment}#verse-${verse.verseStart}`;
+  const chapterPath = chapterHref(verse.bookSlug, verse.chapter, {
+    verse: verseSegment,
+    anchor: verse.verseStart,
+  });
 
   function shareVerse() {
     setShareUrl(buildPublicUrl(sharePath));

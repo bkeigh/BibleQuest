@@ -19,6 +19,7 @@ import {
   formatQuestWindowRemaining,
   isQuestWindowOpen,
 } from "@/lib/questos/quest-engine";
+import { chapterHref } from "@/lib/bible/links";
 import { timeOfDay, toDateKey } from "@/lib/utils/dates";
 import { useStrings, fmt } from "@/lib/i18n";
 import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
@@ -382,7 +383,7 @@ function HomeInner() {
             <QuickActionTile
               href={
                 readingPosition
-                  ? `/app/bible/${readingPosition.bookSlug}/${readingPosition.chapter}`
+                  ? chapterHref(readingPosition.bookSlug, readingPosition.chapter)
                   : "/app/bible"
               }
               sprite="book"

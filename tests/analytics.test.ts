@@ -169,6 +169,47 @@ describe("privacy-first analytics", () => {
     );
   });
 
+  it("reports the native flat reader in the same bucket as the web chapter route", async () => {
+    // The iOS bundle carries book and chapter in the query rather than the
+    // path. Without the flat-reader branch every chapter open would collapse
+    // into the Bible hub and silently merge with index traffic.
+    installBrowser(
+      "https://biblequest.test/app/bible/read/?book=john&chapter=3&verse=16#verse-16",
+    );
+    localStorage.setItem(CONSENT_KEY, "1");
+    const fetchMock = vi.fn().mockResolvedValue(response());
+    vi.stubGlobal("fetch", fetchMock);
+    const { track } = await loadAnalytics();
+
+    track("reflection_created");
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      url: "https://biblequest.test/app/bible/[book]/[chapter]",
+    });
+    // The slug names gate the bucket; their values must never be sent.
+    expect(JSON.stringify(body)).not.toMatch(/john|verse|\?|#/);
+  });
+
+  it("keeps the bare flat reader path distinct from a chapter view", async () => {
+    installBrowser("https://biblequest.test/app/bible/read/");
+    localStorage.setItem(CONSENT_KEY, "1");
+    const fetchMock = vi.fn().mockResolvedValue(response());
+    vi.stubGlobal("fetch", fetchMock);
+    const { track } = await loadAnalytics();
+
+    track("reflection_created");
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      url: "https://biblequest.test/app/bible/read",
+    });
+  });
+
   it("silently denies disabled, incomplete, and malformed configurations", async () => {
     const states = [
       { enabled: "false", domain: "biblequest.test" },

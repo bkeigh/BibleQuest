@@ -3,8 +3,11 @@ import { Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegistrar } from "@/components/app-shell/ServiceWorkerRegistrar";
 import { JournalDraftJanitor } from "@/components/journal/JournalDraftJanitor";
+import { NativeJourneyGuard } from "@/components/app-shell/NativeJourneyGuard";
 import { APPEARANCE_BOOTSTRAP_SCRIPT } from "@/lib/appearance/bootstrap";
 import { deploymentLabel } from "@/lib/deployment-label";
+import { isNativeTarget } from "@/lib/platform/target";
+import { nativeContentSecurityPolicyFromEnv } from "@/lib/security/csp";
 
 const fraunces = Fraunces({
   variable: "--font-fraunces",
@@ -105,6 +108,16 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        {/* The native bundle is served from the filesystem, so no response
+            headers exist and next.config.ts's policy never reaches it. This
+            meta tag is the only CSP the iOS app gets. Web is unaffected — it
+            keeps the header and never renders this. */}
+        {isNativeTarget() ? (
+          <meta
+            httpEquiv="Content-Security-Policy"
+            content={nativeContentSecurityPolicyFromEnv()}
+          />
+        ) : null}
         {/* Applies saved appearance before painted content can flash or animate. */}
         <script
           dangerouslySetInnerHTML={{ __html: APPEARANCE_BOOTSTRAP_SCRIPT }}
@@ -121,6 +134,7 @@ export default function RootLayout({
         ) : null}
         {children}
         <JournalDraftJanitor />
+        <NativeJourneyGuard />
         <ServiceWorkerRegistrar />
       </body>
     </html>

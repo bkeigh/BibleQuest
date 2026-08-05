@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuestOS } from "@/lib/questos/store";
 import type { DailyVerse } from "@/lib/questos/types";
-import type { ChapterContent } from "@/lib/bible/server";
+import type { ChapterContent } from "@/lib/bible/chapter-content";
 import {
   LOCAL_WEB_TRANSLATION_KEY,
   WEB_TRANSLATION,
