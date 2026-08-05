@@ -5,6 +5,7 @@ import { ServiceWorkerRegistrar } from "@/components/app-shell/ServiceWorkerRegi
 import { JournalDraftJanitor } from "@/components/journal/JournalDraftJanitor";
 import { APPEARANCE_BOOTSTRAP_SCRIPT } from "@/lib/appearance/bootstrap";
 import { deploymentLabel } from "@/lib/deployment-label";
+import { Analytics } from "@vercel/analytics/next";
 
 const fraunces = Fraunces({
   variable: "--font-fraunces",
@@ -122,6 +123,7 @@ export default function RootLayout({
         {children}
         <JournalDraftJanitor />
         <ServiceWorkerRegistrar />
+        <Analytics />
       </body>
     </html>
   );
