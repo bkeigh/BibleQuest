@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+	Apple's privacy manifest for the app target.
+
+	Capacitor and Cordova ship their own manifests inside their binary
+	xcframeworks, and both are accurately empty. The five Capacitor plugin SPM
+	packages ship none and compile straight into this target, so their API use
+	is declared here.
+
+	Exactly one required-reason category applies, verified against the built
+	Release binary rather than assumed: @capacitor/filesystem reads file
+	creation and modification dates, because src/lib/native/journey-backup.ts
+	keeps the durable journey mirror. Reason C617.1 is "files inside the app
+	container", which is precisely and only what that mirror touches.
+
+	Deliberately NOT declared, each confirmed absent from the shipped binaries:
+	DiskSpace, SystemBootTime, ActiveKeyboards, UserDefaults. The web bundle
+	adds nothing — localStorage, IndexedDB and crypto.subtle are WebKit
+	internals, not required-reason APIs.
+
+	NSPrivacyCollectedDataTypes is empty because the shipping build is
+	guest-only and nothing user-identifying leaves the device. Revisit this
+	together with the App Store Connect privacy answers before account sync is
+	enabled by default on native.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

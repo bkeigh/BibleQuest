@@ -22,6 +22,15 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- Declared false because every cryptographic path here is exempt: HTTPS
+	     through the system TLS stack, one WebCrypto SHA-256 digest (a hash, not
+	     encryption), and Supabase PKCE/JWT handling, which is authentication.
+	     No cryptographic library ships in the bundle. Without this key every
+	     upload parks in "Missing Compliance" and cannot reach even an internal
+	     tester until the questionnaire is answered by hand. Re-verify against
+	     Apple's exemption criteria if the app ever encrypts data itself. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

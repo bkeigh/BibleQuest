@@ -27,6 +27,18 @@ import { createClient } from "@supabase/supabase-js";
 
 const CONFIRMATION = "staging-only-native-bearer-isolation";
 const NATIVE_ORIGIN = "capacitor://localhost";
+
+/**
+ * The one biblequest.co host this probe may target.
+ *
+ * Vercel Authentication protects every deployment except those reached through
+ * a custom domain, and the iOS WebView cannot satisfy an SSO redirect — so the
+ * native staging target is a custom subdomain rather than a *.vercel.app
+ * preview URL. A source constant, never an environment variable: the apex,
+ * www, and every other production alias stay refused below, so no environment
+ * setting can widen this probe onto production.
+ */
+const ALLOWED_STAGING_HOST = "native-staging.biblequest.co";
 const REQUIRED_ENV = [
   "BIBLEQUEST_STAGING_PROJECT_REF",
   "BIBLEQUEST_CONFIRM_NATIVE_BEARER_TEST",
@@ -76,8 +88,9 @@ function requireEnvironment() {
     );
   }
   if (
-    target.hostname === "biblequest.co" ||
-    target.hostname.endsWith(".biblequest.co")
+    target.hostname !== ALLOWED_STAGING_HOST &&
+    (target.hostname === "biblequest.co" ||
+      target.hostname.endsWith(".biblequest.co"))
   ) {
     throw new Error("Refusing to probe production or any production alias");
   }

@@ -200,9 +200,10 @@ a means of resolving a user id.
 5. **`src/proxy.ts` is a viable seam and a dangerous one.** Its matcher
    (`src/proxy.ts:64`) does not exclude `/api`, so it already runs on every API
    request including preflights. But `updateSession` reassigns the response
-   object — set CORS headers on the object it *returns*, never before. It
-   declares no `export const runtime`; confirm which runtime it gets before
-   relying on `process.env` there.
+   object — set CORS headers on the object it *returns*, never before.
+   **Runtime resolved:** it compiles to the Node.js runtime, so `process.env`
+   is read per request — but Vercel binds environment variables at deploy
+   time, so changing the latch requires a redeploy before it takes effect.
 6. **CORS headers are decoration; the 403 in the guard is the boundary.** The
    dangerous failure is not "browser blocks the response" — it is "route
    accepts, mutation commits, browser discards the response". Both layers must
@@ -244,9 +245,38 @@ actionable message if either is missing or malformed.
 **`NEXT_PUBLIC_NATIVE_HOSTED_ORIGIN` must be a bare HTTPS origin** — enforced in
 four places (`scripts/build-native.mjs`, `src/lib/platform/runtime.ts`,
 `src/lib/platform/api.ts`, `src/lib/security/csp.ts`). You therefore **cannot
-point the native build at a local dev server**. Use a Vercel Preview origin and
-scope `BIBLEQUEST_NATIVE_API_ORIGIN_ENABLED=true` to Preview only. The CSP
-`connect-src` derives from the same variable, so it follows automatically.
+point the native build at a local dev server**. The CSP `connect-src` derives
+from the same variable, so it follows automatically.
+
+**Use `https://native-staging.biblequest.co`, not a `*.vercel.app` preview
+URL.** Measured 2026-08-06: this project runs Vercel Authentication with
+`deploymentType: all_except_custom_domains`, so every preview URL answers
+`302` to a Vercel SSO login — including the `OPTIONS` preflight. The WebView
+cannot satisfy that redirect, and the failure is indistinguishable in-app from
+a CORS block. A custom subdomain is exempt from the SSO rule and, unlike a
+branch alias, is stable for the 90-day life of a TestFlight build even if the
+branch is renamed. Scope `BIBLEQUEST_NATIVE_API_ORIGIN_ENABLED=true` to that
+Preview environment only, never "All Environments".
+
+**Gate on the observable before building.** This must print `204`:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -X OPTIONS https://native-staging.biblequest.co/api/billing/status -H 'Origin: capacitor://localhost' -H 'Access-Control-Request-Method: GET'
+```
+
+`302` means deployment protection still covers the host; `403` means the latch
+is set but not yet redeployed.
+
+**The archive ritual.** The web payload under `ios/App/App/public` is untracked
+build output, so the bundle carries whichever origin was last built in. Run
+this immediately before every Product → Archive, and confirm the origin:
+
+```bash
+NEXT_PUBLIC_APP_PLATFORM=native NEXT_PUBLIC_NATIVE_HOSTED_ORIGIN=https://native-staging.biblequest.co pnpm build:native && pnpm exec cap sync ios && grep -rl 'vercel.app' ios/App/App/public | wc -l
+```
+
+For anything headed to the App Store, rebuild against
+`https://www.biblequest.co` and require that grep to return `0`.
 
 ```bash
 pnpm exec cap sync ios

@@ -30,6 +30,7 @@ import {
   uploadRemoteAvatar,
 } from "@/lib/avatar/client";
 import { validateAvatarFile } from "@/lib/avatar/validation";
+import { isNativeTarget } from "@/lib/platform/target";
 import {
   MAX_IMPORT_FILE_BYTES,
   parseSnapshot,
@@ -1178,26 +1179,40 @@ function SettingsInner() {
                     </GentleButton>
                   </div>
                   <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                    <input
-                      ref={photoInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      className="sr-only"
-                      // Proxy-triggered by the visible button; without this
-                      // the sr-only input is an invisible tab stop.
-                      tabIndex={-1}
-                      aria-hidden="true"
-                      onChange={onPhotoPicked}
-                    />
-                    <GentleButton
-                      variant="outline"
-                      size="sm"
-                      className="min-h-11"
-                      disabled={sessionLoading || photoBusy}
-                      onClick={() => photoInputRef.current?.click()}
-                    >
-                      {photoBusy ? "Saving…" : t.settings.changePhoto}
-                    </GentleButton>
+                    {/*
+                      Withheld on native: iOS offers "Take Photo" on a file
+                      input, and the camera terminates any app that has no
+                      NSCameraUsageDescription — which this app deliberately
+                      omits, because declaring it would re-open a capability
+                      next.config.ts denies on web. That crash sits on a
+                      guest-reachable path, so the control waits for a decision
+                      between adding the usage string and leaving it out. The
+                      existing avatar stays visible and clearable either way.
+                    */}
+                    {!isNativeTarget() && (
+                      <>
+                        <input
+                          ref={photoInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          className="sr-only"
+                          // Proxy-triggered by the visible button; without this
+                          // the sr-only input is an invisible tab stop.
+                          tabIndex={-1}
+                          aria-hidden="true"
+                          onChange={onPhotoPicked}
+                        />
+                        <GentleButton
+                          variant="outline"
+                          size="sm"
+                          className="min-h-11"
+                          disabled={sessionLoading || photoBusy}
+                          onClick={() => photoInputRef.current?.click()}
+                        >
+                          {photoBusy ? "Saving…" : t.settings.changePhoto}
+                        </GentleButton>
+                      </>
+                    )}
                     {profileAvatarMarker(profile) && (
                       <GentleButton
                         variant="text"
