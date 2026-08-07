@@ -25,6 +25,7 @@ import {
   type ArtMascotName,
 } from "@/components/design-system/ArtMascot";
 import { ArtIcon } from "@/components/design-system/ArtIcon";
+import { WheelPicker } from "@/components/design-system/WheelPicker";
 import { SignInMethods } from "@/components/account/SignInMethods";
 import { QuestSlip } from "@/components/quests/QuestSlip";
 import {
@@ -442,13 +443,20 @@ function OnboardingInner({
 function StepMascot({
   name,
   size = 160,
+  className,
 }: {
   /** Rendered edge in CSS pixels, same units as `ArtMascot`. */
   name: ArtMascotName;
   size?: number;
+  className?: string;
 }) {
   return (
-    <motion.div variants={riseIn} initial="hidden" animate="visible" className="mb-4">
+    <motion.div
+      variants={riseIn}
+      initial="hidden"
+      animate="visible"
+      className={cn("mb-4", className)}
+    >
       <ArtMascot name={name} size={size} priority />
     </motion.div>
   );
@@ -604,10 +612,24 @@ function StepLanguage({
     FEATURED_TRANSLATIONS,
     bibleTranslation,
   );
+  const selectedLanguage = LANGUAGES.find(
+    (option) => option.code === language,
+  );
+  const selectedEdition = editions.find(
+    ({ translation }) => translation.key === bibleTranslation,
+  )?.translation;
 
   return (
     <div className="text-center">
-      <StepMascot name="dove" size={144} />
+      {/* The mascot shrinks on short screens rather than disappearing: the
+          step has to fit an iPhone SE without scrolling, but the artwork is
+          brand, not decoration, so it is scaled, not dropped. */}
+      <StepMascot name="dove" size={144} className="max-[700px]:hidden" />
+      <StepMascot
+        name="dove"
+        size={88}
+        className="hidden max-[700px]:block"
+      />
       <h1
         id={STEP_HEADING_ID}
         tabIndex={-1}
@@ -616,100 +638,92 @@ function StepLanguage({
         What should we speak?
       </h1>
       <p className="mx-auto mt-2 max-w-xs text-small leading-relaxed text-ash">
-        Both can be changed at any time in Settings, and they do not have to
-        match.
+        Both can be changed later in Settings, and they need not match.
       </p>
 
-      <fieldset className="mt-6 text-start">
+      <fieldset className="mt-5 min-w-0 text-start">
         <legend className="font-art-label text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
-          The app
+          The app<span className="sr-only"> language</span>
         </legend>
-        <div className="mt-2 max-h-52 overflow-y-auto rounded-[var(--radius-button)] border border-mist bg-paper">
-          {LANGUAGES.map((option) => (
-            <label
-              key={option.code}
-              className={cn(
-                "flex min-h-12 cursor-pointer items-center gap-3 border-b border-mist/60 px-3 last:border-b-0 transition-colors",
-                language === option.code ? "bg-accent-surface" : "hover:bg-linen/60",
-              )}
-            >
-              <input
-                type="radio"
-                name="onboarding-language"
-                value={option.code}
-                checked={language === option.code}
-                onChange={() => onLanguage(option.code)}
-                className="sr-only"
-              />
-              <span aria-hidden="true" className="text-[1.125rem] leading-none">
-                {option.flags.join("")}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span
-                  lang={option.code}
-                  dir={option.dir}
-                  className="block text-small text-graphite"
-                >
-                  {option.endonym}
-                </span>
-                <span className="block text-caption text-ash">
-                  {option.english}
-                </span>
-              </span>
-              {language === option.code && (
-                <IconCheck size={16} className="shrink-0 text-accent" />
-              )}
-            </label>
-          ))}
-        </div>
+        <WheelPicker
+          name="onboarding-language"
+          value={language}
+          onChange={onLanguage}
+          options={LANGUAGES.map((option) => ({
+            value: option.code,
+            // One flag, not two: 🇺🇸🇬🇧 beside "English" was the widest row
+            // in the list and carried no more meaning than 🇺🇸 alone.
+            mark: option.flags[0],
+            label: option.endonym,
+            lang: option.code,
+            dir: option.dir,
+            // Silent when the endonym already IS the English name, which is
+            // where the duplicated "English / English" came from.
+            gloss:
+              option.english === option.endonym ? undefined : option.english,
+          }))}
+        />
+        {/* Same predicate as the gloss above, so the two can never disagree.
+            aria-hidden: the string is already in the radio's accessible
+            name, and a live region here would double-announce per scroll. */}
+        <p
+          aria-hidden="true"
+          className="mt-2 min-h-[1.0625rem] text-caption text-ash"
+        >
+          {selectedLanguage && selectedLanguage.english !== selectedLanguage.endonym
+            ? selectedLanguage.english
+            : ""}
+        </p>
       </fieldset>
 
-      <fieldset className="mt-5 text-start">
+      <fieldset className="mt-4 min-w-0 text-start">
         <legend className="font-art-label text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
-          The Bible
+          The Bible<span className="sr-only"> edition</span>
         </legend>
-        <div className="mt-2 rounded-[var(--radius-button)] border border-mist bg-paper">
-          {editions.map(({ translation, disabled }) => (
-            <label
-              key={translation.key}
-              className={cn(
-                "flex min-h-12 items-center gap-3 border-b border-mist/60 px-3 last:border-b-0 transition-colors",
-                disabled
-                  ? "cursor-not-allowed opacity-45"
-                  : "cursor-pointer hover:bg-linen/60",
-                bibleTranslation === translation.key && "bg-accent-surface",
-              )}
-            >
-              <input
-                type="radio"
-                name="onboarding-bible"
-                value={translation.key}
-                checked={bibleTranslation === translation.key}
-                disabled={disabled}
-                onChange={() => onBibleTranslation(translation.key)}
-                className="sr-only"
-              />
-              <span aria-hidden="true" className="text-[1.125rem] leading-none">
-                {bibleFlags(translation.languageId)}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-small text-graphite">
-                  {translation.abbreviation}
-                </span>
+        {/* Chips, not rows. Three identical 🇺🇸🇬🇧 pairs stacked over three
+            English abbreviations was the same redundancy again; the caption
+            below carries the full name and language instead. */}
+        <div className="mt-2 flex flex-wrap gap-2">
+          {editions.map(({ translation, disabled }) => {
+            const checked = bibleTranslation === translation.key;
+            return (
+              <label key={translation.key} className="min-w-0">
+                <input
+                  type="radio"
+                  name="onboarding-bible"
+                  value={translation.key}
+                  checked={checked}
+                  disabled={disabled}
+                  onChange={() => onBibleTranslation(translation.key)}
+                  className="peer sr-only"
+                />
                 <span
-                  dir={translation.direction}
-                  lang={translation.languageId}
-                  className="block text-caption text-ash"
+                  className={cn(
+                    "flex min-h-11 items-center gap-2 rounded-[var(--radius-button)] border border-mist px-4 text-small text-charcoal transition-colors",
+                    "peer-checked:border-accent/60 peer-checked:bg-accent-surface peer-checked:text-graphite",
+                    "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent",
+                    disabled
+                      ? "cursor-not-allowed opacity-45"
+                      : "cursor-pointer hover:border-accent/40",
+                  )}
                 >
-                  {translation.languageNameLocal}
+                  {translation.abbreviation}
+                  {/* Visible text is a prefix of the accessible name. */}
+                  <span className="sr-only">{translation.name}</span>
+                  {checked && <IconCheck size={14} className="text-accent" />}
                 </span>
-              </span>
-              {bibleTranslation === translation.key && (
-                <IconCheck size={16} className="shrink-0 text-accent" />
-              )}
-            </label>
-          ))}
+              </label>
+            );
+          })}
         </div>
+        <p aria-hidden="true" className="mt-2 text-caption text-ash">
+          {selectedEdition
+            ? `${selectedEdition.name} · ${selectedEdition.languageNameLocal}`
+            : ""}
+          {editions.some(({ disabled }) => disabled)
+            ? " · Greyed editions need a publisher connection BibleQuest does not have yet."
+            : ""}
+        </p>
       </fieldset>
 
       <GentleButton variant="primary" size="lg" fullWidth className="mt-6" onClick={onNext}>
@@ -717,24 +731,6 @@ function StepLanguage({
       </GentleButton>
     </div>
   );
-}
-
-/** ISO-639-3 codes the Scripture catalogue uses, mapped back to the UI flags. */
-const BIBLE_LANGUAGE_FLAGS: Record<string, string> = {
-  eng: "🇺🇸🇬🇧",
-  spa: "🇪🇸",
-  deu: "🇩🇪",
-  cmn: "🇨🇳",
-  arb: "🇸🇦",
-  fra: "🇫🇷",
-  por: "🇧🇷",
-  ita: "🇮🇹",
-  rus: "🇷🇺",
-  lat: "🇻🇦",
-};
-
-function bibleFlags(languageId: string): string {
-  return BIBLE_LANGUAGE_FLAGS[languageId] ?? "📖";
 }
 
 function StepName({
