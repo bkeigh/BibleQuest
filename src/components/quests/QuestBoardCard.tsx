@@ -192,18 +192,19 @@ export function QuestBoardCard({
       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
     >
       <PaperCard padding="none" className="overflow-hidden">
-        {/* A fixed 44px slot and the status inline with the meta. An 80px
-            sprite set the height of a row whose content column held only a
-            duration, a category and a chip — so the title was pushed a full
-            sprite's height down the card for no reason. */}
-        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 px-4 pt-4 sm:px-5">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center">
-            <ArtIcon
-              name={CATEGORY_ART[quest.category] ?? "leaf"}
-              size={40}
-            />
-          </span>
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.75rem] text-ash">
+        {/* One header rail — a small category mark and its metadata — then
+            the title and everything under it running the full width of the
+            card. An 80px sprite used to set the height of a grid row whose
+            content column held only a duration, a category and a chip, so the
+            title began a full sprite's height down an otherwise empty card. */}
+        <div className="px-4 pt-4 sm:px-5">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.75rem] text-ash">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+              <ArtIcon
+                name={CATEGORY_ART[quest.category] ?? "leaf"}
+                size={22}
+              />
+            </span>
             <span className="inline-flex items-center gap-1">
               <IconClock size={13} />
               {formatDuration(quest.durationMinutes)}
@@ -225,7 +226,7 @@ export function QuestBoardCard({
               {statusLabel}
             </span>
           </div>
-          <div className="col-span-2 min-w-0 pt-2.5">
+          <div className="min-w-0 pt-2.5">
             <h4 className="font-display text-[1.1875rem] leading-snug text-graphite">
               {quest.title}
             </h4>
@@ -250,7 +251,13 @@ export function QuestBoardCard({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 px-4 pb-4 pt-3 sm:px-5">
+        {/* The primary action sits at the trailing edge, under the right
+            thumb. `flex-row-reverse` rather than reordering the markup, so
+            the DOM keeps reading primary-first for keyboard and VoiceOver
+            while the eye and the thumb find it where they expect it.
+            No justify override: on a reversed row the default
+            start-packing IS the right edge. */}
+        <div className="flex flex-row-reverse flex-wrap items-center gap-2.5 px-4 pb-4 pt-3 sm:px-5">
           {primaryAction}
           {/* A quest whose window has closed is finished with, one way or the
               other. Putting the only way to clear it inside Details meant

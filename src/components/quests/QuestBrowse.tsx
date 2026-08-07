@@ -298,28 +298,31 @@ function QuestBrowseInner() {
         compact={compact}
         action={
           !isPicked && !done ? (
-            /* Inline and labelled, not two stacked circles in a reserved
-               right-hand gutter. Named per quest so the screen-reader rotor
+            /* Side by side in the header rail, so the title and body below
+               keep the whole width of the card. Icon-only to stay compact
+               there; each carries the quest name so the screen-reader rotor
                does not list a dozen buttons all called "Add to Ready". */
             <>
-              <button
-                type="button"
-                aria-label={`Add ${quest.title} to Ready`}
-                onClick={() => handleAdd(quest)}
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-accent/50 bg-paper px-4 text-small font-medium text-accent transition-colors duration-300 hover:bg-accent-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                <IconPlus size={15} /> Add
-              </button>
               {canSave && !compact && (
                 <button
                   type="button"
                   aria-label={`${t.myQuests.saveForLater}: ${quest.title}`}
+                  title={t.myQuests.saveForLater}
                   onClick={() => handleSave(quest)}
-                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-small text-ash transition-colors duration-300 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-ash transition-colors duration-300 hover:bg-linen hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
-                  <IconBookmark size={15} /> Save
+                  <IconBookmark size={17} />
                 </button>
               )}
+              <button
+                type="button"
+                aria-label={`Add ${quest.title} to Ready`}
+                title="Add to Ready"
+                onClick={() => handleAdd(quest)}
+                className="flex h-11 w-11 items-center justify-center rounded-full border border-accent/50 bg-paper text-accent transition-colors duration-300 hover:bg-accent-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                <IconPlus size={18} />
+              </button>
             </>
           ) : undefined
         }

@@ -130,15 +130,18 @@ export function QuestSlip({
         className
       )}
     >
-      <div className="flex items-start gap-3">
-        {/* A 44px slot, not an 80px sprite. The old size plus a 72px reserved
-            gutter for stacked circular buttons left the text column at 141px
-            of a 335px card, which is what made these read as cramped. */}
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center">
-          <ArtIcon name={CATEGORY_ART[quest.category] ?? "leaf"} size={40} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.75rem] text-ash">
+      {/* One header rail: the mark and its metadata on the left, the actions
+          on the right. Everything below runs the full width of the card —
+          an indented text column under a large sprite was leaving a third of
+          the card empty on both sides. */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          {/* Small enough to read as a category mark rather than an
+              illustration; the artwork has its own space on the quest page. */}
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+            <ArtIcon name={CATEGORY_ART[quest.category] ?? "leaf"} size={22} />
+          </span>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[0.75rem] text-ash">
             <span className="inline-flex items-center gap-1">
               <IconClock size={13} />
               {formatDuration(quest.durationMinutes)}
@@ -149,38 +152,38 @@ export function QuestSlip({
             </span>
             {badge}
           </div>
-          {heading}
-          {expiresAt && (
-            <time
-              dateTime={expiresAt}
-              title={new Date(expiresAt).toLocaleString()}
-              className="mt-1 block text-[0.75rem] font-medium text-accent"
-            >
-              {completed
-                ? `Slot resets · ${formatQuestWindowRemaining(expiresAt)}`
-                : `${formatQuestWindowRemaining(expiresAt).replace(" left", " to complete")}`}
-            </time>
-          )}
-          {displayStatus === "started" && (
-            <span className="mt-1 block text-[0.75rem] font-medium text-accent">
-              Open to continue
-            </span>
-          )}
-          {/* Two lines of invitation, clamped. The scripture reference belongs
-              to the quest page — on a shelf it was a fourth line of small
-              type competing with the title for the same glance. */}
-          {!compact && (
-            <p className="mt-1.5 line-clamp-2 text-[0.9375rem] leading-relaxed text-charcoal">
-              {quest.invitation}
-            </p>
-          )}
-          {action && (
-            <div className="relative z-10 mt-3 flex flex-wrap items-center gap-2">
-              {action}
-            </div>
-          )}
         </div>
+        {action && (
+          <div className="relative z-10 flex shrink-0 items-center gap-1">
+            {action}
+          </div>
+        )}
       </div>
+      {heading}
+      {expiresAt && (
+        <time
+          dateTime={expiresAt}
+          title={new Date(expiresAt).toLocaleString()}
+          className="mt-1 block text-[0.75rem] font-medium text-accent"
+        >
+          {completed
+            ? `Slot resets · ${formatQuestWindowRemaining(expiresAt)}`
+            : `${formatQuestWindowRemaining(expiresAt).replace(" left", " to complete")}`}
+        </time>
+      )}
+      {displayStatus === "started" && (
+        <span className="mt-1 block text-[0.75rem] font-medium text-accent">
+          Open to continue
+        </span>
+      )}
+      {/* Two lines of invitation, clamped. The scripture reference belongs to
+          the quest page — on a shelf it was a fourth line of small type
+          competing with the title for the same glance. */}
+      {!compact && (
+        <p className="mt-1.5 line-clamp-2 text-[0.9375rem] leading-relaxed text-charcoal">
+          {quest.invitation}
+        </p>
+      )}
     </PaperCard>
   );
 }
