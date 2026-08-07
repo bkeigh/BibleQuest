@@ -44,9 +44,14 @@ curl -s -o /dev/null -w '%{http_code}\n' -X OPTIONS https://native-staging.bible
 not yet redeployed. Also confirm the plans exclusion survived the edge:
 
 ```bash
-curl -s -o /dev/null -w '%{http_code}\n' https://native-staging.biblequest.co/api/billing/%70lans   # expect 404
+curl -s -o /dev/null -w '%{http_code}\n' https://native-staging.biblequest.co/api/billing/%70lans   # expect 500
 curl -s -o /dev/null -w '%{http_code}\n' https://native-staging.biblequest.co/api/billing/plans//   # expect 308
 ```
+
+The encoded spelling answers `500`, not `404` — measured 2026-08-06 on both this
+host and production, so it is a pre-existing quirk of the 404 path rather than
+anything the CORS layer introduced. What matters either way is that it never
+serves the cacheable plans payload.
 
 ## 2. Apple Developer — register the app identity
 

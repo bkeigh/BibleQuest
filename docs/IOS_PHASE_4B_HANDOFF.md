@@ -307,10 +307,13 @@ Supabase is the same staging project, with the origin latch and
 `BIBLEQUEST_AVATAR_SYNC_ENABLED` on) and
 `BIBLEQUEST_CONFIRM_NATIVE_BEARER_TEST=staging-only-native-bearer-isolation`.
 Before enabling the latch on that Preview, probe that its edge agrees with the
-local router: `/api/billing/%70lans` must 404, and `/api/billing/plans/` plus
-`/api/billing/plans//` must 308, so no decode/normalize disagreement can reach
-the excluded plans route (the exclusion itself collapses duplicate and
-trailing slashes before comparing).
+local router: `/api/billing/%70lans` must not serve the plans payload, and
+`/api/billing/plans/` plus `/api/billing/plans//` must 308, so no
+decode/normalize disagreement can reach the excluded plans route (the
+exclusion itself collapses duplicate and trailing slashes before comparing).
+Measured 2026-08-06: the encoded spelling answers `500` on Vercel, not the
+`404` the local dev server gives — identical on production, so it is a
+pre-existing quirk of the 404 path, not something this layer introduced.
 
 **Cheapest CORS proof, no auth needed.** In the simulator: Home → tap the avatar
 top-left (Settings is *not* in the bottom nav) → the "Bible translation"
