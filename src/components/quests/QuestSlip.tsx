@@ -102,24 +102,43 @@ export function QuestSlip({
     </span>
   ) : null;
 
-  const inner = (
+  const heading = (
+    <h3 className="mt-1 font-display text-[1.1875rem] leading-snug text-graphite">
+      {href ? (
+        /* Overlay link: the pseudo-element covers the whole card, so the card
+           is one tap target while the action buttons below stay real siblings
+           rather than buttons nested inside an anchor. */
+        <Link
+          href={href}
+          className="after:absolute after:inset-0 after:rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          {quest.title}
+        </Link>
+      ) : (
+        quest.title
+      )}
+    </h3>
+  );
+
+  return (
     <PaperCard
       interactive={Boolean(href)}
       padding="md"
       className={cn(
-        "group h-full",
+        "group relative h-full",
         (picked || completed || assignmentStatus) && "ring-1 ring-accent/35",
         className
       )}
     >
-      {/* The action sits absolutely at right-4 and is 44px wide, so the content
-          must clear 60px plus a gap or the metadata row runs under it. */}
-      <div className={cn("flex items-start gap-3.5", action ? "pr-[4.5rem]" : null)}>
-        <span className="-mt-1 shrink-0">
-          <ArtIcon name={CATEGORY_ART[quest.category] ?? "leaf"} size={80} />
+      <div className="flex items-start gap-3">
+        {/* A 44px slot, not an 80px sprite. The old size plus a 72px reserved
+            gutter for stacked circular buttons left the text column at 141px
+            of a 335px card, which is what made these read as cramped. */}
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center">
+          <ArtIcon name={CATEGORY_ART[quest.category] ?? "leaf"} size={40} />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.75rem] text-ash">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.75rem] text-ash">
             <span className="inline-flex items-center gap-1">
               <IconClock size={13} />
               {formatDuration(quest.durationMinutes)}
@@ -130,9 +149,7 @@ export function QuestSlip({
             </span>
             {badge}
           </div>
-          <h3 className="mt-1 font-display text-[1.1875rem] leading-snug text-graphite">
-            {quest.title}
-          </h3>
+          {heading}
           {expiresAt && (
             <time
               dateTime={expiresAt}
@@ -149,39 +166,21 @@ export function QuestSlip({
               Open to continue
             </span>
           )}
+          {/* Two lines of invitation, clamped. The scripture reference belongs
+              to the quest page — on a shelf it was a fourth line of small
+              type competing with the title for the same glance. */}
           {!compact && (
-            <>
-              <p className="mt-1.5 text-[0.9375rem] leading-relaxed text-charcoal">
-                {quest.invitation}
-              </p>
-              <p className="mt-2.5 text-[0.8125rem] italic text-ash">
-                {quest.scriptureReference}
-              </p>
-            </>
+            <p className="mt-1.5 line-clamp-2 text-[0.9375rem] leading-relaxed text-charcoal">
+              {quest.invitation}
+            </p>
+          )}
+          {action && (
+            <div className="relative z-10 mt-3 flex flex-wrap items-center gap-2">
+              {action}
+            </div>
           )}
         </div>
       </div>
     </PaperCard>
   );
-
-  const linked = href ? (
-    <Link
-      href={href}
-      className="block h-full rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-    >
-      {inner}
-    </Link>
-  ) : (
-    inner
-  );
-
-  if (action) {
-    return (
-      <div className="relative">
-        {linked}
-        <div className="absolute right-4 top-4">{action}</div>
-      </div>
-    );
-  }
-  return linked;
 }

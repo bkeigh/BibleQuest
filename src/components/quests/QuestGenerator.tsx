@@ -241,10 +241,9 @@ export function QuestGenerator({
                   type="button"
                   onClick={() => onAdd(result.quest)}
                   aria-label={`Add ${result.quest.title} to Ready`}
-                  title="Add to Ready"
-                  className="flex h-11 w-11 items-center justify-center rounded-full border border-accent/50 bg-paper text-accent transition-colors hover:bg-accent-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-accent/50 bg-paper px-4 text-small font-medium text-accent transition-colors hover:bg-accent-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
-                  <IconPlus size={17} />
+                  <IconPlus size={15} /> Add
                 </button>
               ) : undefined
             }

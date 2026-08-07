@@ -298,28 +298,29 @@ function QuestBrowseInner() {
         compact={compact}
         action={
           !isPicked && !done ? (
-            <div className="flex flex-col items-center gap-2">
+            /* Inline and labelled, not two stacked circles in a reserved
+               right-hand gutter. Named per quest so the screen-reader rotor
+               does not list a dozen buttons all called "Add to Ready". */
+            <>
               <button
                 type="button"
-                aria-label="Add to Ready"
-                title="Add to Ready"
+                aria-label={`Add ${quest.title} to Ready`}
                 onClick={() => handleAdd(quest)}
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-accent/50 bg-paper text-accent transition-colors duration-300 hover:bg-accent-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-accent/50 bg-paper px-4 text-small font-medium text-accent transition-colors duration-300 hover:bg-accent-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
-                <IconPlus size={17} />
+                <IconPlus size={15} /> Add
               </button>
               {canSave && !compact && (
                 <button
                   type="button"
-                  aria-label={t.myQuests.saveForLater}
-                  title={t.myQuests.saveForLater}
+                  aria-label={`${t.myQuests.saveForLater}: ${quest.title}`}
                   onClick={() => handleSave(quest)}
-                  className="flex h-11 w-11 items-center justify-center rounded-full border border-mist bg-paper text-ash transition-colors duration-300 hover:border-accent/40 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-small text-ash transition-colors duration-300 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
-                  <IconBookmark size={16} />
+                  <IconBookmark size={15} /> Save
                 </button>
               )}
-            </div>
+            </>
           ) : undefined
         }
       />
@@ -390,7 +391,11 @@ function QuestBrowseInner() {
         {/* The board is the one canonical lifecycle surface above discovery. */}
         <section aria-label="Your quest board">
           <div className="flex items-baseline justify-between gap-3">
-            <h2 className="font-art-label text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
+            {/* Small caps like every other section label: the page is already
+                titled "Quests", so a second display-weight "YOUR QUESTS"
+                directly beneath it was the same words twice at the same
+                volume. */}
+            <h2 className="font-art-label text-[0.9375rem] leading-tight uppercase tracking-[0.1em] text-gilt">
               Your quests
             </h2>
             {/* The switch belongs to the board, not to the catalogue below it.

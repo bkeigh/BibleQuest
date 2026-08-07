@@ -63,7 +63,10 @@ export function QuestCatalogueBar({
           inside the ceiling tests/glass-scroll-cost.test.ts enforces. */}
       <div className="sticky top-[env(safe-area-inset-top)] z-20 -mx-5 border-b border-mist/70 bg-parchment/92 px-5 pt-3 pb-2 backdrop-blur-md sm:-mx-8 sm:px-8">
         <div className="flex items-end justify-between gap-3">
-          <h2 className="font-art-label text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
+          {/* Matches the shelf labels: quiet small caps, so the sticky strip
+              stays a thin rule over the list rather than a second title bar
+              riding down the page. */}
+          <h2 className="font-art-label text-[0.9375rem] leading-tight uppercase tracking-[0.1em] text-gilt">
             {title}
             <span className="ms-2 font-sans text-caption normal-case tracking-normal text-ash">
               {count}

@@ -192,27 +192,29 @@ export function QuestBoardCard({
       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
     >
       <PaperCard padding="none" className="overflow-hidden">
-        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3.5 px-4 pt-4 sm:px-5">
-          <span className="-mt-1 shrink-0">
+        {/* A fixed 44px slot and the status inline with the meta. An 80px
+            sprite set the height of a row whose content column held only a
+            duration, a category and a chip — so the title was pushed a full
+            sprite's height down the card for no reason. */}
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 px-4 pt-4 sm:px-5">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center">
             <ArtIcon
               name={CATEGORY_ART[quest.category] ?? "leaf"}
-              size={80}
+              size={40}
             />
           </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.75rem] text-ash">
-              <span className="inline-flex items-center gap-1">
-                <IconClock size={13} />
-                {formatDuration(quest.durationMinutes)}
-              </span>
-              <span className="text-mist">·</span>
-              <span className="font-art-label text-[0.875rem] text-accent">
-                {CATEGORY_LABEL[quest.category]}
-              </span>
-            </div>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.75rem] text-ash">
+            <span className="inline-flex items-center gap-1">
+              <IconClock size={13} />
+              {formatDuration(quest.durationMinutes)}
+            </span>
+            <span className="text-mist">·</span>
+            <span className="font-art-label text-[0.875rem] text-accent">
+              {CATEGORY_LABEL[quest.category]}
+            </span>
             <span
               className={cn(
-                "mt-2 inline-flex rounded-full px-2 py-0.5 font-art-label text-[0.875rem]",
+                "inline-flex rounded-full px-2 py-0.5 font-art-label text-[0.875rem]",
                 state === "completed" || readyToFinish
                   ? "bg-accent-surface text-accent-ink"
                   : expired
@@ -223,7 +225,7 @@ export function QuestBoardCard({
               {statusLabel}
             </span>
           </div>
-          <div className="col-span-2 min-w-0 pt-3">
+          <div className="col-span-2 min-w-0 pt-2.5">
             <h4 className="font-display text-[1.1875rem] leading-snug text-graphite">
               {quest.title}
             </h4>

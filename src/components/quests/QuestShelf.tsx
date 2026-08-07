@@ -38,7 +38,10 @@ export function QuestShelf({
   return (
     <section className="mt-6" aria-label={typeof title === "string" ? title : undefined}>
       <div className="flex items-end justify-between gap-3">
-        <h2 className="font-art-label text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
+        {/* A quiet section label, not a second page title. Only the page
+            heading carries display weight here; a shelf label at 1.5rem
+            competed with it and pushed the first card off the fold. */}
+        <h2 className="font-art-label text-[0.9375rem] leading-tight uppercase tracking-[0.1em] text-gilt">
           {title}
           {count !== undefined && (
             <span className="ms-2 font-sans text-caption normal-case tracking-normal text-ash">
