@@ -21,20 +21,39 @@ device. New `pt-safe-gap-4` / `pt-safe-gap-8` utilities in `globals.css` take
 `max()` of the two. Measured after: web unchanged to the pixel (16px Home,
 32px Quests), device reclaims 16pt on Home and 32pt on every titled page.
 
+**Quest catalogue** (`6c199b5`). `QuestRow` replaces `QuestSlip` in the
+library only — a 64px line that expands in place, in one `PaperCard` sheet of
+hairline-divided rows. Measured at 375px: 24 rows went 7,863px → 1,683px, the
+text column 141px → 201px of a 333px sheet, the page 10,280px → 3,641px.
+`interleaveByCategory` round-robins the open library, so the first 14 rows are
+14 distinct categories instead of 4; category chips carry live counts; the
+library heading is sticky (65px) so Filters stays reachable; an empty board
+collapses three zero-count accordions to one line. Also fixed 27 buttons whose
+accessible name was the identical string "Add to Ready".
+
+**Onboarding language step** (`f9df7b3`). A three-row iOS-style wheel for the
+language and abbreviation chips for the edition. The step measures 812px
+against an 812px viewport, so it no longer scrolls. The wheel is a real radio
+group with scroll-snap over it, not a custom widget, so keyboard and VoiceOver
+come free. Verified with a real flick on the simulator: momentum, snap and
+commit all work, bidirectionally. One flag per language, and the English gloss
+appears only when it differs from the endonym.
+
+**iOS 26 Liquid Glass plan** — `docs/IOS26_LIQUID_GLASS_PLAN.md`. Research
+only, no app code. Headline: `app-glass-nav` already ships five of the six
+static Liquid Glass material properties, so the gap is shape and behaviour
+(both pure CSS/JS), while refraction and specular highlights are genuinely
+unreachable from a WebView.
+
 ## Not started
 
-1. **Onboarding language + Bible pickers.** Two stacked scroll lists
-   (`OnboardingFlow.tsx`, the `max-h-52` list around line 627) eat the step.
-   Wanted: flag only for the selected language — drop the redundant
-   "English / English" pair — and an iOS-style wheel picker on native so the
-   step fits one screen.
-2. **Quest browsing and card density.** 150 quests behind a flat "ALL QUESTS"
-   list. Wanted: a smarter route through the library, and cards that use their
-   container instead of leaving wide empty margins. `QuestBrowse.tsx` is 739
-   lines and is the entry point; `QuestBoardCard.tsx` (410) and
-   `QuestAccordionCard.tsx` (322) are the card surfaces.
-3. **iOS 26 Liquid Glass navbar.** Planning only, on its own branch, per
-   Brendan. Not designed yet.
+1. **App Store commerce gating.** The Arcade Store still shows $0.99/$2.99
+   with a Buy button that cannot work, 14 "Explore Plus" CTAs lead to a page
+   with no purchase path, and all 15 wallpapers are locked. These are
+   guideline 3.1.1 rejections at submission; none block TestFlight.
+2. **Settings legal links** bounce to Home on native.
+3. **The camera decision.** "Change photo" is withheld on native pending a
+   call on `NSCameraUsageDescription` — see the comment in `SettingsScreen.tsx`.
 
 ## Still open from Phase 4b
 
