@@ -18,11 +18,11 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "mx-auto w-full max-w-2xl px-5 pt-safe sm:px-8",
+        "mx-auto w-full max-w-2xl px-5 pt-safe-gap-8 sm:px-8",
         className
       )}
     >
-      <div className="flex items-end justify-between gap-4 pt-8 pb-2">
+      <div className="flex items-end justify-between gap-4 pb-2">
         <div>
           <h1 className="font-display text-editorial text-graphite">
             {title}

@@ -21,7 +21,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<string>2</string>
 	<!-- Declared false because every cryptographic path here is exempt: HTTPS
 	     through the system TLS stack, one WebCrypto SHA-256 digest (a hash, not
 	     encryption), and Supabase PKCE/JWT handling, which is authentication.

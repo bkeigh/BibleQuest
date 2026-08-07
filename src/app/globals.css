@@ -689,6 +689,21 @@ html.theme-dark .milestone-glass-surface[data-milestone-state="reached"] {
 @utility pt-safe {
   padding-top: env(safe-area-inset-top);
 }
+/*
+ * Safe-area padding that REPLACES the design gap instead of stacking on it.
+ *
+ * `pt-safe` plus a design gap reads fine on web, where the inset is 0 — but on
+ * a notched device the inset is already ~59pt of separation, so adding the gap
+ * again leaves the first card floating in dead space (75pt on Home, 91pt above
+ * a page title). `max()` takes whichever is larger, so web is unchanged to the
+ * pixel and the device reclaims the difference.
+ */
+@utility pt-safe-gap-4 {
+  padding-top: max(1rem, env(safe-area-inset-top));
+}
+@utility pt-safe-gap-8 {
+  padding-top: max(2rem, env(safe-area-inset-top));
+}
 /* Comfortable reading measure for Scripture and journals */
 @utility measure-reading {
   max-width: 42rem;

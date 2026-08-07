@@ -1,0 +1,82 @@
+{
+  "fill" : {
+    "automatic-gradient" : "display-p3:0.96436,0.90820,0.80078,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "glass" : false,
+          "hidden" : true,
+          "image-name" : "book-open.png",
+          "name" : "book-open",
+          "position" : {
+            "scale" : 2,
+            "translation-in-points" : [
+              -2,
+              -36.74471926398019
+            ]
+          }
+        },
+        {
+          "fill" : "none",
+          "glass" : false,
+          "hidden" : false,
+          "image-name" : "2.5d-BQ-book.png",
+          "name" : "2.5d-BQ-book",
+          "position" : {
+            "scale" : 0.95,
+            "translation-in-points" : [
+              -3.0799999999999272,
+              39.37272990721158
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+        {
+          "hidden" : true,
+          "image-name" : "01-let-there-be-light.png",
+          "name" : "01-let-there-be-light"
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}
