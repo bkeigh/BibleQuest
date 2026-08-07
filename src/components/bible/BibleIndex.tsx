@@ -18,6 +18,7 @@ import {
   newTestament,
   oldTestament,
 } from "@/lib/bible/index";
+import { chapterHref } from "@/lib/bible/links";
 import { toDateKey } from "@/lib/utils/dates";
 import { cleanVerseText } from "@/lib/utils/scripture";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
@@ -228,8 +229,8 @@ function BibleIndexInner() {
             <QuickLink
               href={
                 readingPosition
-                  ? `/app/bible/${readingPosition.bookSlug}/${readingPosition.chapter}`
-                  : "/app/bible/john/1"
+                  ? chapterHref(readingPosition.bookSlug, readingPosition.chapter)
+                  : chapterHref("john", 1)
               }
               icon={<ArtIcon name="bookmark" size={68} />}
               eyebrow={readingPosition ? "Continue" : "A place to begin"}
@@ -300,7 +301,10 @@ function BibleIndexInner() {
                     className="w-[min(76vw,18rem)] shrink-0 snap-start"
                   >
                     <Link
-                      href={`/app/bible/${recentVerse.bookSlug}/${recentVerse.chapter}?verse=${verseSegment}#verse-${recentVerse.verseStart}`}
+                      href={chapterHref(recentVerse.bookSlug, recentVerse.chapter, {
+                        verse: verseSegment,
+                        anchor: recentVerse.verseStart,
+                      })}
                       aria-label={`Open ${recentVerse.reference}`}
                       className="block h-full rounded-[var(--radius-card)]"
                     >

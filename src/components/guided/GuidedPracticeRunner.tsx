@@ -18,6 +18,7 @@ import {
   nextGuidedMovement,
 } from "@/lib/guided/progress";
 import { useQuestOS } from "@/lib/questos/store";
+import { chapterHref } from "@/lib/bible/links";
 import type {
   GuidedMovementKey,
   GuidedSessionKind,
@@ -182,7 +183,14 @@ export function GuidedPracticeRunner({
             <IconArrowRight />
           </GentleLink>
           <GentleLink
-            href={`/app/bible/${practice.scripture.bookSlug}/${practice.scripture.chapter}?verse=${practice.scripture.verseStart}-${practice.scripture.verseEnd}#verse-${practice.scripture.verseStart}`}
+            href={chapterHref(
+              practice.scripture.bookSlug,
+              practice.scripture.chapter,
+              {
+                verse: `${practice.scripture.verseStart}-${practice.scripture.verseEnd}`,
+                anchor: practice.scripture.verseStart,
+              },
+            )}
             variant="text"
             className="mt-4"
           >
@@ -291,7 +299,14 @@ export function GuidedPracticeRunner({
 
         {movement.key === "read" && (
           <GentleLink
-            href={`/app/bible/${practice.scripture.bookSlug}/${practice.scripture.chapter}?verse=${practice.scripture.verseStart}-${practice.scripture.verseEnd}#verse-${practice.scripture.verseStart}`}
+            href={chapterHref(
+              practice.scripture.bookSlug,
+              practice.scripture.chapter,
+              {
+                verse: `${practice.scripture.verseStart}-${practice.scripture.verseEnd}`,
+                anchor: practice.scripture.verseStart,
+              },
+            )}
             variant="text"
             className="mt-5"
           >

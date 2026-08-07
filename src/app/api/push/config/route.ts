@@ -18,8 +18,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /** Returns only browser-safe VAPID and account preference posture. */
-export async function GET() {
-  const context = await authenticatedServerContext();
+export async function GET(request: Request) {
+  const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;
   if (!pushFeatureEnabled()) return privateError("unavailable", 503);
   if (!(await pushContractReady(context.supabase))) {

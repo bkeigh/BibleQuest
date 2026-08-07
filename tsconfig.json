@@ -36,9 +36,14 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts",
     ".next-header-test/types/**/*.ts",
-    ".next-header-test/dev/types/**/*.ts"
+    ".next-header-test/dev/types/**/*.ts",
+    ".next-header-verify/types/**/*.ts",
+    ".next-header-verify/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    ".native",
+    "out-native",
+    "ios"
   ]
 }

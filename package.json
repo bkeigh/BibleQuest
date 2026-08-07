@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:native": "node --env-file-if-exists=.env.local scripts/build-native.mjs",
     "art:install": "node scripts/install-2_5d-art.mjs",
     "start": "next start",
     "lint": "eslint",
@@ -31,6 +32,7 @@
     "check:production-arcade-store": "node scripts/reconcile-production-arcade-store.mjs --dry-run",
     "check:staging-migration-history": "node scripts/reconcile-staging-migration-history.mjs --dry-run",
     "check:staging-isolation": "node --env-file-if-exists=.env.staging.local scripts/check-staging-two-user-isolation.mjs",
+    "check:native-bearer-isolation": "node --env-file-if-exists=.env.staging.local scripts/check-native-bearer-isolation.mjs",
     "evidence:launch": "node --env-file-if-exists=.env.local scripts/collect-launch-evidence.mjs",
     "test:launch-evidence": "pnpm evidence:launch --phase=preflight --fixture",
     "synthetic:health": "node --env-file-if-exists=.env.local scripts/run-synthetic-health.mjs",
@@ -40,6 +42,12 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/keyboard": "^8.0.5",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.111.0",
     "framer-motion": "^12.43.0",
@@ -52,6 +60,8 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/ios": "^8.5.0",
     "@playwright/test": "1.62.1",
     "@swc/helpers": "^0.5.23",
     "@tailwindcss/postcss": "^4.3.3",

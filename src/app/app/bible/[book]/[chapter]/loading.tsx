@@ -1,30 +1,9 @@
 /**
- * Calm skeleton for chapter navigation — chapter text loads on the server,
- * so this gives immediate feedback instead of a frozen tap.
+ * Chapter navigation feedback. On web the chapter text is read on the server,
+ * so this fires between the tap and the rendered page instead of a frozen tap.
  */
+import { ChapterSkeleton } from "@/components/bible/ChapterSkeleton";
+
 export default function ChapterLoading() {
-  return (
-    <div
-      className="mx-auto w-full max-w-2xl px-5 pt-safe sm:px-8"
-      aria-busy="true"
-      aria-label="Loading chapter"
-    >
-      <div className="flex items-center justify-between pt-6">
-        <div className="h-4 w-20 motion-safe:animate-pulse rounded bg-linen" />
-        <div className="h-3 w-28 motion-safe:animate-pulse rounded bg-linen" />
-      </div>
-
-      <div className="mt-6 h-8 w-44 motion-safe:animate-pulse rounded bg-linen" />
-
-      <div className="measure-reading mt-7 space-y-3.5">
-        {[100, 92, 97, 88, 95, 90, 96, 84, 93, 78].map((w, i) => (
-          <div
-            key={i}
-            className="h-4 motion-safe:animate-pulse rounded bg-linen"
-            style={{ width: `${w}%` }}
-          />
-        ))}
-      </div>
-    </div>
-  );
+  return <ChapterSkeleton />;
 }

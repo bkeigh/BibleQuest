@@ -23,8 +23,14 @@ overrides:
   next>sharp: 0.35.3
   # Collapse legacy minimatch callers onto the patched brace parser.
   brace-expansion: 5.0.9
+  # postcss ships nanoid 3.3.16, where a custom generator can loop forever on
+  # a zero size (GHSA-2v37-7h3g-55p8). Reached only through next>postcss, so
+  # nothing here calls it directly — pinned anyway to keep the production
+  # audit clean.
+  nanoid: 3.3.18
 minimumReleaseAgeExclude:
   # Allow the fresh upstream patches that address brace-expansion advisories.
   - brace-expansion@5.0.9
+  - nanoid@3.3.18
 patchedDependencies:
   minimatch@3.1.5: patches/minimatch@3.1.5.patch

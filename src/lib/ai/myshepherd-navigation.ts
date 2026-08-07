@@ -3,6 +3,7 @@ import {
   type MyShepherdDestination,
 } from "@/lib/ai/contracts";
 import { bibleBooks } from "@/lib/bible";
+import { chapterHref } from "@/lib/bible/links";
 
 const APP_DESTINATION_HREFS = {
   home: "/app",
@@ -76,11 +77,15 @@ export function myShepherdReferenceHref(
     return null;
   }
 
-  const chapterHref = `/app/bible/${book.slug}/${chapter}`;
-  if (verseStart === null || verseEnd === null) return chapterHref;
+  if (verseStart === null || verseEnd === null) {
+    return chapterHref(book.slug, chapter);
+  }
   const verseSegment =
     verseEnd > verseStart
       ? `${verseStart}-${verseEnd}`
       : String(verseStart);
-  return `${chapterHref}?verse=${verseSegment}#verse-${verseStart}`;
+  return chapterHref(book.slug, chapter, {
+    verse: verseSegment,
+    anchor: verseStart,
+  });
 }

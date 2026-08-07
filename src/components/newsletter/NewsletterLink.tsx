@@ -2,6 +2,7 @@ import Link from "next/link";
 import { IconArrowRight } from "@/components/design-system/icons";
 import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { cn } from "@/lib/utils/cn";
+import { isNativeTarget } from "@/lib/platform/target";
 
 interface NewsletterLinkProps {
   className?: string;
@@ -9,6 +10,13 @@ interface NewsletterLinkProps {
 
 /** Brings app users to the public newsletter form without interrupting their day. */
 export function NewsletterLink({ className }: NewsletterLinkProps) {
+  // `/#newsletter` is a marketing route, and the native bundle ships only the
+  // /app tree — the link would dead-end, and the form it anchors is a
+  // third-party iframe that cannot load offline. This is a server component,
+  // so returning null removes the markup from the native build entirely rather
+  // than hiding it with CSS.
+  if (isNativeTarget()) return null;
+
   return (
     <Link
       href="/#newsletter"

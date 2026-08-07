@@ -12,7 +12,7 @@ describe("Plus AI API boundary", () => {
   it("authenticates Plus and checks same-origin before every model call", () => {
     for (const route of [questRoute, shepherdRoute]) {
       expect(route).toContain("hasSameOrigin(request)");
-      expect(route).toContain("requireServerPlus()");
+      expect(route).toContain("requireServerPlus(request)");
       // Identity-scoped: a metered provider budget belongs to the account, so
       // the bucket must not reset when the caller's IP changes.
       expect(route).toContain("guardIdentifiedRequest(");

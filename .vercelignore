@@ -7,3 +7,8 @@ output/
 .next-header-*/
 artifacts/synthetic-health/
 scripts/normalize-live-wallpaper.sh
+
+# The iOS project and the native export are never part of a web deployment.
+ios/
+.native/
+out-native/

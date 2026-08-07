@@ -19,6 +19,7 @@ import {
   formatQuestWindowRemaining,
   isQuestWindowOpen,
 } from "@/lib/questos/quest-engine";
+import { chapterHref } from "@/lib/bible/links";
 import { timeOfDay, toDateKey } from "@/lib/utils/dates";
 import { useStrings, fmt } from "@/lib/i18n";
 import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
@@ -121,14 +122,14 @@ function HomeInner() {
         <SeasonalAtmosphere density={7} />
       </div>
 
-      <PageContainer className="relative pt-safe">
+      <PageContainer className="relative pt-safe-gap-4">
         {/* Personal welcome — one framed devotional surface with today's
             candle, echoing a bookplate rather than a dashboard header. */}
         <header
           data-paper-variant="paper"
           data-plus-nameplate={isPlus ? "active" : "free"}
           className={cn(
-            "app-glass-surface sacred-frame relative mt-4 mb-4 overflow-hidden bg-paper/90 px-5 py-4 max-[380px]:px-4 max-[340px]:px-3 sm:mt-5 sm:px-6 sm:py-5",
+            "app-glass-surface sacred-frame relative mb-4 overflow-hidden bg-paper/90 px-5 py-4 max-[380px]:px-4 max-[340px]:px-3 sm:px-6 sm:py-5",
             isPlus &&
               "plus-nameplate border-[#9f6a1f]/75 bg-[radial-gradient(circle_at_82%_18%,rgba(255,255,244,0.72),transparent_27%),linear-gradient(135deg,rgba(255,249,224,0.97),rgba(241,215,135,0.94)_49%,rgba(255,248,216,0.97))] shadow-[0_14px_38px_rgba(102,68,19,0.23)] ring-1 ring-[#e2bd62]/70",
           )}
@@ -382,7 +383,7 @@ function HomeInner() {
             <QuickActionTile
               href={
                 readingPosition
-                  ? `/app/bible/${readingPosition.bookSlug}/${readingPosition.chapter}`
+                  ? chapterHref(readingPosition.bookSlug, readingPosition.chapter)
                   : "/app/bible"
               }
               sprite="book"

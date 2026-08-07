@@ -28,7 +28,7 @@ const RATE_POLICIES = [
 /** Matches Plus preferences to reviewed content without exposing the API key. */
 export async function POST(request: Request) {
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
-  const entitlement = await requireServerPlus();
+  const entitlement = await requireServerPlus(request);
   if (entitlement instanceof Response) return entitlement;
 
   // Reject oversized or malformed input before reserving paid-provider quota.

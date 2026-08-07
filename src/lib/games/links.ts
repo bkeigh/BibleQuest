@@ -1,4 +1,5 @@
 import type { GamePuzzle, ScriptureSource } from "./types";
+import { chapterHref } from "@/lib/bible/links";
 
 export const GAME_ROUTES = Object.freeze({
   today: "/app/games",
@@ -16,7 +17,10 @@ export function scriptureSourceHref(source: ScriptureSource): string {
     source.verseEnd && source.verseEnd !== source.verseStart
       ? `${source.verseStart}-${source.verseEnd}`
       : String(source.verseStart);
-  return `/app/bible/${source.bookSlug}/${source.chapter}?verse=${range}#verse-${source.verseStart}`;
+  return chapterHref(source.bookSlug, source.chapter, {
+    verse: range,
+    anchor: source.verseStart,
+  });
 }
 
 /** Shares discovery, never answers, misses, identity, or spiritual activity. */

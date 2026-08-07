@@ -56,3 +56,18 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
+
+# Capacitor / iOS. The generated build products, Pods, DerivedData, xcuserdata
+# and the synced web bundle are ignored by `ios/.gitignore`, which the
+# Capacitor CLI writes and maintains — do not duplicate those rules here or the
+# two lists will drift. Only signing and distribution artifacts, which are not
+# confined to ios/, belong at the root.
+*.mobileprovision
+*.ipa
+*.dSYM.zip
+
+# Native static-export staging and output. `.native/` is the filtered copy of
+# the source tree that the native build stages before running `next build`
+# with output:"export"; `out-native/` is the exported bundle Capacitor loads.
+/.native/
+/out-native/

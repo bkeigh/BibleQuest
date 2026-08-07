@@ -1,3 +1,4 @@
+import { isNativeAppOrigin } from "@/lib/http/native-origin";
 import { NextResponse } from "next/server";
 import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
 import { boundedText } from "@/lib/http/json";
@@ -11,6 +12,10 @@ const SIGNAL_RATE_POLICIES = [
 
 /** Requires the browser-supplied origin to match the endpoint being called. */
 function hasExactOrigin(request: Request): boolean {
+  // Routed through the shared decision so this duplicate cannot drift from the
+  // other two origin guards.
+  if (isNativeAppOrigin(request)) return true;
+
   const origin = request.headers.get("origin");
   if (!origin) return false;
   try {

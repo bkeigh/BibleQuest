@@ -9,6 +9,7 @@ import { seedQuests, questBySlug } from "@/data/seed/quests";
 import {
   activeQuestAssignments,
   filterQuests,
+  interleaveByCategory,
   questSlotsRemaining,
   selectSuggestedQuests,
 } from "@/lib/questos/quest-engine";
@@ -41,6 +42,12 @@ import {
   type QuestLayout,
 } from "@/components/quests/QuestShelf";
 import { QuestBoardSection } from "@/components/quests/QuestBoardSection";
+import { QuestRow } from "@/components/quests/QuestRow";
+import {
+  Chip,
+  FilterGroup,
+  QuestCatalogueBar,
+} from "@/components/quests/QuestCatalogueBar";
 import { QuestCompletionSheet } from "@/components/quests/QuestCompletionSheet";
 import { Disclosure } from "@/components/design-system/Disclosure";
 import { GentleButton } from "@/components/design-system/GentleButton";
@@ -53,7 +60,6 @@ import {
 } from "@/components/design-system/icons";
 import { useStrings } from "@/lib/i18n";
 import { toDateKey } from "@/lib/utils/dates";
-import { cn } from "@/lib/utils/cn";
 import { usePlus } from "@/lib/billing/usePlus";
 import { QuestGenerator } from "@/components/quests/QuestGenerator";
 
@@ -105,6 +111,12 @@ function QuestBrowseInner() {
   const [company, setCompany] = useState<"solo" | "social" | null>(null);
   const [setting, setSetting] = useState<"indoor" | "outdoor" | null>(null);
   const [search, setSearch] = useState("");
+  // Separate from the board's `expandedSlug`: a picked quest appears on the
+  // board AND in the catalogue, and one shared value would open both at once.
+  const [catalogueOpenSlug, setCatalogueOpenSlug] = useState<string | null>(
+    null,
+  );
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const resultKey = [duration, category, energy, company, setting, search].join("|");
 
   function chooseLayout(next: QuestLayout) {
@@ -137,6 +149,10 @@ function QuestBrowseInner() {
   );
   const activePicks = picks.filter((pick) => pick.status === "started");
   const readyPicks = picks.filter((pick) => pick.status === "assigned");
+  const boardIsEmpty =
+    activePicks.length === 0 &&
+    readyPicks.length === 0 &&
+    completedToday.size === 0;
   const completedQuests = useMemo(() => {
     const seen = new Set<string>();
     return completions
@@ -167,21 +183,46 @@ function QuestBrowseInner() {
     (setting ? 1 : 0) +
     (search.trim() ? 1 : 0);
 
-  const results = useMemo(
-    () =>
-      filterQuests(
-        seedQuests.filter((q) => !q.isPremium),
-        {
-          durations: duration ? [duration] : undefined,
-          categories: category ? [category] : undefined,
-          energy: energy ? [energy] : undefined,
-          soloOrSocial: company ?? undefined,
-          indoorOrOutdoor: setting ?? undefined,
-          search: search.trim() || undefined,
-        }
-      ),
-    [duration, category, energy, company, setting, search]
-  );
+  const results = useMemo(() => {
+    const matched = filterQuests(
+      seedQuests.filter((q) => !q.isPremium),
+      {
+        durations: duration ? [duration] : undefined,
+        categories: category ? [category] : undefined,
+        energy: energy ? [energy] : undefined,
+        soloOrSocial: company ?? undefined,
+        indoorOrOutdoor: setting ?? undefined,
+        search: search.trim() || undefined,
+      }
+    );
+    // Once a category is chosen the lane order IS the reader's order, so
+    // round-robin would only scramble it. Interleave the open library only.
+    return category ? matched : interleaveByCategory(matched);
+  }, [duration, category, energy, company, setting, search]);
+
+  /**
+   * Live match counts per category, so the filter panel doubles as the index
+   * of the library — the fastest honest answer to "what kinds are there".
+   * Counted against every filter EXCEPT category, so the numbers say what
+   * choosing that category would actually give you.
+   */
+  const categoryCounts = useMemo(() => {
+    const withoutCategory = filterQuests(
+      seedQuests.filter((q) => !q.isPremium),
+      {
+        durations: duration ? [duration] : undefined,
+        energy: energy ? [energy] : undefined,
+        soloOrSocial: company ?? undefined,
+        indoorOrOutdoor: setting ?? undefined,
+        search: search.trim() || undefined,
+      }
+    );
+    const counts = new Map<QuestCategory, number>();
+    for (const quest of withoutCategory) {
+      counts.set(quest.category, (counts.get(quest.category) ?? 0) + 1);
+    }
+    return counts;
+  }, [duration, energy, company, setting, search]);
 
 
 
@@ -257,28 +298,32 @@ function QuestBrowseInner() {
         compact={compact}
         action={
           !isPicked && !done ? (
-            <div className="flex flex-col items-center gap-2">
+            /* Side by side in the header rail, so the title and body below
+               keep the whole width of the card. Icon-only to stay compact
+               there; each carries the quest name so the screen-reader rotor
+               does not list a dozen buttons all called "Add to Ready". */
+            <>
+              {canSave && !compact && (
+                <button
+                  type="button"
+                  aria-label={`${t.myQuests.saveForLater}: ${quest.title}`}
+                  title={t.myQuests.saveForLater}
+                  onClick={() => handleSave(quest)}
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-ash transition-colors duration-300 hover:bg-linen hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  <IconBookmark size={17} />
+                </button>
+              )}
               <button
                 type="button"
-                aria-label="Add to Ready"
+                aria-label={`Add ${quest.title} to Ready`}
                 title="Add to Ready"
                 onClick={() => handleAdd(quest)}
                 className="flex h-11 w-11 items-center justify-center rounded-full border border-accent/50 bg-paper text-accent transition-colors duration-300 hover:bg-accent-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
-                <IconPlus size={17} />
+                <IconPlus size={18} />
               </button>
-              {canSave && !compact && (
-                <button
-                  type="button"
-                  aria-label={t.myQuests.saveForLater}
-                  title={t.myQuests.saveForLater}
-                  onClick={() => handleSave(quest)}
-                  className="flex h-11 w-11 items-center justify-center rounded-full border border-mist bg-paper text-ash transition-colors duration-300 hover:border-accent/40 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  <IconBookmark size={16} />
-                </button>
-              )}
-            </div>
+            </>
           ) : undefined
         }
       />
@@ -349,7 +394,11 @@ function QuestBrowseInner() {
         {/* The board is the one canonical lifecycle surface above discovery. */}
         <section aria-label="Your quest board">
           <div className="flex items-baseline justify-between gap-3">
-            <h2 className="font-art-label text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
+            {/* Small caps like every other section label: the page is already
+                titled "Quests", so a second display-weight "YOUR QUESTS"
+                directly beneath it was the same words twice at the same
+                volume. */}
+            <h2 className="font-art-label text-[0.9375rem] leading-tight uppercase tracking-[0.1em] text-gilt">
               Your quests
             </h2>
             {/* The switch belongs to the board, not to the catalogue below it.
@@ -365,6 +414,16 @@ function QuestBrowseInner() {
             {boardAnnouncement}
           </p>
 
+          {/* An empty board is the most common state, and three zero-count
+              accordions spend ~430px saying "nothing here" three times before
+              a reader reaches a single quest. One line says it once; the
+              sections return the moment anything is on the board. */}
+          {boardIsEmpty ? (
+            <p className="mt-3 rounded-[var(--radius-button)] border border-mist/70 bg-paper/70 px-4 py-3 text-small leading-relaxed text-ash">
+              Nothing on the board yet. Add a quest below when you want a place
+              to begin.
+            </p>
+          ) : (
           <div className="mt-3 space-y-2">
               <QuestBoardSection
                 label="Active"
@@ -466,6 +525,7 @@ function QuestBrowseInner() {
                 </QuestLane>
               </QuestBoardSection>
           </div>
+          )}
         </section>
 
         <Disclosure
@@ -485,13 +545,29 @@ function QuestBrowseInner() {
           <QuestGenerator isPlus={isPlus} onAdd={handleAdd} />
         </Disclosure>
 
-        {/* Filters — collapsed by default so browsing stays calm */}
-        <Disclosure
-          label={t.quests.filters}
-          variant="card"
-          defaultOpen={false}
-          count={hasFilters ? activeFilterCount : undefined}
-          className="mt-6"
+        {/* Suggested and seasonal sit ABOVE the library heading, so the
+            sticky bar belongs to the catalogue it labels rather than
+            floating over unrelated shelves. */}
+        {!hasFilters && suggested.length > 0 && (
+          <QuestShelf title={t.quests.suggested} layout="list">
+            {suggested.map((quest) => browseSlip(quest, false))}
+          </QuestShelf>
+        )}
+        {seasonal.length > 0 && !hasFilters && (
+          <QuestShelf title={`For ${season.label}`} layout="list">
+            {seasonal.map((quest) => browseSlip(quest, false))}
+          </QuestShelf>
+        )}
+
+        {/* The library: a sticky heading that keeps Filters reachable from
+            anywhere in a hundred and fifty rows, and the filter panel it
+            opens. */}
+        <QuestCatalogueBar
+          title={hasFilters ? "Matching quests" : "All quests"}
+          count={results.length}
+          open={filtersOpen}
+          onOpenChange={setFiltersOpen}
+          activeFilterCount={hasFilters ? activeFilterCount : 0}
         >
           <div className="space-y-4">
             <div>
@@ -539,16 +615,27 @@ function QuestBrowseInner() {
               <Chip active={category === null} onClick={() => setCategory(null)} small>
                 All
               </Chip>
-              {QUEST_CATEGORIES.map((c) => (
-                <Chip
-                  key={c}
-                  small
-                  active={category === c}
-                  onClick={() => setCategory(category === c ? null : c)}
-                >
-                  {CATEGORY_LABEL[c]}
-                </Chip>
-              ))}
+              {/* Counts make this panel the index of the library: they say
+                  what choosing a category would actually give you under the
+                  filters already set. A zero-count category is disabled
+                  rather than hidden, so the range stays visible. */}
+              {QUEST_CATEGORIES.map((c) => {
+                const available = categoryCounts.get(c) ?? 0;
+                return (
+                  <Chip
+                    key={c}
+                    small
+                    active={category === c}
+                    disabled={available === 0 && category !== c}
+                    onClick={() => setCategory(category === c ? null : c)}
+                  >
+                    {CATEGORY_LABEL[c]}
+                    <span className="ms-1.5 tabular-nums opacity-60">
+                      {available}
+                    </span>
+                  </Chip>
+                );
+              })}
             </FilterGroup>
 
             <FilterGroup label={t.quests.energy}>
@@ -607,32 +694,18 @@ function QuestBrowseInner() {
               </Chip>
             </FilterGroup>
           </div>
-        </Disclosure>
+        </QuestCatalogueBar>
 
-        {/* Suggested for today — the old daily scorer, now an offer.
-            Compact slips: the shelf invites, the quest page tells the story. */}
-        {!hasFilters && suggested.length > 0 && (
-          <QuestShelf title={t.quests.suggested} layout="list">
-            {suggested.map((quest) => browseSlip(quest, false))}
-          </QuestShelf>
-        )}
-
-        {/* Seasonal shelf */}
-        {seasonal.length > 0 && !hasFilters && (
-          <QuestShelf title={`For ${season.label}`} layout="list">
-            {seasonal.map((quest) => browseSlip(quest, false))}
-          </QuestShelf>
-        )}
-
-        {/* Results — one list, twenty-four at a time.
+        {/* Results — rows, twenty-four at a time.
 
             Grouping the collection into a shelf per category was meant to make
             the range of quests visible, and as rails it did. As columns it
             does not: seventeen categories at twenty-four cards each rendered
             four hundred cards and a page fifty-six thousand pixels tall, so
             the range was buried under exactly the scrolling it was supposed to
-            replace. The Filters disclosure above already answers "what kinds
-            are there", and it answers it in one screen. */}
+            replace. Rows plus interleaveByCategory answer the same question
+            without the height: the first fourteen are one of every category,
+            and the counts in the panel above say what the rest holds. */}
         {results.length === 0 ? (
           <section className="mt-6" aria-label="All quests">
             <PaperCard variant="quiet" padding="lg" className="text-center">
@@ -655,13 +728,47 @@ function QuestBrowseInner() {
             </PaperCard>
           </section>
         ) : (
-          <QuestShelf
-            title={hasFilters ? "Matching quests" : "All quests"}
-            count={results.length}
-            layout="list"
+          /* One sheet of hairline-divided rows rather than a stack of cards:
+             a card's frame, gap and shadow cost more than its content at this
+             length, and the divider carries the same separation for 1px. */
+          <PaperCard
+            variant="paper"
+            padding="none"
+            className="mt-3 overflow-hidden"
           >
-            {results.slice(0, visibleCount).map((quest) => browseSlip(quest, false))}
-          </QuestShelf>
+            <ul>
+              {results.slice(0, visibleCount).map((quest) => {
+                const done = completedToday.has(quest.slug);
+                const assignment = pickedBySlug.get(quest.slug);
+                const isPicked = Boolean(assignment);
+                const shelfStatus = myQuests[quest.slug]?.status;
+                const isSaved =
+                  shelfStatus === "saved" || shelfStatus === "paused";
+                const canSave = !isPicked && !done && !shelfStatus;
+                return (
+                  <li
+                    key={quest.slug}
+                    className="border-b border-mist/50 last:border-b-0"
+                  >
+                    <QuestRow
+                      quest={quest}
+                      open={catalogueOpenSlug === quest.slug}
+                      onOpenChange={(next) =>
+                        setCatalogueOpenSlug(next ? quest.slug : null)
+                      }
+                      assignmentStatus={assignment?.status}
+                      completed={done}
+                      saved={!isPicked && !done && isSaved}
+                      onAdd={
+                        !isPicked && !done ? () => handleAdd(quest) : undefined
+                      }
+                      onSave={canSave ? () => handleSave(quest) : undefined}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          </PaperCard>
         )}
 
         {results.length > 0 && visibleCount < results.length && (
@@ -693,47 +800,5 @@ export function QuestBrowse() {
   );
 }
 
-function FilterGroup({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <p className="text-caption font-medium text-ash">{label}</p>
-      <div className="mt-1.5 flex flex-wrap gap-2">{children}</div>
-    </div>
-  );
-}
-
-function Chip({
-  active,
-  onClick,
-  children,
-  small,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  small?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        "min-h-11 min-w-11 shrink-0 whitespace-nowrap rounded-full border transition-all duration-300",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-        small ? "px-3 py-1.5 text-[0.8125rem]" : "px-4 py-2 text-[0.875rem]",
-        active
-          ? "border-accent bg-accent-surface text-accent-ink"
-          : "border-mist bg-paper text-ash hover:border-accent/40 hover:text-charcoal"
-      )}
-    >
-      {children}
-    </button>
-  );
-}
+// FilterGroup and Chip now live in QuestCatalogueBar, which owns the filter
+// panel; QuestBrowse imports them back so the call sites are unchanged.

@@ -10,6 +10,8 @@ export type QuestLayout = "rail" | "list";
 /** A card wide enough to read at a glance, narrow enough to promise another. */
 const RAIL_ITEM =
   "grid w-[82%] shrink-0 snap-start [&>*]:h-full sm:w-[22rem]";
+/** The same slot with nothing to promise, so it fills its container. */
+const SOLE_ITEM = "grid w-full shrink-0 snap-start [&>*]:h-full";
 const EDGE_TOLERANCE = 24;
 
 /**
@@ -38,7 +40,10 @@ export function QuestShelf({
   return (
     <section className="mt-6" aria-label={typeof title === "string" ? title : undefined}>
       <div className="flex items-end justify-between gap-3">
-        <h2 className="font-art-label text-[1.5rem] leading-tight uppercase tracking-[0.05em] text-accent">
+        {/* A quiet section label, not a second page title. Only the page
+            heading carries display weight here; a shelf label at 1.5rem
+            competed with it and pushed the first card off the fold. */}
+        <h2 className="font-art-label text-[0.9375rem] leading-tight uppercase tracking-[0.1em] text-gilt">
           {title}
           {count !== undefined && (
             <span className="ms-2 font-sans text-caption normal-case tracking-normal text-ash">
@@ -154,8 +159,11 @@ export function QuestLane({
         className="-mx-1 flex snap-x snap-mandatory items-stretch gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         {...rest}
       >
-        {/* Each child owns one rail slot so the cards read as one set. */}
-        {slots(RAIL_ITEM)}
+        {/* Each child owns one rail slot so the cards read as one set.
+            A lone card takes the full width: the 82% slot exists to peek at
+            the next card, and with nothing to peek at it reads as a torn edge
+            of dead space down the right of the container. */}
+        {slots(childCount > 1 ? RAIL_ITEM : SOLE_ITEM)}
       </Tag>
 
       {!(edges.atStart && edges.atEnd) && (

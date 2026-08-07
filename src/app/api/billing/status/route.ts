@@ -18,8 +18,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /** Returns the server projection only; redirect parameters never grant Plus. */
-export async function GET() {
-  const context = await authenticatedServerContext();
+export async function GET(request: Request) {
+  const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;
   const configuration = stripeBillingAvailability();
   if (configuration.status === "invalid") {

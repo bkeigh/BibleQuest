@@ -244,7 +244,7 @@ export function QuestGenerator({
                   title="Add to Ready"
                   className="flex h-11 w-11 items-center justify-center rounded-full border border-accent/50 bg-paper text-accent transition-colors hover:bg-accent-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
-                  <IconPlus size={17} />
+                  <IconPlus size={18} />
                 </button>
               ) : undefined
             }

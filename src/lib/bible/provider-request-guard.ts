@@ -9,6 +9,8 @@
  * also protects development/preview deployments when that feature is absent.
  */
 
+import { isNativeAppOrigin } from "@/lib/http/native-origin";
+
 interface RateWindow {
   count: number;
   resetAt: number;
@@ -84,6 +86,13 @@ function sweepExpiredWindows(state: GuardStore, now: number) {
 }
 
 function crossSiteBrowserRequest(request: Request): boolean {
+  // Must sit above the Fetch Metadata check: the iOS WebView measurably sends
+  // `Sec-Fetch-Site: cross-site`, so without this the native app is rejected
+  // here even after hasSameOrigin accepts it — at a second, differently-located
+  // gate returning an identical body. This is an additional allow; the
+  // anti-hotlink defence below is untouched for every other caller.
+  if (isNativeAppOrigin(request)) return false;
+
   const fetchSite = request.headers.get("sec-fetch-site");
   // App fetches are same-origin even when BibleQuest itself is embedded. Block
   // direct navigations and same-site/cross-site browser callers when the browser

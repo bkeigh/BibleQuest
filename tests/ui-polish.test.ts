@@ -53,10 +53,36 @@ describe("UX pass guardrails", () => {
     );
   });
 
-  it("clears the quest slip action so it cannot cover the metadata row", () => {
-    // The action is absolutely positioned at right-4 and is 44px wide, so the
-    // content must reserve more than the old 32px of padding.
-    expect(slip).toContain('action ? "pr-[4.5rem]" : null');
+  it("keeps the quest slip action out of the content column entirely", () => {
+    // This used to reserve a 72px right-hand gutter for an absolutely
+    // positioned action, which left the text column at 141px of a 335px card.
+    // The action is now an inline sibling below the body, so there is nothing
+    // overlapping to reserve space for — and nothing to re-introduce.
+    expect(slip).not.toContain("pr-[4.5rem]");
+    expect(slip).not.toContain("absolute right-4 top-4");
+    // The card stays one tap target via an overlay link, which is what lets
+    // real buttons sit inside the card without nesting inside an anchor.
+    expect(slip).toContain("after:absolute after:inset-0");
+    // A small category mark in a fixed slot, not an illustration the text has
+    // to flow around: 80px art was the other half of the squeeze, and even at
+    // 40px it still indented every line under it.
+    expect(slip).toContain("h-6 w-6 shrink-0");
+    expect(slip).toContain("size={22}");
+    expect(slip).not.toContain("size={80}");
+  });
+
+  it("gives the quest slip title and body the full card width", () => {
+    // The header rail carries the mark, the metadata and the actions; the
+    // title and invitation are its siblings, not nested in a column beside
+    // the artwork, so neither is indented by it.
+    const headerRail = slip.slice(
+      slip.indexOf("One header rail"),
+      slip.indexOf("{heading}"),
+    );
+    expect(headerRail).toContain("justify-between");
+    expect(headerRail).toContain("shrink-0 items-center gap-1");
+    // The title follows the rail rather than living inside it.
+    expect(slip).toMatch(/\{action &&[\s\S]{0,220}?\}\s*<\/div>\s*\{heading\}/);
   });
 
   it("gives the Home games rail a real link to the games surface", () => {

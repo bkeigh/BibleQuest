@@ -689,6 +689,21 @@ html.theme-dark .milestone-glass-surface[data-milestone-state="reached"] {
 @utility pt-safe {
   padding-top: env(safe-area-inset-top);
 }
+/*
+ * Safe-area padding that REPLACES the design gap instead of stacking on it.
+ *
+ * `pt-safe` plus a design gap reads fine on web, where the inset is 0 — but on
+ * a notched device the inset is already ~59pt of separation, so adding the gap
+ * again leaves the first card floating in dead space (75pt on Home, 91pt above
+ * a page title). `max()` takes whichever is larger, so web is unchanged to the
+ * pixel and the device reclaims the difference.
+ */
+@utility pt-safe-gap-4 {
+  padding-top: max(1rem, env(safe-area-inset-top));
+}
+@utility pt-safe-gap-8 {
+  padding-top: max(2rem, env(safe-area-inset-top));
+}
 /* Comfortable reading measure for Scripture and journals */
 @utility measure-reading {
   max-width: 42rem;
@@ -788,6 +803,125 @@ html.force-reduce-motion .art-at-rest {
   pointer-events: none;
   border: 1px solid color-mix(in srgb, var(--color-gold-500) 48%, transparent);
   border-radius: 14px;
+}
+
+/* Wheel picker — an iOS-style drum built from a real radio group.
+ *
+ * Nineteen languages as a scrolling bordered list took most of the onboarding
+ * step. A drum shows the same options in three rows. It is deliberately NOT a
+ * custom widget: the markup stays <fieldset> + radios, so keyboard, VoiceOver
+ * and all four themes come free, and CSS scroll-snap does the motion.
+ *
+ * Every length derives from --wheel-row, so html.text-large (115%) scales the
+ * rows, the spacers and the selection band together and the snap arithmetic
+ * stays exact.
+ */
+.wheel {
+  --wheel-row: 2.75rem;
+  --wheel-rows: 3;
+  position: relative;
+  height: calc(var(--wheel-row) * var(--wheel-rows));
+  overflow: hidden;
+  border: 1px solid var(--color-mist);
+  border-radius: var(--radius-button);
+  background: var(--color-paper);
+}
+/* Tall viewports can afford the full five-row drum. */
+@media (min-height: 880px) {
+  .wheel {
+    --wheel-rows: 5;
+  }
+}
+.wheel-track {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  overscroll-behavior-y: contain;
+  /* The iOS deployment target is 15.0, where this is still required for
+     momentum. Do NOT set touch-action — the default is what gives WKWebView
+     its flick. */
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.wheel-track::-webkit-scrollbar {
+  display: none;
+}
+/* Half a window of padding at each end. With scroll-snap-align: center on
+   every row, row i then centres at exactly scrollTop = i * rowHeight for any
+   odd row count — so the JS is a plain round() with no offset term, and it
+   stays correct when the media query flips 3 to 5. */
+.wheel-pad {
+  height: calc(var(--wheel-row) * (var(--wheel-rows) - 1) / 2);
+}
+.wheel-row {
+  display: block;
+  min-height: var(--wheel-row);
+  scroll-snap-align: center;
+  /* scroll-snap-stop stays `normal` so one flick can travel several rows. */
+}
+.wheel-face {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: var(--wheel-row);
+  padding-inline: 0.875rem;
+  color: var(--color-charcoal);
+  opacity: 0.6;
+  transition:
+    opacity 180ms var(--ease-gentle),
+    color 180ms var(--ease-gentle);
+}
+.wheel-row input:checked + .wheel-face {
+  opacity: 1;
+  color: var(--color-graphite);
+  font-weight: 500;
+}
+/* The global focus rule draws its ring on the sr-only input, whose
+   clip-path clips it away — project it onto the row instead. Inset, because
+   .wheel is overflow:hidden and an outset ring would be cut at the band. */
+.wheel-row input:focus-visible + .wheel-face {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+.wheel-band {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(var(--wheel-row) * (var(--wheel-rows) - 1) / 2);
+  height: var(--wheel-row);
+  pointer-events: none;
+  /* Solid first as the iOS 15 fallback; color-mix is Safari 16.2+. */
+  background: var(--color-accent-surface);
+  background: color-mix(in srgb, var(--color-accent-surface) 72%, transparent);
+  border-top: 1px solid var(--color-mist);
+  border-bottom: 1px solid var(--color-mist);
+}
+/* Gradient overlays rather than a mask on .wheel: a mask would fade the
+   focus ring of an extreme row too. */
+.wheel-fade {
+  position: absolute;
+  inset-inline: 0;
+  z-index: 2;
+  height: calc(var(--wheel-row) * 0.62);
+  pointer-events: none;
+}
+.wheel-fade-top {
+  top: 0;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-paper) 85%, transparent),
+    transparent
+  );
+}
+.wheel-fade-bottom {
+  bottom: 0;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--color-paper) 85%, transparent),
+    transparent
+  );
 }
 
 /* Plus restores a brighter double-rule and eight restrained corner strokes.

@@ -22,7 +22,7 @@ import {
   IconEye,
   IconShare,
 } from "@/components/design-system/icons";
-import type { ChapterContent } from "@/lib/bible/server";
+import type { ChapterContent } from "@/lib/bible/chapter-content";
 import { cn } from "@/lib/utils/cn";
 import { ApiBibleViewTracker } from "@/components/bible/ApiBibleViewTracker";
 import { usePreferredBibleChapter } from "@/lib/bible/use-preferred-scripture";
@@ -31,6 +31,7 @@ import {
   LOCAL_WEB_TRANSLATION_KEY,
 } from "@/lib/bible/translations";
 import { VerseShareSheet } from "@/components/bible/VerseShareSheet";
+import { bookHref, chapterHref } from "@/lib/bible/links";
 import { formatVerseShareText } from "@/lib/utils/scripture";
 import { track } from "@/lib/analytics/events";
 import { buildPublicUrl } from "@/lib/platform/api";
@@ -242,10 +243,6 @@ function ReaderInner({
     (entry) =>
       entry.bookSlug === content.bookSlug && entry.chapter === content.chapter,
   );
-  const editionQuery = translationOverride
-    ? `?translation=${encodeURIComponent(translationOverride)}`
-    : "";
-
   function moveVerseFocus(nextVerse: number) {
     const bounded = Math.min(resolved.verses.length, Math.max(1, nextVerse));
     setFocusedVerse(bounded);
@@ -296,7 +293,7 @@ function ReaderInner({
       <header className="sticky top-[env(safe-area-inset-top)] z-20 -mx-5 border-b border-mist/70 bg-parchment/92 px-5 pt-3 pb-2 backdrop-blur-md sm:-mx-8 sm:px-8">
         <div className="flex min-h-11 items-center justify-between gap-3">
           <Link
-            href={`/app/bible/${content.bookSlug}`}
+            href={bookHref(content.bookSlug)}
             aria-label={`Back to ${content.bookName} chapters`}
             className="inline-flex min-h-11 items-center gap-1.5 text-[0.875rem] text-ash transition-colors hover:text-charcoal"
           >
@@ -586,7 +583,9 @@ function ReaderInner({
           <GentleLink
             variant="ghost"
             size="sm"
-            href={`/app/bible/${content.bookSlug}/${prev}${editionQuery}`}
+            href={chapterHref(content.bookSlug, prev, {
+              translation: translationOverride,
+            })}
           >
             <IconArrowLeft size={16} /> Chapter {prev}
           </GentleLink>
@@ -597,7 +596,9 @@ function ReaderInner({
           <GentleLink
             variant="ghost"
             size="sm"
-            href={`/app/bible/${content.bookSlug}/${next}${editionQuery}`}
+            href={chapterHref(content.bookSlug, next, {
+              translation: translationOverride,
+            })}
           >
             Chapter {next} <IconArrowRight size={16} />
           </GentleLink>

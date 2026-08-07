@@ -139,6 +139,42 @@ export interface QuestFilters {
   search?: string;
 }
 
+/**
+ * Round-robin a collection across its categories.
+ *
+ * The seed file is written category by category, so the first twenty-four of
+ * one hundred and fifty were six Prayer, six Silence, six Scripture, six
+ * Reflection — four of fourteen. A reader had to press "Show 24 more" five
+ * times before a Patience or Family quest existed on screen. Round-robin puts
+ * one of every category in the first fourteen rows, so the range of the
+ * library is visible by scrolling rather than by filtering.
+ *
+ * Stable, pure, length- and membership-preserving: lanes keep first-appearance
+ * order and every quest is emitted exactly once.
+ */
+export function interleaveByCategory(
+  quests: QuestTemplate[]
+): QuestTemplate[] {
+  const lanes = new Map<QuestCategory, QuestTemplate[]>();
+  for (const quest of quests) {
+    const lane = lanes.get(quest.category);
+    if (lane) lane.push(quest);
+    else lanes.set(quest.category, [quest]);
+  }
+  const rows = [...lanes.values()];
+  // Math.max of an empty spread is -Infinity, which would skip the loop
+  // silently rather than returning the (empty) input.
+  const deepest = Math.max(0, ...rows.map((lane) => lane.length));
+  const ordered: QuestTemplate[] = [];
+  for (let depth = 0; depth < deepest; depth += 1) {
+    for (const lane of rows) {
+      const quest = lane[depth];
+      if (quest) ordered.push(quest);
+    }
+  }
+  return ordered;
+}
+
 export function filterQuests(
   quests: QuestTemplate[],
   filters: QuestFilters
