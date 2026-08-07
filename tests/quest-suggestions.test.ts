@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   filterQuests,
   formatQuestWindowRemaining,
+  interleaveByCategory,
   nextQuestSlotAt,
   normalizeAssignmentWindow,
   QUEST_WINDOW_MS,
@@ -423,5 +424,59 @@ describe("selectSuggestedQuests", () => {
         count: 2,
       }).map((q) => q.slug).sort(),
     ).toEqual(["alternative", "long-ago"]);
+  });
+});
+
+describe("interleaveByCategory", () => {
+  it("puts one of every category in the opening rows", () => {
+    // The seed file is grouped by category, which is what made the first
+    // twenty-four of one hundred and fifty read as four categories.
+    const grouped = [
+      ...Array.from({ length: 6 }, (_, i) =>
+        quest({ slug: `prayer-${i}`, category: "prayer" }),
+      ),
+      ...Array.from({ length: 6 }, (_, i) =>
+        quest({ slug: `silence-${i}`, category: "silence" }),
+      ),
+      ...Array.from({ length: 6 }, (_, i) =>
+        quest({ slug: `service-${i}`, category: "service" }),
+      ),
+    ];
+    expect(new Set(grouped.slice(0, 3).map((q) => q.category)).size).toBe(1);
+
+    const ordered = interleaveByCategory(grouped);
+    expect(ordered.slice(0, 3).map((q) => q.category)).toEqual([
+      "prayer",
+      "silence",
+      "service",
+    ]);
+  });
+
+  it("preserves every quest exactly once and keeps lane order", () => {
+    const input = [
+      quest({ slug: "a1", category: "prayer" }),
+      quest({ slug: "b1", category: "silence" }),
+      quest({ slug: "a2", category: "prayer" }),
+      quest({ slug: "a3", category: "prayer" }),
+    ];
+    const ordered = interleaveByCategory(input);
+    expect(ordered).toHaveLength(input.length);
+    expect(ordered.map((q) => q.slug).sort()).toEqual(["a1", "a2", "a3", "b1"]);
+    // Within a category, first-appearance order survives.
+    expect(
+      ordered.filter((q) => q.category === "prayer").map((q) => q.slug),
+    ).toEqual(["a1", "a2", "a3"]);
+  });
+
+  it("returns an empty list unchanged rather than looping on -Infinity", () => {
+    expect(interleaveByCategory([])).toEqual([]);
+  });
+
+  it("leaves the real catalogue length untouched", () => {
+    const open = seedQuests.filter((q) => !q.isPremium);
+    const ordered = interleaveByCategory(open);
+    expect(ordered).toHaveLength(open.length);
+    // The whole point: the opening screen shows the range of the library.
+    expect(new Set(ordered.slice(0, 10).map((q) => q.category)).size).toBe(10);
   });
 });
