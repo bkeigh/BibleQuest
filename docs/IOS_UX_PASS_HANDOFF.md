@@ -70,7 +70,76 @@ unreachable from a WebView.
 - TestFlight upload never ran. The app is installed on the device over the
   cable (`co.biblequest.app`, build 2, confirmed via `devicectl`). Archive
   needs a registered device, which now exists ("stinkyhill"), so the earlier
-  "no devices" provisioning failure should be gone — unverified.
+  "no devices" provisioning failure should be gone — **resolved 2026-08-08,
+  see below**.
+
+## 2026-08-08 — start here
+
+Three of the four things needed to run the bearer isolation check are done.
+The fourth is a Vercel click-path that needs the account owner.
+
+**Archive verified.** `xcodebuild … archive` returns `ARCHIVE SUCCEEDED`,
+signing `co.biblequest.app` at `CFBundleVersion 3` with "iOS Team Provisioning
+Profile: co.biblequest.app". The "no devices" failure above is gone. Build
+number is committed at 3; the web payload was rebuilt against
+`native-staging.biblequest.co` and synced (1,050 files reference that origin,
+zero reference `www.biblequest.co`).
+
+Caveat: `security find-identity -v -p codesigning` shows exactly one identity,
+**Apple Development**. TestFlight upload signs with an Apple *Distribution*
+certificate, which does not exist on this Mac. Xcode's Distribute App flow can
+mint one, but that step is unverified and needs an Apple ID with a team role
+that permits it.
+
+**A disposable staging Supabase exists.** The org had no staging project — the
+`BibleQuest-Account-Sync-Staging` named in
+`scripts/reconcile-staging-migration-history.mjs` was deleted at some point, so
+`check:native-bearer-isolation` had never been runnable. Branch
+`native-bearer-isolation` (ref `lorqiyzrfmpvvcvsvghc`) now covers it, at
+roughly $0.32/day. **Delete it when the check passes.**
+
+Supabase's own replay stopped at 23 of 32 migrations, failing on production's
+consolidated `reconcile_launch_contracts_and_lifetime_plus` packet. Repo files
+0023–0036 were applied instead: 0023 through the MCP, 0024–0036 via
+`supabase db push` from a temp workdir holding renumbered copies plus empty
+placeholders for the already-applied remote versions. Two mechanics worth
+keeping — the direct DB host is IPv6-only and unreachable from this network, and
+the transaction pooler (6543) fails with `prepared statement … already exists`.
+Use the **session pooler on 5432**. Verified on the branch afterwards:
+`profile_avatar_contract()` returns `ok: true`, the private `profile-avatars`
+bucket exists, and `grant_operator_plus` and `operator_plus_grants` are present.
+
+**A rehearsal run cleared every stage but the last.** Actor creation, the real
+operator Plus grant, and the whole CORS layer all pass; billing status then
+answers `503`. That is the deployment's "Supabase not configured" signature —
+the same route answers `401` with no token, because it short-circuits before
+touching Supabase and only fails on configuration once a real bearer forces it
+to resolve an identity. Local runner config is already written to
+`.env.staging.local` (gitignored, mode 600).
+
+**The one remaining step.** Add three variables on Vercel → bible-quest →
+Settings → Environment Variables, scoped to **Preview only** — "All
+Environments" would repoint production at a database that is about to be
+deleted. Values are in `.env.staging.local`:
+
+| Vercel variable | Source line in `.env.staging.local` |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://lorqiyzrfmpvvcvsvghc.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the `sb_publishable_…` value |
+| `SUPABASE_SECRET_KEY` | the value on the `SUPABASE_SERVICE_ROLE_KEY` line |
+
+That last row is a rename, not a copy — see the `SUPABASE_SECRET_KEY` note
+above for why the original name is ignored on Vercel.
+
+Then push a commit to the branch (never the redeploy button), confirm
+native-staging's CSP `connect-src` has changed from bare `'self'` to include
+`https://lorqiyzrfmpvvcvsvghc.supabase.co`, and run:
+
+```bash
+pnpm check:native-bearer-isolation
+```
+
+Afterwards, delete the Supabase branch and `.env.staging.local`.
 
 ## Resuming
 
