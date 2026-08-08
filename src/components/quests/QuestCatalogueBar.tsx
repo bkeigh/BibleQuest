@@ -15,7 +15,7 @@
  * QuestBrowse already imports this component; putting them anywhere else would
  * either duplicate them or create a cycle.
  */
-import { useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useStrings } from "@/lib/i18n";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 import { cn } from "@/lib/utils/cn";
@@ -38,30 +38,76 @@ export function QuestCatalogueBar({
 }) {
   const t = useStrings();
   const panelId = useId();
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
   const reduceMotion = useShouldReduceMotion();
+  const [stuck, setStuck] = useState(false);
+
+  // IntersectionObserver rather than a scroll listener: no per-frame work on
+  // a long list, and it reads the same on both targets.
+  //
+  // The bar sticks at env(safe-area-inset-top), but a sentinel exits the
+  // viewport at 0 — so on a notched phone the fill would arrive a whole inset
+  // late. getComputedStyle resolves that env() to a real pixel value, which
+  // becomes the observer's top margin so the swap lands exactly as the bar
+  // reaches its resting position.
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const bar = barRef.current;
+    if (!sentinel || typeof IntersectionObserver === "undefined") return;
+    const stickyTop = bar ? Number.parseFloat(getComputedStyle(bar).top) : 0;
+    const offset = Number.isFinite(stickyTop) ? stickyTop : 0;
+    const observer = new IntersectionObserver(
+      ([entry]) => setStuck(!entry.isIntersecting),
+      { threshold: 0, rootMargin: `-${offset}px 0px 0px 0px` },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
 
   function togglePanel(next: boolean) {
     onOpenChange(next);
     // Opening from deep in the list would put the panel above the viewport.
     // Reaching for Filters means "take me back to the top of the library".
     if (next) {
-      wrapperRef.current?.scrollIntoView({
+      sentinelRef.current?.scrollIntoView({
         block: "start",
         behavior: reduceMotion ? "auto" : "smooth",
       });
     }
   }
 
+  // A fragment, deliberately: `position: sticky` only sticks within its
+  // PARENT's box, so wrapping the bar in a div that holds just the bar and its
+  // panel meant it scrolled away with them the moment the list began. As
+  // siblings under PageContainer the parent spans the whole catalogue, which
+  // is the range the bar is supposed to ride.
   return (
-    <div
-      ref={wrapperRef}
-      className="scroll-mt-[calc(env(safe-area-inset-top)+0.5rem)]"
-    >
-      {/* Sticky recipe and the -mx/px bleed match ChapterReader and
-          PageContainer's px-5 sm:px-8 exactly. backdrop-blur-md is 12px, well
-          inside the ceiling tests/glass-scroll-cost.test.ts enforces. */}
-      <div className="sticky top-[env(safe-area-inset-top)] z-20 -mx-5 border-b border-mist/70 bg-parchment/92 px-5 pt-3 pb-2 backdrop-blur-md sm:-mx-8 sm:px-8">
+    <>
+      {/* A zero-height tripwire directly above the bar, and the scroll target
+          for the Filters jump. While it is on screen the bar is in normal
+          flow; the moment it leaves, the bar is stuck. */}
+      <div
+        ref={sentinelRef}
+        aria-hidden="true"
+        className="h-px scroll-mt-[calc(env(safe-area-inset-top)+0.5rem)]"
+      />
+      {/* The fill, blur and rule exist to hold the bar legible OVER the list.
+          Painted while the bar is still in flow they read as an opaque band
+          ruled across the page — which is exactly what it looked like against
+          a wallpaper. So they arrive only once it is actually stuck.
+          The -mx/px bleed matches PageContainer's px-5 sm:px-8, and
+          backdrop-blur-md is 12px, inside the ceiling glass-scroll-cost.test
+          enforces. */}
+      <div
+        ref={barRef}
+        className={cn(
+          "sticky top-[env(safe-area-inset-top)] z-20 -mx-5 px-5 pt-3 pb-2 transition-colors duration-200 sm:-mx-8 sm:px-8",
+          stuck
+            ? "border-b border-mist/70 bg-parchment/92 backdrop-blur-md"
+            : "border-b border-transparent bg-transparent",
+        )}
+      >
         <div className="flex items-end justify-between gap-3">
           {/* Matches the shelf labels: quiet small caps, so the sticky strip
               stays a thin rule over the list rather than a second title bar
@@ -101,7 +147,7 @@ export function QuestCatalogueBar({
           <div className="space-y-4 py-4">{children}</div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
