@@ -191,7 +191,16 @@ export function QuestBoardCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
     >
-      <PaperCard padding="none" className="overflow-hidden">
+      {/* Outlined, not `paper`. This card only ever renders inside a
+          QuestBoardSection, which already carries its own glass surface — the
+          default variant's paper-shadow stacked a second elevation inside the
+          first and read as a stray shadow pooling under the quest. A hairline
+          is all the separation a nested card needs. */}
+      <PaperCard
+        variant="outlined"
+        padding="none"
+        className="overflow-hidden bg-paper"
+      >
         {/* One header rail — a small category mark and its metadata — then
             the title and everything under it running the full width of the
             card. An 80px sprite used to set the height of a grid row whose
