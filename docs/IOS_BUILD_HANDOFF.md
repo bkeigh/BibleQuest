@@ -21,13 +21,13 @@ Read in full before touching anything:
 ## Git state — read this before branching
 
 All prior iOS work is merged into `origin/main` through PRs #94, #95 and #96.
-GitHub then deleted the feature branch, so `origin/feat/capacitor-ios-scaffold`
-**no longer exists**; the local branch of that name still does and is marked
-`[gone]`. Local `main` is stale — fetch before comparing.
+The exact `feat/capacitor-ios-scaffold` branch has been restored on the remote
+after rebasing its local history onto current `origin/main`, so
+`native-staging.biblequest.co` can create Preview deployments from it again.
 
-Exactly one commit is unpushed: `49f63a5`, which touches only
-`docs/IOS_UX_PASS_HANDOFF.md`. Its build-number change was a no-op, because
-`main` already recorded `CURRENT_PROJECT_VERSION = 3` in commit `87b390d`.
+The earlier claim that exactly one commit was unpushed was inaccurate: the
+local branch contained two documentation commits. Both were preserved through
+the rebase before the remote branch was restored.
 
 `.claude/launch.json` carries an unrelated local edit. Leave it alone; do not
 commit it.
@@ -36,23 +36,24 @@ Branch naming is load-bearing. `native-staging.biblequest.co` is configured to
 serve the `feat/capacitor-ios-scaffold` branch (documented in the runbook §1,
 not re-verified today because the Vercel MCP exposes no domain-config tool). A
 Preview deploy at that host therefore requires a branch of **that exact name**
-on the remote. Recreate it from current main rather than pushing the stale
-local branch:
+on the remote. Keep using that branch for this pass:
 
 ```bash
 git fetch origin --prune
-git rebase origin/main   # from the local feat/capacitor-ios-scaffold
-git push -u origin feat/capacitor-ios-scaffold
+git checkout feat/capacitor-ios-scaffold
+git pull --ff-only
 ```
 
 ## Verified green as of 2026-08-09
 
-- `pnpm lint` clean; `pnpm test` 148 files / 1114 tests passing.
+- `pnpm lint` and `pnpm exec tsc --noEmit` clean; `pnpm test` 149 files /
+  1,121 tests passing. The normal web build also succeeds.
 - `NEXT_PUBLIC_APP_PLATFORM=native NEXT_PUBLIC_NATIVE_HOSTED_ORIGIN=https://native-staging.biblequest.co pnpm build:native && pnpm exec cap sync ios`
-  succeeds. The synced payload references the staging origin in 1,050 files and
-  `www.biblequest.co` in zero — worth re-checking after any rebuild, since
-  `ios/App/App/public` is untracked build output that carries whichever origin
-  was last built.
+  succeeds. The synced payload references the staging origin in 1,042 files and
+  `www.biblequest.co` in zero. `/app/plus` and `/app/games/store` are absent,
+  and the build script verifies that postcondition before publishing. Re-check
+  after any rebuild, since `ios/App/App/public` is untracked build output that
+  carries whichever origin was last built.
 - `xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -destination 'generic/platform=iOS' -archivePath <path> archive`
   returns **ARCHIVE SUCCEEDED**, signing `co.biblequest.app` at
   `CFBundleVersion 3` with "iOS Team Provisioning Profile: co.biblequest.app".
@@ -117,22 +118,22 @@ identity resolution itself is the only untested thing left.
 
 Afterwards, delete the Supabase branch and `.env.staging.local`.
 
-## Buildable work, in the order I would take it
+## Completed in the current pass
 
-1. **App Store commerce gating** — the largest item and pure code. The Arcade
-   Store shows $0.99/$2.99 with a Buy button that cannot work, 14 "Explore
-   Plus" CTAs lead to a page with no purchase path, and all 15 wallpapers are
-   locked with no way to buy. These are guideline 3.1.1 rejections at
-   submission. Gate them on native the way `ExplorePlusLink` already does, or
-   ship StoreKit — the latter is far bigger and adds a native dependency.
-2. **Settings legal links** — Privacy Policy / Terms / About bounce to Home on
-   native. Small, self-contained, and a submission surface in its own right.
-3. **iOS 26 Liquid Glass navbar** — on its own branch, per the plan doc.
-4. **`NSCameraUsageDescription` decision** — "Change photo" is withheld on
+1. **App Store commerce gating** — native removes all web-only purchase and
+   acquisition entry points, locked free-user previews, and wallpaper controls;
+   its export also prunes and verifies the Plus and Arcade Store routes.
+2. **Settings legal links** — hosted About, Privacy, and Terms URLs are now
+   absolute on native and continue to be relative on web.
+
+## Remaining work
+
+1. **iOS 26 Liquid Glass navbar** — on its own branch, per the plan doc.
+2. **`NSCameraUsageDescription` decision** — "Change photo" is withheld on
    native because iOS terminates apps that open the camera without it. This is
    a product call for the owner, not a code change to make unilaterally; see
    the comment in `SettingsScreen.tsx`.
-5. **TestFlight upload, runbook §5** — Xcode GUI, needs the owner's Apple ID.
+3. **TestFlight upload, runbook §5** — Xcode GUI, needs the owner's Apple ID.
    Note `security find-identity -v -p codesigning` shows exactly one identity,
    **Apple Development**. TestFlight signs with an Apple *Distribution*
    certificate, which does not exist on this Mac. Xcode's Distribute App flow

@@ -120,6 +120,16 @@ export function buildPublicUrl(
   return new URL(safePath, origin).toString();
 }
 
+/** Keeps hosted links relative on web and makes them external HTTPS links on native. */
+export function buildPublicHref(
+  path: string,
+  runtime: PlatformRuntime = platformRuntime(),
+): string {
+  const safePath = validatedPublicPath(path);
+  if (runtime.target === "web") return safePath;
+  return new URL(safePath, validatedRuntimeOrigin(runtime)).toString();
+}
+
 /** Requires native runtime construction to carry a previously validated origin. */
 function validatedRuntimeOrigin(runtime: PlatformRuntime): string {
   if (runtime.target !== "native" || !runtime.hostedOrigin) {

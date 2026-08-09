@@ -1,4 +1,5 @@
 import { hasSameOrigin, privateError } from "@/lib/http/request";
+import { isNativeAppOrigin } from "@/lib/http/native-origin";
 import { requireStripeBillingConfiguration } from "@/lib/billing/config.server";
 import {
   claimStripeAction,
@@ -15,6 +16,8 @@ export const runtime = "nodejs";
 
 /** Creates a hosted Customer Portal only for the current account mapping. */
 export async function POST(request: Request) {
+  // App Store builds cannot steer an account into external Stripe management.
+  if (isNativeAppOrigin(request)) return privateError("forbidden", 403);
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
   const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;

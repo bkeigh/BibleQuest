@@ -9,6 +9,7 @@ import {
   type BillingInterval,
 } from "@/lib/billing/validation";
 import { usePlus } from "@/lib/billing/usePlus";
+import { buildPublicHref } from "@/lib/platform/api";
 
 function formattedDate(value: string | null): string | null {
   if (!value) return null;
@@ -241,7 +242,7 @@ export function PlusCta() {
         Plus is one payment with no renewal. Cancel subscriptions in the Stripe
         portal; access continues through the paid period. Checkout shows the
         final total before confirmation. Refund requests are reviewed under the{" "}
-        <Link href="/terms" className="text-accent underline">
+        <Link href={buildPublicHref("/terms")} className="text-accent underline">
           Terms
         </Link>
         ; contact{" "}

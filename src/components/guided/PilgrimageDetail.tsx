@@ -19,6 +19,7 @@ import {
 import type { PilgrimageDefinition } from "@/lib/guided/types";
 import { useQuestOS } from "@/lib/questos/store";
 import { GuidedProgressBar } from "./GuidedProgressBar";
+import { WebCommerceOnly } from "@/components/plus/WebCommerceOnly";
 
 function PilgrimageDetailInner({
   pilgrimage,
@@ -96,15 +97,17 @@ function PilgrimageDetailInner({
             Remain Pilgrimage remain available. Plus adds this additional
             reviewed path and supports future guided content.
           </p>
-          <GentleLink
-            href="/app/plus"
-            variant="gold"
-            fullWidth
-            className="mt-4"
-          >
-            Explore Plus
-            <IconArrowRight />
-          </GentleLink>
+          <WebCommerceOnly>
+            <GentleLink
+              href="/app/plus"
+              variant="gold"
+              fullWidth
+              className="mt-4"
+            >
+              Explore Plus
+              <IconArrowRight />
+            </GentleLink>
+          </WebCommerceOnly>
         </PaperCard>
       )}
 

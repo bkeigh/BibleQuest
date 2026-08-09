@@ -103,7 +103,8 @@ function OnboardingInner({
   const updateSettings = useQuestOS((state) => state.updateSettings);
   const alreadyDone = profile?.onboardingCompleted ?? false;
   const resumeStage = getOnboardingResumeStage();
-  const continuingPlus = alreadyDone && resumeStage === "plus";
+  const continuingPlus =
+    !isNativeTarget() && alreadyDone && resumeStage === "plus";
   const [step, setStep] = useState(() =>
     continuingPlus ? PLUS_STEP : user ? NAME_STEP : ACCOUNT_STEP,
   );
@@ -396,7 +397,7 @@ function OnboardingInner({
                   onStart={startFirstQuest}
                 />
               )}
-              {visibleStep === PLUS_STEP && (
+              {!isNativeTarget() && visibleStep === PLUS_STEP && (
                 <StepPlus
                   onExplore={() => finish("/app/plus")}
                   onSkip={() => finish("/app")}

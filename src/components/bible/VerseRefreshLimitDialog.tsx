@@ -8,6 +8,8 @@ import {
 } from "@/components/design-system/GentleButton";
 import { IconClose } from "@/components/design-system/icons";
 import { ArtIcon } from "@/components/design-system/ArtIcon";
+import { WebCommerceOnly } from "@/components/plus/WebCommerceOnly";
+import { isNativeTarget } from "@/lib/platform/target";
 import { FREE_DAILY_VERSE_REFRESH_LIMIT } from "@/lib/questos/verse-engine";
 
 interface VerseRefreshLimitDialogProps {
@@ -118,19 +120,23 @@ export function VerseRefreshLimitDialog({
           id={descriptionId}
           className="mt-2 text-small leading-relaxed text-charcoal"
         >
-          Upgrade to Plus for unlimited refreshes.
+          {isNativeTarget()
+            ? "Come back tomorrow for a fresh set of verses."
+            : "Upgrade to Plus for unlimited refreshes."}
         </p>
 
         <div className="mt-5 grid gap-2.5">
-          <GentleLink
-            href="/app/plus"
-            variant="gold"
-            size="md"
-            fullWidth
-            onClick={onClose}
-          >
-            Explore Plus
-          </GentleLink>
+          <WebCommerceOnly>
+            <GentleLink
+              href="/app/plus"
+              variant="gold"
+              size="md"
+              fullWidth
+              onClick={onClose}
+            >
+              Explore Plus
+            </GentleLink>
+          </WebCommerceOnly>
           <GentleButton
             type="button"
             variant="ghost"
@@ -138,7 +144,7 @@ export function VerseRefreshLimitDialog({
             fullWidth
             onClick={onClose}
           >
-            Maybe later
+            {isNativeTarget() ? "Okay" : "Maybe later"}
           </GentleButton>
         </div>
       </div>

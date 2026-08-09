@@ -1,5 +1,6 @@
 import { boundedJson } from "@/lib/http/json";
 import { hasSameOrigin, privateError } from "@/lib/http/request";
+import { isNativeAppOrigin } from "@/lib/http/native-origin";
 import { requireStripeBillingConfiguration } from "@/lib/billing/config.server";
 import {
   claimStripeAction,
@@ -24,6 +25,8 @@ export const runtime = "nodejs";
 
 /** Creates one server-allowlisted hosted subscription Checkout Session. */
 export async function POST(request: Request) {
+  // Native acquisition stays closed until an audited StoreKit path exists.
+  if (isNativeAppOrigin(request)) return privateError("forbidden", 403);
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
   const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;

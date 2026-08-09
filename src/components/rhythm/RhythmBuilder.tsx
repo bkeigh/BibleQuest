@@ -25,7 +25,9 @@ import { GentleButton } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
+import { WebCommerceOnly } from "@/components/plus/WebCommerceOnly";
 import { track } from "@/lib/analytics/events";
+import { isNativeTarget } from "@/lib/platform/target";
 
 const DEFAULT_DAYS: RhythmDay[] = [1, 2, 3, 4, 5];
 
@@ -68,6 +70,7 @@ function RhythmEditor({
 }) {
   const { toast } = useToast();
   const [draft, setDraft] = useState(initial);
+  const nativeTarget = isNativeTarget();
   const practiceAvailable = (practice: RhythmPractice) =>
     practice === "guided_scripture"
       ? GREEN_FEATURES.guidedScripture
@@ -207,38 +210,44 @@ function RhythmEditor({
         </div>
       </fieldset>
 
-      <label className="mt-4 block text-caption text-ash">
-        Busy-day alternative{" "}
-        <span className="text-gilt">{isPlus ? "Plus" : "Plus preview"}</span>
-        <select
-          value={draft.fallbackPractice ?? ""}
-          disabled={!isPlus}
-          onChange={(event) =>
-            setDraft((current) => ({
-              ...current,
-              fallbackPractice:
-                (event.target.value as RhythmPractice) || null,
-            }))
-          }
-          className="mt-1 min-h-11 w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3 text-body text-graphite disabled:opacity-55"
-        >
-          <option value="">No alternative</option>
-          {RHYTHM_PRACTICES.filter(
-            (practice) =>
-              practiceAvailable(practice) &&
-              !draft.practices.includes(practice),
-          ).map((practice) => (
-              <option key={practice} value={practice}>
-                {RHYTHM_PRACTICE_LABELS[practice]}
-              </option>
-            ))}
-        </select>
-      </label>
-      {!isPlus && (
-        <p className="mt-2 text-caption leading-relaxed text-ash">
-          Plus can keep multiple rhythms and offer one lighter practice when
-          the day changes.
-        </p>
+      {/* Acquired native entitlements keep the field; free native builds do
+          not advertise a disabled upgrade preview. */}
+      {(!nativeTarget || isPlus) && (
+        <>
+          <label className="mt-4 block text-caption text-ash">
+            Busy-day alternative{" "}
+            <span className="text-gilt">{isPlus ? "Plus" : "Plus preview"}</span>
+            <select
+              value={draft.fallbackPractice ?? ""}
+              disabled={!isPlus}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  fallbackPractice:
+                    (event.target.value as RhythmPractice) || null,
+                }))
+              }
+              className="mt-1 min-h-11 w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3 text-body text-graphite disabled:opacity-55"
+            >
+              <option value="">No alternative</option>
+              {RHYTHM_PRACTICES.filter(
+                (practice) =>
+                  practiceAvailable(practice) &&
+                  !draft.practices.includes(practice),
+              ).map((practice) => (
+                <option key={practice} value={practice}>
+                  {RHYTHM_PRACTICE_LABELS[practice]}
+                </option>
+              ))}
+            </select>
+          </label>
+          {!isPlus && (
+            <p className="mt-2 text-caption leading-relaxed text-ash">
+              Plus can keep multiple rhythms and offer one lighter practice
+              when the day changes.
+            </p>
+          )}
+        </>
       )}
 
       <div className="mt-5 flex flex-wrap gap-2.5">
@@ -434,17 +443,20 @@ export function RhythmBuilder() {
       ) : !plus.isPlus ? (
         <div className="mt-4 rounded-[var(--radius-card)] border border-gold-500/35 bg-gold-500/10 p-3.5">
           <p className="text-small leading-relaxed text-charcoal">
-            One rhythm is included. Plus can hold morning, evening, and busy-day
-            rhythms.
+            {isNativeTarget()
+              ? "One rhythm is included in this version of BibleQuest."
+              : "One rhythm is included. Plus can hold morning, evening, and busy-day rhythms."}
           </p>
-          <GentleButton
-            variant="text"
-            size="sm"
-            className="mt-2"
-            onClick={() => setPlusDialogOpen(true)}
-          >
-            Add another rhythm · Plus
-          </GentleButton>
+          <WebCommerceOnly>
+            <GentleButton
+              variant="text"
+              size="sm"
+              className="mt-2"
+              onClick={() => setPlusDialogOpen(true)}
+            >
+              Add another rhythm · Plus
+            </GentleButton>
+          </WebCommerceOnly>
         </div>
       ) : (
         <p className="mt-4 text-caption text-ash">

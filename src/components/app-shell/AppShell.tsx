@@ -14,6 +14,8 @@ import {
 } from "@/lib/analytics/events";
 import { WallpaperBackdrop } from "./WallpaperBackdrop";
 import { cn } from "@/lib/utils/cn";
+import { isNativeTarget } from "@/lib/platform/target";
+import { usePlus } from "@/lib/billing/usePlus";
 
 const FloatingMyShepherd = dynamic(
   () =>
@@ -32,6 +34,7 @@ const FloatingMyShepherd = dynamic(
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { isPlus } = usePlus();
   const floatingMyShepherd = useQuestOS(
     (state) => state.settings.appearance.myShepherdFloatingButton !== false,
   );
@@ -94,10 +97,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         >
           {children}
         </main>
-        {/* Present for everyone on safe app routes. Whether asking a question
-            actually works is Plus's business, and the sheet says so on open
-            rather than after a reader has typed one out. */}
-        {floatingMyShepherd && !hidesFloatingTools && <FloatingMyShepherd />}
+        {/* Web readers may see the acquisition preview; native readers see the
+            tool only after an existing entitlement resolves. */}
+        {floatingMyShepherd &&
+          !hidesFloatingTools &&
+          (!isNativeTarget() || isPlus) && <FloatingMyShepherd />}
         <BottomNav />
         <InstallPrompt />
       </div>

@@ -9,6 +9,7 @@ import {
 import { IconArrowLeft, IconClock } from "@/components/design-system/icons";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
+import { WebCommerceOnly } from "@/components/plus/WebCommerceOnly";
 import { gamePuzzles } from "@/data/games";
 import { getGameAccess } from "@/lib/games/access";
 import { archivedGameHref } from "@/lib/games/links";
@@ -72,14 +73,16 @@ export function GamesArchiveScreen() {
               </h2>
               <p className="mt-2 text-body text-charcoal">{access.message}</p>
               {!access.allowed && (
-                <GentleButton
-                  type="button"
-                  variant="outline"
-                  className="mt-5"
-                  onClick={() => setPlusDialogOpen(true)}
-                >
-                  See what Plus supports
-                </GentleButton>
+                <WebCommerceOnly>
+                  <GentleButton
+                    type="button"
+                    variant="outline"
+                    className="mt-5"
+                    onClick={() => setPlusDialogOpen(true)}
+                  >
+                    See what Plus supports
+                  </GentleButton>
+                </WebCommerceOnly>
               )}
             </PaperCard>
 
@@ -125,15 +128,17 @@ export function GamesArchiveScreen() {
                             Revisit study
                           </GentleLink>
                         ) : (
-                          <GentleButton
-                            type="button"
-                            variant="text"
-                            size="sm"
-                            className="mt-4"
-                            onClick={() => setPlusDialogOpen(true)}
-                          >
-                            Explore Plus
-                          </GentleButton>
+                          <WebCommerceOnly>
+                            <GentleButton
+                              type="button"
+                              variant="text"
+                              size="sm"
+                              className="mt-4"
+                              onClick={() => setPlusDialogOpen(true)}
+                            >
+                              Explore Plus
+                            </GentleButton>
+                          </WebCommerceOnly>
                         )}
                       </PaperCard>
                     ))}

@@ -127,6 +127,14 @@ const REMOVE = [
     "src/app/app/reflection",
     "legacy redirect routes; reads searchParams, and the native app has no legacy URLs",
   ],
+  [
+    "src/app/app/plus",
+    "web membership acquisition; native builds have no audited StoreKit path",
+  ],
+  [
+    "src/app/app/games/store",
+    "web arcade checkout; native builds have no audited StoreKit path",
+  ],
 ];
 
 /**
@@ -253,11 +261,11 @@ function stageTree() {
       "--exclude=/.claude/",
       "--exclude=/output/",
       // 14 animated wallpaper loops, 67 MB — over half the bundle, and not one
-      // is reachable: every wallpaper is Plus-gated (catalog.ts's
-      // canAccessWallpaper returns hasPlusAccess verbatim) and Plus cannot
-      // resolve on native until server auth lands. The posters and thumbnails
-      // beside them are only 3 MB and ARE used — onboarding's step backgrounds
-      // reference poster.webp — so exclude the videos only, never the folder.
+      // is reachable: Settings omits the wallpaper picker from native builds
+      // until a StoreKit path and native entitlement projection exist. The
+      // posters and thumbnails beside them are only 3 MB and ARE used —
+      // onboarding's step backgrounds reference poster.webp — so exclude the
+      // videos only, never the folder.
       "--exclude=/public/wallpapers/*/loop.mp4",
       `${repo}/`,
       `${stage}/`,
@@ -295,6 +303,21 @@ function build() {
     ["build"],
     { cwd: stage, stdio: "inherit", env: process.env },
   );
+}
+
+/** Fails the build if a web-only acquisition route re-enters the app bundle. */
+function verifyCommerceRoutesPruned() {
+  for (const route of ["app/plus", "app/games/store"]) {
+    const exported = path.join(stage, "out", route);
+    if (
+      existsSync(`${exported}.html`) ||
+      existsSync(`${exported}.txt`) ||
+      existsSync(exported)
+    ) {
+      fail(`web-only commerce route was exported into the native bundle: /${route}`);
+    }
+  }
+  log("verified web-only commerce routes are absent");
 }
 
 /**
@@ -361,5 +384,6 @@ log(`target=native hostedOrigin=${origin}`);
 stageTree();
 pruneServerSurfaces();
 build();
+verifyCommerceRoutesPruned();
 publish();
 log("done — run `pnpm exec cap sync ios` to copy it into the app");

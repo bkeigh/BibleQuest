@@ -49,6 +49,7 @@ import { TodayFormation } from "@/components/home/TodayFormation";
 import { RhythmTodayCard } from "@/components/rhythm/RhythmTodayCard";
 import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
 import { HomeSectionHeading } from "@/components/home/HomeSectionHeading";
+import { isNativeTarget } from "@/lib/platform/target";
 
 function HomeInner() {
   const profile = useQuestOS((s) => s.profile);
@@ -56,6 +57,7 @@ function HomeInner() {
   const readingPosition = useQuestOS((s) => s.readingPosition);
   const assignments = useQuestOS((s) => s.assignments);
   const { isPlus } = usePlus();
+  const nativeTarget = isNativeTarget();
   const [shepherdDialogOpen, setShepherdDialogOpen] = useState(false);
   // The candle. Stable ref — the stored object itself.
   const streak = useQuestOS(selectStreak);
@@ -293,14 +295,13 @@ function HomeInner() {
             dayKey={dayKey}
             show="guide"
             afterGuide={
-              <ShepherdCallout
-                href={isPlus ? "/app/shepherd" : undefined}
-                onClick={
-                  isPlus
-                    ? undefined
-                    : () => setShepherdDialogOpen(true)
-                }
-              />
+              isPlus ? (
+                <ShepherdCallout href="/app/shepherd" />
+              ) : nativeTarget ? undefined : (
+                <ShepherdCallout
+                  onClick={() => setShepherdDialogOpen(true)}
+                />
+              )
             }
           />
 

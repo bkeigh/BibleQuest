@@ -44,6 +44,7 @@ import {
   IconSparkle,
 } from "@/components/design-system/icons";
 import { MyShepherdResponse } from "@/components/shepherd/MyShepherdResponse";
+import { WebCommerceOnly } from "@/components/plus/WebCommerceOnly";
 
 const STARTERS = [
   "Where can I read about hope?",
@@ -712,13 +713,15 @@ export function FloatingMyShepherd() {
                         </p>
                       ))}
                     </div>
-                    <Link
-                      href="/app/plus"
-                      onClick={close}
-                      className="mt-4 flex min-h-12 w-full items-center justify-center rounded-[var(--radius-button)] bg-gold-500 px-4 text-[0.9375rem] font-medium text-graphite transition-colors hover:bg-gold-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                    >
-                      Explore Plus
-                    </Link>
+                    <WebCommerceOnly>
+                      <Link
+                        href="/app/plus"
+                        onClick={close}
+                        className="mt-4 flex min-h-12 w-full items-center justify-center rounded-[var(--radius-button)] bg-gold-500 px-4 text-[0.9375rem] font-medium text-graphite transition-colors hover:bg-gold-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                      >
+                        Explore Plus
+                      </Link>
+                    </WebCommerceOnly>
                     <p className="mt-3 text-caption leading-relaxed text-ash">
                       Reading, prayers, quests, and the arcade never need Plus.
                       You can also turn this button off in Settings.

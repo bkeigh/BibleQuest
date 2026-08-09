@@ -2,8 +2,8 @@
 
 Everything the repo can do is done. This is the click-path that needs a human
 with the Apple and Vercel accounts, in dependency order. Internal TestFlight
-takes **no Apple review** — the App Store guideline gaps listed at the bottom
-do not block anything here.
+takes **no Apple review** — the remaining product constraints listed at the
+bottom do not block anything here.
 
 Facts already established, so you do not have to look them up:
 
@@ -122,11 +122,10 @@ Expect to see these while testing; they are recorded, not forgotten.
   excluded from the CORS layer (it is the one shared-cacheable response), and
   `usePlus` needs it, so the projection reads "error"/free. Do not read this
   as a bearer-transport failure.
-- **Arcade Store shows $0.99 / $2.99 with a Buy button that cannot work**, 14
-  "Explore Plus" CTAs lead to a page with no purchase path, and all 15
-  wallpapers are locked. These are guideline 3.1.1 rejections at App Store
-  submission and need either native gating or StoreKit.
-- **Privacy Policy / Terms / About in Settings bounce to Home** on native.
+- **Commerce and legal submission surfaces are resolved in build 3.** The
+  native export prunes the Plus and Arcade Store routes, removes web-only
+  acquisition UI and wallpaper controls, and opens hosted About, Privacy, and
+  Terms pages externally. Re-check these when testing the new branch build.
 - **"Change photo" is withheld on native** pending a decision on
   `NSCameraUsageDescription` (see the comment in `SettingsScreen.tsx`).
 - **Reminders dead-ends** into a sign-in that is itself disabled.

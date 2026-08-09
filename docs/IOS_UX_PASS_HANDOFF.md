@@ -45,15 +45,35 @@ static Liquid Glass material properties, so the gap is shape and behaviour
 (both pure CSS/JS), while refraction and specular highlights are genuinely
 unreachable from a WebView.
 
-## Not started
+## 2026-08-09 — commerce and legal pass complete
 
-1. **App Store commerce gating.** The Arcade Store still shows $0.99/$2.99
-   with a Buy button that cannot work, 14 "Explore Plus" CTAs lead to a page
-   with no purchase path, and all 15 wallpapers are locked. These are
-   guideline 3.1.1 rejections at submission; none block TestFlight.
-2. **Settings legal links** bounce to Home on native.
-3. **The camera decision.** "Change photo" is withheld on native pending a
+**App Store commerce gating.** The native exporter removes `/app/plus` and
+`/app/games/store`, then fails the build if either route reappears. Native UI
+now omits the Arcade Store, prices and Buy actions, Plus acquisition actions,
+free-user locked previews, and the wallpaper picker. Existing entitlements
+remain a separate access path. Billing checkout, billing portal, and arcade
+checkout also reject the native origin with `403` as a server-side backstop.
+Stale onboarding hand-offs to `/app/plus` normalize to `/app`.
+
+**Legal links.** About, Privacy Policy, and Terms stay relative on web but use
+absolute hosted HTTPS URLs on native, so Capacitor opens them outside the
+pruned app router instead of bouncing to Home.
+
+**Verification.** `pnpm lint`, `pnpm exec tsc --noEmit`, all 149 test files /
+1,121 tests, and the normal web build pass. A fresh native build and Capacitor
+sync contain the staging origin in 1,042 files and `www.biblequest.co` in zero;
+both commerce routes are absent, and exported native HTML contains none of the
+store prices, Buy labels, or Plus acquisition labels. A Release archive still
+returns `ARCHIVE SUCCEEDED` for `co.biblequest.app`, build 3.
+
+## Remaining product decisions
+
+1. **The camera decision.** "Change photo" is withheld on native pending a
    call on `NSCameraUsageDescription` — see the comment in `SettingsScreen.tsx`.
+2. **iOS 26 Liquid Glass implementation.** Keep it on its own branch and use
+   `docs/IOS26_LIQUID_GLASS_PLAN.md` as the starting point.
+3. **TestFlight upload.** The archive is buildable, but distribution still
+   needs the owner's Apple ID and an Apple Distribution certificate.
 
 ## Still open from Phase 4b
 

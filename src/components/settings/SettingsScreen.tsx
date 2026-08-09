@@ -60,7 +60,7 @@ import {
   type BibleTranslation,
 } from "@/lib/bible/translations";
 import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
-import { apiFetch } from "@/lib/platform/api";
+import { apiFetch, buildPublicHref } from "@/lib/platform/api";
 import { WallpaperPicker } from "@/components/settings/WallpaperPicker";
 import { ExplorePlusLink } from "@/components/plus/ExplorePlusLink";
 import { SupportLink } from "@/components/plus/SupportLink";
@@ -825,6 +825,7 @@ function SettingsInner() {
   const router = useRouter();
   const { toast } = useToast();
   const { isPlus } = usePlus();
+  const nativeTarget = isNativeTarget();
   // Signed-in clears/restores must also purge the account copy, or the next
   // initial sync merges it straight back (see lib/sync/engine.ts).
   const { user, loading: sessionLoading } = useSession();
@@ -1277,34 +1278,38 @@ function SettingsInner() {
           )}
         </PaperCard>
 
-        <SectionTitle>Plus</SectionTitle>
-        <div className="space-y-3">
-          <ExplorePlusLink description="Discover every wallpaper and extra ways to deepen your daily practice." />
-          {/* Shown to everyone. Hiding the switch from free readers left them
-              with a button they could not explain and could not turn off. */}
-          <PaperCard variant="paper" padding="none" className="px-4">
-            <div className="flex items-center justify-between gap-4 py-3.5">
-              <span className="min-w-0">
-                <span className="block text-[0.9375rem] text-charcoal">
-                  Floating MyShepherd
-                </span>
-                <span className="mt-0.5 block text-caption leading-relaxed text-ash">
-                  {isPlus
-                    ? "Keep a small Scripture assistant available throughout the app."
-                    : "Keep the MyShepherd button on screen. Asking questions is part of Plus."}
-                </span>
-              </span>
-              <Toggle
-                label="Floating MyShepherd"
-                on={appearance.myShepherdFloatingButton}
-                onChange={(myShepherdFloatingButton) =>
-                  setAppearance({ myShepherdFloatingButton })
-                }
-              />
+        {(!nativeTarget || isPlus) && (
+          <>
+            <SectionTitle>Plus</SectionTitle>
+            <div className="space-y-3">
+              <ExplorePlusLink description="Discover every wallpaper and extra ways to deepen your daily practice." />
+              {/* Web readers can dismiss the free preview; native readers see
+                  this setting only after an existing entitlement resolves. */}
+              <PaperCard variant="paper" padding="none" className="px-4">
+                <div className="flex items-center justify-between gap-4 py-3.5">
+                  <span className="min-w-0">
+                    <span className="block text-[0.9375rem] text-charcoal">
+                      Floating MyShepherd
+                    </span>
+                    <span className="mt-0.5 block text-caption leading-relaxed text-ash">
+                      {isPlus
+                        ? "Keep a small Scripture assistant available throughout the app."
+                        : "Keep the MyShepherd button on screen. Asking questions is part of Plus."}
+                    </span>
+                  </span>
+                  <Toggle
+                    label="Floating MyShepherd"
+                    on={appearance.myShepherdFloatingButton}
+                    onChange={(myShepherdFloatingButton) =>
+                      setAppearance({ myShepherdFloatingButton })
+                    }
+                  />
+                </div>
+              </PaperCard>
+              <SupportLink />
             </div>
-          </PaperCard>
-          <SupportLink />
-        </div>
+          </>
+        )}
 
         {/* Always visible — text size and bold text are comfort settings
             people shouldn't have to hunt for behind a disclosure. */}
@@ -1315,22 +1320,26 @@ function SettingsInner() {
             padding="none"
             className="overflow-hidden px-4"
           >
-            <WallpaperPicker
-              value={appearance.wallpaperId}
-              onChange={(wallpaperId) => setAppearance({ wallpaperId })}
-            />
+            {!nativeTarget && (
+              <WallpaperPicker
+                value={appearance.wallpaperId}
+                onChange={(wallpaperId) => setAppearance({ wallpaperId })}
+              />
+            )}
             <div className="divide-y divide-mist/70">
-              <Row label="Wallpaper style">
-                <Segmented
-                  label="Wallpaper style"
-                  value={appearance.wallpaperMode}
-                  onChange={(wallpaperMode) => setAppearance({ wallpaperMode })}
-                  options={[
-                    { value: "still", label: "Still" },
-                    { value: "live", label: "Live" },
-                  ]}
-                />
-              </Row>
+              {!nativeTarget && (
+                <Row label="Wallpaper style">
+                  <Segmented
+                    label="Wallpaper style"
+                    value={appearance.wallpaperMode}
+                    onChange={(wallpaperMode) => setAppearance({ wallpaperMode })}
+                    options={[
+                      { value: "still", label: "Still" },
+                      { value: "live", label: "Live" },
+                    ]}
+                  />
+                </Row>
+              )}
               <Row label="Glass surfaces">
                 <Toggle
                   label="Glass surfaces"
@@ -1386,14 +1395,16 @@ function SettingsInner() {
                 />
               </Row>
             </div>
-            {appearance.wallpaperMode === "live" && shouldReduceMotion && (
+            {!nativeTarget &&
+              appearance.wallpaperMode === "live" &&
+              shouldReduceMotion && (
               <p className="border-t border-mist/70 py-3 text-caption leading-relaxed text-ash">
                 Live is saved as your preference. The matching still is shown
                 while {appearance.reducedMotion
                   ? "Reduce Motion is"
                   : "your device’s Reduce Motion setting is"} on.
               </p>
-            )}
+              )}
           </PaperCard>
         </section>
 
@@ -1517,7 +1528,7 @@ function SettingsInner() {
                   touch height. An inline link inside a sentence is the
                   exception to that rule; a link standing among buttons is not. */}
               <Link
-                href="/privacy"
+                href={buildPublicHref("/privacy")}
                 className="inline-flex min-h-11 items-center px-1 text-[0.875rem] text-accent hover:text-accent/80"
               >
                 Privacy policy
@@ -1558,17 +1569,17 @@ function SettingsInner() {
           <Disclosure variant="card" label="About">
             <ul className="divide-y divide-mist/70 text-[0.9375rem]">
               <li>
-                <Link href="/about" className="block py-3 text-charcoal hover:text-accent">
+                <Link href={buildPublicHref("/about")} className="block py-3 text-charcoal hover:text-accent">
                   About BibleQuest
                 </Link>
               </li>
               <li>
-                <Link href="/terms" className="block py-3 text-charcoal hover:text-accent">
+                <Link href={buildPublicHref("/terms")} className="block py-3 text-charcoal hover:text-accent">
                   Terms of Use
                 </Link>
               </li>
               <li>
-                <Link href="/privacy" className="block py-3 text-charcoal hover:text-accent">
+                <Link href={buildPublicHref("/privacy")} className="block py-3 text-charcoal hover:text-accent">
                   Privacy Policy
                 </Link>
               </li>
