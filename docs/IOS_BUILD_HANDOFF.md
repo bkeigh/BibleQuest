@@ -63,60 +63,29 @@ git pull --ff-only
   `Origin: capacitor://localhost` returns no `access-control-allow-origin`
   header. Re-verify this before and after anything that touches the CORS layer.
 
-## The one real gap — the bearer isolation check
+## Bearer isolation — passed and cleaned up 2026-08-09
 
-`pnpm check:native-bearer-isolation` proves two accounts cannot read each
-other's data through the bearer path. It has still never completed. 15 of 16
-authenticated surfaces have no RLS backstop, so a wrong identity is a
-cross-account breach, and every unit test mocks token verification — nothing
-has ever resolved a real token to a real user. **Do not enable
-`BIBLEQUEST_NATIVE_API_ORIGIN_ENABLED` anywhere real until this passes.**
+The account owner added the three required variables to **Preview only**. Empty
+commit `a3b25fe` triggered the feature-branch deployment; its CSP then included
+the exact staging Supabase origin. The real check passed:
 
-Three of the four prerequisites are done:
-
-1. A disposable staging Supabase exists: branch `native-bearer-isolation`,
-   ref `lorqiyzrfmpvvcvsvghc`, created 2026-08-08, billing at ~$0.32/day.
-   **Delete it once the check passes.** Its dashboard branch status still reads
-   `MIGRATIONS_FAILED` — that is stale, because the migrations were applied
-   out-of-band; the underlying project is `ACTIVE_HEALTHY` and verified below.
-2. Its schema is complete and verified: `profile_avatar_contract()` returns
-   `ok: true`, the private `profile-avatars` bucket exists, and
-   `grant_operator_plus` plus `operator_plus_grants` are present.
-3. `.env.staging.local` is written (gitignored, mode 600) with the branch's
-   URL, anon key, publishable key and service-role key, plus the two
-   confirmation strings and the target origin. Never print its values.
-4. **Blocked on the account owner:** three variables on Vercel → bible-quest →
-   Settings → Environment Variables, scoped to **Preview only**:
-
-   | Vercel variable | Source line in `.env.staging.local` |
-   | --- | --- |
-   | `NEXT_PUBLIC_SUPABASE_URL` | `https://lorqiyzrfmpvvcvsvghc.supabase.co` |
-   | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the `sb_publishable_…` value |
-   | `SUPABASE_SECRET_KEY` | the value on the `SUPABASE_SERVICE_ROLE_KEY` line |
-
-   The last row is a rename, not a copy: `src/lib/supabase/admin.server.ts:12`
-   ignores `SUPABASE_SERVICE_ROLE_KEY` when `NODE_ENV=production`, which every
-   Vercel build is. Scope must be Preview — "All Environments" would repoint
-   production at a database that is about to be deleted.
-
-Once those land, push a commit to the branch, then gate on the observable
-before running anything: native-staging's CSP `connect-src` is currently bare
-`'self'` and must come back containing
-`https://lorqiyzrfmpvvcvsvghc.supabase.co`. Then run:
-
-```bash
-pnpm check:native-bearer-isolation
+```json
+{"authenticatedUsers":2,"corsPreflights":2,"billingDirections":2,"failClosedCases":3,"avatarDirections":2,"status":"pass"}
 ```
 
-A rehearsal on 2026-08-09 already cleared actor creation, the real operator
-Plus grant, and the entire CORS layer, then failed at billing with `503`. That
-503 is the deployment's "Supabase not configured" signature — the same route
-answers `401` with no token, because it short-circuits before touching Supabase
-and only fails on configuration once a real bearer forces an identity
-resolution. So the script, the fixtures and the CORS layer are all proven; the
-identity resolution itself is the only untested thing left.
+The result proves two real bearer identities stay isolated in both billing and
+avatar directions. Production was rechecked after the run and still returns no
+`access-control-allow-origin` for `Origin: capacitor://localhost`; its native
+latch remains off.
 
-Afterwards, delete the Supabase branch and `.env.staging.local`.
+Cleanup is done: disposable Supabase branch `native-bearer-isolation`
+(`lorqiyzrfmpvvcvsvghc`) was deleted, and `.env.staging.local` was moved to
+`~/.Trash/BibleQuest.env.staging.local.2026-08-09` with mode `600`.
+
+The Vercel Preview variables still point at the now-deleted project. Remove or
+repoint them before treating `native-staging` as an account-capable backend.
+The passing check removes the security prohibition but does not authorize any
+production environment or CORS change.
 
 ## Completed in the current pass
 

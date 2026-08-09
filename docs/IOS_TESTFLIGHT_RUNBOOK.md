@@ -118,6 +118,14 @@ App → TestFlight Internal Only**.
 
 Expect to see these while testing; they are recorded, not forgotten.
 
+- **Bearer identity isolation passed on 2026-08-09.** Two real users were
+  isolated across billing and avatar directions, CORS, and fail-closed cases.
+  The disposable Supabase branch was deleted after the pass. Production's
+  native-origin latch remains off.
+- **The current Preview Supabase variables point to that deleted branch.**
+  Remove them or repoint them to an explicitly approved durable backend before
+  expecting account-backed `native-staging` APIs to work. This does not block
+  the bundled local-first core.
 - **Billing UI always errors on native.** `/api/billing/plans` is deliberately
   excluded from the CORS layer (it is the one shared-cacheable response), and
   `usePlus` needs it, so the projection reads "error"/free. Do not read this
