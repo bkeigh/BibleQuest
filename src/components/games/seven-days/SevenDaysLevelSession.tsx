@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { GentleButton } from "@/components/design-system/GentleButton";
@@ -32,6 +32,10 @@ import {
   type SevenDaysSession,
 } from "@/lib/games/seven-days/play";
 import { SEVEN_DAYS_TILES } from "@/lib/games/seven-days/tiles";
+import {
+  readSevenDaysTutorialSeen,
+  writeSevenDaysTutorialSeen,
+} from "@/lib/games/seven-days/tutorial";
 import type {
   SevenDaysBoard as SevenDaysBoardShape,
   SevenDaysLevel,
@@ -84,6 +88,10 @@ export function SevenDaysLevelSession({
   );
   const [announcement, setAnnouncement] = useState("");
   const [paused, setPaused] = useState(false);
+  // New players see guidance once; returning players reach the existing intro.
+  const [tutorialOpen, setTutorialOpen] = useState(
+    () => !readSevenDaysTutorialSeen(),
+  );
   // While a cascade plays, the board shown is a frame from the engine rather
   // than the committed state; input waits so a second tap cannot outrun it.
   const [preview, setPreview] = useState<{
@@ -97,6 +105,9 @@ export function SevenDaysLevelSession({
     null,
   );
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const pauseButtonRef = useRef<HTMLButtonElement>(null);
+  const tutorialHeadingRef = useRef<HTMLHeadingElement>(null);
+  const startButtonId = "seven-days-start-level";
 
   const { state } = session;
   const goals = goalProgress(state);
@@ -122,6 +133,46 @@ export function SevenDaysLevelSession({
     window.addEventListener("keydown", resumeOnEscape);
     return () => window.removeEventListener("keydown", resumeOnEscape);
   }, [paused]);
+
+  /** Closes the tips, remembers completion, and restores a useful focus point. */
+  const dismissTutorial = useCallback(() => {
+    writeSevenDaysTutorialSeen();
+    setTutorialOpen(false);
+    setAnnouncement(
+      stage === "play"
+        ? "How to play closed. The board is ready."
+        : "How to play closed. Start the level when you are ready.",
+    );
+    window.requestAnimationFrame(() => {
+      if (stage === "play") pauseButtonRef.current?.focus();
+      else document.getElementById(startButtonId)?.focus();
+    });
+  }, [stage]);
+
+  // Replayed tips receive focus and can be dismissed with the standard key.
+  useEffect(() => {
+    if (!tutorialOpen || stage !== "play" || paused) return;
+    tutorialHeadingRef.current?.focus();
+    const dismissOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      dismissTutorial();
+    };
+    window.addEventListener("keydown", dismissOnEscape);
+    return () => window.removeEventListener("keydown", dismissOnEscape);
+  }, [dismissTutorial, paused, stage, tutorialOpen]);
+
+  /** Starts play while leaving unread guidance beside the first live board. */
+  function beginLevel() {
+    setStage("play");
+  }
+
+  /** Leaves Pause and opens the same non-modal instructions above the board. */
+  function replayTutorial() {
+    setPaused(false);
+    setTutorialOpen(true);
+    setAnnouncement("How to play opened.");
+  }
 
   function restart() {
     const next = attempt + 1;
@@ -296,6 +347,13 @@ export function SevenDaysLevelSession({
                 ))}
               </ul>
 
+              {tutorialOpen && (
+                <SevenDaysTutorial
+                  headingRef={tutorialHeadingRef}
+                  onDismiss={dismissTutorial}
+                />
+              )}
+
               {chapter && (
                 <Link
                   href={scriptureSourceHref(chapter.source)}
@@ -306,10 +364,11 @@ export function SevenDaysLevelSession({
               )}
 
               <GentleButton
+                id={startButtonId}
                 variant="primary"
                 fullWidth
                 className="mt-5"
-                onClick={() => setStage("play")}
+                onClick={beginLevel}
               >
                 Start level
               </GentleButton>
@@ -329,6 +388,7 @@ export function SevenDaysLevelSession({
           <div className="flex min-h-0 flex-1 flex-col gap-3">
             <div className="flex items-center gap-2">
               <button
+                ref={pauseButtonRef}
                 type="button"
                 onClick={() => setPaused(true)}
                 aria-label="Pause"
@@ -376,6 +436,13 @@ export function SevenDaysLevelSession({
                 </span>
               </p>
             </div>
+
+            {tutorialOpen && (
+              <SevenDaysTutorial
+                headingRef={tutorialHeadingRef}
+                onDismiss={dismissTutorial}
+              />
+            )}
 
             <div className="relative">
               {combo !== null && !reduceMotion && (
@@ -572,6 +639,14 @@ export function SevenDaysLevelSession({
               variant="outline"
               fullWidth
               className="mt-2"
+              onClick={replayTutorial}
+            >
+              How to play
+            </GentleButton>
+            <GentleButton
+              variant="outline"
+              fullWidth
+              className="mt-2"
               onClick={restart}
             >
               Restart level
@@ -593,6 +668,79 @@ export function SevenDaysLevelSession({
         </div>
       )}
     </div>
+  );
+}
+
+interface SevenDaysTutorialProps {
+  headingRef: React.RefObject<HTMLHeadingElement | null>;
+  onDismiss: () => void;
+}
+
+/** Teaches the complete first move without covering or disabling the board. */
+function SevenDaysTutorial({
+  headingRef,
+  onDismiss,
+}: SevenDaysTutorialProps) {
+  return (
+    <section
+      aria-labelledby="seven-days-how-to-play"
+      className="mt-4 rounded-[var(--radius-card)] border border-gold-500/45 bg-gold-500/10 p-3.5"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-art-label text-caption uppercase tracking-[0.06em] text-gilt">
+            Three simple steps
+          </p>
+          <h3
+            id="seven-days-how-to-play"
+            ref={headingRef}
+            tabIndex={-1}
+            className="mt-1 font-display text-[1.25rem] text-graphite outline-none"
+          >
+            How to play
+          </h3>
+        </div>
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Hide how to play"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ash hover:bg-paper/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          <IconClose size={18} />
+        </button>
+      </div>
+      <ol className="mt-2.5 grid gap-2 text-small leading-relaxed text-charcoal sm:grid-cols-3">
+        <li>
+          <strong className="font-semibold text-graphite">
+            1. Swap adjacent tiles.
+          </strong>{" "}
+          Swipe one tile toward its neighbor, or select two neighboring tiles.
+          With a keyboard, use the arrow keys and Enter or Space.
+        </li>
+        <li>
+          <strong className="font-semibold text-graphite">
+            2. Match 3 or more.
+          </strong>{" "}
+          Line up at least three matching tiles. A swap that makes no match
+          returns for free.
+        </li>
+        <li>
+          <strong className="font-semibold text-graphite">
+            3. Collect the pictured goal.
+          </strong>{" "}
+          Gather the tiles shown above the board before your moves reach zero.
+        </li>
+      </ol>
+      <GentleButton
+        variant="outline"
+        size="sm"
+        fullWidth
+        className="mt-3 bg-paper/45"
+        onClick={onDismiss}
+      >
+        Got it
+      </GentleButton>
+    </section>
   );
 }
 

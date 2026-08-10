@@ -4,6 +4,7 @@ import {
   type PlatformRuntime,
 } from "./runtime";
 import { isNativeTarget } from "./target";
+import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 
@@ -86,6 +87,9 @@ async function nativeApiFetch(
  * executes; whether the minifier also drops the branch is minifier-dependent).
  */
 async function nativeSessionAccessToken(): Promise<string | null> {
+  // Guest-only releases must not inspect, refresh, or revive a stale native
+  // Supabase session merely because an older build left one in WebView storage.
+  if (ACCOUNT_SYNC_CONTAINED) return null;
   try {
     const { createClient, isSupabaseConfigured } = await import(
       "@/lib/supabase/client"

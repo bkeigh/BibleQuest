@@ -74,4 +74,31 @@ describe("marketing hero wallpaper", () => {
       /icon="compass"\s+title="See how it works"/,
     );
   });
+
+  it("protects hero copy from every still and video frame", () => {
+    const landingPage = readFileSync(
+      path.join(process.cwd(), "src/app/(marketing)/page.tsx"),
+      "utf8",
+    );
+
+    // The image can vary by crop and the video varies over time, so contrast
+    // belongs to the complete reading surface rather than one sampled frame.
+    expect(landingPage).toContain("bg-paper/[0.94]");
+    expect(landingPage).toContain("backdrop-blur-md");
+  });
+
+  it("leads a new visitor through the tour before asking them to begin", () => {
+    const landingPage = readFileSync(
+      path.join(process.cwd(), "src/app/(marketing)/page.tsx"),
+      "utf8",
+    );
+    const walkthrough = landingPage.indexOf('title="See how it works"');
+    const onboarding = landingPage.indexOf('title="Get BibleQuest"');
+
+    expect(walkthrough).toBeGreaterThan(-1);
+    expect(onboarding).toBeGreaterThan(walkthrough);
+    expect(landingPage.slice(walkthrough - 120, walkthrough)).toContain(
+      "primary",
+    );
+  });
 });

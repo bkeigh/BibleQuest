@@ -1,5 +1,9 @@
 # iOS UX pass — where this stopped
 
+> Historical handoff. Use [`IOS_TESTFLIGHT_RUNBOOK.md`](IOS_TESTFLIGHT_RUNBOOK.md)
+> for the production-backed App Store candidate; do not reuse the staging build
+> command near the end of this document.
+
 Branch `feat/capacitor-ios-scaffold`. Target: a polished working build inside
 ten days of 2026-08-07. Written mid-session against a dying battery, so it
 records state rather than conclusions.
@@ -97,10 +101,9 @@ Cleanup is complete. Disposable Supabase branch `native-bearer-isolation`
 `.env.staging.local` was removed from the repo and moved to
 `~/.Trash/BibleQuest.env.staging.local.2026-08-09` with mode `600`.
 
-The three Vercel Preview variables still reference that deleted disposable
-project. Remove them or repoint them to an explicitly approved durable backend
-before relying on account-backed `native-staging` APIs again. Passing isolation
-removes the security blocker; it does not authorize a production promotion.
+The three Vercel Preview variables that referenced the deleted disposable
+project were removed. Passing isolation removed the security blocker; the
+production native-origin latch remains a separate owner-controlled rollout.
 
 ## Resuming
 
@@ -113,10 +116,9 @@ The dev server for UI work is `.claude/launch.json` → `biblequest` on port
 3200. To skip onboarding when inspecting `/app`, set `onboardingCompleted` on
 the `biblequest:v1` localStorage blob.
 
-To put a fresh build on the phone: rebuild the web payload against the staging
-origin, sync, bump, then Product → Archive (or just ▶ Run with the phone
-connected, which is faster for iteration):
+To prepare the production-backed, guest-only App Store payload and sync it into
+Xcode:
 
 ```bash
-NEXT_PUBLIC_APP_PLATFORM=native NEXT_PUBLIC_NATIVE_HOSTED_ORIGIN=https://native-staging.biblequest.co pnpm build:native && pnpm exec cap sync ios
+pnpm ios:release:prepare
 ```

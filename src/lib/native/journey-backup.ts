@@ -34,6 +34,25 @@ type FilesystemModule = typeof import("@capacitor/filesystem");
 
 let filesystem: FilesystemModule | null = null;
 
+/** Serializes mirror writes with irreversible purge requests. */
+let filesystemMutation: Promise<void> = Promise.resolve();
+
+/** Prevents an old scheduled write from recreating a purged journey. */
+let backupWritesSuspended = false;
+
+/** Invalidates writes that were requested before a purge began. */
+let backupGeneration = 0;
+
+/** Runs one filesystem mutation after every earlier mutation has settled. */
+function serializeFilesystemMutation<T>(operation: () => Promise<T>): Promise<T> {
+  const result = filesystemMutation.then(operation, operation);
+  filesystemMutation = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
 /**
  * Loaded lazily so the plugin never enters the web bundle. Returns null on web
  * and on any load failure — a backup is a safety net, and a failing net must
@@ -65,23 +84,77 @@ function isSubstantive(raw: string | null): raw is string {
 
 /** Writes the current journey to the app's Documents directory. */
 export async function writeJourneyBackup(): Promise<boolean> {
-  const fs = await loadFilesystem();
-  if (!fs) return false;
-
   const raw = readPrimary();
-  if (!isSubstantive(raw)) return false;
+  const generation = backupGeneration;
+  if (backupWritesSuspended || !isSubstantive(raw)) return false;
 
-  try {
-    await fs.Filesystem.writeFile({
-      path: BACKUP_FILE,
-      data: raw,
-      directory: fs.Directory.Data,
-      encoding: fs.Encoding.UTF8,
-    });
+  return serializeFilesystemMutation(async () => {
+    if (backupWritesSuspended || generation !== backupGeneration) return false;
+    const fs = await loadFilesystem();
+    if (!fs || backupWritesSuspended || generation !== backupGeneration) {
+      return false;
+    }
+
+    try {
+      await fs.Filesystem.writeFile({
+        path: BACKUP_FILE,
+        data: raw,
+        directory: fs.Directory.Data,
+        encoding: fs.Encoding.UTF8,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}
+
+/**
+ * Irreversibly removes the native mirror before Settings clears localStorage.
+ *
+ * The empty-object write is a durable tombstone: even if the following delete
+ * is unavailable, restore rejects the two-byte file as non-substantive. Writes
+ * remain suspended after success until the caller has reset the primary store.
+ */
+export async function purgeJourneyBackup(): Promise<boolean> {
+  if (!isNativeTarget()) return true;
+
+  backupWritesSuspended = true;
+  backupGeneration += 1;
+
+  const purged = await serializeFilesystemMutation(async () => {
+    const fs = await loadFilesystem();
+    if (!fs) return false;
+
+    try {
+      await fs.Filesystem.writeFile({
+        path: BACKUP_FILE,
+        data: "{}",
+        directory: fs.Directory.Data,
+        encoding: fs.Encoding.UTF8,
+      });
+    } catch {
+      return false;
+    }
+
+    try {
+      await fs.Filesystem.deleteFile({
+        path: BACKUP_FILE,
+        directory: fs.Directory.Data,
+      });
+    } catch {
+      // The tombstone already makes the mirror non-restorable.
+    }
     return true;
-  } catch {
-    return false;
-  }
+  });
+
+  if (!purged) backupWritesSuspended = false;
+  return purged;
+}
+
+/** Lets mirroring resume only after the caller has reset the primary store. */
+export function resumeJourneyBackupAfterPurge(): void {
+  backupWritesSuspended = false;
 }
 
 /** Reads the mirrored journey, or null when there is none. */

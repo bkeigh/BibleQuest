@@ -39,6 +39,7 @@ import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
 import { toDateKey } from "@/lib/utils/dates";
 import { track } from "@/lib/analytics/events";
 import { authFailureMessage, type AuthFailureReason } from "@/lib/auth/errors";
+import { accountSyncAvailable } from "@/lib/sync/containment";
 import {
   getOnboardingResumeStage,
   setOnboardingResumeStage,
@@ -275,7 +276,7 @@ function OnboardingInner({
             >
               {visibleStep === ACCOUNT_STEP && (
                 <StepAccount
-                  accountEnabled={configured}
+                  accountEnabled={accountSyncAvailable(configured)}
                   authFailure={authFailure}
                   onContinue={continueWithoutAccount}
                   onOpenLegal={setLegalDocument}
@@ -493,14 +494,18 @@ function StepAccount({
           tabIndex={-1}
           className="mt-1.5 font-display text-[1.75rem] leading-tight text-graphite outline-none"
         >
-          {intent === "create"
-            ? "Create your free account"
-            : "Welcome back"}
+          {!accountEnabled
+            ? "Begin your journey"
+            : intent === "create"
+              ? "Create your free account"
+              : "Welcome back"}
         </h1>
         <p className="mx-auto mt-2 max-w-sm text-small leading-relaxed text-charcoal">
-          {intent === "create"
-            ? "Keep your journey with you across devices. Your private writing stays out of analytics."
-            : "Sign in and we’ll restore your saved journey before opening the app."}
+          {!accountEnabled
+            ? "Your BibleQuest journey stays private on this device and can be exported from Settings."
+            : intent === "create"
+              ? "Keep your journey with you across devices. Your private writing stays out of analytics."
+              : "Sign in and we’ll restore your saved journey before opening the app."}
         </p>
       </div>
 
@@ -558,7 +563,7 @@ function StepAccount({
         className="mt-2 text-ash"
         onClick={onContinue}
       >
-        Continue without an account
+        {accountEnabled ? "Continue without an account" : "Continue on this device"}
       </GentleButton>
       <div className="mt-3 text-center">
         <LegalLinks onOpen={onOpenLegal} />

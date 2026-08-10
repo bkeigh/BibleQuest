@@ -1,5 +1,9 @@
 # iOS build handoff — 2026-08-09
 
+> Historical staging handoff. The canonical App Store path is now
+> [`IOS_TESTFLIGHT_RUNBOOK.md`](IOS_TESTFLIGHT_RUNBOOK.md); do not use this
+> document's `native-staging` commands for a release archive.
+
 Paste this whole file as the opening prompt of a fresh session. Everything in
 it was measured on 2026-08-09, not inferred. Where something is unverified it
 says so.

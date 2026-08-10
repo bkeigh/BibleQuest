@@ -1,5 +1,9 @@
 # iOS Phase 4b — native session transport
 
+> Historical implementation handoff. Use
+> [`IOS_TESTFLIGHT_RUNBOOK.md`](IOS_TESTFLIGHT_RUNBOOK.md) for the current
+> production-backed App Store candidate.
+
 The iOS app can already **reach** the hosted API and cannot **authenticate** to
 it. Phase 4b closes that: bearer identity on the server, and a CORS layer.
 

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const PLATFORM = "NEXT_PUBLIC_APP_PLATFORM";
 const HOSTED = "NEXT_PUBLIC_NATIVE_HOSTED_ORIGIN";
+const ACCOUNT_SYNC = "NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED";
 
 type FetchArgs = [string, RequestInit | undefined];
 
@@ -22,19 +23,21 @@ async function apiModule() {
 }
 
 function mockSupabaseClient(accessToken: string | null, configured = true) {
+  const createClient = vi.fn(() => ({
+    auth: {
+      getSession: async () => ({
+        data: {
+          session: accessToken ? { access_token: accessToken } : null,
+        },
+        error: null,
+      }),
+    },
+  }));
   vi.doMock("@/lib/supabase/client", () => ({
     isSupabaseConfigured: () => configured,
-    createClient: () => ({
-      auth: {
-        getSession: async () => ({
-          data: {
-            session: accessToken ? { access_token: accessToken } : null,
-          },
-          error: null,
-        }),
-      },
-    }),
+    createClient,
   }));
+  return createClient;
 }
 
 beforeEach(() => {
@@ -44,6 +47,7 @@ beforeEach(() => {
 afterEach(() => {
   delete process.env[PLATFORM];
   delete process.env[HOSTED];
+  delete process.env[ACCOUNT_SYNC];
   vi.doUnmock("@/lib/supabase/client");
   vi.unstubAllGlobals();
 });
@@ -74,6 +78,7 @@ describe("apiFetch on the native target", () => {
   beforeEach(() => {
     process.env[PLATFORM] = "native";
     process.env[HOSTED] = "https://www.biblequest.co";
+    process.env[ACCOUNT_SYNC] = "true";
   });
 
   it("injects the session bearer token and keeps the caller's options", async () => {
@@ -138,4 +143,21 @@ describe("apiFetch on the native target", () => {
     const headers = new Headers(calls[0][1]!.headers);
     expect(headers.has("authorization")).toBe(false);
   });
+
+  it.each([undefined, "false"])(
+    "never inspects a stale native session while account sync is %s",
+    async (value) => {
+      if (value === undefined) delete process.env[ACCOUNT_SYNC];
+      else process.env[ACCOUNT_SYNC] = value;
+      const calls = stubFetch();
+      const createClient = mockSupabaseClient("stale-session-token");
+      const { apiFetch } = await apiModule();
+
+      await apiFetch("/api/bible/chapter?book=john");
+
+      expect(createClient).not.toHaveBeenCalled();
+      const headers = new Headers(calls[0][1]!.headers);
+      expect(headers.has("authorization")).toBe(false);
+    },
+  );
 });

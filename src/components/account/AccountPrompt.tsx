@@ -22,6 +22,7 @@ import { GentleButton, GentleLink } from "@/components/design-system/GentleButto
 import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { useStrings } from "@/lib/i18n";
 import { track } from "@/lib/analytics/events";
+import { accountSyncAvailable } from "@/lib/sync/containment";
 
 const QUIET_PERIOD_DAYS = 14;
 const MAX_DISMISSALS = 3;
@@ -73,59 +74,87 @@ export function AccountPrompt() {
 
   const [hidden, setHidden] = useState(false);
   const viewedRef = useRef(false);
+  const promptRef = useRef<HTMLDivElement>(null);
 
   // Latch the context once at mount so the card doesn't vanish mid-visit
   // the moment markAccountNudgeShown consumes its eligibility. Each Home
   // visit remounts this component, so the latch is per-visit by design.
   const [context] = useState<AccountNudgeContext | null>(() => eligible);
 
-  const show = configured && !loading && !user && !hidden;
+  // A configured provider is not an invitation while the release latch keeps
+  // account sync contained; hide the CTA instead of sending people to a stop.
+  const show = accountSyncAvailable(configured) && !loading && !user && !hidden;
 
+  // Count a view only after the card enters the viewport. This also prevents
+  // content inside a closed disclosure from consuming its one-time prompt.
   useEffect(() => {
-    if (!show || !context || viewedRef.current) return;
-    viewedRef.current = true;
-    markShown(context);
-    track("account_prompt_viewed", { context });
+    const prompt = promptRef.current;
+    if (!show || !context || viewedRef.current || !prompt) return;
+
+    const recordView = () => {
+      if (viewedRef.current) return;
+      viewedRef.current = true;
+      markShown(context);
+      track("account_prompt_viewed", { context });
+    };
+
+    if (!("IntersectionObserver" in window)) {
+      recordView();
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+        recordView();
+        observer.disconnect();
+      },
+      { threshold: 0.35 },
+    );
+    observer.observe(prompt);
+    return () => observer.disconnect();
   }, [show, context, markShown]);
 
   if (!show || !context) return null;
 
   return (
-    <PaperCard variant="linen" padding="md" role="note" aria-label={t.accountPrompt.title}>
-      <div className="flex items-start gap-3.5">
-        <span className="-mt-1 shrink-0">
-          <ArtIcon name="lantern" size={80} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h3 className="font-display text-subheading text-graphite">
-            {t.accountPrompt.title}
-          </h3>
-          <p className="mt-1 text-small leading-relaxed text-charcoal">
-            {t.accountPrompt.body}
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-2.5">
-            <GentleLink
-              variant="primary"
-              size="sm"
-              href="/app/account"
-              onClick={() => track("account_prompt_accepted", { context })}
-            >
-              {t.accountPrompt.cta}
-            </GentleLink>
-            <GentleButton
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                dismiss();
-                setHidden(true);
-                track("account_prompt_dismissed", { context });
-              }}
-            >
-              {t.accountPrompt.dismiss}
-            </GentleButton>
+    <div ref={promptRef}>
+      <PaperCard variant="linen" padding="md" role="note" aria-label={t.accountPrompt.title}>
+        <div className="flex items-start gap-3.5">
+          <span className="-mt-1 shrink-0">
+            <ArtIcon name="lantern" size={80} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-display text-subheading text-graphite">
+              {t.accountPrompt.title}
+            </h3>
+            <p className="mt-1 text-small leading-relaxed text-charcoal">
+              {t.accountPrompt.body}
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2.5">
+              <GentleLink
+                variant="primary"
+                size="sm"
+                href="/app/account"
+                onClick={() => track("account_prompt_accepted", { context })}
+              >
+                {t.accountPrompt.cta}
+              </GentleLink>
+              <GentleButton
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  dismiss();
+                  setHidden(true);
+                  track("account_prompt_dismissed", { context });
+                }}
+              >
+                {t.accountPrompt.dismiss}
+              </GentleButton>
+            </div>
           </div>
         </div>
-      </div>
-    </PaperCard>
+      </PaperCard>
+    </div>
   );
 }

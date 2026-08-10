@@ -2,8 +2,9 @@
 
 /**
  * The Bible landing page is a reading hub rather than a static index. It keeps
- * the daily verse, reading history, saved Scripture, and all 66 books close
- * without allowing navigation controls to compete with the text itself.
+ * the daily verse, reviewed life topics, reading history, saved Scripture, and
+ * all 66 books close without allowing navigation controls to compete with the
+ * text itself.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -19,6 +20,11 @@ import {
   oldTestament,
 } from "@/lib/bible/index";
 import { chapterHref } from "@/lib/bible/links";
+import {
+  SCRIPTURE_TOPICS,
+  searchScriptureTopics,
+  topicPassageHref,
+} from "@/lib/bible/topics";
 import { toDateKey } from "@/lib/utils/dates";
 import { cleanVerseText } from "@/lib/utils/scripture";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
@@ -87,7 +93,7 @@ function BibleIndexInner() {
   const verseRefreshCount = useQuestOS(selectVerseRefreshCount);
   const refreshVerse = useQuestOS((state) => state.refreshVerse);
   const dayKey = useCurrentDayKey();
-  const [query, setQuery] = useState("");
+  const [bookQuery, setBookQuery] = useState("");
   const [refreshLimitOpen, setRefreshLimitOpen] = useState(false);
   const [testament, setTestament] = useState<Testament>(() =>
     readingPosition &&
@@ -142,15 +148,15 @@ function BibleIndexInner() {
     [recordRecentVerse, verse, verseBookName],
   );
 
-  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const normalizedBookQuery = bookQuery.trim().toLocaleLowerCase();
   const visibleBooks = useMemo(() => {
-    if (normalizedQuery) {
+    if (normalizedBookQuery) {
       return bibleBooks.filter((book) =>
-        book.name.toLocaleLowerCase().includes(normalizedQuery),
+        book.name.toLocaleLowerCase().includes(normalizedBookQuery),
       );
     }
     return testament === "new" ? newTestament : oldTestament;
-  }, [normalizedQuery, testament]);
+  }, [normalizedBookQuery, testament]);
 
   const readCountByBook = useMemo(() => {
     const counts = new Map<string, number>();
@@ -333,6 +339,10 @@ function BibleIndexInner() {
           </section>
         )}
 
+        {/* Topic discovery stays separate from book lookup so a reader can
+            search by a life question without changing testament browsing. */}
+        <TopicDiscovery />
+
         <section
           aria-labelledby="find-a-book"
           className="mt-7"
@@ -360,21 +370,21 @@ function BibleIndexInner() {
             <input
               id="bible-book-search"
               type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              value={bookQuery}
+              onChange={(event) => setBookQuery(event.target.value)}
               placeholder="Search Genesis, John, Psalms…"
               autoComplete="off"
-              className="min-h-12 w-full rounded-[var(--radius-card)] border border-mist bg-paper pl-11 pr-12 text-small text-graphite outline-none paper-shadow transition-colors placeholder:text-quill focus:border-accent/50"
+              className="min-h-12 w-full rounded-[var(--radius-card)] border border-mist bg-paper pl-11 pr-12 text-small text-graphite outline-none paper-shadow transition-colors placeholder:text-quill focus:border-accent/50 [&::-webkit-search-cancel-button]:appearance-none"
             />
             <SearchClearButton
               inputId="bible-book-search"
-              visible={query.length > 0}
-              onClear={() => setQuery("")}
+              visible={bookQuery.length > 0}
+              onClear={() => setBookQuery("")}
               label="Clear Bible book search"
             />
           </div>
 
-          {!normalizedQuery && (
+          {!normalizedBookQuery && (
             <div
               role="group"
               aria-label="Choose a testament"
@@ -458,11 +468,11 @@ function BibleIndexInner() {
           {visibleBooks.length === 0 && (
             <PaperCard variant="quiet" padding="md" className="mt-3 text-center">
               <p className="text-small text-ash">
-                No Bible book matches “{query.trim()}”.
+                No Bible book matches “{bookQuery.trim()}”.
               </p>
               <button
                 type="button"
-                onClick={() => setQuery("")}
+                onClick={() => setBookQuery("")}
                 className="mt-2 min-h-11 text-small font-medium text-accent underline-offset-4 hover:underline"
               >
                 Clear search
@@ -480,6 +490,166 @@ function BibleIndexInner() {
         </p>
       </PageContainer>
     </div>
+  );
+}
+
+/** Offers reviewed passages by life topic without loading Bible chapter data. */
+function TopicDiscovery() {
+  const [topicQuery, setTopicQuery] = useState("");
+  const hasTopicQuery = topicQuery.trim().length > 0;
+  const topicMatches = useMemo(
+    () => searchScriptureTopics(topicQuery),
+    [topicQuery],
+  );
+
+  return (
+    <section
+      aria-labelledby="find-scripture-by-topic"
+      className="mt-7"
+    >
+      <div className="px-1">
+        <h2
+          id="find-scripture-by-topic"
+          className="font-art-label text-[1.5rem] uppercase tracking-[0.05em] text-accent"
+        >
+          Find Scripture by topic
+        </h2>
+        <p className="mt-1 text-small text-ash">
+          Search a curated set of passages for what you&apos;re carrying.
+        </p>
+      </div>
+
+      <div className="relative mt-3">
+        <label htmlFor="bible-topic-search" className="sr-only">
+          Search Scripture topics
+        </label>
+        <IconSearch
+          size={18}
+          className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ash"
+        />
+        <input
+          id="bible-topic-search"
+          type="search"
+          value={topicQuery}
+          onChange={(event) => setTopicQuery(event.target.value)}
+          placeholder="Try forgiveness, anxiety, grief…"
+          autoComplete="off"
+          aria-controls="scripture-topic-results"
+          className="min-h-12 w-full rounded-[var(--radius-card)] border border-mist bg-paper pl-11 pr-12 text-small text-graphite outline-none paper-shadow transition-colors placeholder:text-quill focus:border-accent/50 [&::-webkit-search-cancel-button]:appearance-none"
+        />
+        <SearchClearButton
+          inputId="bible-topic-search"
+          visible={topicQuery.length > 0}
+          onClear={() => setTopicQuery("")}
+          label="Clear Scripture topic search"
+        />
+      </div>
+
+      {/* A single horizontal row makes the catalog discoverable without
+          turning the reading page into a wall of topic cards. */}
+      <div className="mt-3">
+        <div className="flex items-center justify-between gap-3 px-1">
+          <p className="text-caption font-medium uppercase tracking-[0.1em] text-accent">
+            Browse topics
+          </p>
+          <p className="text-caption text-ash">Available offline</p>
+        </div>
+        <ul className="-mx-5 mt-2 flex snap-x gap-2 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-8 sm:px-8">
+          {SCRIPTURE_TOPICS.map((topic) => {
+            const selected = topicQuery === topic.title;
+            return (
+              <li key={topic.slug} className="shrink-0 snap-start">
+                <button
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setTopicQuery(topic.title)}
+                  className={cn(
+                    "min-h-11 rounded-full border px-4 text-small transition-colors",
+                    selected
+                      ? "border-accent/45 bg-accent-surface text-accent"
+                      : "border-mist bg-paper text-graphite hover:border-accent/35",
+                  )}
+                >
+                  {topic.title}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      <div id="scripture-topic-results">
+        {hasTopicQuery && (
+          <p
+            role="status"
+            aria-live="polite"
+            className="mt-2 px-1 text-caption text-ash"
+          >
+            {topicMatches.length === 0
+              ? "No reviewed topic found"
+              : `${topicMatches.length} ${topicMatches.length === 1 ? "topic" : "topics"} found`}
+          </p>
+        )}
+
+        {hasTopicQuery && topicMatches.length > 0 && (
+          <ul className="mt-2 space-y-3">
+            {topicMatches.map((topic) => (
+              <PaperCard
+                key={topic.slug}
+                as="li"
+                variant="quiet"
+                padding="sm"
+              >
+                <h3 className="font-display text-[1.25rem] text-graphite">
+                  {topic.title}
+                </h3>
+                <p className="mt-1 text-small leading-relaxed text-ash">
+                  {topic.summary}
+                </p>
+                <ul className="mt-3 space-y-2">
+                  {topic.passages.map((passage) => (
+                    <li key={passage.reference}>
+                      <Link
+                        href={topicPassageHref(passage)}
+                        className="group flex min-h-16 items-center gap-3 rounded-[var(--radius-button)] border border-mist/80 bg-paper/75 px-3 py-2.5 transition-colors hover:border-accent/40 hover:bg-paper"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-display text-[1.0625rem] text-graphite">
+                            {passage.reference}
+                          </span>
+                          <span className="mt-0.5 block text-caption leading-relaxed text-ash">
+                            {passage.context}
+                          </span>
+                        </span>
+                        <IconChevronRight
+                          size={18}
+                          className="shrink-0 text-fog transition-colors group-hover:text-accent"
+                        />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </PaperCard>
+            ))}
+          </ul>
+        )}
+
+        {hasTopicQuery && topicMatches.length === 0 && (
+          <PaperCard variant="quiet" padding="md" className="mt-2 text-center">
+            <p className="text-small text-ash">
+              No curated topic matches “{topicQuery.trim()}” yet.
+            </p>
+            <button
+              type="button"
+              onClick={() => setTopicQuery("")}
+              className="mt-2 min-h-11 text-small font-medium text-accent underline-offset-4 hover:underline"
+            >
+              Browse all topics
+            </button>
+          </PaperCard>
+        )}
+      </div>
+    </section>
   );
 }
 

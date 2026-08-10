@@ -16,6 +16,7 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -27,6 +28,42 @@ import { fileURLToPath } from "node:url";
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const stage = path.join(repo, ".native");
 const output = path.join(repo, "out-native");
+const RELEASE_ORIGIN = "https://www.biblequest.co";
+const releaseBuild = process.argv.slice(2).includes("--release");
+
+/**
+ * Pins every privacy- or identity-sensitive public value for the App Store
+ * candidate. Process values deliberately override `.env.local`, so a previous
+ * staging session cannot silently produce an account-enabled release binary.
+ */
+function pinReleaseEnvironment() {
+  if (!releaseBuild) return;
+  const values = {
+    NEXT_PUBLIC_APP_PLATFORM: "native",
+    NEXT_PUBLIC_APP_URL: RELEASE_ORIGIN,
+    NEXT_PUBLIC_NATIVE_HOSTED_ORIGIN: RELEASE_ORIGIN,
+    NEXT_PUBLIC_NATIVE_AUTH_CALLBACK_URL: "",
+    NEXT_PUBLIC_SUPABASE_URL: "",
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "",
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: "",
+    NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED: "false",
+    NEXT_PUBLIC_ACCOUNT_GATE_ENABLED: "false",
+    NEXT_PUBLIC_ANALYTICS_ENABLED: "false",
+    NEXT_PUBLIC_PLAUSIBLE_DOMAIN: "",
+    NEXT_PUBLIC_PLAUSIBLE_HOST: "",
+    NEXT_PUBLIC_GREEN_FEATURES_ENABLED: "true",
+    NEXT_PUBLIC_GUIDED_SCRIPTURE_ENABLED: "true",
+    NEXT_PUBLIC_PILGRIMAGES_ENABLED: "true",
+    NEXT_PUBLIC_SCRIPTURE_GAMES_ENABLED: "true",
+    NEXT_PUBLIC_SCRIPTURE_CONNECTIONS_ENABLED: "true",
+    NEXT_PUBLIC_BIBLE_TIMELINE_ENABLED: "true",
+    NEXT_PUBLIC_SEVEN_DAYS_MATCH_ENABLED: "true",
+    NEXT_PUBLIC_RHYTHM_BUILDER_ENABLED: "true",
+  };
+  for (const [key, value] of Object.entries(values)) {
+    process.env[key] = value;
+  }
+}
 
 function log(message) {
   process.stdout.write(`[build:native] ${message}\n`);
@@ -84,6 +121,17 @@ function requiredEnvironment() {
       `NEXT_PUBLIC_NATIVE_HOSTED_ORIGIN must be one bare HTTPS origin with no ` +
         `path, query, fragment or credentials (got "${origin}").`,
     );
+  }
+  if (releaseBuild && origin !== RELEASE_ORIGIN) {
+    fail(`release builds must use ${RELEASE_ORIGIN} (got "${origin}").`);
+  }
+  if (
+    releaseBuild &&
+    (process.env.NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED !== "false" ||
+      process.env.NEXT_PUBLIC_ACCOUNT_GATE_ENABLED !== "false" ||
+      process.env.NEXT_PUBLIC_ANALYTICS_ENABLED !== "false")
+  ) {
+    fail("release builds must keep account sync, account gates, and analytics off.");
   }
   return { target, origin };
 }
@@ -320,6 +368,48 @@ function verifyCommerceRoutesPruned() {
   log("verified web-only commerce routes are absent");
 }
 
+/** Walks generated output without shell globs so release checks are portable. */
+function generatedFiles(directory) {
+  const files = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const target = path.join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...generatedFiles(target));
+    else if (entry.isFile()) files.push(target);
+  }
+  return files;
+}
+
+/** Fails if a release artifact retains a disposable or protected host. */
+function verifyReleaseOrigin() {
+  if (!releaseBuild) return;
+  const releaseMarker = Buffer.from(RELEASE_ORIGIN);
+  const forbiddenMarkers = [
+    "native-staging.biblequest.co",
+    ".vercel.app",
+  ].map((value) => Buffer.from(value));
+  let releaseReferences = 0;
+
+  for (const file of generatedFiles(path.join(stage, "out"))) {
+    const contents = readFileSync(file);
+    if (contents.includes(releaseMarker)) releaseReferences += 1;
+    for (const marker of forbiddenMarkers) {
+      if (contents.includes(marker)) {
+        fail(
+          `release output contains forbidden host marker in ${path.relative(
+            path.join(stage, "out"),
+            file,
+          )}`,
+        );
+      }
+    }
+  }
+
+  if (releaseReferences === 0) {
+    fail(`release output does not contain the required origin ${RELEASE_ORIGIN}.`);
+  }
+  log(`verified production origin in ${releaseReferences} generated files`);
+}
+
 /**
  * Copies the Content-Security-Policy meta tag onto the launch document.
  *
@@ -379,11 +469,13 @@ function publish() {
   log(`wrote ${path.relative(repo, output)}/`);
 }
 
+pinReleaseEnvironment();
 const { origin } = requiredEnvironment();
-log(`target=native hostedOrigin=${origin}`);
+log(`mode=${releaseBuild ? "release" : "custom"} target=native hostedOrigin=${origin}`);
 stageTree();
 pruneServerSurfaces();
 build();
 verifyCommerceRoutesPruned();
+verifyReleaseOrigin();
 publish();
 log("done — run `pnpm exec cap sync ios` to copy it into the app");

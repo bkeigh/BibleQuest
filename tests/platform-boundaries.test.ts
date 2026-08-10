@@ -54,7 +54,7 @@ describe("platform runtime and API routing", () => {
   });
 
   it("keeps hosted-page links relative on web and external on native", () => {
-    for (const path of ["/about", "/terms", "/privacy"] as const) {
+    for (const path of ["/", "/about", "/terms", "/privacy"] as const) {
       expect(buildPublicHref(path, WEB_RUNTIME)).toBe(path);
       expect(buildPublicHref(path, NATIVE_RUNTIME)).toBe(
         `https://www.biblequest.co${path}`,
@@ -391,5 +391,15 @@ describe("adapted client call sites", () => {
       expect(source(path)).toContain("buildPublicHref(");
       expect(source(path)).not.toMatch(/href=["']\/(?:about|privacy|terms)["']/);
     }
+  });
+
+  it("keeps the marketing homepage link web-only in Settings", () => {
+    const settings = source("src/components/settings/SettingsScreen.tsx");
+
+    expect(settings).toContain('href={buildPublicHref("/")}');
+    expect(settings).toContain("BibleQuest website");
+    expect(settings).toMatch(
+      /\{!nativeTarget \? \([\s\S]*?BibleQuest website[\s\S]*?\) : null\}/,
+    );
   });
 });

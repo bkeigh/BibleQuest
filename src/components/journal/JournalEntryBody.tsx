@@ -12,8 +12,17 @@ type JournalBlock =
  * a prayer cannot smuggle markup or script into the page.
  */
 function inlineText(value: string): ReactNode[] {
-  const tokens = value.split(/(\*\*[^*\n]+\*\*|\*[^*\n]+\*)/g);
+  const tokens = value.split(
+    /(\*\*\*[^*\n]+\*\*\*|\*\*[^*\n]+\*\*|\*[^*\n]+\*)/g,
+  );
   return tokens.filter(Boolean).map((token, index) => {
+    if (token.startsWith("***") && token.endsWith("***")) {
+      return (
+        <strong key={index}>
+          <em>{token.slice(3, -3)}</em>
+        </strong>
+      );
+    }
     if (token.startsWith("**") && token.endsWith("**")) {
       return <strong key={index}>{token.slice(2, -2)}</strong>;
     }

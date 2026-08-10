@@ -14,6 +14,8 @@ import { useSession } from "@/lib/supabase/useSession";
 import type { PlanKey } from "@/lib/questos/types";
 import { apiFetch } from "@/lib/platform/api";
 import { purchaseAdapter } from "@/lib/platform/purchases";
+import { isNativeTarget } from "@/lib/platform/target";
+import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 import type { BillingInterval, BillingPlan } from "./validation";
 
 export type PlusStatus =
@@ -95,6 +97,14 @@ function initialState(subjectKey: string): StoredPlusState {
   };
 }
 
+/** Keeps a guest-only native build free without probing web billing routes. */
+function containedNativeState(subjectKey: string): StoredPlusState {
+  return {
+    ...initialState(subjectKey),
+    status: "free",
+  };
+}
+
 function safePlusStatus(value: BillingStatusResponse): PlusStatus {
   if (value.isPlus) return "plus";
   if (value.availability === "coming-soon") return "coming-soon";
@@ -159,13 +169,16 @@ export interface PlusState {
 /** Coordinates one account-bound, server-authoritative Plus projection. */
 function usePlusCoordinator(): PlusState {
   const session = useSession();
+  const nativeGuestOnly = isNativeTarget() && ACCOUNT_SYNC_CONTAINED;
   const subjectKey = session.loading
     ? "session:pending"
     : session.user
       ? `user:${session.user.id}`
       : "guest";
   const [stored, setStored] = useState<StoredPlusState>(() =>
-    initialState(subjectKey),
+    nativeGuestOnly
+      ? containedNativeState(subjectKey)
+      : initialState(subjectKey),
   );
   const sequence = useRef(0);
   const currentSubject = useRef(subjectKey);
@@ -179,10 +192,18 @@ function usePlusCoordinator(): PlusState {
   }, [subjectKey]);
 
   const visible =
-    stored.subjectKey === subjectKey ? stored : initialState(subjectKey);
+    stored.subjectKey === subjectKey
+      ? stored
+      : nativeGuestOnly
+        ? containedNativeState(subjectKey)
+        : initialState(subjectKey);
 
   const load = useCallback(async () => {
     if (session.loading) return;
+    if (nativeGuestOnly) {
+      setStored(containedNativeState(subjectKey));
+      return;
+    }
     const request = ++sequence.current;
     try {
       // Guests need public plan copy but must not probe the protected account
@@ -297,7 +318,7 @@ function usePlusCoordinator(): PlusState {
         returnNotice: safeReturnNotice(),
       });
     }
-  }, [session.loading, subjectKey]);
+  }, [nativeGuestOnly, session.loading, subjectKey]);
 
   // Start after the effect commits so async state never cascades in its body.
   useEffect(() => {
@@ -306,6 +327,7 @@ function usePlusCoordinator(): PlusState {
   }, [load]);
 
   useEffect(() => {
+    if (nativeGuestOnly) return;
     if (session.loading) return;
     const refreshOnReturn = () => void load();
     const refreshWhenVisible = () => {
@@ -321,7 +343,7 @@ function usePlusCoordinator(): PlusState {
       window.removeEventListener("online", refreshOnReturn);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [load, session.loading]);
+  }, [load, nativeGuestOnly, session.loading]);
 
   const refresh = useCallback(async () => {
     if (session.user) {

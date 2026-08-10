@@ -24,6 +24,7 @@ import {
 } from "@/lib/push/validation";
 import { useQuestOS } from "@/lib/questos/store";
 import { useSession } from "@/lib/supabase/useSession";
+import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 
 const REMINDER_OPTIONS = [
   {
@@ -192,6 +193,16 @@ export function ReminderSettings() {
     }
   };
 
+  // Push reminders are account-bound. Do not advertise sign-in while the
+  // release is intentionally guest-only.
+  if (ACCOUNT_SYNC_CONTAINED) {
+    return (
+      <p className="text-small leading-relaxed text-ash">
+        Reminders are not included in this release. BibleQuest works fully
+        without notifications.
+      </p>
+    );
+  }
   if (loading) {
     return <p className="text-small text-ash">Checking reminder support…</p>;
   }

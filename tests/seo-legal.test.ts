@@ -58,6 +58,7 @@ describe("search metadata", () => {
       "/",
       "/about",
       "/pricing",
+      "/contact",
       "/support",
       "/churches",
       "/writing",
