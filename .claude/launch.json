@@ -14,6 +14,30 @@
       "runtimeArgs": ["dev"],
       "port": 3211,
       "autoPort": true
+    },
+    {
+      "name": "vineyardvibes",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "/Users/brendankenney/Development/VineyardVibes",
+        "run",
+        "dev"
+      ],
+      "port": 5173,
+      "autoPort": true
+    },
+    {
+      "name": "brndn",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "/Users/brendankenney/Development/BRNDN",
+        "run",
+        "dev"
+      ],
+      "port": 5273,
+      "autoPort": true
     }
   ]
 }

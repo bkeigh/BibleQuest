@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   buildApiUrl,
+  buildPublicHref,
   buildPublicUrl,
   validatedApiPath,
 } from "@/lib/platform/api";
@@ -50,6 +51,15 @@ describe("platform runtime and API routing", () => {
     expect(
       buildPublicUrl("/verse/john/3/16", { runtime: NATIVE_RUNTIME }),
     ).toBe("https://www.biblequest.co/verse/john/3/16");
+  });
+
+  it("keeps hosted-page links relative on web and external on native", () => {
+    for (const path of ["/", "/about", "/terms", "/privacy"] as const) {
+      expect(buildPublicHref(path, WEB_RUNTIME)).toBe(path);
+      expect(buildPublicHref(path, NATIVE_RUNTIME)).toBe(
+        `https://www.biblequest.co${path}`,
+      );
+    }
   });
 
   it("rejects unknown targets and malformed or non-HTTPS hosted origins", () => {
@@ -369,6 +379,27 @@ describe("adapted client call sites", () => {
     }
     expect(source("src/components/bible/VerseShareSheet.tsx")).not.toMatch(
       /navigator\.(?:share|clipboard)/,
+    );
+  });
+
+  it("routes app-shell legal links through the hosted-page boundary", () => {
+    for (const path of [
+      "src/components/settings/SettingsScreen.tsx",
+      "src/components/journal/JournalPrivacyNote.tsx",
+      "src/components/plus/PlusCta.tsx",
+    ]) {
+      expect(source(path)).toContain("buildPublicHref(");
+      expect(source(path)).not.toMatch(/href=["']\/(?:about|privacy|terms)["']/);
+    }
+  });
+
+  it("keeps the marketing homepage link web-only in Settings", () => {
+    const settings = source("src/components/settings/SettingsScreen.tsx");
+
+    expect(settings).toContain('href={buildPublicHref("/")}');
+    expect(settings).toContain("BibleQuest website");
+    expect(settings).toMatch(
+      /\{!nativeTarget \? \([\s\S]*?BibleQuest website[\s\S]*?\) : null\}/,
     );
   });
 });

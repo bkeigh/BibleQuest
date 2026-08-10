@@ -9,6 +9,7 @@ import {
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { ARCADE_PRODUCTS } from "@/lib/games/arcade/store";
 import { useArcadeAccess } from "@/lib/games/arcade/useArcadeAccess";
+import { isNativeTarget } from "@/lib/platform/target";
 
 type ReturnNotice = "returned" | "cancelled" | null;
 
@@ -181,6 +182,10 @@ function ArcadeStoreInner() {
 }
 
 export function ArcadeStore() {
+  // The native export also prunes this route; this render guard keeps the
+  // component safe if it is reused before a StoreKit implementation exists.
+  if (isNativeTarget()) return null;
+
   return (
     <ClientOnly>
       <ArcadeStoreInner />

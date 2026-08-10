@@ -9,6 +9,7 @@ import {
 } from "@/components/design-system/GentleButton";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
+import { WebCommerceOnly } from "@/components/plus/WebCommerceOnly";
 import {
   IconArrowRight,
   IconCheck,
@@ -22,6 +23,7 @@ import {
 import { usePlus } from "@/lib/billing/usePlus";
 import { useQuestOS } from "@/lib/questos/store";
 import { GuidedProgressBar } from "./GuidedProgressBar";
+import { isNativeTarget } from "@/lib/platform/target";
 
 /** Shows reviewed paths with aggregate Start, Resume, and duration context. */
 function PilgrimageCatalogInner() {
@@ -37,6 +39,16 @@ function PilgrimageCatalogInner() {
       />
       <PageContainer className="space-y-5 pb-12 pt-4">
         {pilgrimages.map((pilgrimage) => {
+          // Keep acquired paths available while removing locked previews from
+          // a native build that has no StoreKit acquisition path.
+          if (
+            pilgrimage.access === "plus" &&
+            !plus.isPlus &&
+            isNativeTarget()
+          ) {
+            return null;
+          }
+
           const dayProgress = pilgrimage.days.map(
             (day) =>
               progress[
@@ -105,15 +117,17 @@ function PilgrimageCatalogInner() {
                   Checking Plus access…
                 </GentleButton>
               ) : pilgrimage.access === "plus" && !plus.isPlus ? (
-                <GentleButton
-                  variant="gold"
-                  fullWidth
-                  className="mt-6"
-                  onClick={() => setLockedPilgrimage(pilgrimage.title)}
-                >
-                  View path · Plus
-                  <IconArrowRight />
-                </GentleButton>
+                <WebCommerceOnly>
+                  <GentleButton
+                    variant="gold"
+                    fullWidth
+                    className="mt-6"
+                    onClick={() => setLockedPilgrimage(pilgrimage.title)}
+                  >
+                    View path · Plus
+                    <IconArrowRight />
+                  </GentleButton>
+                </WebCommerceOnly>
               ) : (
                 <GentleLink
                   href={`/app/pilgrimages/${pilgrimage.slug}`}

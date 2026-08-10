@@ -8,6 +8,7 @@ const PUBLIC_ROUTES = [
   { path: "/", priority: 1, changeFrequency: "weekly" },
   { path: "/about", priority: 0.8, changeFrequency: "monthly" },
   { path: "/pricing", priority: 0.8, changeFrequency: "monthly" },
+  { path: "/contact", priority: 0.6, changeFrequency: "monthly" },
   { path: "/support", priority: 0.6, changeFrequency: "monthly" },
   { path: "/churches", priority: 0.6, changeFrequency: "monthly" },
   { path: "/writing", priority: 0.5, changeFrequency: "weekly" },

@@ -1,120 +1,68 @@
-# iOS release readiness
+# iOS 1.0 release readiness
 
-BibleQuest remains a web/PWA product for the Green release. This document
-freezes the boundary for a later native project; it does not authorize or add
-an iOS wrapper.
+BibleQuest now has a Capacitor iOS project that ships a local static bundle.
+The canonical execution checklist is
+[`IOS_TESTFLIGHT_RUNBOOK.md`](IOS_TESTFLIGHT_RUNBOOK.md); product-page material
+is in [`APP_STORE_SUBMISSION.md`](APP_STORE_SUBMISSION.md).
 
-## What the Green release prepares
+## Locked 1.0 scope
 
-- `src/lib/platform/runtime.ts` selects an exact `web` or future `native`
-  target and rejects malformed configuration.
-- `src/lib/platform/api.ts` keeps web API requests relative and can point a
-  future local native bundle at one reviewed HTTPS API origin.
-- `src/lib/platform/auth.ts` centralizes the current browser callback and one
-  future BibleQuest callback URL.
-- `src/lib/platform/share.ts` centralizes system share and clipboard fallback.
-- `src/lib/platform/notifications.ts` keeps web push active and requires an
-  explicit future native notification adapter.
-- `src/lib/platform/purchases.ts` keeps Stripe on web, hides every web Checkout
-  entry point from a native target, and leaves native purchase, restore, and
-  manage actions unavailable until a reviewed StoreKit adapter exists.
+- iPhone-only, portrait, iOS 15 or later
+- local-first guest journey; no account creation or sync
+- no reminders or notification permission
+- no native profile-photo picker or camera permission
+- no native purchase, pricing, external acquisition, or locked-content dead end
+- analytics disabled in the release bundle
+- production `www.biblequest.co` used only for reviewed guest API calls and
+  public About, Terms, Privacy, and support destinations
 
-These seams preserve today’s behavior. They are not a native session,
-StoreKit, APNs, deep-link registration, or App Store implementation.
+The release builder pins those public flags even when `.env.local` contains
+staging or account values, removes server/marketing/commerce routes, verifies
+the production origin, and synchronizes the result into Xcode with:
 
-## Native project start gate
+```bash
+pnpm ios:release:prepare
+```
 
-Begin the iOS project only after the core web release is stable and all of the
-following are true:
+## Implemented safety boundaries
 
-1. The Green web release has completed production monitoring and its rollback
-   window.
-2. Content licensing confirms every bundled Scripture and media asset may ship
-   inside an iOS binary.
-3. A native authentication design specifies Keychain storage, session refresh,
-   API authorization, CORS, callback registration, account switching, and
-   account deletion.
-4. StoreKit product identifiers and entitlement mapping have been reviewed
-   against the existing server-projected Plus model.
-5. APNs registration, notification copy, permission timing, token rotation,
-   logout, and account deletion behavior are designed.
-6. The App Store privacy disclosure and Apple privacy manifest match the
-   network and local-storage behavior observed in a release build.
+- Capacitor loads `out-native` locally; no `server.url` thin shell exists.
+- The WebView origin is frozen at `capacitor://localhost` to preserve local data.
+- Guest-only containment suppresses account prompts, enrollment UI, reminders,
+  Supabase session refresh, native bearer tokens, and billing probes.
+- Stripe checkout, billing portal, Arcade checkout, Plus/store routes, pricing
+  links, and marketing-home links are absent or rejected on native.
+- Camera/photo input is absent and `NSCameraUsageDescription` is intentionally
+  omitted.
+- The privacy manifest declares no tracking and the required file-timestamp API
+  reason.
+- `ITSAppUsesNonExemptEncryption=false` records the current export-compliance
+  posture.
 
-## Required implementation order
+## External release gates
 
-### 1. Local application bundle
-
-- Bundle the Next.js application assets and reviewed offline content with the
-  app. Do not ship a thin shell whose primary purpose is displaying the hosted
-  website.
-- Keep `NEXT_PUBLIC_NATIVE_HOSTED_ORIGIN` for reviewed API and public-link
-  destinations only.
-- Confirm offline launch, safe-area layout, reduced motion, Dynamic Type,
-  VoiceOver, hardware keyboard, interruption recovery, and background/foreground
-  transitions before adding purchases.
-
-### 2. Native session transport
-
-- Supply an explicit native API/session adapter; never rely on browser
-  same-origin cookies inside the local bundle.
-- Store refresh credentials only in the Keychain.
-- Register and allowlist the final callback/universal-link configuration in the
-  app, Apple capability settings, and Supabase.
-- Re-run the two-user isolation, account-switch, offline merge, export, clear,
-  and delete-account matrices on physical devices.
-
-### 3. StoreKit Plus
-
-- Implement purchase, restore, and manage actions behind the existing
-  `PurchaseAdapter`.
-- Reconcile signed App Store transaction state into the provider-neutral Plus
-  entitlement model on the server. A client success screen must never grant
-  Plus by itself.
-- Map Free and Plus features exactly as the web release does. Guided Scripture,
-  today’s complete game, the free pilgrimage, one rhythm, Scripture, prayer,
-  reflection, quests, and Journey remain complete without payment.
-- Keep Stripe Checkout and one-time web support links absent from the native
-  target.
-- Test new purchase, renewal, expiration, billing retry, refund, revocation,
-  restore on another device, Family Sharing policy, account switching, and
-  offline entitlement grace.
-
-### 4. Native notifications and sharing
-
-- Supply an APNs-backed `NotificationCapabilityAdapter`.
-- Ask for notification permission only after the existing in-app explanation
-  and explicit user action.
-- Keep lock-screen copy neutral; never expose prayer, reflection, puzzle answer,
-  or spiritual-progress details.
-- Use the central share boundary for spoiler-free game results and public
-  Scripture links.
-
-### 5. TestFlight and review
-
-- Run debug, release, fresh-install, upgrade, offline, and low-storage builds on
-  the oldest supported iPhone, a current iPhone, and iPad.
-- Test every sign-in method, purchase state, restore, notification state,
-  deep link, account switch, clear, export, and delete path with sanitized
-  evidence.
-- Verify no development server URL, test payment mode, private log payload,
-  hidden web Checkout, or unregistered callback remains in the archive.
-- Prepare review notes that plainly explain local-first guest use, optional
-  account sync, Free versus Plus access, restore purchases, account deletion,
-  and why BibleQuest does not rank spiritual behavior.
+1. Attach and triage the quality tester PDF; fix all P0/P1 findings.
+2. Enable `BIBLEQUEST_NATIVE_API_ORIGIN_ENABLED=true` for Vercel Production
+   only, redeploy, and verify the exact CORS header on preflight and GET.
+3. Create/confirm the App ID and App Store Connect record, agreements, uploader
+   role, and Xcode account.
+4. Pass the complete internal TestFlight device matrix.
+5. Complete screenshots, privacy answers, age rating, content rights, metadata,
+   and review contact.
 
 ## Hard release stops
 
 Do not submit if any of these remain:
 
-- the native build loads the hosted website as its main experience;
-- authenticated API traffic still depends on browser same-origin cookies;
-- StoreKit restore or server reconciliation is incomplete;
-- Stripe or an external web purchase path is reachable in the native target;
-- private journal text, game answers, or content identifiers enter analytics or
-  notifications;
-- the app cannot launch and use its core Scripture experience offline;
-- account deletion leaves synced rows, media, push tokens, or native
-  credentials behind;
-- VoiceOver, Dynamic Type, reduced motion, or safe-area navigation blocks a
-  core flow.
+- the tester PDF has an untriaged crash, data-loss, security, or core-flow issue;
+- Production omits `Access-Control-Allow-Origin: capacitor://localhost` on the
+  reviewed guest APIs;
+- a release artifact contains staging, `*.vercel.app`, account-enabled,
+  analytics-enabled, or native-commerce behavior;
+- a stale Supabase session is inspected or refreshed while containment is on;
+- core Scripture, prayer, reflection, quests, games, or Journey cannot launch
+  and operate offline;
+- fresh install, force-quit restore, keyboard/safe-area handling, VoiceOver, or
+  reduced motion blocks a core journey;
+- App Store privacy answers do not match the observed binary and provider
+  retention.

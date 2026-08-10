@@ -60,7 +60,7 @@ import {
   type BibleTranslation,
 } from "@/lib/bible/translations";
 import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
-import { apiFetch } from "@/lib/platform/api";
+import { apiFetch, buildPublicHref } from "@/lib/platform/api";
 import { WallpaperPicker } from "@/components/settings/WallpaperPicker";
 import { ExplorePlusLink } from "@/components/plus/ExplorePlusLink";
 import { SupportLink } from "@/components/plus/SupportLink";
@@ -86,10 +86,29 @@ import {
   type DeviceBackupExtras,
 } from "@/lib/backup/device-extras";
 import { clearGameProgress } from "@/lib/games/storage";
+import { clearSevenDaysProgress } from "@/lib/games/seven-days/progress";
+import { SEVEN_DAYS_TUTORIAL_STORAGE_KEY } from "@/lib/games/seven-days/tutorial";
+import { BOOST_STORAGE_KEY } from "@/lib/games/arcade/boosts";
+import {
+  purgeJourneyBackup,
+  resumeJourneyBackupAfterPurge,
+} from "@/lib/native/journey-backup";
 
 interface PendingJourneyImport {
   journey: Partial<QuestOSSnapshot>;
   device: DeviceBackupExtras | null;
+}
+
+/** Clears game records that live outside the persisted journey store. */
+function clearStandaloneGameData(): void {
+  clearGameProgress();
+  clearSevenDaysProgress();
+  try {
+    window.localStorage.removeItem(SEVEN_DAYS_TUTORIAL_STORAGE_KEY);
+    window.localStorage.removeItem(BOOST_STORAGE_KEY);
+  } catch {
+    // Restricted storage is already inaccessible and cannot be restored here.
+  }
 }
 
 function Row({
@@ -825,6 +844,7 @@ function SettingsInner() {
   const router = useRouter();
   const { toast } = useToast();
   const { isPlus } = usePlus();
+  const nativeTarget = isNativeTarget();
   // Signed-in clears/restores must also purge the account copy, or the next
   // initial sync merges it straight back (see lib/sync/engine.ts).
   const { user, loading: sessionLoading } = useSession();
@@ -1064,17 +1084,28 @@ function SettingsInner() {
       return;
     }
 
-    // Stop every subscriber before removing the deleted account's local copy.
-    stopSync();
-    clearAllData();
-    clearAllDeviceLocalJournalDrafts();
-    clearLastSyncedUserId();
-    clearStoredAccountSyncGenerations();
-    clearStoredDailyQuestSyncContext();
-    clearStoredMutableRevisionContext();
-    clearRhythmState();
-    clearGameProgress();
-    await clearAvatar();
+    // Purge the native mirror before the local reset can become restorable.
+    if (!(await purgeJourneyBackup())) {
+      setDeletingAccount(false);
+      setDeleteAccountError(true);
+      return;
+    }
+    try {
+      // Stop every subscriber before removing the deleted account's local copy.
+      stopSync();
+      clearAllData();
+      clearAllDeviceLocalJournalDrafts();
+      clearLastSyncedUserId();
+      clearStoredAccountSyncGenerations();
+      clearStoredDailyQuestSyncContext();
+      clearStoredMutableRevisionContext();
+      clearRhythmState();
+      clearStandaloneGameData();
+      await clearAvatar();
+    } finally {
+      // The primary is now reset, so future backups cannot resurrect old data.
+      resumeJourneyBackupAfterPurge();
+    }
     toast("Your account and saved journey were deleted.", {
       variant: "success",
     });
@@ -1087,16 +1118,24 @@ function SettingsInner() {
     setClearingData(true);
     try {
       if (user) await deleteRemoteAvatar(true);
+      // This await is the privacy boundary: local data remains intact unless
+      // the native filesystem mirror is first made non-restorable.
+      if (!(await purgeJourneyBackup())) {
+        throw new Error("native journey backup could not be purged");
+      }
       clearAllData(user ? { purgeAccount: user.id } : undefined);
       clearAllDeviceLocalJournalDrafts();
       clearRhythmState();
-      clearGameProgress();
+      clearStandaloneGameData();
       await clearAvatar();
       clearLastSyncedUserId();
       router.replace("/onboarding");
     } catch {
       toast("Your data could not be cleared. Nothing on this device was removed.");
       setClearingData(false);
+    } finally {
+      // A failed purge already resumes itself; this is harmless on that path.
+      resumeJourneyBackupAfterPurge();
     }
   }
 
@@ -1231,80 +1270,84 @@ function SettingsInner() {
           </div>
         </PaperCard>
 
-        <SectionTitle>{t.settings.account}</SectionTitle>
-        <PaperCard variant="paper" padding="none" className="overflow-hidden">
-          <Link
-            href="/app/account"
-            className="flex items-center justify-between gap-3 px-4 py-3.5 text-charcoal hover:bg-linen"
-          >
-            {/* The row states sign-in plainly on both lines, so nobody has to
-                open the account screen to learn whether syncing is on. */}
-            <span className="min-w-0 flex-1">
-              <span className="block text-[0.9375rem]">Account sync</span>
-              <span className="mt-0.5 block truncate text-[0.8125rem] text-ash">
-                {ACCOUNT_SYNC_CONTAINED
-                  ? "Paused for everyone right now — this device keeps your journey."
-                  : sessionLoading
-                    ? "Checking your sign-in…"
-                    : user
-                      ? `Signed in${user.email ? ` as ${user.email}` : ""}`
-                      : "Not signed in — your journey stays on this device."}
-              </span>
-            </span>
-            <span className="flex shrink-0 items-center gap-1 text-[0.8125rem] text-ash">
-              {ACCOUNT_SYNC_CONTAINED
-                ? "Unavailable"
-                : sessionLoading
-                  ? "Checking…"
-                  : user
-                    ? "Signed in"
-                    : "Sign in"}
-              <IconChevronRight size={15} />
-            </span>
-          </Link>
-          {!ACCOUNT_SYNC_CONTAINED && user && (
-            <div className="border-t border-mist/70 px-4 py-3">
-              <GentleButton
-                variant="outline"
-                size="sm"
-                fullWidth
-                disabled={signingOut}
-                onClick={() => void logOut()}
+        {!ACCOUNT_SYNC_CONTAINED ? (
+          <>
+            <SectionTitle>{t.settings.account}</SectionTitle>
+            <PaperCard variant="paper" padding="none" className="overflow-hidden">
+              <Link
+                href="/app/account"
+                className="flex items-center justify-between gap-3 px-4 py-3.5 text-charcoal hover:bg-linen"
               >
-                {signingOut ? "Logging out…" : "Log out"}
-              </GentleButton>
-            </div>
-          )}
-        </PaperCard>
+                {/* The row states sign-in plainly on both lines, so nobody has
+                    to open the account screen to learn whether syncing is on. */}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[0.9375rem]">Account sync</span>
+                  <span className="mt-0.5 block truncate text-[0.8125rem] text-ash">
+                    {sessionLoading
+                      ? "Checking your sign-in…"
+                      : user
+                        ? `Signed in${user.email ? ` as ${user.email}` : ""}`
+                        : "Not signed in — your journey stays on this device."}
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-1 text-[0.8125rem] text-ash">
+                  {sessionLoading
+                    ? "Checking…"
+                    : user
+                      ? "Signed in"
+                      : "Sign in"}
+                  <IconChevronRight size={15} />
+                </span>
+              </Link>
+              {user ? (
+                <div className="border-t border-mist/70 px-4 py-3">
+                  <GentleButton
+                    variant="outline"
+                    size="sm"
+                    fullWidth
+                    disabled={signingOut}
+                    onClick={() => void logOut()}
+                  >
+                    {signingOut ? "Logging out…" : "Log out"}
+                  </GentleButton>
+                </div>
+              ) : null}
+            </PaperCard>
+          </>
+        ) : null}
 
-        <SectionTitle>Plus</SectionTitle>
-        <div className="space-y-3">
-          <ExplorePlusLink description="Discover every wallpaper and extra ways to deepen your daily practice." />
-          {/* Shown to everyone. Hiding the switch from free readers left them
-              with a button they could not explain and could not turn off. */}
-          <PaperCard variant="paper" padding="none" className="px-4">
-            <div className="flex items-center justify-between gap-4 py-3.5">
-              <span className="min-w-0">
-                <span className="block text-[0.9375rem] text-charcoal">
-                  Floating MyShepherd
-                </span>
-                <span className="mt-0.5 block text-caption leading-relaxed text-ash">
-                  {isPlus
-                    ? "Keep a small Scripture assistant available throughout the app."
-                    : "Keep the MyShepherd button on screen. Asking questions is part of Plus."}
-                </span>
-              </span>
-              <Toggle
-                label="Floating MyShepherd"
-                on={appearance.myShepherdFloatingButton}
-                onChange={(myShepherdFloatingButton) =>
-                  setAppearance({ myShepherdFloatingButton })
-                }
-              />
+        {(!nativeTarget || isPlus) && (
+          <>
+            <SectionTitle>Plus</SectionTitle>
+            <div className="space-y-3">
+              <ExplorePlusLink description="Discover every wallpaper and extra ways to deepen your daily practice." />
+              {/* Web readers can dismiss the free preview; native readers see
+                  this setting only after an existing entitlement resolves. */}
+              <PaperCard variant="paper" padding="none" className="px-4">
+                <div className="flex items-center justify-between gap-4 py-3.5">
+                  <span className="min-w-0">
+                    <span className="block text-[0.9375rem] text-charcoal">
+                      Floating MyShepherd
+                    </span>
+                    <span className="mt-0.5 block text-caption leading-relaxed text-ash">
+                      {isPlus
+                        ? "Keep a small Scripture assistant available throughout the app."
+                        : "Keep the MyShepherd button on screen. Asking questions is part of Plus."}
+                    </span>
+                  </span>
+                  <Toggle
+                    label="Floating MyShepherd"
+                    on={appearance.myShepherdFloatingButton}
+                    onChange={(myShepherdFloatingButton) =>
+                      setAppearance({ myShepherdFloatingButton })
+                    }
+                  />
+                </div>
+              </PaperCard>
+              <SupportLink />
             </div>
-          </PaperCard>
-          <SupportLink />
-        </div>
+          </>
+        )}
 
         {/* Always visible — text size and bold text are comfort settings
             people shouldn't have to hunt for behind a disclosure. */}
@@ -1315,22 +1358,26 @@ function SettingsInner() {
             padding="none"
             className="overflow-hidden px-4"
           >
-            <WallpaperPicker
-              value={appearance.wallpaperId}
-              onChange={(wallpaperId) => setAppearance({ wallpaperId })}
-            />
+            {!nativeTarget && (
+              <WallpaperPicker
+                value={appearance.wallpaperId}
+                onChange={(wallpaperId) => setAppearance({ wallpaperId })}
+              />
+            )}
             <div className="divide-y divide-mist/70">
-              <Row label="Wallpaper style">
-                <Segmented
-                  label="Wallpaper style"
-                  value={appearance.wallpaperMode}
-                  onChange={(wallpaperMode) => setAppearance({ wallpaperMode })}
-                  options={[
-                    { value: "still", label: "Still" },
-                    { value: "live", label: "Live" },
-                  ]}
-                />
-              </Row>
+              {!nativeTarget && (
+                <Row label="Wallpaper style">
+                  <Segmented
+                    label="Wallpaper style"
+                    value={appearance.wallpaperMode}
+                    onChange={(wallpaperMode) => setAppearance({ wallpaperMode })}
+                    options={[
+                      { value: "still", label: "Still" },
+                      { value: "live", label: "Live" },
+                    ]}
+                  />
+                </Row>
+              )}
               <Row label="Glass surfaces">
                 <Toggle
                   label="Glass surfaces"
@@ -1386,14 +1433,16 @@ function SettingsInner() {
                 />
               </Row>
             </div>
-            {appearance.wallpaperMode === "live" && shouldReduceMotion && (
+            {!nativeTarget &&
+              appearance.wallpaperMode === "live" &&
+              shouldReduceMotion && (
               <p className="border-t border-mist/70 py-3 text-caption leading-relaxed text-ash">
                 Live is saved as your preference. The matching still is shown
                 while {appearance.reducedMotion
                   ? "Reduce Motion is"
                   : "your device’s Reduce Motion setting is"} on.
               </p>
-            )}
+              )}
           </PaperCard>
         </section>
 
@@ -1462,9 +1511,11 @@ function SettingsInner() {
             />
           </Disclosure>
 
-          <Disclosure variant="card" label={t.settings.reminders}>
-            <ReminderSettings />
-          </Disclosure>
+          {!ACCOUNT_SYNC_CONTAINED ? (
+            <Disclosure variant="card" label={t.settings.reminders}>
+              <ReminderSettings />
+            </Disclosure>
+          ) : null}
 
           <Disclosure variant="card" label="Privacy & data">
             <p className="text-[0.9375rem] leading-relaxed text-charcoal">
@@ -1517,7 +1568,7 @@ function SettingsInner() {
                   touch height. An inline link inside a sentence is the
                   exception to that rule; a link standing among buttons is not. */}
               <Link
-                href="/privacy"
+                href={buildPublicHref("/privacy")}
                 className="inline-flex min-h-11 items-center px-1 text-[0.875rem] text-accent hover:text-accent/80"
               >
                 Privacy policy
@@ -1557,18 +1608,31 @@ function SettingsInner() {
 
           <Disclosure variant="card" label="About">
             <ul className="divide-y divide-mist/70 text-[0.9375rem]">
+              {!nativeTarget ? (
+                <li>
+                  {/* The public homepage remains useful on web. Native omits
+                      it because that marketing surface contains pricing links. */}
+                  <Link
+                    href={buildPublicHref("/")}
+                    className="flex min-h-11 items-center justify-between gap-3 py-3 text-charcoal hover:text-accent"
+                  >
+                    <span>BibleQuest website</span>
+                    <span className="text-caption text-ash">Home</span>
+                  </Link>
+                </li>
+              ) : null}
               <li>
-                <Link href="/about" className="block py-3 text-charcoal hover:text-accent">
+                <Link href={buildPublicHref("/about")} className="block py-3 text-charcoal hover:text-accent">
                   About BibleQuest
                 </Link>
               </li>
               <li>
-                <Link href="/terms" className="block py-3 text-charcoal hover:text-accent">
+                <Link href={buildPublicHref("/terms")} className="block py-3 text-charcoal hover:text-accent">
                   Terms of Use
                 </Link>
               </li>
               <li>
-                <Link href="/privacy" className="block py-3 text-charcoal hover:text-accent">
+                <Link href={buildPublicHref("/privacy")} className="block py-3 text-charcoal hover:text-accent">
                   Privacy Policy
                 </Link>
               </li>

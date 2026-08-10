@@ -64,19 +64,33 @@ describe("Home formation layout", () => {
     expect(home).toContain("<HomeSectionHeading");
   });
 
-  it("uses the requested MyShepherd color and matched quick actions", () => {
+  it("uses the requested MyShepherd color inside one secondary-content disclosure", () => {
     // The blue moved from an inline style into `.app-glass-shepherd` so the
     // glass rule can tint it; an inline background would have out-ranked it.
     expect(home).toContain("app-glass-shepherd");
     expect(home).not.toContain('backgroundColor: "#3F7EA3"');
     expect(home).toContain("space-y-7 pb-7");
-    expect(home).toContain("grid grid-cols-3");
-    // The three tiles have to match each other, which a shared min-height is
-    // what guarantees. The exact figure is a design decision that has moved
-    // once already; that it is shared is the part worth holding.
-    const tileMinHeight = /min-h-\[([\d.]+)rem\]/.exec(home)?.[1];
-    expect(tileMinHeight, "quick action tiles lost their shared min-height").toBeDefined();
-    expect(Number(tileMinHeight)).toBeGreaterThanOrEqual(6);
+    // First-time Home now leads with Scripture and one quest. Optional guides,
+    // games, promotions, and support remain reachable behind one real control.
+    expect(home).toContain("<Disclosure");
+    expect(home).toContain("Explore more");
+    expect(home).toContain(
+      'nativeTarget\n                    ? "Your rhythm, guided Scripture, growth, and games"',
+    );
+    expect(home).toContain('variant="quiet"');
+    expect(home).not.toContain("function QuickActionTile");
+  });
+
+  it("does not consume the account prompt while Explore more is closed", () => {
+    const prompt = readFileSync(
+      "src/components/account/AccountPrompt.tsx",
+      "utf8",
+    );
+
+    expect(prompt).toContain("new IntersectionObserver");
+    expect(prompt).toContain("if (!entry?.isIntersecting) return;");
+    expect(prompt).toContain("observer.observe(prompt)");
+    expect(prompt).toContain("<div ref={promptRef}>");
   });
 
   it("uses editorial artwork and display type for games", () => {
@@ -118,17 +132,16 @@ describe("Home formation layout", () => {
     expect(card).toContain("flex h-full min-h-[17rem] overflow-hidden");
   });
 
-  it("places the three shortcuts between support and newsletter", () => {
+  it("removes destinations already represented by the primary navigation", () => {
     const support = home.indexOf("<SupportLink");
-    const prayer = home.indexOf('title="One minute of prayer"', support);
-    const bible = home.indexOf('title="Open the Bible"', prayer);
-    const reflections = home.indexOf('title="Reflect on Today"', bible);
     const newsletter = home.indexOf("<NewsletterLink");
 
     expect(support).toBeGreaterThan(-1);
-    expect(prayer).toBeGreaterThan(support);
-    expect(bible).toBeGreaterThan(prayer);
-    expect(reflections).toBeGreaterThan(bible);
-    expect(newsletter).toBeGreaterThan(reflections);
+    expect(newsletter).toBeGreaterThan(support);
+    // Prayer and Bible stay one tap away in BottomNav instead of appearing a
+    // second time as a three-card choice near the end of an already long Home.
+    expect(home).not.toContain('title="One minute of prayer"');
+    expect(home).not.toContain('title="Open the Bible"');
+    expect(home).not.toContain('title="Reflect on Today"');
   });
 });

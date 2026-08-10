@@ -61,6 +61,7 @@ import {
 import { useStrings } from "@/lib/i18n";
 import { toDateKey } from "@/lib/utils/dates";
 import { usePlus } from "@/lib/billing/usePlus";
+import { isNativeTarget } from "@/lib/platform/target";
 import { QuestGenerator } from "@/components/quests/QuestGenerator";
 
 const DURATIONS: QuestDuration[] = [5, 10, 15, 30, 60, 240, 480];
@@ -82,6 +83,7 @@ function QuestBrowseInner() {
   const profile = useQuestOS((s) => s.profile);
   const settings = useQuestOS((s) => s.settings);
   const { isPlus } = usePlus();
+  const nativeTarget = isNativeTarget();
 
   // Rolling windows can expire without another store write. Refresh the
   // projection gently so countdown and Resume states stay accurate.
@@ -528,22 +530,26 @@ function QuestBrowseInner() {
           )}
         </section>
 
-        <Disclosure
-          label="Generate a quest"
-          variant="blue"
-          defaultOpen={false}
-          summary={
-            isPlus ? (
-              <span className="rounded-full bg-white/20 px-2.5 py-1 text-caption text-white">
-                Plus
-              </span>
-            ) : undefined
-          }
-          className="mt-6"
-          contentClassName="pt-4"
-        >
-          <QuestGenerator isPlus={isPlus} onAdd={handleAdd} />
-        </Disclosure>
+        {/* Free native readers have no acquisition path, so omit the parent
+            disclosure as well as its paid contents. */}
+        {(!nativeTarget || isPlus) && (
+          <Disclosure
+            label="Generate a quest"
+            variant="blue"
+            defaultOpen={false}
+            summary={
+              isPlus ? (
+                <span className="rounded-full bg-white/20 px-2.5 py-1 text-caption text-white">
+                  Plus
+                </span>
+              ) : undefined
+            }
+            className="mt-6"
+            contentClassName="pt-4"
+          >
+            <QuestGenerator isPlus={isPlus} onAdd={handleAdd} />
+          </Disclosure>
+        )}
 
         {/* Suggested and seasonal sit ABOVE the library heading, so the
             sticky bar belongs to the catalogue it labels rather than

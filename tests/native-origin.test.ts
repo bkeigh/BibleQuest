@@ -76,18 +76,18 @@ describe("native origin matching", () => {
 });
 
 describe("routes that must stay closed to the native origin", () => {
-  it("support checkout rejects the native origin explicitly", async () => {
-    // The only route where the origin check is the sole protection: it allows
-    // guests, so the native allowance would hand unauthenticated Stripe
-    // Checkout creation to any client that sets an Origin header.
+  it("every web-only Stripe route rejects the native origin explicitly", async () => {
     const { readFileSync } = await import("node:fs");
-    const source = readFileSync(
+    for (const path of [
       "src/app/api/support/checkout/route.ts",
-      "utf8",
-    );
-    expect(source).toContain(
-      'if (isNativeAppOrigin(request)) return privateError("forbidden", 403);',
-    );
+      "src/app/api/billing/checkout/route.ts",
+      "src/app/api/billing/portal/route.ts",
+      "src/app/api/arcade/checkout/route.ts",
+    ]) {
+      expect(readFileSync(path, "utf8")).toContain(
+        'if (isNativeAppOrigin(request)) return privateError("forbidden", 403);',
+      );
+    }
   });
 });
 

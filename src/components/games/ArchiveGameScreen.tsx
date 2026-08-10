@@ -12,6 +12,7 @@ import { readGameProgress } from "@/lib/games/storage";
 import type { GamePuzzle, GameStatus } from "@/lib/games/types";
 import { useHydrated } from "@/lib/utils/useHydrated";
 import { track } from "@/lib/analytics/events";
+import { WebCommerceOnly } from "@/components/plus/WebCommerceOnly";
 import { ConnectionsGame } from "./ConnectionsGame";
 import { GameShell } from "./GameShell";
 import { TimelineGame } from "./TimelineGame";
@@ -59,9 +60,11 @@ export function ArchiveGameScreen({ puzzle }: { puzzle: GamePuzzle }) {
               <GentleLink href="/app/games" variant="primary">
                 Play today&apos;s game
               </GentleLink>
-              <GentleLink href="/app/plus" variant="outline">
-                Explore Plus
-              </GentleLink>
+              <WebCommerceOnly>
+                <GentleLink href="/app/plus" variant="outline">
+                  Explore Plus
+                </GentleLink>
+              </WebCommerceOnly>
             </div>
           </PaperCard>
         ) : !enabled ? (

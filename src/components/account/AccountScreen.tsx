@@ -24,6 +24,10 @@ import {
   type AccountIntent,
 } from "@/lib/auth/account-intent";
 import { isStandaloneWebApp } from "@/lib/pwa/install-guidance";
+import {
+  ACCOUNT_SYNC_CONTAINED,
+  ACCOUNT_SYNC_CONTAINMENT_NOTICE,
+} from "@/lib/sync/containment";
 
 function AccountInner() {
   const router = useRouter();
@@ -65,6 +69,24 @@ function AccountInner() {
       window.location.pathname + (qs ? `?${qs}` : "")
     );
   }, [callbackFailure]);
+
+  // The 1.0 guest-only release keeps this route informative without exposing
+  // account creation controls that cannot complete while sync is contained.
+  if (ACCOUNT_SYNC_CONTAINED) {
+    return (
+      <Frame title="Your journey" subtitle="Saved privately on this device.">
+        <PaperCard variant="quiet" padding="lg" className="text-center">
+          <p role="status" className="text-small leading-relaxed text-ash">
+            {ACCOUNT_SYNC_CONTAINMENT_NOTICE}
+          </p>
+          <p className="mt-3 text-caption leading-relaxed text-ash">
+            You can export a readable backup or clear your journey at any time
+            from Settings.
+          </p>
+        </PaperCard>
+      </Frame>
+    );
+  }
 
   if (!configured) {
     return (

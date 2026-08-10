@@ -36,12 +36,7 @@ export function Footer() {
               <FooterLink href="/about">About</FooterLink>
               <FooterLink href="/writing">Writing</FooterLink>
               <FooterLink href="/churches">Churches</FooterLink>
-              <a
-                href={SUPPORT_EMAIL_HREF}
-                className="text-ash transition-colors hover:text-accent"
-              >
-                Contact
-              </a>
+              <FooterLink href="/contact">Contact</FooterLink>
             </FooterCol>
             <FooterCol title="Legal">
               <FooterLink href="/privacy">Privacy</FooterLink>

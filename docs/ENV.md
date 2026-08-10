@@ -6,6 +6,9 @@ template in [`../.env.example`](../.env.example).
 | Variable | Required? | Purpose |
 | --- | --- | --- |
 | `NEXT_PUBLIC_APP_URL` | Recommended | Canonical URL for metadata / OG. |
+| `NEXT_PUBLIC_APP_PLATFORM` | Native build gate | Public target discriminator: `web` by default or exact `native` for the reviewed local iOS bundle. |
+| `NEXT_PUBLIC_NATIVE_HOSTED_ORIGIN` | Native build gate | Public bare HTTPS origin used only for native API and public-document links. The App Store release pins `https://www.biblequest.co`. |
+| `BIBLEQUEST_NATIVE_API_ORIGIN_ENABLED` | Native server gate | **Server-only.** Allows the frozen `capacitor://localhost` origin through reviewed API guards/CORS only when exactly `true`. Scope to one Vercel environment and redeploy; never use All Environments. |
 | `BIBLEQUEST_ROLLBACK_SHA` | Launch gate | **Server-only.** Exact approved 40-character rollback commit reported by health; never a branch, URL, or deployment ID. |
 | `BIBLEQUEST_DEPLOYMENT_LABEL` | Staging safety | **Server-only.** Renders a warning only when the value is exactly `SYNC-ENABLED STAGING — NEVER PROMOTE`; leave unset in Production. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Optional | Enables account sync. |
@@ -13,6 +16,7 @@ template in [`../.env.example`](../.env.example).
 | `SUPABASE_SECRET_KEY` | Server feature gate | **Server-only.** Used by sealed push, rate-limit, and billing projection routes. Never use a `NEXT_PUBLIC_*` name. |
 | `BIBLEQUEST_RATE_LIMIT_SECRET` | Server secret | **Server-only.** At least 32 random characters used only to HMAC opaque distributed rate-limit identities. |
 | `NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED` | Launch gate | Must be exactly `true` to expose account auth and sync after the full migration, RLS, provider, restore, and PWA gates pass. Missing or any other value stays guest-only. |
+| `NEXT_PUBLIC_ACCOUNT_GATE_ENABLED` | Account gate | Requires account sync to be enabled as a second precondition. The App Store 1.0 release pins both flags false. |
 | `BIBLEQUEST_AVATAR_SYNC_ENABLED` | Launch gate | **Server-only.** Must be exactly `true` after migration `0023`, private-bucket RLS, two-user isolation, and preview checks pass. Missing or any other value blocks avatar reads/uploads while account deletion cleanup remains available. |
 | `BIBLEQUEST_PUSH_ENABLED` | Launch gate | **Server-only.** Must be exactly `true` after migration `0024`, encryption/VAPID configuration, two-user isolation, and preview checks pass. |
 | `WEB_PUSH_VAPID_PUBLIC_KEY` | Push gate | **Server-only configuration returned only to authenticated clients.** Base64url P-256 VAPID public key. |
@@ -57,6 +61,15 @@ template in [`../.env.example`](../.env.example).
   `NEXT_PUBLIC_*` name, appear in logs, or be returned to a client. See
   [`../SECURITY.md`](../SECURITY.md).
 - Never commit real values. Only `.env.example` (placeholders) is committed.
+- Build App Store candidates with `pnpm ios:release:prepare`. That profile
+  overrides local public values, strips Supabase client configuration, keeps
+  analytics/account flags off, and rejects disposable hosted origins. The
+  generic `build:native` command remains available only for reviewed custom
+  development builds.
+- Guest-only containment includes native bearer lookup: it must not create a
+  Supabase client, inspect or refresh an old WebView session, or attach an
+  Authorization header. Clearing public Supabase configuration in the release
+  profile is defense in depth, not the sole enforcement boundary.
 - `BIBLEQUEST_ROLLBACK_SHA` is evidence, not an automatic rollback control. Set
   it only after the rollback authority approves the target; changing it does not
   move traffic or undo database changes.

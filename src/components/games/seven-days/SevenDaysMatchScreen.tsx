@@ -46,6 +46,8 @@ import {
   type SevenDaysProgress,
 } from "@/lib/games/seven-days/progress";
 import { useArcadeAccess } from "@/lib/games/arcade/useArcadeAccess";
+import { WebCommerceOnly } from "@/components/plus/WebCommerceOnly";
+import { isNativeTarget } from "@/lib/platform/target";
 import { SEVEN_DAYS_TILES } from "@/lib/games/seven-days/tiles";
 import type {
   SevenDaysChapter,
@@ -286,17 +288,21 @@ function SevenDaysMatchInner() {
               <p className="mt-5 text-caption leading-relaxed text-ash">
                 All seven days and every answer are included. There are no
                 lives and no timers, running out of moves costs nothing but
-                another go, and every question and explanation remain
-                available when a store option makes the question gate optional.
+                another go
+                {isNativeTarget()
+                  ? "."
+                  : ", and every question and explanation remain available when a store option makes the question gate optional."}
                 {!storageAvailable &&
                   " This browser cannot save your place, so the map will start fresh next time."}
               </p>
-              <Link
-                href="/app/games/store"
-                className="mt-2 inline-flex min-h-11 items-center text-caption font-medium text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                Question Skips and Game Pass
-              </Link>
+              <WebCommerceOnly>
+                <Link
+                  href="/app/games/store"
+                  className="mt-2 inline-flex min-h-11 items-center text-caption font-medium text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  Question Skips and Game Pass
+                </Link>
+              </WebCommerceOnly>
             </PaperCard>
         </div>
       )}

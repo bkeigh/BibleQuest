@@ -1,5 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { emptySnapshot } from "./fixtures";
@@ -141,6 +142,38 @@ describe("guest-only account-sync containment", () => {
     expect(markup).not.toContain("Sign in with Google");
     expect(markup).not.toContain("Sign in with Apple");
     expect(markup).not.toContain("<input");
+  });
+
+  it("removes every reviewer-visible account and reminder invitation", () => {
+    const prompt = readFileSync(
+      "src/components/account/AccountPrompt.tsx",
+      "utf8",
+    );
+    const onboarding = readFileSync(
+      "src/components/onboarding/OnboardingFlow.tsx",
+      "utf8",
+    );
+    const settings = readFileSync(
+      "src/components/settings/SettingsScreen.tsx",
+      "utf8",
+    );
+    const reminders = readFileSync(
+      "src/components/settings/ReminderSettings.tsx",
+      "utf8",
+    );
+
+    expect(prompt).toContain("accountSyncAvailable(configured)");
+    expect(onboarding).toContain(
+      "accountEnabled={accountSyncAvailable(configured)}",
+    );
+    expect(onboarding).toContain("Continue on this device");
+    expect(settings).toMatch(
+      /\{!ACCOUNT_SYNC_CONTAINED \? \([\s\S]*?<SectionTitle>\{t\.settings\.account\}/,
+    );
+    expect(settings).toMatch(
+      /\{!ACCOUNT_SYNC_CONTAINED \? \([\s\S]*?label=\{t\.settings\.reminders\}/,
+    );
+    expect(reminders).toContain("Reminders are not included in this release");
   });
 
   it.each([

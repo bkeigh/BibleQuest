@@ -1,5 +1,9 @@
 # iOS UX pass — where this stopped
 
+> Historical handoff. Use [`IOS_TESTFLIGHT_RUNBOOK.md`](IOS_TESTFLIGHT_RUNBOOK.md)
+> for the production-backed App Store candidate; do not reuse the staging build
+> command near the end of this document.
+
 Branch `feat/capacitor-ios-scaffold`. Target: a polished working build inside
 ten days of 2026-08-07. Written mid-session against a dying battery, so it
 records state rather than conclusions.
@@ -45,32 +49,61 @@ static Liquid Glass material properties, so the gap is shape and behaviour
 (both pure CSS/JS), while refraction and specular highlights are genuinely
 unreachable from a WebView.
 
-## Not started
+## 2026-08-09 — commerce and legal pass complete
 
-1. **App Store commerce gating.** The Arcade Store still shows $0.99/$2.99
-   with a Buy button that cannot work, 14 "Explore Plus" CTAs lead to a page
-   with no purchase path, and all 15 wallpapers are locked. These are
-   guideline 3.1.1 rejections at submission; none block TestFlight.
-2. **Settings legal links** bounce to Home on native.
-3. **The camera decision.** "Change photo" is withheld on native pending a
+**App Store commerce gating.** The native exporter removes `/app/plus` and
+`/app/games/store`, then fails the build if either route reappears. Native UI
+now omits the Arcade Store, prices and Buy actions, Plus acquisition actions,
+free-user locked previews, and the wallpaper picker. Existing entitlements
+remain a separate access path. Billing checkout, billing portal, and arcade
+checkout also reject the native origin with `403` as a server-side backstop.
+Stale onboarding hand-offs to `/app/plus` normalize to `/app`.
+
+**Legal links.** About, Privacy Policy, and Terms stay relative on web but use
+absolute hosted HTTPS URLs on native, so Capacitor opens them outside the
+pruned app router instead of bouncing to Home.
+
+**Verification.** `pnpm lint`, `pnpm exec tsc --noEmit`, all 149 test files /
+1,121 tests, and the normal web build pass. A fresh native build and Capacitor
+sync contain the staging origin in 1,042 files and `www.biblequest.co` in zero;
+both commerce routes are absent, and exported native HTML contains none of the
+store prices, Buy labels, or Plus acquisition labels. A Release archive still
+returns `ARCHIVE SUCCEEDED` for `co.biblequest.app`, build 3.
+
+## Remaining product decisions
+
+1. **The camera decision.** "Change photo" is withheld on native pending a
    call on `NSCameraUsageDescription` — see the comment in `SettingsScreen.tsx`.
+2. **iOS 26 Liquid Glass implementation.** Keep it on its own branch and use
+   `docs/IOS26_LIQUID_GLASS_PLAN.md` as the starting point.
+3. **TestFlight upload.** The archive is buildable, but distribution still
+   needs the owner's Apple ID and an Apple Distribution certificate.
 
-## Still open from Phase 4b
+## 2026-08-09 — bearer isolation passed
 
-- `SUPABASE_SECRET_KEY` is **not** on the Vercel Preview environment, so every
-  Bible endpoint on `native-staging.biblequest.co` answers
-  `{"error":"rate_limit_unavailable"}` (503). The app degrades correctly
-  ("Online editions could not be checked"), but other-language editions stay
-  dark until it is added and the **branch** is redeployed. Note the code
-  accepts only that exact name — `SUPABASE_SERVICE_ROLE_KEY` is deliberately
-  ignored when `NODE_ENV=production`, which a Vercel build always is.
-- Redeploying from the Vercel deployments list keeps landing on `main`,
-  because each `main` redeploy becomes the newest row. Push a commit to the
-  branch instead; that builds the branch and nothing else.
-- TestFlight upload never ran. The app is installed on the device over the
-  cable (`co.biblequest.app`, build 2, confirmed via `devicectl`). Archive
-  needs a registered device, which now exists ("stinkyhill"), so the earlier
-  "no devices" provisioning failure should be gone — unverified.
+The account owner added the three Supabase variables to Vercel Preview only.
+Empty commit `a3b25fe` triggered the exact feature-branch deployment. The new
+deployment's CSP included
+`https://lorqiyzrfmpvvcvsvghc.supabase.co`, so the safety gate opened and
+`pnpm check:native-bearer-isolation` completed with:
+
+```json
+{"authenticatedUsers":2,"corsPreflights":2,"billingDirections":2,"failClosedCases":3,"avatarDirections":2,"status":"pass"}
+```
+
+This is the first real proof that two Supabase identities resolve to different
+BibleQuest accounts across both billing and avatar directions. Production was
+rechecked afterwards: its native-origin preflight still returns `204` with no
+`access-control-allow-origin`, so the production latch remains off.
+
+Cleanup is complete. Disposable Supabase branch `native-bearer-isolation`
+(`lorqiyzrfmpvvcvsvghc`) was deleted, leaving only the production branch.
+`.env.staging.local` was removed from the repo and moved to
+`~/.Trash/BibleQuest.env.staging.local.2026-08-09` with mode `600`.
+
+The three Vercel Preview variables that referenced the deleted disposable
+project were removed. Passing isolation removed the security blocker; the
+production native-origin latch remains a separate owner-controlled rollout.
 
 ## Resuming
 
@@ -83,10 +116,9 @@ The dev server for UI work is `.claude/launch.json` → `biblequest` on port
 3200. To skip onboarding when inspecting `/app`, set `onboardingCompleted` on
 the `biblequest:v1` localStorage blob.
 
-To put a fresh build on the phone: rebuild the web payload against the staging
-origin, sync, bump, then Product → Archive (or just ▶ Run with the phone
-connected, which is faster for iteration):
+To prepare the production-backed, guest-only App Store payload and sync it into
+Xcode:
 
 ```bash
-NEXT_PUBLIC_APP_PLATFORM=native NEXT_PUBLIC_NATIVE_HOSTED_ORIGIN=https://native-staging.biblequest.co pnpm build:native && pnpm exec cap sync ios
+pnpm ios:release:prepare
 ```

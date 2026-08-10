@@ -6,6 +6,7 @@ const KEY = "biblequest:v1";
 /** Stands in for the app's Documents directory. */
 const disk = new Map<string, string>();
 let writeFailure: Error | null = null;
+let deleteFailure: Error | null = null;
 
 vi.mock("@capacitor/filesystem", () => ({
   Directory: { Data: "DATA" },
@@ -19,6 +20,10 @@ vi.mock("@capacitor/filesystem", () => ({
       const data = disk.get(path);
       if (data === undefined) throw new Error("File does not exist");
       return { data };
+    }),
+    deleteFile: vi.fn(async ({ path }: { path: string }) => {
+      if (deleteFailure) throw deleteFailure;
+      disk.delete(path);
     }),
   },
 }));
@@ -58,6 +63,7 @@ const JOURNEY = JSON.stringify({
 beforeEach(() => {
   disk.clear();
   writeFailure = null;
+  deleteFailure = null;
   const storage = new MemoryStorage();
   vi.stubGlobal("localStorage", storage);
   vi.stubGlobal("window", {
@@ -150,6 +156,84 @@ describe("journey backup on native", () => {
     await expect(writeJourneyBackup()).resolves.toBe(false);
   });
 
+  it("purges the filesystem mirror before allowing backups to resume", async () => {
+    const {
+      purgeJourneyBackup,
+      readJourneyBackup,
+      resumeJourneyBackupAfterPurge,
+      writeJourneyBackup,
+    } = await load();
+    localStorage.setItem(KEY, JOURNEY);
+    await writeJourneyBackup();
+
+    expect(await purgeJourneyBackup()).toBe(true);
+    expect(await readJourneyBackup()).toBeNull();
+    expect(await writeJourneyBackup()).toBe(false);
+
+    // Settings resets the primary before reopening the write-through mirror.
+    localStorage.removeItem(KEY);
+    resumeJourneyBackupAfterPurge();
+    expect(await writeJourneyBackup()).toBe(false);
+    expect(await readJourneyBackup()).toBeNull();
+  });
+
+  it("leaves a non-restorable tombstone when native deletion fails", async () => {
+    const {
+      purgeJourneyBackup,
+      readJourneyBackup,
+      restoreJourneyIfEvicted,
+      resumeJourneyBackupAfterPurge,
+      writeJourneyBackup,
+    } = await load();
+    localStorage.setItem(KEY, JOURNEY);
+    await writeJourneyBackup();
+    deleteFailure = new Error("delete denied");
+
+    expect(await purgeJourneyBackup()).toBe(true);
+    expect(disk.get("journey-backup.json")).toBe("{}");
+    expect(await readJourneyBackup()).toBeNull();
+
+    localStorage.removeItem(KEY);
+    resumeJourneyBackupAfterPurge();
+    expect(await restoreJourneyIfEvicted()).toBe("no-backup");
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it("reports a failed tombstone write and reopens normal mirroring", async () => {
+    const {
+      purgeJourneyBackup,
+      readJourneyBackup,
+      writeJourneyBackup,
+    } = await load();
+    localStorage.setItem(KEY, JOURNEY);
+    await writeJourneyBackup();
+    writeFailure = new Error("disk full");
+
+    expect(await purgeJourneyBackup()).toBe(false);
+    writeFailure = null;
+    expect(await writeJourneyBackup()).toBe(true);
+    expect(await readJourneyBackup()).toBe(JOURNEY);
+  });
+
+  it("invalidates a stale write that was queued before the purge", async () => {
+    const {
+      purgeJourneyBackup,
+      readJourneyBackup,
+      resumeJourneyBackupAfterPurge,
+      writeJourneyBackup,
+    } = await load();
+    localStorage.setItem(KEY, JOURNEY);
+
+    const staleWrite = writeJourneyBackup();
+    const purge = purgeJourneyBackup();
+    expect(await staleWrite).toBe(false);
+    expect(await purge).toBe(true);
+    expect(await readJourneyBackup()).toBeNull();
+
+    localStorage.removeItem(KEY);
+    resumeJourneyBackupAfterPurge();
+  });
+
   it("mirrors subsequent store writes through the patched setItem", async () => {
     vi.useFakeTimers();
     const { startJourneyBackup, readJourneyBackup } = await load();
@@ -172,12 +256,17 @@ describe("journey backup on native", () => {
 describe("journey backup on web", () => {
   it("is inert — no plugin load, no file, no restore", async () => {
     process.env[PLATFORM] = "web";
-    const { writeJourneyBackup, restoreJourneyIfEvicted, startJourneyBackup } =
-      await load();
+    const {
+      purgeJourneyBackup,
+      writeJourneyBackup,
+      restoreJourneyIfEvicted,
+      startJourneyBackup,
+    } = await load();
     localStorage.setItem(KEY, JOURNEY);
 
     expect(await writeJourneyBackup()).toBe(false);
     expect(await restoreJourneyIfEvicted()).toBe("not-native");
+    expect(await purgeJourneyBackup()).toBe(true);
     expect(disk.size).toBe(0);
 
     const setItem = localStorage.setItem;

@@ -2,9 +2,9 @@
 
 /**
  * The daily landing screen. It composes the local-first QuestOS state into one
- * calm sequence: welcome and candle, quests, growth, and
- * private next steps. Scripture discovery stays one tap away without competing
- * with the quests that anchor the daily experience.
+ * calm sequence: welcome and candle, Scripture, and one quest. Optional
+ * formation, growth, and support stay behind one disclosure so they remain
+ * available without competing with the daily path.
  */
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -19,7 +19,6 @@ import {
   formatQuestWindowRemaining,
   isQuestWindowOpen,
 } from "@/lib/questos/quest-engine";
-import { chapterHref } from "@/lib/bible/links";
 import { timeOfDay, toDateKey } from "@/lib/utils/dates";
 import { useStrings, fmt } from "@/lib/i18n";
 import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
@@ -49,13 +48,15 @@ import { TodayFormation } from "@/components/home/TodayFormation";
 import { RhythmTodayCard } from "@/components/rhythm/RhythmTodayCard";
 import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
 import { HomeSectionHeading } from "@/components/home/HomeSectionHeading";
+import { isNativeTarget } from "@/lib/platform/target";
+import { Disclosure } from "@/components/design-system/Disclosure";
 
 function HomeInner() {
   const profile = useQuestOS((s) => s.profile);
   const growthEvents = useQuestOS((s) => s.growthEvents);
-  const readingPosition = useQuestOS((s) => s.readingPosition);
   const assignments = useQuestOS((s) => s.assignments);
   const { isPlus } = usePlus();
+  const nativeTarget = isNativeTarget();
   const [shepherdDialogOpen, setShepherdDialogOpen] = useState(false);
   // The candle. Stable ref — the stored object itself.
   const streak = useQuestOS(selectStreak);
@@ -285,124 +286,113 @@ function HomeInner() {
             </Link>
           </section>
 
-          {/* The optional weekly rhythm stays attached to the daily quest. */}
-          <RhythmTodayCard dayKey={dayKey} now={now} />
+          {/* Secondary formation and promotional surfaces stay available without
+              asking a first-time reader to choose among all of them at once. */}
+          <Disclosure
+            variant="quiet"
+            label={
+              <span>
+                <span className="block font-display text-[1.0625rem] text-graphite">
+                  Explore more
+                </span>
+                <span className="mt-0.5 block text-caption font-normal text-ash">
+                  {nativeTarget
+                    ? "Your rhythm, guided Scripture, growth, and games"
+                    : "Your rhythm, guided Scripture, growth, games, and support"}
+                </span>
+              </span>
+            }
+            contentClassName="pt-3"
+          >
+            <div className="space-y-7">
+              {/* The optional weekly rhythm stays near the daily quest while
+                  remaining out of the default first-use decision path. */}
+              <RhythmTodayCard dayKey={dayKey} now={now} />
 
-          {/* Guided Scripture remains a distinct daily formation choice. */}
-          <TodayFormation
-            dayKey={dayKey}
-            show="guide"
-            afterGuide={
-              <ShepherdCallout
-                href={isPlus ? "/app/shepherd" : undefined}
-                onClick={
-                  isPlus
-                    ? undefined
-                    : () => setShepherdDialogOpen(true)
+              {/* Guided Scripture remains a distinct daily formation choice. */}
+              <TodayFormation
+                dayKey={dayKey}
+                show="guide"
+                afterGuide={
+                  isPlus ? (
+                    <ShepherdCallout href="/app/shepherd" />
+                  ) : nativeTarget ? undefined : (
+                    <ShepherdCallout
+                      onClick={() => setShepherdDialogOpen(true)}
+                    />
+                  )
                 }
               />
-            }
-          />
 
-          {/* Growth uses the same left-aligned category rhythm as every Home section. */}
-          <section aria-labelledby="growth-home-title">
-            <HomeSectionHeading
-              id="growth-home-title"
-              title={t.home.yourGrowth}
-              subtitle="Your journey"
-            />
-            <Link href="/app/journey" className="block">
-              <PaperCard
-                interactive
-                variant="linen"
-                padding="md"
-                className="flex min-h-28 items-center gap-4"
-              >
-                <GrowthTree
-                  state={tree}
-                  size={96}
-                  treeOnly
-                  className="shrink-0"
+              {/* Growth uses the same left-aligned category rhythm as every Home section. */}
+              <section aria-labelledby="growth-home-title">
+                <HomeSectionHeading
+                  id="growth-home-title"
+                  title={t.home.yourGrowth}
+                  subtitle="Your journey"
                 />
-                <div className="min-w-0 flex-1">
-                  <p className="font-display text-subheading text-graphite">
-                    {tree.stageLabel}
-                  </p>
-                  {/* Gentle progression bar — the caption carries the meaning. */}
-                  <div
-                    aria-hidden="true"
-                    className="mt-2 h-1.5 overflow-hidden rounded-full bg-mist/60"
+                <Link href="/app/journey" className="block">
+                  <PaperCard
+                    interactive
+                    variant="linen"
+                    padding="md"
+                    className="flex min-h-28 items-center gap-4"
                   >
-                    <div
-                      className="h-full rounded-full bg-accent"
-                      style={{ width: `${(progress?.fraction ?? 1) * 100}%` }}
+                    <GrowthTree
+                      state={tree}
+                      size={96}
+                      treeOnly
+                      className="shrink-0"
                     />
-                  </div>
-                  <p className="mt-1.5 text-caption text-ash">
-                    {tree.toNextStage != null
-                      ? tree.toNextStage === 1
-                        ? t.journey.toNextOne
-                        : fmt(t.journey.toNext, { n: tree.toNextStage })
-                      : t.journey.fullGrown}
-                  </p>
-                </div>
-                <IconChevronRight className="shrink-0 text-fog max-[350px]:hidden" />
-              </PaperCard>
-            </Link>
-          </section>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-display text-subheading text-graphite">
+                        {tree.stageLabel}
+                      </p>
+                      {/* Gentle progression bar — the caption carries the meaning. */}
+                      <div
+                        aria-hidden="true"
+                        className="mt-2 h-1.5 overflow-hidden rounded-full bg-mist/60"
+                      >
+                        <div
+                          className="h-full rounded-full bg-accent"
+                          style={{ width: `${(progress?.fraction ?? 1) * 100}%` }}
+                        />
+                      </div>
+                      <p className="mt-1.5 text-caption text-ash">
+                        {tree.toNextStage != null
+                          ? tree.toNextStage === 1
+                            ? t.journey.toNextOne
+                            : fmt(t.journey.toNext, { n: tree.toNextStage })
+                          : t.journey.fullGrown}
+                      </p>
+                    </div>
+                    <IconChevronRight className="shrink-0 text-fog max-[350px]:hidden" />
+                  </PaperCard>
+                </Link>
+              </section>
 
-          {/* The arcade follows growth as the lighter play surface. */}
-          <TodayFormation dayKey={dayKey} show="game" />
+              {/* The arcade follows growth as the lighter play surface. */}
+              <TodayFormation dayKey={dayKey} show="game" />
 
-          {/* A gentle, once-per-context invitation to keep the journey
-              safe across devices. Never a modal; easy to wave off. */}
-          <AccountPrompt />
+              {/* A gentle, once-per-context invitation keeps a journey safe
+                  across devices without interrupting the primary daily path. */}
+              <AccountPrompt />
 
-          {!isPlus && (
-            <ExplorePlusLink
-              className="mt-1"
-              description="See every wallpaper and the complete Plus experience."
-            />
-          )}
+              {!isPlus && (
+                <ExplorePlusLink
+                  className="mt-1"
+                  description="See every wallpaper and the complete Plus experience."
+                />
+              )}
 
-          {/* One-time support remains separate from membership. */}
-          <SupportLink />
+              {/* One-time support remains separate from membership. */}
+              <SupportLink />
 
-          {/* These equal-width shortcuts form one calm, predictable action row. */}
-          <div
-            role="group"
-            className="grid grid-cols-3 gap-2.5 sm:gap-4"
-            aria-label="Prayer, Bible, and reflection shortcuts"
-          >
-            <QuickActionTile
-              href="/app/prayer/new"
-              sprite="candle"
-              title="One minute of prayer"
-              animate
-            />
-            <QuickActionTile
-              href={
-                readingPosition
-                  ? chapterHref(readingPosition.bookSlug, readingPosition.chapter)
-                  : "/app/bible"
-              }
-              sprite="book"
-              title="Open the Bible"
-              ariaLabel={
-                readingPosition
-                  ? `Continue ${readingPosition.bookName} ${readingPosition.chapter}`
-                  : "Open the Bible"
-              }
-            />
-            <QuickActionTile
-              href="/app/prayer/reflections"
-              sprite="sun"
-              title="Reflect on Today"
-            />
-          </div>
+              {/* Newsletter updates remain available after voluntary support. */}
+              <NewsletterLink />
+            </div>
+          </Disclosure>
 
-          {/* Newsletter updates remain available after voluntary support. */}
-          <NewsletterLink />
           <PlusFeatureDialog
             open={shepherdDialogOpen}
             onClose={() => setShepherdDialogOpen(false)}
@@ -504,45 +494,6 @@ function ShepherdCallout({
     >
       {content}
     </button>
-  );
-}
-
-function QuickActionTile({
-  href,
-  sprite,
-  title,
-  ariaLabel,
-  animate = false,
-}: {
-  href: string;
-  sprite: Parameters<typeof ArtIcon>[0]["name"];
-  title: string;
-  ariaLabel?: string;
-  /** Play the sprite's hand-animated GIF, reduced-motion switch and all. */
-  animate?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      aria-label={ariaLabel}
-      className="group block rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-    >
-      <PaperCard
-        interactive
-        variant="paper"
-        padding="sm"
-        className="flex h-full min-h-[7rem] flex-col items-center justify-center gap-2.5 text-center sm:min-h-[7.75rem]"
-      >
-        {/* The chip has to be larger than the sprite it holds. At 44px around a
-            44px icon the art was flush to all four edges and read as clipped. */}
-        <span className="flex shrink-0 items-center justify-center transition-transform duration-300 group-hover:-translate-y-0.5">
-          <ArtIcon name={sprite} size={68} animate={animate} />
-        </span>
-        <span className="text-[0.75rem] font-medium leading-snug text-graphite min-[390px]:text-[0.8125rem] sm:text-small">
-          {title}
-        </span>
-      </PaperCard>
-    </Link>
   );
 }
 

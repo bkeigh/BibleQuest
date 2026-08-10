@@ -13,6 +13,7 @@ import type {
 } from "@/lib/guided/types";
 import { GuidedPracticeRunner } from "./GuidedPracticeRunner";
 import { useQuestOS } from "@/lib/questos/store";
+import { WebCommerceOnly } from "@/components/plus/WebCommerceOnly";
 
 function PilgrimageDayInner({
   pilgrimage,
@@ -70,10 +71,12 @@ function PilgrimageDayInner({
             This reviewed path is included with BibleQuest Plus. The complete
             Learning to Remain path remains available.
           </p>
-          <GentleLink href="/app/plus" variant="gold" fullWidth className="mt-6">
-            Explore Plus
-            <IconArrowRight />
-          </GentleLink>
+          <WebCommerceOnly>
+            <GentleLink href="/app/plus" variant="gold" fullWidth className="mt-6">
+              Explore Plus
+              <IconArrowRight />
+            </GentleLink>
+          </WebCommerceOnly>
           <GentleLink
             href={`/app/pilgrimages/${pilgrimage.slug}`}
             variant="text"

@@ -29,6 +29,15 @@ import { ArtMascot } from "@/components/design-system/ArtMascot";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { accountSyncResetRequired } from "@/lib/sync/generation";
+import { isNativeTarget } from "@/lib/platform/target";
+
+/** Redirects stale web-only Plus hand-offs to the native app home. */
+function safeLaunchDestination(stage: ReturnType<typeof getOnboardingResumeStage>) {
+  const destination = onboardingLaunchDestination(stage);
+  return isNativeTarget() && destination === "/app/plus"
+    ? "/app"
+    : destination;
+}
 
 /**
  * Sends first-time visitors to onboarding before the app opens. Renders a
@@ -43,7 +52,7 @@ function Gate({ children }: { children: React.ReactNode }) {
     completed,
     resumeStage,
   );
-  const launchDestination = onboardingLaunchDestination(resumeStage);
+  const launchDestination = safeLaunchDestination(resumeStage);
   const redirectToLaunch = Boolean(
     launchDestination && pathname !== launchDestination,
   );
@@ -83,11 +92,10 @@ function OnboardingRouteGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const completed = useQuestOS((s) => s.profile?.onboardingCompleted ?? false);
   const resumeStage = getOnboardingResumeStage();
-  const continuingOnboarding = shouldKeepCompletedProfileOnOnboarding(
-    completed,
-    resumeStage,
-  );
-  const launchDestination = onboardingLaunchDestination(resumeStage);
+  const continuingOnboarding =
+    !isNativeTarget() &&
+    shouldKeepCompletedProfileOnOnboarding(completed, resumeStage);
+  const launchDestination = safeLaunchDestination(resumeStage);
 
   useEffect(() => {
     if (completed && !continuingOnboarding) {

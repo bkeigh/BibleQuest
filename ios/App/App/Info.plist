@@ -21,7 +21,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>3</string>
+	<string>4</string>
 	<!-- Declared false because every cryptographic path here is exempt: HTTPS
 	     through the system TLS stack, one WebCrypto SHA-256 digest (a hash, not
 	     encryption), and Supabase PKCE/JWT handling, which is authentication.
@@ -63,19 +63,11 @@
 	<array>
 		<string>arm64</string>
 	</array>
-	<!-- Portrait only on iPhone, matching `orientation: "portrait"` in
-	     src/app/manifest.ts. The reading layout is built around a single
-	     column; iPad keeps all orientations below, where the width is useful. -->
+	<!-- Portrait only on the iPhone-only 1.0 target, matching `orientation:
+	     "portrait"` in src/app/manifest.ts and the single-column reading UI. -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>

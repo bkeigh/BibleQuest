@@ -10,6 +10,8 @@
     "dev": "next dev",
     "build": "next build",
     "build:native": "node --env-file-if-exists=.env.local scripts/build-native.mjs",
+    "build:native:release": "node --env-file-if-exists=.env.local scripts/build-native.mjs --release",
+    "ios:release:prepare": "pnpm build:native:release && pnpm exec cap sync ios",
     "art:install": "node scripts/install-2_5d-art.mjs",
     "start": "next start",
     "lint": "eslint",

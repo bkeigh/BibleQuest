@@ -21,9 +21,11 @@ import { GentleButton } from "@/components/design-system/GentleButton";
 import { InfoHint } from "@/components/design-system/InfoHint";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
+import { WebCommerceOnly } from "@/components/plus/WebCommerceOnly";
 import { QuestSlip, CATEGORY_LABEL, formatDuration } from "./QuestSlip";
 import { IconPlus } from "@/components/design-system/icons";
 import { apiFetch } from "@/lib/platform/api";
+import { isNativeTarget } from "@/lib/platform/target";
 
 const DURATIONS: QuestDuration[] = [5, 10, 15, 30, 60, 240, 480];
 const provider = createReviewedQuestProvider(seedQuests);
@@ -47,6 +49,10 @@ export function QuestGenerator({
   const completions = useQuestOS((state) => state.completions);
   const myQuests = useQuestOS(selectMyQuests);
 
+  // A free native build has no acquisition path, so it omits the preview
+  // rather than advertising a feature the reader cannot unlock in-app.
+  if (!isPlus && isNativeTarget()) return null;
+
   if (!isPlus) {
     return (
       <>
@@ -62,15 +68,17 @@ export function QuestGenerator({
             category. It never reads your profile, prayers, reflections, or
             journals.
           </InfoHint>
-          <GentleButton
-            type="button"
-            variant="text"
-            size="sm"
-            className="mt-3"
-            onClick={() => setPlusDialogOpen(true)}
-          >
-            Explore BibleQuest Plus
-          </GentleButton>
+          <WebCommerceOnly>
+            <GentleButton
+              type="button"
+              variant="text"
+              size="sm"
+              className="mt-3"
+              onClick={() => setPlusDialogOpen(true)}
+            >
+              Explore BibleQuest Plus
+            </GentleButton>
+          </WebCommerceOnly>
         </PaperCard>
         <PlusFeatureDialog
           open={plusDialogOpen}

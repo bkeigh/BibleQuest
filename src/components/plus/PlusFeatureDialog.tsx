@@ -8,6 +8,7 @@ import {
 } from "@/components/design-system/GentleButton";
 import { IconClose } from "@/components/design-system/icons";
 import { ArtIcon } from "@/components/design-system/ArtIcon";
+import { WebCommerceOnly } from "@/components/plus/WebCommerceOnly";
 
 interface PlusFeatureDialogProps {
   description: string;
@@ -128,15 +129,19 @@ export function PlusFeatureDialog({
         </p>
 
         <div className="mt-5 grid gap-2.5">
-          <GentleLink
-            href="/app/plus"
-            variant="gold"
-            size="md"
-            fullWidth
-            onClick={onClose}
-          >
-            Explore Plus
-          </GentleLink>
+          {/* The dialog is a final backstop for any locked preview whose
+              invoking control has not yet moved behind the native gate. */}
+          <WebCommerceOnly>
+            <GentleLink
+              href="/app/plus"
+              variant="gold"
+              size="md"
+              fullWidth
+              onClick={onClose}
+            >
+              Explore Plus
+            </GentleLink>
+          </WebCommerceOnly>
           <GentleButton
             type="button"
             variant="ghost"

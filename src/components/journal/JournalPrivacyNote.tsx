@@ -7,6 +7,7 @@ import {
   ACCOUNT_SYNC_CONTAINED,
   ACCOUNT_SYNC_CONTAINMENT_NOTICE,
 } from "@/lib/sync/containment";
+import { buildPublicHref } from "@/lib/platform/api";
 
 export function JournalPrivacyNote() {
   const { user, loading, configured } = useSession();
@@ -41,7 +42,7 @@ export function JournalPrivacyNote() {
           in analytics or sent to AI.
         </p>
         <Link
-          href="/privacy"
+          href={buildPublicHref("/privacy")}
           className="inline-flex min-h-11 items-center font-medium text-accent"
         >
           Read the privacy policy

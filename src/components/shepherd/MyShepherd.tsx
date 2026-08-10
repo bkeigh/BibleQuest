@@ -11,6 +11,7 @@ import { GentleButton } from "@/components/design-system/GentleButton";
 import { InfoHint } from "@/components/design-system/InfoHint";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
+import { WebCommerceOnly } from "@/components/plus/WebCommerceOnly";
 import { MyShepherdResponse } from "@/components/shepherd/MyShepherdResponse";
 
 const STARTERS = [
@@ -87,13 +88,15 @@ export function MyShepherd() {
             Ask one faith or Bible question at a time. MyShepherd gives a
             humble explanation, passages to open, and one gentle next step.
           </p>
-          <GentleButton
-            variant="primary"
-            className="mt-5"
-            onClick={() => setPlusDialogOpen(true)}
-          >
-            Explore Plus
-          </GentleButton>
+          <WebCommerceOnly>
+            <GentleButton
+              variant="primary"
+              className="mt-5"
+              onClick={() => setPlusDialogOpen(true)}
+            >
+              Explore Plus
+            </GentleButton>
+          </WebCommerceOnly>
         </PaperCard>
         <PlusFeatureDialog
           open={plusDialogOpen}

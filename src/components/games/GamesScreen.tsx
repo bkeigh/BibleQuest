@@ -15,6 +15,7 @@ import {
   IconClock,
 } from "@/components/design-system/icons";
 import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
+import { WebCommerceOnly } from "@/components/plus/WebCommerceOnly";
 import { usePlus } from "@/lib/billing/usePlus";
 import { GREEN_FEATURES } from "@/lib/features/green";
 import {
@@ -101,27 +102,29 @@ export function GamesScreen() {
           <div className="mt-3 space-y-4">
             {GREEN_FEATURES.sevenDaysMatch && <SevenDaysArcadeCard />}
             <TodaysGameCard dayKey={dayKey} puzzle={puzzle} />
-            <Link
-              href="/app/games/store"
-              className="group block rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
-              <PaperCard variant="paper" padding="md" interactive>
-                <div className="flex items-center gap-3">
-                  <span aria-hidden="true" className="shrink-0">
-                    <ArtIcon name="service-basket" size={56} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-display text-subheading text-graphite">
-                      Arcade Store
+            <WebCommerceOnly>
+              <Link
+                href="/app/games/store"
+                className="group block rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                <PaperCard variant="paper" padding="md" interactive>
+                  <div className="flex items-center gap-3">
+                    <span aria-hidden="true" className="shrink-0">
+                      <ArtIcon name="service-basket" size={56} />
                     </span>
-                    <span className="block text-small leading-relaxed text-ash">
-                      Question Skips and a permanent Seven Days Game Pass.
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-display text-subheading text-graphite">
+                        Arcade Store
+                      </span>
+                      <span className="block text-small leading-relaxed text-ash">
+                        Question Skips and a permanent Seven Days Game Pass.
+                      </span>
                     </span>
-                  </span>
-                  <IconArrowRight size={16} className="shrink-0 text-accent" />
-                </div>
-              </PaperCard>
-            </Link>
+                    <IconArrowRight size={16} className="shrink-0 text-accent" />
+                  </div>
+                </PaperCard>
+              </Link>
+            </WebCommerceOnly>
             <ArchiveCard
               loading={plus.loading}
               isPlus={plus.isPlus}
@@ -279,13 +282,15 @@ function ArchiveCard({
       {card}
     </Link>
   ) : (
-    <button
-      type="button"
-      onClick={onExplorePlus}
-      className="group block w-full rounded-[var(--radius-card)] text-start focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-    >
-      {card}
-    </button>
+    <WebCommerceOnly>
+      <button
+        type="button"
+        onClick={onExplorePlus}
+        className="group block w-full rounded-[var(--radius-card)] text-start focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        {card}
+      </button>
+    </WebCommerceOnly>
   );
 }
 

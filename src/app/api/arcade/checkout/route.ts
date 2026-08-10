@@ -8,6 +8,7 @@ import { createStripe } from "@/lib/billing/stripe.server";
 import { MAX_BILLING_REQUEST_BYTES } from "@/lib/billing/validation";
 import { boundedJson } from "@/lib/http/json";
 import { hasSameOrigin, privateError } from "@/lib/http/request";
+import { isNativeAppOrigin } from "@/lib/http/native-origin";
 import { arcadePriceId } from "@/lib/games/arcade/records.server";
 import { arcadeStoreContractReady } from "@/lib/games/arcade/server";
 import {
@@ -22,6 +23,8 @@ export const runtime = "nodejs";
 
 /** Creates one authenticated, server-priced arcade Checkout Session. */
 export async function POST(request: Request) {
+  // Native acquisition stays closed until these products exist in StoreKit.
+  if (isNativeAppOrigin(request)) return privateError("forbidden", 403);
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
   const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;
