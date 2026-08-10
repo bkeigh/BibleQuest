@@ -22,7 +22,11 @@ import { InfoHint } from "@/components/design-system/InfoHint";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
 import { WebCommerceOnly } from "@/components/plus/WebCommerceOnly";
-import { QuestSlip, CATEGORY_LABEL, formatDuration } from "./QuestSlip";
+import { QuestSlip } from "./QuestSlip";
+import {
+  formatQuestDuration,
+  QUEST_CATEGORY_LABEL,
+} from "@/lib/questos/quest-presentation";
 import { IconPlus } from "@/components/design-system/icons";
 import { apiFetch } from "@/lib/platform/api";
 import { isNativeTarget } from "@/lib/platform/target";
@@ -188,7 +192,7 @@ export function QuestGenerator({
             <option value="">Any category</option>
             {QUEST_CATEGORIES.map((value) => (
               <option key={value} value={value}>
-                {CATEGORY_LABEL[value]}
+                {QUEST_CATEGORY_LABEL[value]}
               </option>
             ))}
           </select>
@@ -210,7 +214,7 @@ export function QuestGenerator({
             <option value="">Any length</option>
             {DURATIONS.map((value) => (
               <option key={value} value={value}>
-                {formatDuration(value)}
+                {formatQuestDuration(value)}
               </option>
             ))}
           </select>

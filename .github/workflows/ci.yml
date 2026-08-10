@@ -206,8 +206,8 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
-      - name: Report all production advisories
+      - name: Report all dependency advisories
         continue-on-error: true
-        run: pnpm audit --prod
-      - name: Block high and critical production risk
-        run: pnpm audit --prod --audit-level high
+        run: pnpm audit
+      - name: Block high and critical dependency risk
+        run: pnpm audit --audit-level high

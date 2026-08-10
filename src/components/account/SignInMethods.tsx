@@ -119,7 +119,6 @@ export function SignInMethods({
         createClient().auth.signInWithOtp({
           email: address,
           options: {
-            emailRedirectTo: callbackUrl(),
             shouldCreateUser: shouldCreateAccount(intent),
           },
         }),
@@ -274,7 +273,7 @@ export function SignInMethods({
           </p>
           <p className="mt-2 text-center text-caption leading-relaxed text-ash">
             Delivery can take a minute. Check Spam or Junk, and search for
-            “BibleQuest.” The code and link can only be used once.
+            “BibleQuest.” The code can only be used once.
           </p>
         </div>
 

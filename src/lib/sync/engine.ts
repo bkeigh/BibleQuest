@@ -31,7 +31,7 @@ import type {
   Settings,
   SyncTombstones,
 } from "@/lib/questos/types";
-import { DEFAULT_SETTINGS } from "@/lib/questos/types";
+import { DEFAULT_SETTINGS, emptyTombstones } from "@/lib/questos/types";
 import { useSyncStatus } from "./status";
 import {
   clearInitialSyncPending,
@@ -1868,11 +1868,11 @@ function tombstoneBatchItems(t: SyncTombstones): TombstoneBatchItem[] {
   return [
     ...t.prayers.map((id) => ({
       deletion: { resource: "prayers" as const, id },
-      cleared: { ...emptySyncTombstones(), prayers: [id] },
+      cleared: { ...emptyTombstones(), prayers: [id] },
     })),
     ...t.reflections.map((id) => ({
       deletion: { resource: "reflections" as const, id },
-      cleared: { ...emptySyncTombstones(), reflections: [id] },
+      cleared: { ...emptyTombstones(), reflections: [id] },
     })),
     ...t.bookmarks.map((bookmark) => ({
       deletion: {
@@ -1882,11 +1882,11 @@ function tombstoneBatchItems(t: SyncTombstones): TombstoneBatchItem[] {
         verse: bookmark.verse,
         translation_key: bookmark.translationKey ?? "web",
       },
-      cleared: { ...emptySyncTombstones(), bookmarks: [bookmark] },
+      cleared: { ...emptyTombstones(), bookmarks: [bookmark] },
     })),
     ...t.myQuests.map((questSlug) => ({
       deletion: { resource: "user_quests" as const, quest_slug: questSlug },
-      cleared: { ...emptySyncTombstones(), myQuests: [questSlug] },
+      cleared: { ...emptyTombstones(), myQuests: [questSlug] },
     })),
   ];
 }
@@ -1920,22 +1920,11 @@ function mutableRevisionRemovals(
   ];
 }
 
-/** Return a fresh empty tombstone set without importing store implementation. */
-function emptySyncTombstones(): SyncTombstones {
-  return {
-    prayers: [],
-    reflections: [],
-    bookmarks: [],
-    myQuests: [],
-    purgeAccount: null,
-  };
-}
-
 /** Combine the tombstones acknowledged by one bounded server batch. */
 function combineClearedTombstones(
   items: readonly TombstoneBatchItem[],
 ): SyncTombstones {
-  const cleared = emptySyncTombstones();
+  const cleared = emptyTombstones();
   for (const item of items) {
     cleared.prayers.push(...item.cleared.prayers);
     cleared.reflections.push(...item.cleared.reflections);

@@ -158,7 +158,7 @@ describe("rolling quest lifecycle", () => {
   it("lets Plus remove a Ready quest immediately", () => {
     expect(useQuestOS.getState().pickQuest(slugs[0], true)).toBe(true);
     vi.setSystemTime(new Date(START.getTime() + QUEST_WINDOW_MS * 2));
-    useQuestOS.getState().unpickQuest(slugs[0], true);
+    useQuestOS.getState().unpickQuest(slugs[0]);
     expect(occupiedQuestAssignments(useQuestOS.getState().assignments)).toHaveLength(0);
   });
 

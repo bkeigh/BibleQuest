@@ -118,7 +118,7 @@ describe("native cookie storage", () => {
   });
 });
 
-describe("native auth callback", () => {
+describe("native OAuth callback", () => {
   const runtime = {
     target: "native" as const,
     hostedOrigin: "https://www.biblequest.co",
@@ -132,9 +132,7 @@ describe("native auth callback", () => {
     ).toBe("https://www.biblequest.co/auth/callback?next=%2Fapp");
   });
 
-  it("always produces a URL that already carries a query string", () => {
-    // The magic-link template appends `&token_hash=...`, so a query-less
-    // redirect yields a malformed link.
+  it("carries the validated post-auth destination", () => {
     const url = resolveAuthCallbackUrl("/app", { runtime });
     expect(url).toContain("?");
     expect(new URL(url).searchParams.get("next")).toBe("/app");

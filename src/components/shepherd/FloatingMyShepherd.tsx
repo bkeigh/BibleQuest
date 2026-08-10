@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Hosts the movable MyShepherd launcher and its responsive conversation UI.
+ * Desktop uses a non-modal panel, compact screens use a keyboard-safe sheet,
+ * and Plus, motion, and persisted placement rules remain behind typed seams.
+ */
 import {
   useCallback,
   useEffect,
@@ -66,9 +71,8 @@ const FOCUSABLE_SELECTOR =
 const RESTING_GUTTER =
   "max(var(--app-bottom-nav-height, 4.5rem), calc(env(safe-area-inset-bottom) + 0.75rem))";
 
-/** Ten percent smaller than the former 108px art request. */
+/** Balances the character's optical weight inside its movable touch target. */
 const LAUNCHER_ART_SIZE = 97;
-/** MyShepherd's optical weight renders the requested art into this square. */
 const LAUNCHER_SIZE = 85;
 const LAUNCHER_GUTTER = 12;
 const LAUNCHER_PEEK = 24;
@@ -76,14 +80,7 @@ const LAUNCHER_DRAG_THRESHOLD = 6;
 const LAUNCHER_HIDE_EDGE = 18;
 const LAUNCHER_HIDE_VELOCITY = 0.45; // px per ms
 
-/**
- * MyShepherd's blue, one step deeper than the marian-500 it used to be.
- *
- * White on marian-500 is 4.45:1 — under the 4.5:1 floor for text this size, so
- * the header subtitle failed at any opacity, not just at the 75% it was set to.
- * marian-700 carries white at 9.4:1 and sits better against parchment. The
- * lighter blue stays where it is only a tint, never behind white text.
- */
+/** Keeps every white header label above the small-text contrast threshold. */
 const SHEPHERD_INK = "bg-marian-700";
 
 interface ChatTurn {
@@ -636,10 +633,7 @@ export function FloatingMyShepherd() {
               className={[
                 "app-glass-surface pointer-events-auto relative flex min-h-0 max-h-full flex-col overflow-hidden",
                 "border border-mist bg-paper/95 paper-shadow-lg backdrop-blur-xl",
-                // A card, rounded on every corner. It used to run edge to edge
-                // with a square bottom — the sides of a docked sheet on
-                // something that stops above the tab bar, which is what made it
-                // read as crowded against the screen rather than deliberate.
+                // The sheet floats above navigation as one bounded card.
                 "rounded-[22px]",
                 // Desktop: the same card, anchored bottom-end.
                 "sm:self-end sm:me-[var(--shepherd-inset)] sm:max-h-[42rem]",
@@ -659,8 +653,7 @@ export function FloatingMyShepherd() {
                 )}
               >
                 {compact && (
-                  // The handle for the swipe-down dismiss. At 45% white it was
-                  // a smudge nobody would read as an affordance.
+                  // A visible handle communicates the swipe-down dismissal.
                   <span
                     aria-hidden="true"
                     className="absolute inset-x-0 top-2 mx-auto h-1.5 w-10 rounded-full bg-white/70"
@@ -877,15 +870,8 @@ export function FloatingMyShepherd() {
           mobileOrTablet && "cursor-grab touch-none",
           launcherDragging && "cursor-grabbing transition-none",
           launcherReady ? "opacity-100" : "pointer-events-none opacity-0",
-          // No plate behind it. The sprite is drawn with its own transparency
-          // and reads as a character standing on the page; a blue disc around
-          // it turned that character into a small mark inside a button.
-          //
-          // The focus ring is a box-shadow, never `outline` — an outline with
-          // an offset is drawn as a rectangle by some engines regardless of
-          // border-radius, which is what squared this off whenever it took
-          // focus, most visibly right after the sheet closed and handed focus
-          // back to it.
+          // A shadow-based ring follows the transparent character silhouette
+          // more reliably than offset outlines across browser engines.
           "outline-none focus-visible:shadow-[0_0_0_3px_var(--color-paper),0_0_0_5px_var(--color-accent)]",
         )}
         style={

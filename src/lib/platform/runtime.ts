@@ -19,6 +19,27 @@ export class PlatformConfigurationError extends Error {
   }
 }
 
+/** Allows HTTPS production and HTTP local development, with no URL decorations. */
+export function validatedWebOrigin(value: string): string {
+  try {
+    const url = new URL(value);
+    if (
+      (url.protocol !== "https:" && url.protocol !== "http:") ||
+      url.username ||
+      url.password ||
+      url.pathname !== "/" ||
+      url.search ||
+      url.hash
+    ) {
+      throw new PlatformConfigurationError();
+    }
+    return url.origin;
+  } catch (error) {
+    if (error instanceof PlatformConfigurationError) throw error;
+    throw new PlatformConfigurationError();
+  }
+}
+
 /** Reads only explicitly public build settings; no credential belongs in this boundary. */
 export function currentPlatformEnvironment(): PlatformEnvironment {
   return {

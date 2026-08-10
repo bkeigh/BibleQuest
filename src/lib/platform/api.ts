@@ -1,6 +1,7 @@
 import {
   PlatformConfigurationError,
   platformRuntime,
+  validatedWebOrigin,
   type PlatformRuntime,
 } from "./runtime";
 import { isNativeTarget } from "./target";
@@ -144,27 +145,6 @@ function validatedRuntimeOrigin(runtime: PlatformRuntime): string {
     if (
       url.protocol !== "https:" ||
       url.origin !== runtime.hostedOrigin ||
-      url.username ||
-      url.password ||
-      url.pathname !== "/" ||
-      url.search ||
-      url.hash
-    ) {
-      throw new PlatformConfigurationError();
-    }
-    return url.origin;
-  } catch (error) {
-    if (error instanceof PlatformConfigurationError) throw error;
-    throw new PlatformConfigurationError();
-  }
-}
-
-/** Allows HTTPS production and HTTP local development while rejecting non-web schemes. */
-function validatedWebOrigin(value: string): string {
-  try {
-    const url = new URL(value);
-    if (
-      (url.protocol !== "https:" && url.protocol !== "http:") ||
       url.username ||
       url.password ||
       url.pathname !== "/" ||

@@ -160,11 +160,3 @@ export function collectSevenDaysContentErrors(): string[] {
 
   return errors;
 }
-
-/** A bad content handoff stops the build instead of reaching a reader. */
-export function assertValidSevenDaysContent(): void {
-  const errors = collectSevenDaysContentErrors();
-  if (errors.length > 0) {
-    throw new Error(`Seven Days Match content is invalid:\n- ${errors.join("\n- ")}`);
-  }
-}

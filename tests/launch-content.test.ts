@@ -92,6 +92,10 @@ describe("launch content catalog", () => {
       path.join(process.cwd(), "src/components/home/HomeScreen.tsx"),
       "utf8",
     );
+    const globalStyles = readFileSync(
+      path.join(process.cwd(), "src/app/globals.css"),
+      "utf8",
+    );
 
     // The sealed Plus projection controls both the visual state and its label.
     expect(home).toContain('data-plus-nameplate={isPlus ? "active" : "free"}');
@@ -107,12 +111,29 @@ describe("launch content catalog", () => {
     expect(home).toContain('"@container min-w-0 flex-1"');
     expect(home).toContain('className="max-[340px]:w-12"');
     expect(home).toContain("plus-nameplate");
+    expect(home).toContain("home-hero-surface");
     expect(home).toContain("border-[#9f6a1f]/75");
-    expect(home).toContain("from-[#7d5013]");
+    expect(home).toContain("from-[#4d3008]");
     expect(home).toContain('tone={isPlus ? "gold" : "default"}');
-    expect(home).toContain('isPlus ? "text-[#704713]" : "text-accent"');
-    expect(home).toContain('isPlus ? "text-[#68512b]" : "text-ash"');
+    expect(home).toContain('isPlus ? "text-[#4f3108]" : "text-accent"');
+    expect(home).toContain('isPlus ? "text-[#493816]" : "text-charcoal"');
     expect(home).not.toContain("subscription.status");
+
+    // Wallpaper members always receive the Plus nameplate. Its fill therefore
+    // has to remain one <=50%-opaque layer rather than stacked opaque gradients.
+    const plusHeroRule = globalStyles.indexOf(
+      '.home-hero-surface[data-plus-nameplate="active"]',
+    );
+    const plusHeroCss = globalStyles.slice(
+      plusHeroRule,
+      globalStyles.indexOf("}", plusHeroRule),
+    );
+    expect(plusHeroRule).toBeGreaterThan(-1);
+    expect(globalStyles).toContain(
+      'html.glass-surfaces.has-wallpaper [data-app-shell] .app-glass-surface.home-hero-surface[data-plus-nameplate="active"]',
+    );
+    expect(plusHeroCss).toContain("background-color: transparent");
+    expect(plusHeroCss).toContain("/ 0.46");
   });
 
   it("keeps Home membership-aware with newsletter beneath voluntary support", () => {

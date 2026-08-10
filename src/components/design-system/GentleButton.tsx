@@ -17,13 +17,14 @@ const BASE =
   "inline-flex items-center justify-center gap-2 font-medium rounded-[var(--radius-button)] " +
   "transition-all duration-300 [transition-timing-function:var(--ease-gentle)] " +
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent " +
+  "active:translate-y-px motion-reduce:transform-none disabled:translate-y-0 " +
   "disabled:opacity-50 disabled:pointer-events-none select-none";
 
 const VARIANTS: Record<Variant, string> = {
   /** THE main CTA — deep evergreen fill, warm ivory text. */
   primary:
     "bg-evergreen-700 text-[#fdfbf3] border border-evergreen-700 " +
-    "hover:bg-evergreen-600 hover:border-evergreen-600 " +
+    "shadow-[0_8px_20px_rgb(14_83_60_/_0.16)] hover:bg-evergreen-600 hover:border-evergreen-600 hover:shadow-[0_10px_24px_rgb(14_83_60_/_0.22)] " +
     "active:bg-evergreen-800 active:border-evergreen-800",
   outline:
     "border border-accent/60 text-accent bg-transparent hover:bg-accent-surface active:bg-accent-surface",
@@ -53,14 +54,7 @@ const SIZES: Record<Size, string> = {
   lg: "min-h-11 text-[1.0625rem] px-6 py-3",
 };
 
-/* The text variant keeps the font size of its Size but never the padding.
- *
- * It keeps the touch height, though. Dropping the padding dropped `min-h-11`
- * along with it, which left every text button in the app a 23px target — fine
- * for a mouse, under half of Apple's 44pt minimum for a thumb, and worth
- * fixing before any of this is wrapped for iOS. `inline-flex items-center`
- * grows the hit area around the label without moving the label itself, so
- * nothing shifts on screen. */
+/** Text buttons drop horizontal padding but retain a 44px touch target. */
 const TEXT_SIZES: Record<Size, string> = {
   sm: "min-h-11 text-[0.9375rem]",
   md: "min-h-11 text-[1rem]",

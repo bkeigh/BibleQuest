@@ -23,7 +23,7 @@ export function HomeSectionHeading({
         >
           {title}
         </h2>
-        <p className="text-[0.625rem] uppercase tracking-[0.08em] text-ash sm:text-caption sm:tracking-[0.12em]">
+        <p className="text-[0.6875rem] uppercase tracking-[0.08em] text-ash sm:text-caption sm:tracking-[0.12em]">
           {subtitle}
         </p>
       </div>

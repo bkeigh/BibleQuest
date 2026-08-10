@@ -8,6 +8,10 @@ describe("Home formation layout", () => {
     "utf8",
   );
   const bible = readFileSync("src/components/bible/BibleIndex.tsx", "utf8");
+  const appShell = readFileSync(
+    "src/components/app-shell/AppShell.tsx",
+    "utf8",
+  );
   // The card itself now lives beside the arcade, so Home and the arcade page
   // draw the same one instead of two that drift apart.
   const card = readFileSync(
@@ -64,24 +68,22 @@ describe("Home formation layout", () => {
     expect(home).toContain("<HomeSectionHeading");
   });
 
-  it("uses the requested MyShepherd color inside one secondary-content disclosure", () => {
+  it("uses the requested MyShepherd color and keeps the full path visible", () => {
     // The blue moved from an inline style into `.app-glass-shepherd` so the
     // glass rule can tint it; an inline background would have out-ranked it.
     expect(home).toContain("app-glass-shepherd");
     expect(home).not.toContain('backgroundColor: "#3F7EA3"');
     expect(home).toContain("space-y-7 pb-7");
-    // First-time Home now leads with Scripture and one quest. Optional guides,
-    // games, promotions, and support remain reachable behind one real control.
-    expect(home).toContain("<Disclosure");
-    expect(home).toContain("Explore more");
-    expect(home).toContain(
-      'nativeTarget\n                    ? "Your rhythm, guided Scripture, growth, and games"',
-    );
-    expect(home).toContain('variant="quiet"');
-    expect(home).not.toContain("function QuickActionTile");
+    // The recording's uninterrupted sequence is the product behavior: useful
+    // formation and navigation cannot disappear behind a generic drawer.
+    expect(home).not.toContain("<Disclosure");
+    expect(home).not.toContain("Explore more");
+    expect(home).toContain("function QuickActionTile");
+    expect(home).toContain("grid grid-cols-3");
+    expect(appShell).toContain('pathname === "/app" ||');
   });
 
-  it("does not consume the account prompt while Explore more is closed", () => {
+  it("records the account prompt only after it is actually visible", () => {
     const prompt = readFileSync(
       "src/components/account/AccountPrompt.tsx",
       "utf8",
@@ -104,10 +106,11 @@ describe("Home formation layout", () => {
     expect(formation.match(/role=\"listitem\"/g)).toHaveLength(3);
     expect(card).toContain("flex h-full min-h-[17rem] w-full flex-col");
     expect(card).toContain("mt-auto pt-8");
-    expect(formation).toContain("absolute -left-5");
-    expect(formation).toContain("absolute -right-5");
-    expect(formation).toContain("sm:-left-8");
-    expect(formation).toContain("sm:-right-8");
+    expect(formation).toContain("absolute -left-3");
+    expect(formation).toContain("absolute -right-3");
+    expect(formation).toContain("h-11 w-11");
+    expect(formation).toContain("sm:-left-5");
+    expect(formation).toContain("sm:-right-5");
     expect(formation).toContain("const edgeTolerance = 24");
     expect(formation).toContain("Seven Days Match");
     // Seven Days Match stopped being a preview and became a real card, so the
@@ -132,16 +135,20 @@ describe("Home formation layout", () => {
     expect(card).toContain("flex h-full min-h-[17rem] overflow-hidden");
   });
 
-  it("removes destinations already represented by the primary navigation", () => {
-    const support = home.indexOf("<SupportLink");
+  it("places devotional shortcuts before account and commerce invitations", () => {
+    const games = home.indexOf('show="game"');
+    const prayer = home.indexOf('title="One minute of prayer"', games);
+    const bible = home.indexOf('title="Open the Bible"', prayer);
+    const reflections = home.indexOf('title="Reflect on Today"', bible);
+    const account = home.indexOf("<AccountPrompt", reflections);
+    const support = home.indexOf("<SupportLink", account);
     const newsletter = home.indexOf("<NewsletterLink");
 
-    expect(support).toBeGreaterThan(-1);
+    expect(prayer).toBeGreaterThan(games);
+    expect(bible).toBeGreaterThan(prayer);
+    expect(reflections).toBeGreaterThan(bible);
+    expect(account).toBeGreaterThan(reflections);
+    expect(support).toBeGreaterThan(account);
     expect(newsletter).toBeGreaterThan(support);
-    // Prayer and Bible stay one tap away in BottomNav instead of appearing a
-    // second time as a three-card choice near the end of an already long Home.
-    expect(home).not.toContain('title="One minute of prayer"');
-    expect(home).not.toContain('title="Open the Bible"');
-    expect(home).not.toContain('title="Reflect on Today"');
   });
 });

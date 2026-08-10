@@ -14,13 +14,13 @@ import {
   makeGuidedSessionKey,
 } from "@/lib/guided/progress";
 import { useQuestOS } from "@/lib/questos/store";
-import { toDateKey } from "@/lib/utils/dates";
+import { useCurrentDayKey } from "@/lib/use-current-day-key";
 import { GuidedProgressBar } from "./GuidedProgressBar";
 import { GREEN_FEATURES } from "@/lib/features/green";
 
 /** Hydrated daily guide invitation with an honest Start or Resume state. */
 function GuidedHubInner() {
-  const dateKey = toDateKey();
+  const dateKey = useCurrentDayKey();
   const guide = guidedScriptureForDate(dateKey);
   const sessionKey = makeGuidedSessionKey("daily", guide.id, dateKey);
   const progress = useQuestOS((state) => state.guidedProgress[sessionKey]);

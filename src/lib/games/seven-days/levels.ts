@@ -2,7 +2,6 @@ import { hashString } from "@/lib/utils/dates";
 import {
   SEVEN_DAYS_CHAPTERS,
   SEVEN_DAYS_LEVELS_PER_CHAPTER,
-  SEVEN_DAYS_TOTAL_LEVELS,
 } from "./content";
 import {
   SEVEN_DAYS_TILE_IDS,
@@ -32,7 +31,7 @@ const BASE_GOAL = 12;
  * One shape per level, so a day is seven boards rather than the same board
  * seven times. `#` plays, `.` is cut away — readable in source, which matters
  * because a mask with an isolated cell is unwinnable and easy to write by
- * accident. `assertValidSevenDaysContent` checks every one.
+ * accident. The content validation test checks every one.
  */
 const MASKS: readonly SevenDaysMask[] = [
   // 1 — the full field.
@@ -156,11 +155,6 @@ export function levelOrdinal(level: SevenDaysLevel): number {
   return (level.day - 1) * SEVEN_DAYS_LEVELS_PER_CHAPTER + (level.level - 1);
 }
 
-export function levelAtOrdinal(ordinal: number): SevenDaysLevel | null {
-  if (!Number.isInteger(ordinal) || ordinal < 0) return null;
-  return SEVEN_DAYS_LEVELS[ordinal] ?? null;
-}
-
 export function chapterById(id: string): SevenDaysChapter | undefined {
   return SEVEN_DAYS_CHAPTERS.find((chapter) => chapter.id === id);
 }
@@ -188,5 +182,3 @@ export function verseForLevel(level: SevenDaysLevel): SevenDaysVerse | null {
   if (pool.length === 0) return null;
   return pool[hashString(level.id) % pool.length];
 }
-
-export { SEVEN_DAYS_TOTAL_LEVELS };

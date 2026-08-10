@@ -1,8 +1,14 @@
 import "server-only";
 
+/**
+ * Reconciles Stripe events into BibleQuest's provider-neutral billing rows.
+ * Event payloads identify the object to refresh; current Stripe objects remain
+ * authoritative so duplicate, delayed, or out-of-order webhooks are harmless.
+ */
 import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StripeBillingConfiguration } from "./config.server";
+import { stripeObjectId } from "./stripe-object.server";
 import {
   synchronizeLifetimeCharge,
   synchronizeLifetimeSession,
@@ -58,13 +64,8 @@ export class StripeWebhookProcessingError extends Error {
   }
 }
 
-function id(value: string | { id: string } | null): string | null {
-  if (!value) return null;
-  return typeof value === "string" ? value : value.id;
-}
-
 function invoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
-  return id(invoice.parent?.subscription_details?.subscription ?? null);
+  return stripeObjectId(invoice.parent?.subscription_details?.subscription ?? null);
 }
 
 async function currentSubscription(
@@ -121,9 +122,9 @@ async function subscriptionContextFromCharge(
   stripe: Stripe,
   charge: Stripe.Charge,
 ): Promise<{ customerId: string | null; subscriptionId: string | null }> {
-  const paymentIntentId = id(charge.payment_intent);
+  const paymentIntentId = stripeObjectId(charge.payment_intent);
   if (!paymentIntentId) {
-    return { customerId: id(charge.customer), subscriptionId: null };
+    return { customerId: stripeObjectId(charge.customer), subscriptionId: null };
   }
   const payments = await stripe.invoicePayments.list({
     payment: {
@@ -132,13 +133,13 @@ async function subscriptionContextFromCharge(
     },
     limit: 1,
   });
-  const invoiceId = id(payments.data[0]?.invoice ?? null);
+  const invoiceId = stripeObjectId(payments.data[0]?.invoice ?? null);
   if (!invoiceId) {
-    return { customerId: id(charge.customer), subscriptionId: null };
+    return { customerId: stripeObjectId(charge.customer), subscriptionId: null };
   }
   const invoice = await stripe.invoices.retrieve(invoiceId);
   return {
-    customerId: id(charge.customer),
+    customerId: stripeObjectId(charge.customer),
     subscriptionId: invoiceSubscriptionId(invoice),
   };
 }
@@ -148,7 +149,7 @@ async function supportRequestIdFromCharge(
   stripe: Stripe,
   charge: Stripe.Charge,
 ): Promise<string | null> {
-  const paymentIntentId = id(charge.payment_intent);
+  const paymentIntentId = stripeObjectId(charge.payment_intent);
   if (!paymentIntentId) return null;
   const paymentIntent =
     await stripe.paymentIntents.retrieve(paymentIntentId);
@@ -175,7 +176,7 @@ async function processInvoice(
           ? "invoice_paid"
           : "invoice_payment_failed",
       stripe_object_id: invoice.id,
-      stripe_customer_id: id(invoice.customer),
+      stripe_customer_id: stripeObjectId(invoice.customer),
       stripe_subscription_id: subscriptionId,
       status: invoice.status,
       amount:
@@ -220,7 +221,7 @@ async function processCheckout(
     if (session.status !== "complete" || session.payment_status !== "paid") {
       return;
     }
-    const paymentIntentId = id(session.payment_intent);
+    const paymentIntentId = stripeObjectId(session.payment_intent);
     if (!paymentIntentId) {
       throw new StripeWebhookProcessingError("invalid");
     }
@@ -242,7 +243,7 @@ async function processCheckout(
     session.metadata?.purpose === "biblequest_plus" &&
     session.metadata?.billing_interval === "lifetime"
   ) {
-    const paymentIntentId = id(session.payment_intent);
+    const paymentIntentId = stripeObjectId(session.payment_intent);
     if (!paymentIntentId) {
       throw new StripeWebhookProcessingError("invalid");
     }
@@ -265,7 +266,7 @@ async function processCheckout(
     stripe,
     configuration,
     event,
-    id(session.subscription),
+    stripeObjectId(session.subscription),
   );
 }
 
@@ -277,13 +278,13 @@ async function processRefund(
 ): Promise<void> {
   const eventRefund = event.data.object as Stripe.Refund;
   const refund = await stripe.refunds.retrieve(eventRefund.id);
-  const chargeId = id(refund.charge);
+  const chargeId = stripeObjectId(refund.charge);
   let customerId: string | null = null;
   let subscriptionId: string | null = null;
   let currentCharge: Stripe.Charge | null = null;
   if (chargeId) {
     currentCharge = await stripe.charges.retrieve(chargeId);
-    customerId = id(currentCharge.customer);
+    customerId = stripeObjectId(currentCharge.customer);
     // A known one-time payment has no invoice, so skip the unrelated lookup.
     const lifetimePayment = await synchronizeLifetimeCharge(
       admin,
@@ -346,13 +347,13 @@ async function processDispute(
 ): Promise<void> {
   const eventDispute = event.data.object as Stripe.Dispute;
   const dispute = await stripe.disputes.retrieve(eventDispute.id);
-  const chargeId = id(dispute.charge);
+  const chargeId = stripeObjectId(dispute.charge);
   let customerId: string | null = null;
   let subscriptionId: string | null = null;
   let currentCharge: Stripe.Charge | null = null;
   if (chargeId) {
     currentCharge = await stripe.charges.retrieve(chargeId);
-    customerId = id(currentCharge.customer);
+    customerId = stripeObjectId(currentCharge.customer);
     // A known one-time payment has no invoice, so skip the unrelated lookup.
     const lifetimePayment = await synchronizeLifetimeCharge(
       admin,

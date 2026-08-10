@@ -38,7 +38,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const floatingMyShepherd = useQuestOS(
     (state) => state.settings.appearance.myShepherdFloatingButton !== false,
   );
+  // Home already carries MyShepherd in the formation flow, where the large
+  // launcher would duplicate the action and cover the restored card sequence.
   const hidesFloatingTools =
+    pathname === "/app" ||
     pathname === "/app/shepherd" ||
     pathname === "/app/prayer/new" ||
     pathname === "/app/prayer/reflection/new" ||

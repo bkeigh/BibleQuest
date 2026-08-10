@@ -118,54 +118,14 @@ export interface UIStrings {
     title: string;
     body: string;
   };
-  /** My Quests — the persistent quest shelf and its Home feed. */
+  /** Quest actions and four movement labels shared by Browse and detail views. */
   myQuests: {
-    /** Feed section heading on Home. */
-    title: string;
-    /** Sub-section: active walks beyond today's picks. */
-    continueTitle: string;
-    /** Sub-section: saved-for-later and paused quests. */
-    savedTitle: string;
-    /** Collapsed sub-section: finished walks. */
-    completedTitle: string;
-    /** Collapsed sub-section inside completed: archived quests. */
-    archivedTitle: string;
-    emptyTitle: string;
-    emptyBody: string;
-    browseCta: string;
-    continueCta: string;
-    resumeCta: string;
-    /** Reopen a completed quest. */
-    reopenCta: string;
     saveForLater: string;
     savedToast: string;
-    pause: string;
-    pausedToast: string;
-    archive: string;
-    archivedToast: string;
-    /** Remove from the shelf (the quest stays in Browse). */
-    removeFromShelf: string;
-    removedToast: string;
-    statusNew: string;
-    statusInProgress: string;
-    statusSaved: string;
-    statusPaused: string;
-    statusCompleted: string;
-    statusArchived: string;
-    /** Chip on quests picked for today. */
-    statusToday: string;
-    /** Uses {done} and {total}, e.g. "2 of 4 steps". */
-    steps: string;
-    /** Uses {step}, e.g. "Next: Read the Scripture". */
-    nextStep: string;
     stepScripture: string;
     stepLive: string;
     stepReflect: string;
     stepPray: string;
-    /** Uses {n} — lifetime completions of one quest, shown when > 1. */
-    walkedTimes: string;
-    /** aria-label prefix for the card toggle; uses {title}. */
-    toggleDetails: string;
   };
   /** Gentle, contextual invitation to create an account. */
   accountPrompt: {

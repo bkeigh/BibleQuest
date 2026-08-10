@@ -18,7 +18,7 @@ guest mode with analytics, payments, and Supabase integrations disabled.
 | `Production build` | `pnpm build` | Blocks a guest-mode production build failure; times out after 20 minutes. |
 | `Browser smoke` | `pnpm test:e2e` | Builds the configured-but-contained release and verifies public privacy/framing plus onboarding landmarks in Chromium. |
 | `Database policies` | `supabase start`, `supabase db reset`, `supabase test db --local` | Applies every migration and seed to an ephemeral local stack, then blocks schema or RLS acceptance failures without remote credentials. |
-| `Dependency risk` | `pnpm audit --prod`, then `pnpm audit --prod --audit-level high` | Reports every production advisory. High and critical advisories block CI; moderate advisories stay visible for triage without blocking. |
+| `Dependency risk` | `pnpm audit`, then `pnpm audit --audit-level high` | Reports advisories across runtime and build tooling. High and critical advisories block CI; lower advisories stay visible for triage. |
 
 The workflow has only `contents: read` permission. Checkout credentials are not
 persisted, actions are pinned to major versions, and no artifacts or logs are

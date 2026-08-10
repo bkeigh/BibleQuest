@@ -49,8 +49,6 @@ export const LANGUAGES: LanguageMeta[] = [
   { code: "la", endonym: "Lingua Latina", english: "Latin", dir: "ltr", flags: ["🇻🇦"] },
 ];
 
-export const LANGUAGE_CODES = LANGUAGES.map((l) => l.code);
-
 export function languageMeta(code: string): LanguageMeta {
   return LANGUAGES.find((l) => l.code === code) ?? LANGUAGES[0];
 }

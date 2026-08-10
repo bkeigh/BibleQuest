@@ -1,9 +1,12 @@
 import Link from "next/link";
 import type {
   DailyQuestStatus,
-  QuestCategory,
   QuestTemplate,
 } from "@/lib/questos/types";
+import {
+  formatQuestDuration,
+  QUEST_CATEGORY_LABEL,
+} from "@/lib/questos/quest-presentation";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { ArtIcon, CATEGORY_ART } from "@/components/design-system/ArtIcon";
 import {
@@ -13,32 +16,6 @@ import {
 } from "@/components/design-system/icons";
 import { cn } from "@/lib/utils/cn";
 import { formatQuestWindowRemaining } from "@/lib/questos/quest-engine";
-
-export function formatDuration(minutes: number): string {
-  if (minutes < 60) return `${minutes} min`;
-  if (minutes === 60) return "1 hour";
-  if (minutes === 240) return "Half day";
-  if (minutes === 480) return "Full day";
-  return `${Math.round(minutes / 60)} hours`;
-}
-
-/** The one category → display-name map for every quest surface. */
-export const CATEGORY_LABEL: Record<QuestCategory, string> = {
-  prayer: "Prayer",
-  scripture: "Scripture",
-  service: "Service",
-  kindness: "Kindness",
-  forgiveness: "Forgiveness",
-  generosity: "Generosity",
-  discipline: "Discipline",
-  gratitude: "Gratitude",
-  silence: "Silence",
-  worship: "Worship",
-  family: "Family",
-  community: "Community",
-  reflection: "Reflection",
-  patience: "Patience",
-};
 
 interface QuestSlipProps {
   quest: QuestTemplate;
@@ -144,11 +121,11 @@ export function QuestSlip({
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[0.75rem] text-ash">
             <span className="inline-flex items-center gap-1">
               <IconClock size={13} />
-              {formatDuration(quest.durationMinutes)}
+              {formatQuestDuration(quest.durationMinutes)}
             </span>
             <span className="text-mist">·</span>
             <span className="font-art-label text-[0.875rem] text-accent">
-              {CATEGORY_LABEL[quest.category]}
+              {QUEST_CATEGORY_LABEL[quest.category]}
             </span>
             {badge}
           </div>

@@ -240,13 +240,3 @@ export function stageProgress(
     fraction: needed > 0 ? Math.min(1, Math.max(0, done / needed)) : 1,
   };
 }
-
-/** What each growth type nourishes, for gentle UI explanations. */
-export const GROWTH_MEANINGS: Record<GrowthType, string> = {
-  roots: "Roots hold grounding and steadiness",
-  branches: "Branches carry learning and direction",
-  leaves: "Leaves show care taking shape",
-  fruit: "Fruit reflects love put into practice",
-  sunlight: "Sunlight holds attention and reflection",
-  flowers: "Flowers hold gratitude and joy",
-};

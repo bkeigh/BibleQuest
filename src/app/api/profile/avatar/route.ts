@@ -1,3 +1,8 @@
+/**
+ * Owns the private avatar upload boundary: authenticate, validate origin and
+ * byte limits, verify image signatures, normalize to WebP, then update the
+ * user's private storage path through a database-owned mutation contract.
+ */
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -14,6 +19,11 @@ import {
 } from "@/lib/avatar/validation";
 import { boundedBytes, boundedJson } from "@/lib/http/json";
 import { hasSameOrigin, privateError } from "@/lib/http/request";
+import { guardIdentifiedRequest } from "@/lib/bible/provider-request-guard";
+import {
+  distributedPoliciesFromWindows,
+  guardDistributedRequest,
+} from "@/lib/security/distributed-rate-limit.server";
 import {
   recordServerFailure,
   recordServerFailureReason,
@@ -27,6 +37,10 @@ export const runtime = "nodejs";
 const AVATAR_BUCKET = "profile-avatars";
 const AVATAR_CONTRACT = "biblequest_profile_avatar_v1";
 const MAX_FORM_BYTES = MAX_AVATAR_INPUT_BYTES + 64 * 1024;
+const AVATAR_UPLOAD_RATE_POLICIES = [
+  { limit: 5, windowMs: 10 * 60_000 },
+  { limit: 20, windowMs: 24 * 60 * 60_000 },
+] as const;
 const PRIVATE_IMAGE_HEADERS = {
   "Cache-Control": "private, no-store",
   "Content-Type": "image/webp",
@@ -188,6 +202,21 @@ export async function POST(request: Request) {
   if (!(await avatarContractReady(supabase, "write"))) {
     return privateError("unavailable", 503);
   }
+
+  // Reserve per-account capacity before any expensive image decode or resize.
+  const blocked = guardIdentifiedRequest(
+    request,
+    `avatar-upload:${user.id}`,
+    AVATAR_UPLOAD_RATE_POLICIES,
+  );
+  if (blocked) return blocked;
+  const distributedBlocked = await guardDistributedRequest(
+    request,
+    "avatar-upload",
+    distributedPoliciesFromWindows(AVATAR_UPLOAD_RATE_POLICIES),
+    user.id,
+  );
+  if (distributedBlocked) return distributedBlocked;
 
   let normalized: Uint8Array;
   try {

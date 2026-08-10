@@ -69,13 +69,14 @@ In **Supabase → Authentication → URL Configuration**:
 
 In **Authentication → Email Templates**, publish the checked-in confirmation
 and magic-link templates from [`supabase/templates/`](../supabase/templates/).
-They include both `Token` for an installed PWA to verify inside its own storage
-context and the established `RedirectTo`/`TokenHash` browser link. See
+They include only `Token`, which an installed PWA or browser verifies inside
+its own storage context. Portable `RedirectTo`/`TokenHash` links are
+intentionally absent because they are not bound to the requesting browser. See
 [Supabase redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls)
 and [email templates](https://supabase.com/docs/guides/auth/auth-email-templates).
 
 Before calling auth fixed, complete the schema/content recovery steps in
-[`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md). A delivered link can
+[`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md). A verified code can
 successfully create a session and still fail to restore the journey if the
 hosted database is behind the app migrations.
 

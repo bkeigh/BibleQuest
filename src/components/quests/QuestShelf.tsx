@@ -98,10 +98,7 @@ export function QuestLane({
     );
   }
 
-  // Depend on how many cards there are, not on the children themselves. A
-  // React element array is a fresh object every render, so listing `children`
-  // tore down and rebuilt a ResizeObserver on every single render of every
-  // rail on the page.
+  // Card count keeps the ResizeObserver stable across equivalent renders.
   const childCount = Array.isArray(children) ? children.length : 1;
   useEffect(() => {
     if (layout !== "rail") return;
@@ -122,15 +119,7 @@ export function QuestLane({
     });
   }
 
-  /**
-   * One card's slot.
-   *
-   * When the lane is a `<ul>` the slot has to be the `<li>`, and the lane has
-   * to place it directly. A rail slot used to be a `<div>`, which put a plain
-   * div between the list and its items — so the list announced no items at all
-   * and every card lost its "2 of 3". Owning the item here rather than asking
-   * each card to be one keeps both layouts right for the same children.
-   */
+  /** Keeps list semantics intact while one wrapper controls both lane layouts. */
   const Slot = Tag === "ul" ? "li" : "div";
   const slots = (extra?: string) => {
     const wrap = (child: React.ReactNode, key: React.Key) => (
@@ -159,10 +148,7 @@ export function QuestLane({
         className="-mx-1 flex snap-x snap-mandatory items-stretch gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         {...rest}
       >
-        {/* Each child owns one rail slot so the cards read as one set.
-            A lone card takes the full width: the 82% slot exists to peek at
-            the next card, and with nothing to peek at it reads as a torn edge
-            of dead space down the right of the container. */}
+        {/* Multiple cards peek; a lone card fills the available rail. */}
         {slots(childCount > 1 ? RAIL_ITEM : SOLE_ITEM)}
       </Tag>
 

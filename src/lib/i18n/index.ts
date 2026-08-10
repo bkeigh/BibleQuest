@@ -35,7 +35,7 @@ import { ar } from "./locales/ar";
 import { la } from "./locales/la";
 
 export type { UIStrings } from "./types";
-export { LANGUAGES, LANGUAGE_CODES, languageMeta } from "./languages";
+export { LANGUAGES, languageMeta } from "./languages";
 export type { LanguageMeta } from "./languages";
 
 const DICTIONARIES: Record<string, UIStrings> = {

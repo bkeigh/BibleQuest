@@ -283,7 +283,7 @@ describe("reading surfaces", () => {
         boardCard.indexOf("{primaryAction}"),
         boardCard.indexOf("aria-expanded={open}"),
       );
-      expect(actionRow).toContain("removeQuest(quest.slug, isPlus)");
+      expect(actionRow).toContain("removeQuest(quest.slug)");
     });
   });
 });

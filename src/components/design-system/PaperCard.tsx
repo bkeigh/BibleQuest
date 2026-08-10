@@ -11,13 +11,7 @@ const VARIANTS: Record<PaperVariant, string> = {
   quiet: "bg-paper/60 border border-mist/70",
 };
 
-/**
- * Every step came down once. On a 375px phone the old `lg` spent 48px of a
- * 375px-wide card on its own margins, so a card holding one line of text stood
- * nearly as tall as one holding four and the page read as a column of mostly
- * empty boxes. The larger breakpoint steps stay generous, because the
- * complaint is a phone complaint — there is room to breathe on a desktop.
- */
+/** Keeps phone cards compact while restoring generous spacing on larger screens. */
 const PADDING: Record<PaperPadding, string> = {
   none: "",
   sm: "p-3 sm:p-4",
@@ -49,7 +43,7 @@ export function PaperCard({
         VARIANTS[variant],
         PADDING[padding],
         interactive &&
-          "transition-shadow transition-colors duration-300 [transition-timing-function:var(--ease-gentle)] hover:paper-shadow-lg hover:border-olive-300/60",
+          "transition-[transform,box-shadow,border-color,background-color] duration-300 [transition-timing-function:var(--ease-gentle)] hover:-translate-y-0.5 hover:paper-shadow-lg hover:border-olive-300/60 active:translate-y-px motion-reduce:transform-none",
         className
       )}
       {...rest}

@@ -155,37 +155,24 @@ matrix instead and leave the provider round trips explicitly out of scope.
 3. Open [Supabase email templates](https://supabase.com/dashboard/project/iacnjqnssovaaojswjoh/auth/templates).
    Publish the exact checked-in
    [`confirmation.html`](../supabase/templates/confirmation.html) and
-   [`magic-link.html`](../supabase/templates/magic-link.html) bodies. The app
-   passes an approved callback as `emailRedirectTo`, exposed by Supabase as
-   `{{ .RedirectTo }}`. Each template includes `{{ .Token }}` for in-context
-   PWA verification and retains the portable browser link below.
-
-Use this link in each email template that currently uses Supabase's confirmation
-URL:
-
-```html
-<a href="{{ .RedirectTo }}&amp;token_hash={{ .TokenHash }}&amp;type=email">
-  Open BibleQuest
-</a>
-```
+   [`magic-link.html`](../supabase/templates/magic-link.html) bodies. Each
+   template includes `{{ .Token }}` for in-context PWA verification and must
+   not include `{{ .TokenHash }}`, `{{ .RedirectTo }}`, or
+   `{{ .ConfirmationURL }}`. A portable bearer link is not bound to the
+   browser that requested sign-in and can create a login-CSRF/session-swap
+   path, so the server callback rejects it.
 
 Do not put `{{ .Token }}` in the subject, where a locked-screen notification
 could expose it. Keep the code in the email body. A fresh iOS 17.2+ Home Screen
 install copies existing browser cookies once, but Safari and the installed app
 do not keep storage synchronized afterward. Returning PWA users must request
 the email from the PWA, leave it open, and enter the code there. Opening the
-link in Mail may authenticate Safari instead and cannot safely transfer that
-session back into an existing PWA.
+email in Mail never transfers a session into Safari or the installed PWA.
 
-Do not hard-code `SiteURL`, `/app`, or a separate magic-link `type` in this
-template: the current callback contract supplies the redirect and verifies the
-email token with `type=email`. Test each saved template with a newly created
-beta account and an existing account. Test the numeric code inside an installed
-PWA separately from the browser link; using either consumes the single-use
-credential. An email-link scanner can still consume the browser link and
-invalidate the code in that same message; if real delivery testing finds this,
-replace the direct link with a user-confirmed intermediate page or ship the
-code-only template. See
+Do not hard-code `SiteURL`, `/app`, or an email verification link in these
+templates. Test each saved template with a newly created beta account and an
+existing account, including the numeric code inside an installed PWA. The code
+must complete only in the browser or app where it is entered. See
 [Supabase email templates](https://supabase.com/docs/guides/auth/auth-email-templates)
 and [redirect URL guidance](https://supabase.com/docs/guides/auth/redirect-urls).
 

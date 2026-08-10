@@ -87,8 +87,6 @@ flowchart LR
 - `store.ts` owns all user mutations and local persistence. Prayer and
   reflection bodies must never be sent to analytics or logs.
 - `quest-engine.ts` filters and deterministically suggests quests.
-- `home-quest-groups.ts` deduplicates rolling assignments and the persistent
-  shelf into Home's Active, Ready, and Completed drawers.
 - `journal.ts` derives the mixed, date-grouped Prayer Journal timeline and
   performs in-memory search/filtering without persisting a search index.
 - `journal-drafts.ts` keeps scoped, expiring unfinished prayer/reflection
@@ -148,7 +146,9 @@ rows. Keep conversions symmetric and update both directions together.
 - `src/lib/supabase/server.ts` creates cookie-aware server clients.
 - `src/lib/supabase/useSession.ts` exposes client auth state and deduplicates the
   sign-in completion event across mounted consumers and tabs.
-- `src/app/auth/callback/route.ts` validates redirects before completing auth.
+- `src/app/auth/callback/route.ts` accepts only browser-bound PKCE codes and
+  validates redirects before completing OAuth. Email authentication uses the
+  one-time code inside the browser or installed app that requested it.
 
 The service-role key is never valid in browser code. Ownership is enforced in
 the database, not by trusting client filters.
@@ -193,7 +193,7 @@ When the worker policy changes, increment `CACHE_VERSION` and update
 | --- | --- |
 | `/` and marketing pages | Public acquisition and policy pages. |
 | `/onboarding` | First-run profile and rhythm setup; prioritizes an account immediately before the first-quest reveal while preserving a quiet local-only path. |
-| `/app` | Quest-first daily home: active work, a compact verse invitation, candle, growth, and next steps. |
+| `/app` | One continuous daily path: welcome, verse, quests, Guided Scripture, MyShepherd, growth, Arcade, and devotional shortcuts. |
 | `/app/quests` | Browse, filter, and pick quests. |
 | `/app/quests/[slug]` | Read, start, walk, complete, save, or archive one quest. |
 | `/app/bible` | Daily verse, reading shortcuts/history, book search, and testament browser. |

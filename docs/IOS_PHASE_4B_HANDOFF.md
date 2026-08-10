@@ -327,9 +327,9 @@ from the app — attach Web Inspector to tell them apart.
 
 **Sign-in.** Build with `NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED=true`, then Home →
 avatar → Account sync → Sign in. Use the **emailed numeric code**: it is a pure
-XHR (`verifyOtp`) with no redirect. The emailed *link* opens in Safari, and OAuth
-falls back to the hosted callback — neither completes in-app until deep links
-exist.
+XHR (`verifyOtp`) with no redirect. Email templates intentionally contain no
+portable bearer link. OAuth falls back to the hosted callback and cannot
+complete in-app until deep links exist.
 
 ## Checks that fail for environment reasons — do not chase
 

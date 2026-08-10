@@ -2,16 +2,12 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  FREE_WALLPAPERS,
-  PLUS_WALLPAPERS,
   WALLPAPER_CATALOG,
   resolveWallpaper,
 } from "@/lib/wallpapers/catalog";
 
 describe("wallpaper catalog", () => {
   it("reserves every artwork pair for Plus", () => {
-    expect(FREE_WALLPAPERS).toHaveLength(0);
-    expect(PLUS_WALLPAPERS).toHaveLength(14);
     expect(WALLPAPER_CATALOG).toHaveLength(14);
     expect(WALLPAPER_CATALOG.every(({ tier }) => tier === "plus")).toBe(true);
   });
@@ -29,7 +25,7 @@ describe("wallpaper catalog", () => {
   });
 
   it("falls back to parchment when a wallpaper is unavailable", () => {
-    const paid = PLUS_WALLPAPERS[0];
+    const paid = WALLPAPER_CATALOG[0];
     expect(resolveWallpaper(paid.id, true)?.id).toBe(paid.id);
     expect(resolveWallpaper(paid.id, false)).toBeNull();
     expect(resolveWallpaper("unknown", true)).toBeNull();

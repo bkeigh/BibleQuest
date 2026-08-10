@@ -23,8 +23,6 @@ import type {
  */
 export const FREE_QUEST_SLOTS = 3;
 export const QUEST_WINDOW_MS = 24 * 60 * 60 * 1000;
-/** Kept for import/test compatibility with pre-board assignment records. */
-export const QUEST_PICK_UNDO_MS = 2 * 60 * 1000;
 
 function validTime(value?: string): number | null {
   if (!value) return null;

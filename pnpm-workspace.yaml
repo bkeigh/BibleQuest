@@ -17,6 +17,9 @@ allowBuilds:
   unrs-resolver: true
 verifyDepsBeforeRun: false
 overrides:
+  # Capacitor's xcode helper only calls uuid.v4(), whose CommonJS API remains
+  # compatible; move it past the vulnerable buffered v3/v5/v6 implementation.
+  xcode>uuid: 11.1.1
   # Pin the complete source-map path validation fix (GHSA-fxqj-rqcc-2cmp).
   postcss: 8.5.23
   # Keep Next's optional image runtime on the audited libvips build.

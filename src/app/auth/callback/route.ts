@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import type { EmailOtpType } from "@supabase/supabase-js";
 import {
   createServerSupabase,
   isSupabaseConfigured,
@@ -16,26 +15,6 @@ import {
   consoleAllowedEmails,
   consoleAuthEnabled,
 } from "@/lib/console/auth-config";
-
-/**
- * Email OTP types we accept on the token_hash path. An allow-list, not a cast:
- * `type` arrives from the (attacker-influencable) query string, and passing an
- * unexpected value straight into verifyOtp is how you get surprises.
- */
-const EMAIL_OTP_TYPES = new Set<EmailOtpType>([
-  "email",
-  "magiclink",
-  "signup",
-  "recovery",
-  "invite",
-  "email_change",
-]);
-
-function asEmailOtpType(value: string | null): EmailOtpType | null {
-  return value && EMAIL_OTP_TYPES.has(value as EmailOtpType)
-    ? (value as EmailOtpType)
-    : null;
-}
 
 /** Allows the independent operator console to complete auth while product sync stays contained. */
 function isConfiguredConsoleCallback(
@@ -57,27 +36,14 @@ function isConfiguredConsoleCallback(
 }
 
 /**
- * Auth callback. Handles both flows Supabase can send us:
- *
- *  - `?code=…`  — the PKCE authorization-code flow, used by OAuth (Apple and
- *    Google) and by the default `{{ .ConfirmationURL }}` email template.
- *    Completing it needs the code-verifier cookie set in the browser that
- *    STARTED sign-in, so it only works when the link is opened there.
- *
- *  - `?token_hash=…&type=…` — the OTP-verification flow. It carries no verifier
- *    cookie, so it works no matter where the email link is opened (Mail's
- *    in-app webview, the system browser of an installed PWA, a second device).
- *    Switch the Supabase email templates to `{{ .TokenHash }}` to route magic
- *    links here; until then this branch is simply never taken.
- *
- * When account sync is available, either flow ends with a session cookie and
- * returns the user to the app. Guest-only containment rejects both first.
+ * Completes only Supabase's browser-bound PKCE authorization-code flow. Email
+ * authentication stays code-only inside the browser or installed app that
+ * requested it; accepting a bearer token_hash here would let an unsolicited
+ * link replace another browser's session and expose its local guest journey.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const tokenHash = url.searchParams.get("token_hash");
-  const type = asEmailOtpType(url.searchParams.get("type"));
   const next = safeNextPath(url.searchParams.get("next"));
   const providerError =
     url.searchParams.get("error_code") ?? url.searchParams.get("error");
@@ -93,12 +59,10 @@ export async function GET(request: Request) {
     failure = "configuration";
   } else if (providerError) {
     failure = authFailureReason(null, providerError);
-  } else if (code || (tokenHash && type)) {
+  } else if (code) {
     try {
       const supabase = await createServerSupabase();
-      const { data, error } = code
-        ? await supabase.auth.exchangeCodeForSession(code)
-        : await supabase.auth.verifyOtp({ type: type!, token_hash: tokenHash! });
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
       if (!error) {
         const email = data.user?.email?.trim().toLowerCase();
         if (!consoleCallback || (email && consoleAllowedEmails().has(email))) {

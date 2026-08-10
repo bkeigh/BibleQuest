@@ -46,7 +46,10 @@ import {
   IconPlus,
 } from "@/components/design-system/icons";
 import { QuestCompletionSheet } from "@/components/quests/QuestCompletionSheet";
-import { formatDuration, CATEGORY_LABEL } from "@/components/quests/QuestSlip";
+import {
+  formatQuestDuration,
+  QUEST_CATEGORY_LABEL,
+} from "@/lib/questos/quest-presentation";
 import { useStrings } from "@/lib/i18n";
 import { cleanVerseText } from "@/lib/utils/scripture";
 import { track } from "@/lib/analytics/events";
@@ -217,10 +220,10 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
               />
             </span>
             <span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-ash">
-              <IconClock size={14} /> {formatDuration(quest.durationMinutes)}
+              <IconClock size={14} /> {formatQuestDuration(quest.durationMinutes)}
               <span className="text-mist">·</span>
               <span className="font-art-label text-[0.875rem] text-accent">
-                {CATEGORY_LABEL[quest.category]}
+                {QUEST_CATEGORY_LABEL[quest.category]}
               </span>
             </span>
           </div>
