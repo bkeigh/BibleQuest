@@ -1,39 +1,35 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  clearNativeCookieStorage,
-  nativeAuthClientOptions,
-  nativeCookieStorage,
-} from "@/lib/supabase/native-cookie-storage";
+  clearNativeAuthStorage,
+  clearLegacyNativeAuthStorage,
+  createNativeAuthStorage,
+  nativeSupabaseAuthOptions,
+  type NativeAuthStorageBackend,
+} from "@/lib/supabase/native-auth-storage";
 import { resolveAuthCallbackUrl } from "@/lib/platform/auth";
 
 const PLATFORM = "NEXT_PUBLIC_APP_PLATFORM";
 
-class MemoryStorage {
-  values = new Map<string, string>();
-  get length() {
-    return this.values.size;
-  }
-  clear() {
-    this.values.clear();
-  }
-  getItem(k: string) {
-    return this.values.get(k) ?? null;
-  }
-  key(i: number) {
-    return [...this.values.keys()][i] ?? null;
-  }
-  removeItem(k: string) {
-    this.values.delete(k);
-  }
-  setItem(k: string, v: string) {
-    this.values.set(k, String(v));
-  }
+function memoryBackend(): NativeAuthStorageBackend & {
+  values: Map<string, string>;
+} {
+  const values = new Map<string, string>();
+  return {
+    values,
+    getItem: async (key) => values.get(key) ?? null,
+    setItem: async (key, value) => {
+      values.set(key, value);
+    },
+    removeItem: async (key) => {
+      values.delete(key);
+    },
+    clear: async () => {
+      values.clear();
+    },
+  };
 }
 
 beforeEach(() => {
-  const storage = new MemoryStorage();
-  vi.stubGlobal("localStorage", storage);
-  vi.stubGlobal("window", { localStorage: storage });
   process.env[PLATFORM] = "native";
 });
 
@@ -42,79 +38,64 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/**
- * `document.cookie` is a measured no-op at capacitor://localhost, and
- * @supabase/ssr persists the entire session through it. These cover the
- * adapter that stands in for it.
- */
-describe("native cookie storage", () => {
-  it("round-trips a session cookie", () => {
-    const store = nativeCookieStorage();
-    store.setAll([{ name: "sb-proj-auth-token", value: "base64-abc" }]);
-    expect(store.getAll()).toEqual([
-      { name: "sb-proj-auth-token", value: "base64-abc" },
-    ]);
-  });
+describe("native Keychain auth storage", () => {
+  it("purges the obsolete plaintext cookie blob without loading Keychain", () => {
+    const removeItem = vi.fn();
 
-  it("keeps chunked cookies distinct, as the ssr package splits at 3180 chars", () => {
-    const store = nativeCookieStorage();
-    store.setAll([
-      { name: "sb-proj-auth-token.0", value: "a".repeat(3180) },
-      { name: "sb-proj-auth-token.1", value: "b".repeat(500) },
-    ]);
-    const all = store.getAll();
-    expect(all).toHaveLength(2);
-    expect(all.find((c) => c.name.endsWith(".0"))?.value).toHaveLength(3180);
-    expect(all.find((c) => c.name.endsWith(".1"))?.value).toHaveLength(500);
-  });
+    clearLegacyNativeAuthStorage({ removeItem });
 
-  it("updates an existing cookie rather than duplicating it", () => {
-    const store = nativeCookieStorage();
-    store.setAll([{ name: "token", value: "first" }]);
-    store.setAll([{ name: "token", value: "second" }]);
-    expect(store.getAll()).toEqual([{ name: "token", value: "second" }]);
-  });
-
-  it("treats maxAge 0 as a delete — the ssr package's sign-out signal", () => {
-    const store = nativeCookieStorage();
-    store.setAll([{ name: "token", value: "live" }]);
-    store.setAll([{ name: "token", value: "live", options: { maxAge: 0 } }]);
-    // A husk here would read back as a live session after sign-out.
-    expect(store.getAll()).toEqual([]);
-  });
-
-  it("treats an empty value as a delete too", () => {
-    const store = nativeCookieStorage();
-    store.setAll([{ name: "token", value: "live" }]);
-    store.setAll([{ name: "token", value: "" }]);
-    expect(store.getAll()).toEqual([]);
-  });
-
-  it("survives corrupt persisted state without throwing", () => {
-    localStorage.setItem("biblequest:native-auth-cookies", "{ not json");
-    expect(nativeCookieStorage().getAll()).toEqual([]);
-  });
-
-  it("ignores entries that are not name/value pairs", () => {
-    localStorage.setItem(
+    expect(removeItem).toHaveBeenCalledWith(
       "biblequest:native-auth-cookies",
-      JSON.stringify([{ name: "ok", value: "v" }, { nope: 1 }, null, "x"]),
     );
-    expect(nativeCookieStorage().getAll()).toEqual([{ name: "ok", value: "v" }]);
   });
 
-  it("clears everything on demand", () => {
-    const store = nativeCookieStorage();
-    store.setAll([{ name: "token", value: "live" }]);
-    clearNativeCookieStorage();
-    expect(store.getAll()).toEqual([]);
+  it("round-trips Supabase session values through the async adapter", async () => {
+    const backend = memoryBackend();
+    const storage = createNativeAuthStorage(async () => backend);
+
+    await storage.setItem("sb-proj-auth-token", "session-json");
+
+    expect(await storage.getItem("sb-proj-auth-token")).toBe("session-json");
   });
 
-  it("is supplied to the client only on native", () => {
-    expect(nativeAuthClientOptions().cookies).toBeDefined();
+  it("removes one session value without disturbing another", async () => {
+    const backend = memoryBackend();
+    const storage = createNativeAuthStorage(async () => backend);
+    await storage.setItem("session", "live");
+    await storage.setItem("pkce", "verifier");
+
+    await storage.removeItem("session");
+
+    expect(await storage.getItem("session")).toBeNull();
+    expect(await storage.getItem("pkce")).toBe("verifier");
+  });
+
+  it("clears the isolated auth prefix after confirmed account deletion", async () => {
+    const backend = memoryBackend();
+    await backend.setItem("session", "live");
+    await backend.setItem("pkce", "verifier");
+
+    await clearNativeAuthStorage(async () => backend);
+
+    expect(backend.values.size).toBe(0);
+  });
+
+  it("does not initialize a native backend in web builds", async () => {
     process.env[PLATFORM] = "web";
-    // On web, document.cookie works and must stay the source of truth.
-    expect(nativeAuthClientOptions().cookies).toBeUndefined();
+    const load = vi.fn(async () => memoryBackend());
+
+    await clearNativeAuthStorage(load);
+
+    expect(load).not.toHaveBeenCalled();
+  });
+
+  it("configures persistent PKCE auth without URL session detection", () => {
+    expect(nativeSupabaseAuthOptions().auth).toMatchObject({
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+      flowType: "pkce",
+    });
   });
 });
 
@@ -125,8 +106,6 @@ describe("native OAuth callback", () => {
   };
 
   it("falls back to the hosted callback when no deep link is configured", () => {
-    // Previously this threw before any network call, and the caller swallowed
-    // it into a generic "sign-in request failed" notice.
     expect(
       resolveAuthCallbackUrl("/app", { runtime, nativeCallbackUrl: undefined }),
     ).toBe("https://www.biblequest.co/auth/callback?next=%2Fapp");

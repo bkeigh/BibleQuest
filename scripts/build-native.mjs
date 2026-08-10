@@ -149,6 +149,7 @@ const REMOVE = [
     "console-only components; they import the deleted server actions",
   ],
   ["src/app/(marketing)", "public marketing site; the app bundle ships only /app"],
+  ["src/app/offline", "service workers cannot load from Capacitor's custom scheme"],
   [
     "src/components/marketing",
     "marketing-only components, unreachable once the marketing group is gone",
@@ -308,6 +309,10 @@ function stageTree() {
       // Agent worktrees are full second copies of the repository.
       "--exclude=/.claude/",
       "--exclude=/output/",
+      // Web-only acquisition media and service-worker code cannot execute in
+      // the local Capacitor scheme and should not inflate the signed binary.
+      "--exclude=/public/marketing/",
+      "--exclude=/public/sw.js",
       // 14 animated wallpaper loops, 67 MB — over half the bundle, and not one
       // is reachable: Settings omits the wallpaper picker from native builds
       // until a StoreKit path and native entitlement projection exist. The

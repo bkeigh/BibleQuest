@@ -15,6 +15,7 @@ release instructions.
 | Account sync | Off and build-pinned |
 | Analytics | Off and build-pinned |
 | Commerce | Native routes and acquisition UI removed |
+| Reminders | Optional local schedules; no account or remote push |
 
 ## 1. Prepare the deterministic local payload
 
@@ -69,7 +70,8 @@ binary when the bundled production origin is unchanged.
 ## 3. Create the Apple records
 
 1. Apple Developer → Certificates, Identifiers & Profiles → Identifiers:
-   register `co.biblequest.app` if it does not already exist.
+   register `co.biblequest.app` if it does not already exist, and enable Data
+   Protection with **Complete Protection** to match `App.entitlements`.
 2. App Store Connect → Apps → New App: create the iOS record using the same
    bundle ID.
 3. Confirm the Account Holder has accepted current agreements.
@@ -109,7 +111,10 @@ After processing:
 | Offline | Bundled Scripture, prayer, reflection, quests, games, and Journey remain usable. |
 | Online Bible | Translation search returns reviewed hosted editions. |
 | Privacy | Writing remains local; export and clear controls work. |
-| Native scope | No reminders, camera picker, store, prices, purchase CTA, marketing-site link, or locked wallpaper dead end. |
+| Reminders | Permission appears only after Enable; copy is neutral; quiet hours, save, test, disable, and Settings-denied recovery work. |
+| Accessibility | Dynamic Type, Bold Text, VoiceOver, Reduce Motion, light/dark status-bar contrast, and keyboard focus remain usable. |
+| App switcher | Background snapshot shows the branded privacy cover, never prayer or journal text. |
+| Native scope | No camera picker, remote push, store, prices, purchase CTA, marketing-site link, or locked wallpaper dead end. |
 | Public links | About, Terms, Privacy, and support open correctly. |
 | Layout | Portrait UI clears the notch, keyboard, and home indicator on the smallest and largest supported iPhones. |
 
@@ -122,9 +127,10 @@ Complete the fields in [`APP_STORE_SUBMISSION.md`](APP_STORE_SUBMISSION.md),
 select the processed build under version 1.0, choose manual release, add it for
 review, and submit. The tester-feedback PDF must be triaged before this step.
 
-## Current external stop
+## Current production-origin state
 
-As of August 9, 2026, Production answers the native preflight with `204` but
-does **not** return `Access-Control-Allow-Origin`. The repository is ready to
-build against Production, but the Vercel latch/redeploy and the two header gates
-above still require the account owner.
+On August 10, 2026, the production-only latch was set to `true`, the current
+merged `main` deployment was rebuilt and aliased to `www.biblequest.co`, and
+both checks above returned `Access-Control-Allow-Origin:
+capacitor://localhost`. Treat the commands—not this note—as the release gate;
+they must stay green for every candidate.

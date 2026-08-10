@@ -40,4 +40,12 @@ describe("Settings device-data purge", () => {
     expect(deletion).toContain("clearStandaloneGameData()");
     expect(clear).toContain("clearStandaloneGameData()");
   });
+
+  it("cancels native reminders during both destructive Settings paths", () => {
+    const deletion = handler("deleteAccount", "\n\n  /** Removes account");
+    const clear = handler("clearJourneyData", "\n\n  return (");
+
+    expect(deletion).toContain("await purgeNativeReminders()");
+    expect(clear).toContain("await purgeNativeReminders()");
+  });
 });

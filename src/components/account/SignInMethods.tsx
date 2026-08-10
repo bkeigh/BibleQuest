@@ -26,6 +26,7 @@ import {
   ACCOUNT_SYNC_CONTAINMENT_NOTICE,
 } from "@/lib/sync/containment";
 import { withDeadline } from "@/lib/async/deadline";
+import { isNativeTarget } from "@/lib/platform/target";
 
 type EmailStatus = "idle" | "sending" | "requested";
 type OAuthProvider = "apple" | "google";
@@ -71,6 +72,7 @@ export function SignInMethods({
   onUnavailable,
   nextPath = "/app",
 }: SignInMethodsProps) {
+  const nativeTarget = isNativeTarget();
   const [email, setEmail] = useState("");
   const [requestedEmail, setRequestedEmail] = useState("");
   const [emailStatus, setEmailStatus] = useState<EmailStatus>("idle");
@@ -358,13 +360,16 @@ export function SignInMethods({
           </GentleButton>
         </div>
 
-        <Divider />
-
-        <OAuthButtons
-          pending={oauthPending}
-          disabled={Boolean(oauthPending) || resending || verifyingOtp}
-          onSelect={oauth}
-        />
+        {!nativeTarget && (
+          <>
+            <Divider />
+            <OAuthButtons
+              pending={oauthPending}
+              disabled={Boolean(oauthPending) || resending || verifyingOtp}
+              onSelect={oauth}
+            />
+          </>
+        )}
       </div>
     );
   }
@@ -418,13 +423,16 @@ export function SignInMethods({
         </GentleButton>
       </form>
 
-      <Divider />
-
-      <OAuthButtons
-        pending={oauthPending}
-        disabled={Boolean(oauthPending) || emailStatus === "sending"}
-        onSelect={oauth}
-      />
+      {!nativeTarget && (
+        <>
+          <Divider />
+          <OAuthButtons
+            pending={oauthPending}
+            disabled={Boolean(oauthPending) || emailStatus === "sending"}
+            onSelect={oauth}
+          />
+        </>
+      )}
 
       {error && <FailureNotice failure={error} />}
     </>

@@ -2,7 +2,12 @@
 
 import { useEffect } from "react";
 import { useQuestOS } from "@/lib/questos/store";
-import { applyAppearance, watchSystemTheme } from "@/lib/appearance/theme";
+import {
+  applyAppearance,
+  syncAppearanceStatusBar,
+  watchSystemTheme,
+} from "@/lib/appearance/theme";
+import { syncNativePreferredTextZoom } from "@/lib/native/accessibility";
 
 /**
  * Applies persisted appearance on mount and whenever it changes. While the
@@ -13,7 +18,19 @@ export function ThemeApplier() {
   const appearance = useQuestOS((s) => s.settings.appearance);
   useEffect(() => {
     applyAppearance(appearance);
+    syncAppearanceStatusBar(appearance);
     return watchSystemTheme(appearance);
   }, [appearance]);
+
+  useEffect(() => {
+    const syncTextZoom = () => {
+      if (document.visibilityState === "visible") {
+        void syncNativePreferredTextZoom().catch(() => undefined);
+      }
+    };
+    syncTextZoom();
+    document.addEventListener("visibilitychange", syncTextZoom);
+    return () => document.removeEventListener("visibilitychange", syncTextZoom);
+  }, []);
   return null;
 }

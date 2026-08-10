@@ -1,4 +1,5 @@
 import type { AppearanceSettings } from "@/lib/questos/types";
+import { syncNativeStatusBar } from "@/lib/native/status-bar";
 import { glassOpacityVariables } from "./glass-opacity";
 import { resolveTheme } from "./themes";
 
@@ -35,6 +36,15 @@ export function applyAppearance(a: AppearanceSettings) {
   root.style.colorScheme = dark ? "dark" : "light";
 }
 
+/** Updates native chrome once per theme change, not on every glass preview. */
+export function syncAppearanceStatusBar(a: AppearanceSettings): void {
+  const prefersDark =
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const { dark } = resolveTheme(a.theme, prefersDark);
+  void syncNativeStatusBar(dark).catch(() => undefined);
+}
+
 /**
  * Watches the OS color scheme and re-applies the appearance when it changes,
  * so theme "system" tracks the OS mid-session instead of going stale.
@@ -49,7 +59,10 @@ export function watchSystemTheme(a: AppearanceSettings): () => void {
     return () => {};
   }
   const media = window.matchMedia("(prefers-color-scheme: dark)");
-  const onChange = () => applyAppearance(a);
+  const onChange = () => {
+    applyAppearance(a);
+    syncAppearanceStatusBar(a);
+  };
   media.addEventListener("change", onChange);
   return () => media.removeEventListener("change", onChange);
 }

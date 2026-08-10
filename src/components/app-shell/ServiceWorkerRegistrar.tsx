@@ -5,6 +5,7 @@ import {
   isSafeServiceWorkerVersion,
   reportClientSignal,
 } from "@/lib/observability/client-signals";
+import { isNativeTarget } from "@/lib/platform/target";
 
 const VERSION_TIMEOUT_MS = 10_000;
 
@@ -12,6 +13,7 @@ const VERSION_TIMEOUT_MS = 10_000;
 export function ServiceWorkerRegistrar() {
   useEffect(() => {
     if (
+      isNativeTarget() ||
       process.env.NODE_ENV !== "production" ||
       typeof navigator === "undefined" ||
       !("serviceWorker" in navigator) ||

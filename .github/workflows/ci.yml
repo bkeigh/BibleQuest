@@ -140,6 +140,66 @@ jobs:
         if: matrix.mode == 'configured-auth-contained'
         run: pnpm test:headers:built
 
+  native-export:
+    name: Native release export
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+      - name: Set up Node.js 24
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build the pinned guest-only native bundle
+        run: pnpm build:native:release
+
+  ios-simulator-build:
+    name: iOS simulator build
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+      - name: Set up Node.js 24
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Prepare the release bundle and native plugins
+        run: pnpm ios:release:prepare
+      - name: Validate Capacitor and Apple configuration
+        run: |
+          pnpm exec cap doctor
+          plutil -lint ios/App/App/Info.plist ios/App/App/PrivacyInfo.xcprivacy ios/App/App/App.entitlements
+      - name: Compile the unsigned iOS simulator app
+        run: >-
+          xcodebuild
+          -project ios/App/App.xcodeproj
+          -scheme App
+          -sdk iphonesimulator
+          -configuration Release
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath "$RUNNER_TEMP/BibleQuestDerivedData"
+          -disableAutomaticPackageResolution
+          CODE_SIGNING_ALLOWED=NO
+          build
+
   browser-smoke:
     name: Browser smoke
     runs-on: ubuntu-latest

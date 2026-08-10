@@ -41,6 +41,7 @@ import { clearLastSyncedUserId } from "@/lib/sync/last-user";
 import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 import { useSession } from "@/lib/supabase/useSession";
 import { createClient } from "@/lib/supabase/client";
+import { clearNativeAuthStorage } from "@/lib/supabase/native-auth-storage";
 import { deleteOwnAccountWithAvatar } from "@/lib/auth/account-deletion";
 import { track } from "@/lib/analytics/events";
 import { stopSync } from "@/lib/sync/engine";
@@ -93,11 +94,14 @@ import {
   purgeJourneyBackup,
   resumeJourneyBackupAfterPurge,
 } from "@/lib/native/journey-backup";
+import { purgeNativeReminders } from "@/lib/native/reminders";
 
 interface PendingJourneyImport {
   journey: Partial<QuestOSSnapshot>;
   device: DeviceBackupExtras | null;
 }
+
+type DeleteAccountError = "request" | "device" | null;
 
 /** Clears game records that live outside the persisted journey store. */
 function clearStandaloneGameData(): void {
@@ -148,6 +152,30 @@ function ThemePicker({
   value: ThemeId;
   onChange: (theme: ThemeId) => void;
 }) {
+  const refs = useRef<Array<HTMLButtonElement | null>>([]);
+  const selectedIndex = Math.max(
+    0,
+    THEME_CHOICES.findIndex((choice) => choice.id === value),
+  );
+
+  /** Implements the radio keyboard pattern with one tab stop. */
+  function onKeyDown(event: React.KeyboardEvent, index: number) {
+    let next: number | null = null;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      next = (index + 1) % THEME_CHOICES.length;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      next = (index - 1 + THEME_CHOICES.length) % THEME_CHOICES.length;
+    } else if (event.key === "Home") {
+      next = 0;
+    } else if (event.key === "End") {
+      next = THEME_CHOICES.length - 1;
+    }
+    if (next === null) return;
+    event.preventDefault();
+    onChange(THEME_CHOICES[next].id);
+    refs.current[next]?.focus();
+  }
+
   return (
     <div className="py-3.5">
       <span className="block text-[0.9375rem] text-charcoal">{label}</span>
@@ -156,15 +184,20 @@ function ThemePicker({
         aria-label={label}
         className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4"
       >
-        {THEME_CHOICES.map((choice) => {
+        {THEME_CHOICES.map((choice, index) => {
           const active = value === choice.id;
           return (
             <button
               key={choice.id}
+              ref={(element) => {
+                refs.current[index] = element;
+              }}
               type="button"
               role="radio"
               aria-checked={active}
+              tabIndex={index === selectedIndex ? 0 : -1}
               onClick={() => onChange(choice.id)}
+              onKeyDown={(event) => onKeyDown(event, index)}
               className={cn(
                 "rounded-[var(--radius-button)] border p-2 text-start transition-colors duration-300",
                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
@@ -862,7 +895,8 @@ function SettingsInner() {
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
-  const [deleteAccountError, setDeleteAccountError] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] =
+    useState<DeleteAccountError>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [pendingImport, setPendingImport] =
@@ -1074,20 +1108,37 @@ function SettingsInner() {
       return;
     }
     setDeletingAccount(true);
-    setDeleteAccountError(false);
+    setDeleteAccountError(null);
 
     try {
       await deleteOwnAccountWithAvatar();
     } catch {
       setDeletingAccount(false);
-      setDeleteAccountError(true);
+      setDeleteAccountError("request");
       return;
+    }
+
+    // The identity is gone; keep clearing independent device stores even if
+    // Keychain access itself is temporarily unavailable.
+    let deviceCleanupFailed = false;
+    try {
+      await clearNativeAuthStorage();
+    } catch {
+      deviceCleanupFailed = true;
+    }
+    try {
+      await purgeNativeReminders();
+    } catch {
+      deviceCleanupFailed = true;
     }
 
     // Purge the native mirror before the local reset can become restorable.
     if (!(await purgeJourneyBackup())) {
       setDeletingAccount(false);
-      setDeleteAccountError(true);
+      setDeleteAccountError("device");
+      toast(
+        "Your account was deleted, but this device could not finish clearing. Use Clear my journey to remove the remaining local copy.",
+      );
       return;
     }
     try {
@@ -1102,13 +1153,19 @@ function SettingsInner() {
       clearRhythmState();
       clearStandaloneGameData();
       await clearAvatar();
+    } catch {
+      deviceCleanupFailed = true;
     } finally {
       // The primary is now reset, so future backups cannot resurrect old data.
       resumeJourneyBackupAfterPurge();
     }
-    toast("Your account and saved journey were deleted.", {
-      variant: "success",
-    });
+
+    toast(
+      deviceCleanupFailed
+        ? "Your account was deleted, but some device-only cleanup could not finish. Restart BibleQuest, then use Settings to finish any remaining cleanup."
+        : "Your account and saved journey were deleted.",
+      { variant: deviceCleanupFailed ? "default" : "success" },
+    );
     router.replace("/onboarding");
   }
 
@@ -1116,6 +1173,7 @@ function SettingsInner() {
   async function clearJourneyData() {
     if (clearingData) return;
     setClearingData(true);
+    let reminderCleanupFailed = false;
     try {
       if (user) await deleteRemoteAvatar(true);
       // This await is the privacy boundary: local data remains intact unless
@@ -1123,15 +1181,28 @@ function SettingsInner() {
       if (!(await purgeJourneyBackup())) {
         throw new Error("native journey backup could not be purged");
       }
+      try {
+        await purgeNativeReminders();
+      } catch {
+        // Continue erasing private content after attempting every reminder ID.
+        reminderCleanupFailed = true;
+      }
       clearAllData(user ? { purgeAccount: user.id } : undefined);
       clearAllDeviceLocalJournalDrafts();
       clearRhythmState();
       clearStandaloneGameData();
       await clearAvatar();
       clearLastSyncedUserId();
+      if (reminderCleanupFailed) {
+        toast(
+          "Your journey was cleared, but iOS may still show an old BibleQuest reminder.",
+        );
+      }
       router.replace("/onboarding");
     } catch {
-      toast("Your data could not be cleared. Nothing on this device was removed.");
+      toast(
+        "Your data could not be fully cleared. Some cleanup may have completed; try again before continuing.",
+      );
       setClearingData(false);
     } finally {
       // A failed purge already resumes itself; this is harmless on that path.
@@ -1425,6 +1496,12 @@ function SettingsInner() {
                   onChange={(boldText) => setAppearance({ boldText })}
                 />
               </Row>
+              {nativeTarget && (
+                <p className="py-3.5 text-caption leading-relaxed text-ash">
+                  BibleQuest also follows iOS text size and Bold Text. Large
+                  adds an extra reading boost on top of your device choice.
+                </p>
+              )}
               <Row label={t.settings.reduceMotion}>
                 <Toggle
                   label={t.settings.reduceMotion}
@@ -1511,7 +1588,7 @@ function SettingsInner() {
             />
           </Disclosure>
 
-          {!ACCOUNT_SYNC_CONTAINED ? (
+          {nativeTarget || !ACCOUNT_SYNC_CONTAINED ? (
             <Disclosure variant="card" label={t.settings.reminders}>
               <ReminderSettings />
             </Disclosure>
@@ -1520,26 +1597,29 @@ function SettingsInner() {
           <Disclosure variant="card" label="Privacy & data">
             <p className="text-[0.9375rem] leading-relaxed text-charcoal">
               Your prayers and reflections are private by default. On this device
-              they’re stored only for you. Analytics are off until you choose to
-              share limited usage counts, and never include prayer or journal text.
+              they’re stored only for you. {nativeTarget
+                ? "Analytics are disabled in this iOS release."
+                : "Analytics are off until you choose to share limited usage counts, and never include prayer or journal text."}
             </p>
-            <div className="mt-4 flex items-start justify-between gap-4 border-t border-mist/70 pt-4">
-              <div className="min-w-0">
-                <p className="text-[0.9375rem] text-graphite">
-                  {t.settings.analyticsToggle}
-                </p>
-                <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-ash">
-                  {t.settings.analyticsNote}
-                </p>
+            {!nativeTarget && (
+              <div className="mt-4 flex items-start justify-between gap-4 border-t border-mist/70 pt-4">
+                <div className="min-w-0">
+                  <p className="text-[0.9375rem] text-graphite">
+                    {t.settings.analyticsToggle}
+                  </p>
+                  <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-ash">
+                    {t.settings.analyticsNote}
+                  </p>
+                </div>
+                <Toggle
+                  label={t.settings.analyticsToggle}
+                  on={settings.analyticsConsent}
+                  onChange={(analyticsConsent) =>
+                    updateSettings({ analyticsConsent })
+                  }
+                />
               </div>
-              <Toggle
-                label={t.settings.analyticsToggle}
-                on={settings.analyticsConsent}
-                onChange={(analyticsConsent) =>
-                  updateSettings({ analyticsConsent })
-                }
-              />
-            </div>
+            )}
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <GentleButton variant="outline" size="sm" onClick={exportData}>
                 {t.settings.exportData}
@@ -1710,7 +1790,7 @@ function SettingsInner() {
                     size="sm"
                     className="mt-3"
                     onClick={() => {
-                      setDeleteAccountError(false);
+                      setDeleteAccountError(null);
                       setConfirmDeleteAccount(true);
                     }}
                   >
@@ -1735,7 +1815,7 @@ function SettingsInner() {
                     value={deleteConfirmation}
                     onChange={(event) => {
                       setDeleteConfirmation(event.target.value);
-                      setDeleteAccountError(false);
+                      setDeleteAccountError(null);
                     }}
                     autoComplete="off"
                     spellCheck={false}
@@ -1744,8 +1824,9 @@ function SettingsInner() {
                   />
                   {deleteAccountError && (
                     <p role="alert" className="mt-2 text-caption text-rose-700">
-                      We couldn’t delete your account. Nothing on this device
-                      was removed. Check your connection and try again.
+                      {deleteAccountError === "request"
+                        ? "We couldn’t delete your account. Nothing on this device was removed. Check your connection and try again."
+                        : "Your account was deleted, but this device could not finish clearing its local copy. Use Clear my journey above to try again."}
                     </p>
                   )}
                   <div className="mt-3 flex flex-wrap gap-2.5">
@@ -1769,7 +1850,7 @@ function SettingsInner() {
                       onClick={() => {
                         setConfirmDeleteAccount(false);
                         setDeleteConfirmation("");
-                        setDeleteAccountError(false);
+                        setDeleteAccountError(null);
                       }}
                     >
                       Keep my account

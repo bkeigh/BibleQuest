@@ -56,6 +56,20 @@ describe("production sign-in methods", () => {
     expect(signInMarkup).toContain("Sign in with Google");
   });
 
+  it("offers email code only on native until audited OAuth deep links exist", () => {
+    process.env.NEXT_PUBLIC_APP_PLATFORM = "native";
+    try {
+      const markup = renderToStaticMarkup(
+        createElement(SignInMethods, { source: "account" }),
+      );
+      expect(markup).toContain("Email me a sign-in code");
+      expect(markup).not.toContain("Sign in with Apple");
+      expect(markup).not.toContain("Sign in with Google");
+    } finally {
+      delete process.env.NEXT_PUBLIC_APP_PLATFORM;
+    }
+  });
+
   it("allows email identity creation only from explicit create mode", () => {
     expect(shouldCreateAccount("create")).toBe(true);
     expect(shouldCreateAccount("signin")).toBe(false);

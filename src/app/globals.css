@@ -364,17 +364,22 @@ html.text-large .verse-text-lead {
 }
 
 /* ---- Bold text (accessibility): a gentle weight lift, not a shout. ---- */
-html.text-bold body {
+html.text-bold body,
+html.system-bold-text body {
   font-weight: 500;
 }
-html.text-bold .font-medium {
+html.text-bold .font-medium,
+html.system-bold-text .font-medium {
   font-weight: 600;
 }
-html.text-bold .font-display {
+html.text-bold .font-display,
+html.system-bold-text .font-display {
   font-weight: 560;
 }
 html.text-bold .verse-text,
-html.text-bold .verse-text-lead {
+html.text-bold .verse-text-lead,
+html.system-bold-text .verse-text,
+html.system-bold-text .verse-text-lead {
   font-weight: 540;
 }
 

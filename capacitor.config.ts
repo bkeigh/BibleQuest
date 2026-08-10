@@ -47,8 +47,15 @@ const config: CapacitorConfig = {
   ios: {
     contentInset: "always",
     limitsNavigationsToAppBoundDomains: false,
+    // TextZoom needs the mobile content mode on iPad; iPhone is unchanged.
+    preferredContentMode: "mobile",
   },
   plugins: {
+    LocalNotifications: {
+      // Foreground reminders stay visible but never play attention-grabbing
+      // audio. Scheduled payloads also omit prayer, journal and Scripture text.
+      presentationOptions: ["banner", "list"],
+    },
     SplashScreen: {
       // The splash is hidden explicitly once the journey restore settles, so
       // it covers the repair rather than revealing an empty journey that then

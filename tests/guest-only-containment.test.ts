@@ -144,7 +144,7 @@ describe("guest-only account-sync containment", () => {
     expect(markup).not.toContain("<input");
   });
 
-  it("removes every reviewer-visible account and reminder invitation", () => {
+  it("hides account enrollment while allowing account-free native reminders", () => {
     const prompt = readFileSync(
       "src/components/account/AccountPrompt.tsx",
       "utf8",
@@ -170,10 +170,9 @@ describe("guest-only account-sync containment", () => {
     expect(settings).toMatch(
       /\{!ACCOUNT_SYNC_CONTAINED \? \([\s\S]*?<SectionTitle>\{t\.settings\.account\}/,
     );
-    expect(settings).toMatch(
-      /\{!ACCOUNT_SYNC_CONTAINED \? \([\s\S]*?label=\{t\.settings\.reminders\}/,
-    );
+    expect(settings).toContain("nativeTarget || !ACCOUNT_SYNC_CONTAINED");
     expect(reminders).toContain("Reminders are not included in this release");
+    expect(reminders).toContain("<NativeReminderSettings />");
   });
 
   it.each([
