@@ -15,21 +15,24 @@ guest mode with analytics, payments, and Supabase integrations disabled.
 | --- | --- | --- |
 | `Quality` | `pnpm lint`, `pnpm check:seed`, `git diff --check` over the event changes and working tree | Blocks lint, stale generated Console content, and whitespace errors. |
 | `Types and tests` | `pnpm exec tsc --noEmit`, `pnpm test`, `pnpm test:launch-evidence` | Blocks type/test failures and verifies the sanitized evidence command plus alert thresholds with fixtures. Tests run noninteractively. |
-| `Production build` | `pnpm build` | Blocks a guest-mode production build failure; times out after 20 minutes. |
+| `Production build` | `pnpm build` | Blocks guest, configured-auth-contained, or configured-auth-enabled build failures; each matrix entry times out after 20 minutes. |
+| `Native release export` | `pnpm build:native:release` | Blocks a failure in the deterministic, guest-only Capacitor export. |
+| `iOS simulator build` | `pnpm ios:release:prepare`, `cap doctor`, `plutil`, and an unsigned Xcode Release build | Blocks native plugin, Apple configuration, generated payload, Swift package, and iOS compilation regressions. |
 | `Browser smoke` | `pnpm test:e2e` | Builds the configured-but-contained release and verifies public privacy/framing plus onboarding landmarks in Chromium. |
 | `Database policies` | `supabase start`, `supabase db reset`, `supabase test db --local` | Applies every migration and seed to an ephemeral local stack, then blocks schema or RLS acceptance failures without remote credentials. |
 | `Dependency risk` | `pnpm audit`, then `pnpm audit --audit-level high` | Reports advisories across runtime and build tooling. High and critical advisories block CI; lower advisories stay visible for triage. |
 
 The workflow has only `contents: read` permission. Checkout credentials are not
-persisted, actions are pinned to major versions, and no artifacts or logs are
-published.
+persisted, actions are pinned to reviewed commit SHAs, and no artifacts or logs
+are published.
 
 ## Branch protection
 
 In the GitHub ruleset or branch protection rule for `main`:
 
 1. Require a pull request before merging.
-2. Require all six status checks listed above to pass.
+2. Require every status check listed above to pass, including every
+   `Production build` matrix entry.
 3. Require branches to be up to date before merging so the production build is
    tested against the latest `main`.
 4. Prevent force pushes and branch deletion. Keep bypass access limited to the

@@ -3,7 +3,8 @@
 BibleQuest now has a Capacitor iOS project that ships a local static bundle.
 The canonical execution checklist is
 [`IOS_TESTFLIGHT_RUNBOOK.md`](IOS_TESTFLIGHT_RUNBOOK.md); product-page material
-is in [`APP_STORE_SUBMISSION.md`](APP_STORE_SUBMISSION.md).
+is in [`APP_STORE_SUBMISSION.md`](APP_STORE_SUBMISSION.md). The sequenced work
+after the parity foundation is in [`IOS_PHASE_5_PLAN.md`](IOS_PHASE_5_PLAN.md).
 
 ## Locked 1.0 scope
 
