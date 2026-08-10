@@ -124,6 +124,14 @@ describe("iOS App Store release configuration", () => {
     expect(registrar).toContain("isNativeTarget() ||");
   });
 
+  it("compiles native CI with an Icon Composer-capable Xcode", () => {
+    const workflow = source(".github/workflows/ci.yml");
+
+    expect(workflow).toContain("DEVELOPER_DIR: /Applications/Xcode_26.3.app");
+    expect(workflow).toContain("-configuration Release");
+    expect(workflow).toContain("-disableAutomaticPackageResolution");
+  });
+
   it("documents a reusable App Store Connect upload and header-level CORS gate", () => {
     const runbook = source("docs/IOS_TESTFLIGHT_RUNBOOK.md");
 

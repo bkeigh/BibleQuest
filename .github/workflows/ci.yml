@@ -166,6 +166,9 @@ jobs:
     name: iOS simulator build
     runs-on: macos-15
     timeout-minutes: 40
+    # The runner defaults to Xcode 16.4, which cannot compile AppIcon.icon.
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     steps:
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
