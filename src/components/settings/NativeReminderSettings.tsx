@@ -16,12 +16,9 @@ import {
 } from "@/lib/native/reminders";
 import {
   anyPushReminderEnabled,
-  broadRhythmForClock,
   DEFAULT_PUSH_REMINDER_PREFERENCES,
   parsePushReminderPreferences,
-  type PushReminderPreferences,
 } from "@/lib/push/validation";
-import { useQuestOS } from "@/lib/questos/store";
 
 function deviceTimezone(): string {
   try {
@@ -32,27 +29,19 @@ function deviceTimezone(): string {
 }
 
 export function NativeReminderSettings() {
-  const legacy = useQuestOS((state) => state.settings.notifications);
-  const updateSettings = useQuestOS((state) => state.updateSettings);
   const { toast } = useToast();
-  const fallback: PushReminderPreferences = {
-    ...DEFAULT_PUSH_REMINDER_PREFERENCES,
-    dailyVerse: legacy.dailyVerse,
-    dailyQuest: legacy.dailyQuest,
-    prayerReminders: legacy.prayerReminders,
-    weeklyRecap: legacy.weeklyRecap,
-    deliveryTime:
-      legacy.preferredTime === "afternoon"
-        ? "13:00"
-        : legacy.preferredTime === "evening"
-          ? "19:00"
-          : "08:00",
-    timezone: deviceTimezone(),
-  };
-  const [preferences, setPreferences] = useState(() => ({
-    ...readNativeReminderPreferences(fallback),
-    timezone: deviceTimezone(),
-  }));
+  // Native choices stay outside QuestOS because that settings object becomes
+  // account-synced in later releases; localStorage is the device-only source.
+  const [preferences, setPreferences] = useState(() => {
+    const timezone = deviceTimezone();
+    return {
+      ...readNativeReminderPreferences({
+        ...DEFAULT_PUSH_REMINDER_PREFERENCES,
+        timezone,
+      }),
+      timezone,
+    };
+  });
   const [permission, setPermission] =
     useState<NativeReminderPermission>("prompt");
   const [enabled, setEnabled] = useState(false);
@@ -70,24 +59,11 @@ export function NativeReminderSettings() {
       .finally(() => setChecking(false));
   }, []);
 
-  function mirrorLegacy(value: PushReminderPreferences) {
-    updateSettings({
-      notifications: {
-        dailyVerse: value.dailyVerse,
-        dailyQuest: value.dailyQuest,
-        prayerReminders: value.prayerReminders,
-        weeklyRecap: value.weeklyRecap,
-        preferredTime: broadRhythmForClock(value.deliveryTime),
-      },
-    });
-  }
-
   async function enable() {
     if (busy || !valid || !anyPushReminderEnabled(preferences)) return;
     setBusy(true);
     try {
       await enableNativeReminders(preferences);
-      mirrorLegacy(preferences);
       setPermission("granted");
       setEnabled(true);
       toast("Gentle reminders are on.", { variant: "success" });
@@ -113,7 +89,6 @@ export function NativeReminderSettings() {
     setBusy(true);
     try {
       await reconcileNativeReminders(preferences);
-      mirrorLegacy(preferences);
       setEnabled(anyPushReminderEnabled(preferences));
       toast("Reminder choices saved.", { variant: "success" });
     } catch {
@@ -136,7 +111,6 @@ export function NativeReminderSettings() {
     try {
       await disableNativeReminders(preferences);
       setPreferences(disabled);
-      mirrorLegacy(disabled);
       setEnabled(false);
       toast("Reminders are off.", { variant: "success" });
     } catch {

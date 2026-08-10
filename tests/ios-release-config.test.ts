@@ -36,7 +36,7 @@ describe("iOS App Store release configuration", () => {
     );
   });
 
-  it("locks version 1.0 build 4 to the iPhone device family", () => {
+  it("locks version 1.0 to the iPhone device family", () => {
     const project = source("ios/App/App.xcodeproj/project.pbxproj");
     const plist = source("ios/App/App/Info.plist");
 
@@ -121,6 +121,9 @@ describe("iOS App Store release configuration", () => {
     expect(builder).toContain('"--exclude=/public/marketing/"');
     expect(builder).toContain('"--exclude=/public/sw.js"');
     expect(builder).toContain('["src/app/offline"');
+    expect(builder).toContain(
+      'turbopack: { root: path.resolve(process.cwd(), "..") }',
+    );
     expect(registrar).toContain("isNativeTarget() ||");
   });
 
@@ -141,6 +144,12 @@ describe("iOS App Store release configuration", () => {
     expect(script).toContain("CI_PRIMARY_REPOSITORY_PATH");
     expect(script).toContain("brew install node@24");
     expect(script).toContain("corepack prepare pnpm@11.10.0 --activate");
+    expect(script).toContain(
+      'cloud_build_number="${CI_BUILD_NUMBER:?CI_BUILD_NUMBER is required}"',
+    );
+    expect(script).toContain(
+      'xcrun agvtool new-version -all "$cloud_build_number"',
+    );
     expect(script).toContain("pnpm install --frozen-lockfile");
     expect(script).toContain("pnpm ios:release:prepare");
   });

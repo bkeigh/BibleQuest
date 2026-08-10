@@ -161,6 +161,10 @@ describe("guest-only account-sync containment", () => {
       "src/components/settings/ReminderSettings.tsx",
       "utf8",
     );
+    const nativeReminders = readFileSync(
+      "src/components/settings/NativeReminderSettings.tsx",
+      "utf8",
+    );
 
     expect(prompt).toContain("accountSyncAvailable(configured)");
     expect(onboarding).toContain(
@@ -173,6 +177,9 @@ describe("guest-only account-sync containment", () => {
     expect(settings).toContain("nativeTarget || !ACCOUNT_SYNC_CONTAINED");
     expect(reminders).toContain("Reminders are not included in this release");
     expect(reminders).toContain("<NativeReminderSettings />");
+    expect(nativeReminders).toContain("readNativeReminderPreferences");
+    expect(nativeReminders).not.toContain('from "@/lib/questos/store"');
+    expect(nativeReminders).not.toContain("updateSettings(");
   });
 
   it.each([

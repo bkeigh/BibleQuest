@@ -1,8 +1,8 @@
 # iOS Phase 5 — release proof and controlled account beta
 
-**Status:** Planned
+**Status:** Milestone 0 complete; Milestone 1 physical-device QA is next
 
-**Baseline:** `cdd43abec70ed09c89567eda2059ae050aa3feef`
+**Successful Cloud archive baseline:** `1784cfa5ffd4818606c7e00113f8dbfb14f70e9e`
 
 **Canonical 1.0 procedure:** [`IOS_TESTFLIGHT_RUNBOOK.md`](IOS_TESTFLIGHT_RUNBOOK.md)
 
@@ -22,16 +22,16 @@ accounts, and passing an account beta does not change the App Store build.
 - Keep comments focused on a block's current goal, invariant, or non-obvious
   policy. Avoid comments that narrate history or restate the code.
 
-## Milestone 0 — restore Xcode Cloud
+## Milestone 0 — restore Xcode Cloud (complete)
 
-This is the first priority because the external `App | Default` workflow has
-failed on multiple `main` commits while the repository's GitHub iOS build is
-green.
+The external `App | Default` workflow now archives successfully alongside the
+green GitHub iOS Release build.
 
-The current failure is confirmed: Xcode Cloud reaches Swift package resolution
-before signing, but every Capacitor package path under `node_modules/.pnpm` is
-missing. The older Xcode environment and new Data Protection entitlement are
-important follow-up checks, but neither causes this first failure.
+The original failure happened before signing: Xcode Cloud reached Swift package
+resolution without the Capacitor packages under `node_modules/.pnpm`. The
+post-clone preparation script fixed that clean-checkout boundary. Enabling
+Complete Data Protection for the App ID then allowed automatic signing and
+distribution to complete.
 
 ### Diagnose from the first red action
 
@@ -62,9 +62,10 @@ into the app. A clean Xcode Cloud checkout therefore uses the executable
 
 1. resolves the repository through `CI_PRIMARY_REPOSITORY_PATH`;
 2. selects Node 24 and pnpm 11.10.0;
-3. runs `pnpm install --frozen-lockfile`;
-4. runs `pnpm ios:release:prepare`; and
-5. prints tool versions and the release-builder result without printing secrets.
+3. maps Xcode Cloud's increasing build number to `CFBundleVersion`;
+4. runs `pnpm install --frozen-lockfile`;
+5. runs `pnpm ios:release:prepare`; and
+6. prints tool versions and the release-builder result without printing secrets.
 
 Apple recognizes `ci_post_clone.sh` when it is inside a `ci_scripts` directory
 next to the Xcode project. Keep the script thin and leave release policy inside
@@ -81,7 +82,8 @@ archive.
 **Exit gate:** a clean `main` checkout completes post-clone preparation,
 archives with a current Xcode release, signs the expected bundle and
 entitlements, and produces an App Store Connect build. Preserve the build log
-and artifact identifiers as release evidence.
+and artifact identifiers as release evidence. This gate passed on August 10,
+2026 for commit `1784cfa5ffd4818606c7e00113f8dbfb14f70e9e`.
 
 ## Milestone 1 — prove the guest-only TestFlight candidate
 
@@ -120,12 +122,10 @@ matrix and one core smoke pass. Add three short living documents:
    result, and restricted evidence links. Its reminder rows must cover delivery
    state, recurrence, time changes, authorization changes, and cleanup.
 
-Before account beta, remove the current ambiguity between local and synced
-reminders. Native permission, schedule, time, and timezone must have one
-device-only source of truth and must not change another device's settings.
-Provide an “Open iOS Settings” recovery action after permission denial and
-refresh permission and pending-request state when the app returns to the
-foreground.
+Native permission, schedule, time, and timezone now use one device-only source
+of truth and do not update account-sync settings. Before account beta, provide
+an “Open iOS Settings” recovery action after permission denial and refresh
+permission and pending-request state when the app returns to the foreground.
 
 Update [`CI.md`](CI.md) whenever required checks change. Keep broad visual
 experiments, dependency upgrades, and unrelated refactors out of the release

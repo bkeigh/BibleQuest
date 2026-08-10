@@ -32,6 +32,10 @@ const MANIFEST = readFileSync(
 const MIGRATION = readFileSync(
   join(ROOT, "supabase", "migrations", "0036_arcade_store_purchases.sql"),
 );
+const PRODUCTION_READINESS = readFileSync(
+  join(ROOT, "scripts", "check-production-readiness.mjs"),
+  "utf8",
+);
 const PACKAGE = JSON.parse(
   readFileSync(join(ROOT, "package.json"), "utf8"),
 ) as { scripts: Record<string, string> };
@@ -42,6 +46,16 @@ function sha256(value: string | Buffer) {
 }
 
 describe("production Arcade store migration", () => {
+  it("is required by the production readiness contract", () => {
+    expect(PRODUCTION_READINESS).toContain(
+      'candidate.schema_contract !== "0036"',
+    );
+    expect(PRODUCTION_READINESS).toContain('rpc: "arcade_store_contract"');
+    expect(PRODUCTION_READINESS).toContain(
+      'contract: "biblequest_arcade_store_v1"',
+    );
+  });
+
   it("pins the target, manifest, source, and long-version packet", () => {
     expect(SCRIPT).toContain('const PROJECT_REF = "iacnjqnssovaaojswjoh";');
     expect(SCRIPT).toContain(sha256(MANIFEST));
