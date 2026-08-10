@@ -27,11 +27,11 @@ import {
 } from "@/lib/questos/types";
 import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
+import { QuestSlip } from "@/components/quests/QuestSlip";
 import {
-  QuestSlip,
-  formatDuration,
-  CATEGORY_LABEL,
-} from "@/components/quests/QuestSlip";
+  formatQuestDuration,
+  QUEST_CATEGORY_LABEL,
+} from "@/lib/questos/quest-presentation";
 import { QuestBoardCard } from "@/components/quests/QuestBoardCard";
 import {
   QuestLane,
@@ -612,7 +612,7 @@ function QuestBrowseInner() {
                   active={duration === d}
                   onClick={() => setDuration(duration === d ? null : d)}
                 >
-                  {formatDuration(d)}
+                  {formatQuestDuration(d)}
                 </Chip>
               ))}
             </FilterGroup>
@@ -635,7 +635,7 @@ function QuestBrowseInner() {
                     disabled={available === 0 && category !== c}
                     onClick={() => setCategory(category === c ? null : c)}
                   >
-                    {CATEGORY_LABEL[c]}
+                    {QUEST_CATEGORY_LABEL[c]}
                     <span className="ms-1.5 tabular-nums opacity-60">
                       {available}
                     </span>

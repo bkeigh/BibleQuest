@@ -128,10 +128,6 @@ export const WALLPAPER_CATALOG = [
 export type Wallpaper = (typeof WALLPAPER_CATALOG)[number];
 export type WallpaperId = Wallpaper["id"];
 
-// Parchment is the only non-Plus canvas; every catalogued artwork is paid.
-export const FREE_WALLPAPERS: readonly Wallpaper[] = [];
-export const PLUS_WALLPAPERS = WALLPAPER_CATALOG;
-
 const WALLPAPERS_BY_ID = new Map<WallpaperId, Wallpaper>(
   WALLPAPER_CATALOG.map((wallpaper) => [wallpaper.id, wallpaper]),
 );

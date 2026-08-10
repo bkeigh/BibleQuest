@@ -1,20 +1,6 @@
 "use client";
 
-/**
- * The library heading, and the only persistent control on the Quests page.
- *
- * The Filters disclosure used to sit at y≈525 and scroll away for good: six
- * thousand pixels into a hundred and fifty quests there was no way to change
- * duration or category without scrolling back to find it. Sticking the heading
- * keeps that one tap reachable from anywhere in the list.
- *
- * Only the heading line sticks. The panel is a non-sticky sibling, so an open
- * filter panel does not ride hundreds of pixels of chrome down the page.
- *
- * `Chip` and `FilterGroup` live here rather than in a fourth file because
- * QuestBrowse already imports this component; putting them anywhere else would
- * either duplicate them or create a cycle.
- */
+/** Keeps the catalogue heading and filter trigger reachable above a long list. */
 import { useEffect, useId, useRef, useState } from "react";
 import { useStrings } from "@/lib/i18n";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
@@ -43,14 +29,7 @@ export function QuestCatalogueBar({
   const reduceMotion = useShouldReduceMotion();
   const [stuck, setStuck] = useState(false);
 
-  // IntersectionObserver rather than a scroll listener: no per-frame work on
-  // a long list, and it reads the same on both targets.
-  //
-  // The bar sticks at env(safe-area-inset-top), but a sentinel exits the
-  // viewport at 0 — so on a notched phone the fill would arrive a whole inset
-  // late. getComputedStyle resolves that env() to a real pixel value, which
-  // becomes the observer's top margin so the swap lands exactly as the bar
-  // reaches its resting position.
+  // Match the observer boundary to the resolved safe-area sticky position.
   useEffect(() => {
     const sentinel = sentinelRef.current;
     const bar = barRef.current;
@@ -77,16 +56,10 @@ export function QuestCatalogueBar({
     }
   }
 
-  // A fragment, deliberately: `position: sticky` only sticks within its
-  // PARENT's box, so wrapping the bar in a div that holds just the bar and its
-  // panel meant it scrolled away with them the moment the list began. As
-  // siblings under PageContainer the parent spans the whole catalogue, which
-  // is the range the bar is supposed to ride.
+  // Sibling placement lets the sticky bar use the full catalogue as its range.
   return (
     <>
-      {/* A zero-height tripwire directly above the bar, and the scroll target
-          for the Filters jump. While it is on screen the bar is in normal
-          flow; the moment it leaves, the bar is stuck. */}
+      {/* The sentinel detects sticky state and anchors the Filters jump. */}
       <div
         ref={sentinelRef}
         aria-hidden="true"

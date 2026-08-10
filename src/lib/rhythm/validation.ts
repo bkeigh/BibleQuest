@@ -1,5 +1,4 @@
 import {
-  EMPTY_RHYTHM_STATE,
   FREE_RHYTHM_BLOCK_LIMIT,
   PLUS_RHYTHM_BLOCK_LIMIT,
   RHYTHM_DAYS,
@@ -119,11 +118,6 @@ export function parseRhythmState(value: unknown): RhythmState | null {
     return null;
   }
   return { version: 1, blocks: validBlocks };
-}
-
-/** Returns the safe empty state when device storage is corrupt or outdated. */
-export function safeRhythmState(value: unknown): RhythmState {
-  return parseRhythmState(value) ?? EMPTY_RHYTHM_STATE;
 }
 
 /** Selects today's enabled blocks in clock order. */

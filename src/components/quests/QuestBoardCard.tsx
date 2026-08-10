@@ -36,7 +36,10 @@ import {
   IconChevronRight,
   IconClock,
 } from "@/components/design-system/icons";
-import { CATEGORY_LABEL, formatDuration } from "./QuestSlip";
+import {
+  formatQuestDuration,
+  QUEST_CATEGORY_LABEL,
+} from "@/lib/questos/quest-presentation";
 import { cleanVerseText } from "@/lib/utils/scripture";
 import { cn } from "@/lib/utils/cn";
 
@@ -216,11 +219,11 @@ export function QuestBoardCard({
             </span>
             <span className="inline-flex items-center gap-1">
               <IconClock size={13} />
-              {formatDuration(quest.durationMinutes)}
+              {formatQuestDuration(quest.durationMinutes)}
             </span>
             <span className="text-mist">·</span>
             <span className="font-art-label text-[0.875rem] text-accent">
-              {CATEGORY_LABEL[quest.category]}
+              {QUEST_CATEGORY_LABEL[quest.category]}
             </span>
             <span
               className={cn(
@@ -276,7 +279,7 @@ export function QuestBoardCard({
               variant="ghost"
               size="sm"
               onClick={() => {
-                removeQuest(quest.slug, isPlus);
+                removeQuest(quest.slug);
                 toast("Quest removed.");
               }}
             >
@@ -398,7 +401,7 @@ export function QuestBoardCard({
                   <button
                     type="button"
                     onClick={() => {
-                      unpickQuest(quest.slug, isPlus);
+                      unpickQuest(quest.slug);
                       toast("Quest removed from Ready.");
                     }}
                     className="inline-flex min-h-11 items-center text-small text-ash transition-colors hover:text-charcoal"
@@ -410,7 +413,7 @@ export function QuestBoardCard({
                   <button
                     type="button"
                     onClick={() => {
-                      removeQuest(quest.slug, isPlus);
+                      removeQuest(quest.slug);
                       toast("Quest removed.");
                     }}
                     className="inline-flex min-h-11 items-center text-small text-ash transition-colors hover:text-charcoal"

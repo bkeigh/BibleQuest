@@ -93,7 +93,6 @@ export const ART_SPRITES = defineAssets({
 });
 
 export type ArtSpriteName = keyof typeof ART_SPRITES;
-export const ART_SPRITE_NAMES = Object.keys(ART_SPRITES) as ArtSpriteName[];
 
 /**
  * Optical-size correction measured from each approved alpha silhouette.
@@ -145,4 +144,3 @@ export const ART_MASCOTS = defineAssets({
 });
 
 export type ArtMascotName = keyof typeof ART_MASCOTS;
-export const ART_MASCOT_NAMES = Object.keys(ART_MASCOTS) as ArtMascotName[];

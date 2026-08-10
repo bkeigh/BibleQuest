@@ -2,6 +2,7 @@ import "server-only";
 
 import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { stripeObjectId } from "@/lib/billing/stripe-object.server";
 import {
   isSupportAmount,
   SUPPORT_CURRENCY,
@@ -127,11 +128,6 @@ export async function completeSupportCheckout(
   return !error && data === true;
 }
 
-function id(value: string | { id: string } | null): string | null {
-  if (!value) return null;
-  return typeof value === "string" ? value : value.id;
-}
-
 function occurredAt(created: number): string {
   return new Date(created * 1000).toISOString();
 }
@@ -183,7 +179,7 @@ export function supportSessionProjection(
   event: Pick<Stripe.Event, "id" | "created" | "type">,
 ) {
   const requestId = session.metadata?.support_request_id;
-  const paymentIntentId = id(session.payment_intent);
+  const paymentIntentId = stripeObjectId(session.payment_intent);
   const checkoutStatus = session.status;
   const paymentStatus = session.payment_status;
   if (
@@ -309,7 +305,7 @@ export async function synchronizeSupportRefund(
   event: Pick<Stripe.Event, "id" | "created">,
   requestId?: string | null,
 ): Promise<boolean> {
-  const paymentIntentId = id(charge.payment_intent);
+  const paymentIntentId = stripeObjectId(charge.payment_intent);
   if (!paymentIntentId) return false;
   const data = await findSupportPayment(
     admin,
@@ -348,7 +344,7 @@ export function supportDisputeProjection(
     charge.amount !== row.requested_amount ||
     dispute.amount <= 0 ||
     dispute.amount > row.requested_amount ||
-    id(dispute.charge) !== charge.id
+    stripeObjectId(dispute.charge) !== charge.id
   ) {
     throw new StripeSupportProjectionError(
       "Stripe support dispute mismatch.",
@@ -377,7 +373,7 @@ export async function synchronizeSupportDispute(
   event: Pick<Stripe.Event, "id" | "created">,
   requestId?: string | null,
 ): Promise<boolean> {
-  const paymentIntentId = id(charge.payment_intent);
+  const paymentIntentId = stripeObjectId(charge.payment_intent);
   if (!paymentIntentId) return false;
   const data = await findSupportPayment(
     admin,

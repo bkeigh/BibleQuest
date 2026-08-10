@@ -1,5 +1,5 @@
 import type { ArtSpriteName } from "@/components/design-system/art-assets";
-import { SEVEN_DAYS_TILE_IDS, type SevenDaysTileId } from "./types";
+import type { SevenDaysTileId } from "./types";
 
 export interface SevenDaysTileArt {
   readonly id: SevenDaysTileId;
@@ -78,9 +78,3 @@ export const SEVEN_DAYS_TILES: Readonly<
     goalClassName: "text-violet-700",
   },
 };
-
-export const SEVEN_DAYS_TILE_ORDER = SEVEN_DAYS_TILE_IDS;
-
-export function tileLabel(id: SevenDaysTileId): string {
-  return SEVEN_DAYS_TILES[id].label;
-}

@@ -11,7 +11,6 @@ import {
   type ArtSpriteName,
 } from "./art-assets";
 
-export { ART_SPRITE_NAMES } from "./art-assets";
 export type { ArtSpriteName } from "./art-assets";
 
 interface ArtIconProps {

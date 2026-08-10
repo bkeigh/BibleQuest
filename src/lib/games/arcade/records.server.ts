@@ -4,6 +4,7 @@ import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StripeBillingConfiguration } from "@/lib/billing/config.server";
 import { userForStripeCustomer } from "@/lib/billing/records.server";
+import { stripeObjectId } from "@/lib/billing/stripe-object.server";
 import {
   arcadeProduct,
   isArcadeProductId,
@@ -15,11 +16,6 @@ export class StripeArcadeProjectionError extends Error {
     super(message);
     this.name = "StripeArcadeProjectionError";
   }
-}
-
-function id(value: string | { id: string } | null): string | null {
-  if (!value) return null;
-  return typeof value === "string" ? value : value.id;
 }
 
 /** Maps one fixed product key to its independently configured Stripe Price. */
@@ -48,14 +44,14 @@ export async function synchronizeArcadeSession(
   }
   const expected = arcadeProduct(productKey);
   const expectedPriceId = arcadePriceId(configuration, productKey);
-  const customerId = id(session.customer);
-  const paymentIntentId = id(session.payment_intent);
+  const customerId = stripeObjectId(session.customer);
+  const paymentIntentId = stripeObjectId(session.payment_intent);
   const lineItem = session.line_items?.data[0];
   const price =
     lineItem?.price && typeof lineItem.price !== "string"
       ? lineItem.price
       : null;
-  const stripeProductId = price ? id(price.product) : null;
+  const stripeProductId = price ? stripeObjectId(price.product) : null;
   const charge =
     paymentIntent.latest_charge &&
     typeof paymentIntent.latest_charge !== "string"
@@ -81,11 +77,11 @@ export async function synchronizeArcadeSession(
     !customerId ||
     !paymentIntentId ||
     paymentIntent.id !== paymentIntentId ||
-    id(paymentIntent.customer) !== customerId ||
+    stripeObjectId(paymentIntent.customer) !== customerId ||
     paymentIntent.status !== "succeeded" ||
     !charge ||
     !charge.paid ||
-    id(charge.payment_intent) !== paymentIntent.id ||
+    stripeObjectId(charge.payment_intent) !== paymentIntent.id ||
     session.line_items?.data.length !== 1 ||
     lineItem?.quantity !== 1 ||
     !price ||
@@ -150,7 +146,7 @@ export async function synchronizeArcadeCharge(
   event: Pick<Stripe.Event, "id" | "created">,
   dispute?: Stripe.Dispute,
 ): Promise<boolean> {
-  const paymentIntentId = id(charge.payment_intent);
+  const paymentIntentId = stripeObjectId(charge.payment_intent);
   if (!paymentIntentId) return false;
   const { data, error } = await admin
     .from("arcade_orders")
@@ -172,7 +168,7 @@ export async function synchronizeArcadeCharge(
         dispute.currency !== data.currency ||
         dispute.amount <= 0 ||
         dispute.amount > data.amount_total ||
-        id(dispute.charge) !== charge.id))
+        stripeObjectId(dispute.charge) !== charge.id))
   ) {
     throw new StripeArcadeProjectionError("Stripe arcade adjustment mismatch.");
   }

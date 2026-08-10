@@ -6,7 +6,7 @@
  * all 66 books close without allowing navigation controls to compete with the
  * text itself.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   selectVerseRefreshCount,
@@ -25,8 +25,8 @@ import {
   searchScriptureTopics,
   topicPassageHref,
 } from "@/lib/bible/topics";
-import { toDateKey } from "@/lib/utils/dates";
 import { cleanVerseText } from "@/lib/utils/scripture";
+import { useCurrentDayKey } from "@/lib/use-current-day-key";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
@@ -51,31 +51,6 @@ import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 import { TodayFormation } from "@/components/home/TodayFormation";
 
 type Testament = "new" | "old";
-
-/** Re-evaluate daily content when a long-lived PWA crosses local midnight. */
-function useCurrentDayKey() {
-  const [dayKey, setDayKey] = useState(() => toDateKey());
-
-  useEffect(() => {
-    function refreshDay() {
-      const current = toDateKey();
-      setDayKey((previous) => (previous === current ? previous : current));
-    }
-    const onVisible = () => {
-      if (document.visibilityState === "visible") refreshDay();
-    };
-    const interval = window.setInterval(refreshDay, 60_000);
-    window.addEventListener("focus", refreshDay);
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", refreshDay);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, []);
-
-  return dayKey;
-}
 
 function BibleIndexInner() {
   const plus = usePlus();

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { authCallbackPath } from "@/lib/auth/redirect";
 import { isConsoleHost } from "@/lib/console/paths";
 import { recordConsoleSignIn } from "@/app/console/(protected)/actions";
 
@@ -36,13 +35,9 @@ export function ConsoleSignIn() {
     setState("sending");
     const address = email.trim().toLowerCase();
     try {
-      const callback = new URL(
-        authCallbackPath(returnPath()),
-        window.location.origin,
-      ).toString();
       const { error } = await createClient().auth.signInWithOtp({
         email: address,
-        options: { emailRedirectTo: callback, shouldCreateUser: false },
+        options: { shouldCreateUser: false },
       });
       if (error) throw error;
       setRequestedEmail(address);

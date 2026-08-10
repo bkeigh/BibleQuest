@@ -8,15 +8,16 @@ interface SupportLinkProps {
   className?: string;
 }
 
-/** Gives the one-time support path the same prominent treatment as Home's verse card. */
+/** Keeps one-time support visible without competing with the primary Scripture action. */
 export function SupportLink({ className }: SupportLinkProps) {
   if (!webCommerceAvailable()) return null;
 
   return (
     <Link
       href="/support"
+      data-paper-variant="quiet"
       className={cn(
-        "group relative isolate flex min-h-20 items-center gap-3 overflow-hidden rounded-[var(--radius-card)] border border-evergreen-600 bg-evergreen-700 px-4 py-4 text-[#fdfbf3] paper-shadow-lg transition-all duration-300 [transition-timing-function:var(--ease-gentle)] hover:-translate-y-0.5 hover:bg-evergreen-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0",
+        "app-glass-surface group relative isolate flex min-h-20 items-center gap-3 overflow-hidden rounded-[var(--radius-card)] border border-gold-500/45 bg-paper/70 px-4 py-4 text-graphite paper-shadow transition-all duration-300 [transition-timing-function:var(--ease-gentle)] hover:-translate-y-0.5 hover:border-gold-500/65 hover:bg-linen focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0",
         className,
       )}
     >
@@ -42,11 +43,11 @@ export function SupportLink({ className }: SupportLinkProps) {
         <span className="block font-display text-[1.125rem] leading-tight">
           Support BibleQuest
         </span>
-        <span className="mt-1 block text-caption text-[#fdfbf3]/70">
+        <span className="mt-1 block text-caption text-charcoal">
           Make a voluntary one-time contribution.
         </span>
       </span>
-      <IconArrowRight className="relative shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
+      <IconArrowRight className="relative shrink-0 text-accent transition-transform duration-300 group-hover:translate-x-1" />
     </Link>
   );
 }

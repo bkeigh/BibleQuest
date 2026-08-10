@@ -18,18 +18,23 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "mx-auto w-full max-w-2xl px-5 pt-safe-gap-8 sm:px-8",
+        "mx-auto mb-3 w-full max-w-2xl px-5 pt-safe-gap-8 sm:px-8",
         className
       )}
     >
-      <div className="flex items-end justify-between gap-4 pb-2">
-        <div>
+      <div className="relative flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b border-mist/70 pb-4">
+        <div className="min-w-0 flex-1">
           <h1 className="font-display text-editorial text-graphite">
             {title}
           </h1>
           {subtitle && <p className="mt-1 text-small text-ash">{subtitle}</p>}
         </div>
         {action}
+        {/* A short gilt rule gives every app section the same editorial finish. */}
+        <span
+          aria-hidden="true"
+          className="absolute -bottom-px left-0 h-px w-14 bg-gradient-to-r from-accent via-gold-500 to-transparent"
+        />
       </div>
     </header>
   );

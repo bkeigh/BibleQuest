@@ -982,7 +982,4 @@ export const SEVEN_DAYS_CHAPTERS: readonly SevenDaysChapter[] = [
   },
 ] as const satisfies readonly SevenDaysChapter[];
 
-export const SEVEN_DAYS_CHAPTER_COUNT = SEVEN_DAYS_CHAPTERS.length;
 export const SEVEN_DAYS_LEVELS_PER_CHAPTER = 7;
-export const SEVEN_DAYS_TOTAL_LEVELS =
-  SEVEN_DAYS_CHAPTER_COUNT * SEVEN_DAYS_LEVELS_PER_CHAPTER;

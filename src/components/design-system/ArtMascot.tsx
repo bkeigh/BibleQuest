@@ -4,7 +4,6 @@
 import { cn } from "@/lib/utils/cn";
 import { ART_MASCOTS, type ArtMascotName } from "./art-assets";
 
-export { ART_MASCOT_NAMES } from "./art-assets";
 export type { ArtMascotName } from "./art-assets";
 
 interface ArtMascotProps {

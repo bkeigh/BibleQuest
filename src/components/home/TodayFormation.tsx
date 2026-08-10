@@ -268,7 +268,7 @@ export function TodayFormation({
               onClick={() => scrollGameRail(-1)}
               disabled={gameRailEdges.atStart}
               aria-label="Previous arcade game"
-              className="absolute -left-5 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-paper/90 text-accent paper-shadow backdrop-blur-md transition-opacity disabled:pointer-events-none disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:-left-8"
+              className="absolute -left-3 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-paper/90 text-accent paper-shadow backdrop-blur-md transition-opacity disabled:pointer-events-none disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:-left-5"
             >
               <IconArrowLeft size={17} />
             </button>
@@ -277,7 +277,7 @@ export function TodayFormation({
               onClick={() => scrollGameRail(1)}
               disabled={gameRailEdges.atEnd}
               aria-label="Next arcade game"
-              className="absolute -right-5 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-paper/90 text-accent paper-shadow backdrop-blur-md transition-opacity disabled:pointer-events-none disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:-right-8"
+              className="absolute -right-3 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-paper/90 text-accent paper-shadow backdrop-blur-md transition-opacity disabled:pointer-events-none disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:-right-5"
             >
               <IconArrowRight size={17} />
             </button>

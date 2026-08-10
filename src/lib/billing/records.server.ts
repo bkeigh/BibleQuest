@@ -3,6 +3,7 @@ import "server-only";
 import type Stripe from "stripe";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { StripeBillingConfiguration } from "./config.server";
+import { stripeObjectId } from "./stripe-object.server";
 import {
   subscriptionProjection,
   type StripeCustomerRow,
@@ -193,11 +194,6 @@ interface LifetimeProjectionRow {
   outcome_status: string;
 }
 
-function id(value: string | { id: string } | null): string | null {
-  if (!value) return null;
-  return typeof value === "string" ? value : value.id;
-}
-
 /** Projects a paid lifetime Checkout from current Stripe objects only. */
 export async function synchronizeLifetimeSession(
   admin: SupabaseClient,
@@ -206,14 +202,14 @@ export async function synchronizeLifetimeSession(
   configuration: StripeBillingConfiguration,
   event: Pick<Stripe.Event, "id" | "created">,
 ): Promise<boolean> {
-  const customerId = id(session.customer);
-  const paymentIntentId = id(session.payment_intent);
+  const customerId = stripeObjectId(session.customer);
+  const paymentIntentId = stripeObjectId(session.payment_intent);
   const lineItem = session.line_items?.data[0];
   const price =
     lineItem?.price && typeof lineItem.price !== "string"
       ? lineItem.price
       : null;
-  const product = price ? id(price.product) : null;
+  const product = price ? stripeObjectId(price.product) : null;
   const charge =
     paymentIntent.latest_charge &&
     typeof paymentIntent.latest_charge !== "string"
@@ -239,11 +235,11 @@ export async function synchronizeLifetimeSession(
     !customerId ||
     !paymentIntentId ||
     paymentIntent.id !== paymentIntentId ||
-    id(paymentIntent.customer) !== customerId ||
+    stripeObjectId(paymentIntent.customer) !== customerId ||
     paymentIntent.status !== "succeeded" ||
     !charge ||
     !charge.paid ||
-    id(charge.payment_intent) !== paymentIntent.id ||
+    stripeObjectId(charge.payment_intent) !== paymentIntent.id ||
     lineItem?.quantity !== 1 ||
     session.line_items?.data.length !== 1 ||
     !price ||
@@ -323,7 +319,7 @@ export async function synchronizeLifetimeCharge(
   event: Pick<Stripe.Event, "id" | "created">,
   dispute?: Stripe.Dispute,
 ): Promise<boolean> {
-  const paymentIntentId = id(charge.payment_intent);
+  const paymentIntentId = stripeObjectId(charge.payment_intent);
   if (!paymentIntentId) return false;
   const { data, error } = await admin
     .from("subscriptions")
@@ -346,7 +342,7 @@ export async function synchronizeLifetimeCharge(
         dispute.currency !== row.currency ||
         dispute.amount <= 0 ||
         dispute.amount > row.amount_total ||
-        id(dispute.charge) !== charge.id))
+        stripeObjectId(dispute.charge) !== charge.id))
   ) {
     throw new StripeLifetimeProjectionError(
       "Stripe lifetime adjustment mismatch.",

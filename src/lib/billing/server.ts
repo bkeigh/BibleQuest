@@ -7,6 +7,7 @@ import {
   type BillingInterval,
 } from "./validation";
 import type { StripeBillingConfiguration } from "./config.server";
+import { stripeObjectId } from "./stripe-object.server";
 
 export interface StripeCustomerRow {
   user_id: string | null;
@@ -73,11 +74,6 @@ export async function stripeBillingContractReady(
   return !error && isBillingContract(data);
 }
 
-function id(value: string | { id: string } | null): string | null {
-  if (!value) return null;
-  return typeof value === "string" ? value : value.id;
-}
-
 function instant(value: number | null | undefined): string | null {
   return typeof value === "number"
     ? new Date(value * 1000).toISOString()
@@ -102,8 +98,8 @@ export function subscriptionProjection(
       : priceId === configuration.priceIds.annual
         ? "annual"
         : null;
-  const product = id(item.price.product);
-  const customer = id(subscription.customer);
+  const product = stripeObjectId(item.price.product);
+  const customer = stripeObjectId(subscription.customer);
   if (!customer || !product) {
     throw new Error("Stripe subscription shape unavailable.");
   }
@@ -132,7 +128,7 @@ export function subscriptionProjection(
       subscription.cancel_at_period_end || subscription.cancel_at !== null,
     canceled_at: instant(subscription.canceled_at),
     trial_end: instant(subscription.trial_end),
-    latest_invoice_id: id(subscription.latest_invoice),
+    latest_invoice_id: stripeObjectId(subscription.latest_invoice),
     ...(event
       ? {
           last_stripe_event_created: event.created,

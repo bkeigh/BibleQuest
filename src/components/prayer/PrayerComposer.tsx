@@ -20,20 +20,7 @@ import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 import { hashString, toDateKey } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils/cn";
 import { guidedJournalHandoff } from "@/lib/guided/journal-handoff";
-
-export const CATEGORY_LABEL: Record<PrayerCategory, string> = {
-  morning: "Morning",
-  evening: "Evening",
-  gratitude: "Gratitude",
-  difficulty: "In difficulty",
-  intercession: "For others",
-  stillness: "Stillness",
-  forgiveness: "Forgiveness",
-  courage: "Courage",
-  family: "Family",
-  work: "Work",
-  general: "General",
-};
+import { PRAYER_CATEGORY_LABEL } from "@/lib/questos/prayer-presentation";
 
 type PrayerDraft = {
   title: string;
@@ -257,7 +244,7 @@ function PrayerComposerInner() {
         label="Theme (optional)"
         summary={
           <span className="rounded-full bg-accent-surface px-2 py-0.5 text-[0.75rem] text-accent">
-            {CATEGORY_LABEL[value.category]}
+            {PRAYER_CATEGORY_LABEL[value.category]}
           </span>
         }
         className="mt-5"
@@ -276,7 +263,7 @@ function PrayerComposerInner() {
                   : "border-mist bg-paper text-ash hover:border-accent/50",
               )}
             >
-              {CATEGORY_LABEL[category]}
+              {PRAYER_CATEGORY_LABEL[category]}
             </button>
           ))}
         </div>

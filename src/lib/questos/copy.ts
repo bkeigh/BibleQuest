@@ -11,17 +11,6 @@
  * remain only where screens still read them directly.
  */
 
-const completionLines = [
-  "Done. That counts.",
-  "A small thing, done well.",
-  "Your tree grew today.",
-  "That one's yours now.",
-] as const;
-
-export function completionLine(seed: number): string {
-  return completionLines[Math.abs(seed) % completionLines.length];
-}
-
 export const emptyStates = {
   prayer: "Write what’s actually on your mind. Save it in your private-by-default journal.",
   reflections: "Your reflections will collect here.",
@@ -59,5 +48,3 @@ export const treeStageLabels: Record<string, string> = {
   shade: "Shade Tree",
   sheltering: "Sheltering Tree",
 };
-
-export const treeReturnLine = "One meaningful step is enough to keep growing.";

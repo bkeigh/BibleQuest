@@ -3,8 +3,6 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const ROOT = process.cwd();
-const PORTABLE_LINK =
-  "{{ .RedirectTo }}&amp;token_hash={{ .TokenHash }}&amp;type=email";
 
 /** Reads one versioned Supabase Auth template from the repository. */
 function template(name: "confirmation" | "magic-link"): string {
@@ -16,12 +14,13 @@ function template(name: "confirmation" | "magic-link"): string {
 
 describe("PWA-safe auth email templates", () => {
   it.each(["confirmation", "magic-link"] as const)(
-    "%s offers both an in-app code and the portable browser link",
+    "%s keeps email authentication bound to the requesting app with a code",
     (name) => {
       const html = template(name);
 
       expect(html).toContain("{{ .Token }}");
-      expect(html).toContain(PORTABLE_LINK);
+      expect(html).not.toContain("{{ .TokenHash }}");
+      expect(html).not.toContain("{{ .RedirectTo }}");
       expect(html).not.toContain("{{ .ConfirmationURL }}");
       expect(html.match(/https?:\/\/[^"\s]+/g)).toEqual([
         "https://www.biblequest.co/icons/icon-192.png",

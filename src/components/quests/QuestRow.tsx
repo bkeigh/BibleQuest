@@ -26,7 +26,10 @@ import {
   IconClock,
   IconPlus,
 } from "@/components/design-system/icons";
-import { CATEGORY_LABEL, formatDuration } from "./QuestSlip";
+import {
+  formatQuestDuration,
+  QUEST_CATEGORY_LABEL,
+} from "@/lib/questos/quest-presentation";
 
 export function QuestRow({
   quest,
@@ -84,10 +87,10 @@ export function QuestRow({
             </span>
             <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.8125rem] text-ash">
               <IconClock size={12} />
-              {formatDuration(quest.durationMinutes)}
+              {formatQuestDuration(quest.durationMinutes)}
               <span className="text-mist">·</span>
               <span className="font-art-label text-accent">
-                {CATEGORY_LABEL[quest.category]}
+                {QUEST_CATEGORY_LABEL[quest.category]}
               </span>
               {completed ? (
                 <span className="art-frame ms-auto inline-flex items-center gap-1 bg-accent-surface px-2 py-0.5 text-caption text-accent-ink">

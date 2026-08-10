@@ -1,77 +1,23 @@
 "use client";
 
 /**
- * The reflection journal embedded in Prayer. Entries are rendered newest
- * first with their optional quest or verse context; mutations remain in
- * QuestOS so guest persistence and signed-in sync follow the same path.
+ * Renders one editable reflection inside Prayer's unified journal. Mutations
+ * stay in QuestOS so local persistence and optional account sync share the
+ * same archive, restore, edit, and delete behavior.
  */
 import { useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useQuestOS } from "@/lib/questos/store";
 import { useToast } from "@/components/design-system/Toast";
-import { ClientOnly } from "@/components/app-shell/ClientOnly";
-import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
-import { GentleButton, GentleLink } from "@/components/design-system/GentleButton";
-import { ArtIcon } from "@/components/design-system/ArtIcon";
+import { GentleButton } from "@/components/design-system/GentleButton";
 import { expander } from "@/lib/motion";
-import { emptyStates } from "@/lib/questos/copy";
 import { formatShortDate } from "@/lib/utils/dates";
 import { questBySlug } from "@/data/seed/quests";
 import type { Reflection } from "@/lib/questos/types";
 import { JournalEntryBody } from "@/components/journal/JournalEntryBody";
 import { cn } from "@/lib/utils/cn";
-
-export function ReflectionPanel() {
-  const reflections = useQuestOS((s) => s.reflections);
-  const sorted = reflections
-    .filter((reflection) => !reflection.archivedAt)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-  return (
-    <section aria-labelledby="reflection-journal-heading">
-      <div className="mb-3 px-1">
-        <h2
-          id="reflection-journal-heading"
-          className="font-display text-[1.125rem] text-graphite"
-        >
-          Reflection journal
-        </h2>
-        <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-ash">
-          A private record of what you’re learning and noticing.
-        </p>
-      </div>
-
-      {sorted.length === 0 ? (
-        <PaperCard variant="atmospheric" padding="lg" className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-linen ring-1 ring-mist">
-            <ArtIcon name="sun" size={92} />
-          </div>
-          <h3 className="font-display text-[1.125rem] text-graphite">
-            Notice what’s stirring
-          </h3>
-          <p className="mx-auto mt-1.5 max-w-xs text-[0.9375rem] leading-relaxed text-ash">
-            {emptyStates.reflections} A few honest lines are enough.
-          </p>
-          <GentleLink
-            variant="primary"
-            href="/app/prayer/reflection/new"
-            className="mt-5"
-          >
-            Write your first reflection
-          </GentleLink>
-        </PaperCard>
-      ) : (
-        <div className="space-y-3 pb-2">
-          {sorted.map((r) => (
-            <ReflectionCard key={r.id} reflection={r} />
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
 
 export function ReflectionCard({
   reflection: r,
@@ -215,19 +161,5 @@ export function ReflectionCard({
         )}
       </AnimatePresence>
     </PaperCard>
-  );
-}
-
-export function ReflectionScreen() {
-  return (
-    <ClientOnly>
-      <PageHeader
-        title="Prayer"
-        subtitle="A private place to pray, notice, and remember."
-      />
-      <PageContainer className="pb-6">
-        <ReflectionPanel />
-      </PageContainer>
-    </ClientOnly>
   );
 }

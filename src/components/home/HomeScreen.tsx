@@ -2,9 +2,9 @@
 
 /**
  * The daily landing screen. It composes the local-first QuestOS state into one
- * calm sequence: welcome and candle, Scripture, and one quest. Optional
- * formation, growth, and support stay behind one disclosure so they remain
- * available without competing with the daily path.
+ * calm sequence: welcome and candle, quests, formation, growth, and private
+ * next steps. The full path stays visible so Home feels like a journey rather
+ * than a menu with its most useful destinations hidden.
  */
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -19,6 +19,7 @@ import {
   formatQuestWindowRemaining,
   isQuestWindowOpen,
 } from "@/lib/questos/quest-engine";
+import { chapterHref } from "@/lib/bible/links";
 import { timeOfDay, toDateKey } from "@/lib/utils/dates";
 import { useStrings, fmt } from "@/lib/i18n";
 import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
@@ -49,11 +50,11 @@ import { RhythmTodayCard } from "@/components/rhythm/RhythmTodayCard";
 import { PlusFeatureDialog } from "@/components/plus/PlusFeatureDialog";
 import { HomeSectionHeading } from "@/components/home/HomeSectionHeading";
 import { isNativeTarget } from "@/lib/platform/target";
-import { Disclosure } from "@/components/design-system/Disclosure";
 
 function HomeInner() {
   const profile = useQuestOS((s) => s.profile);
   const growthEvents = useQuestOS((s) => s.growthEvents);
+  const readingPosition = useQuestOS((s) => s.readingPosition);
   const assignments = useQuestOS((s) => s.assignments);
   const { isPlus } = usePlus();
   const nativeTarget = isNativeTarget();
@@ -130,7 +131,7 @@ function HomeInner() {
           data-paper-variant="paper"
           data-plus-nameplate={isPlus ? "active" : "free"}
           className={cn(
-            "app-glass-surface sacred-frame relative mb-4 overflow-hidden bg-paper/90 px-5 py-4 max-[380px]:px-4 max-[340px]:px-3 sm:px-6 sm:py-5",
+            "app-glass-surface home-hero-surface sacred-frame relative mb-4 overflow-hidden bg-paper/90 px-5 py-4 max-[380px]:px-4 max-[340px]:px-3 sm:px-6 sm:py-5",
             isPlus &&
               "plus-nameplate border-[#9f6a1f]/75 bg-[radial-gradient(circle_at_82%_18%,rgba(255,255,244,0.72),transparent_27%),linear-gradient(135deg,rgba(255,249,224,0.97),rgba(241,215,135,0.94)_49%,rgba(255,248,216,0.97))] shadow-[0_14px_38px_rgba(102,68,19,0.23)] ring-1 ring-[#e2bd62]/70",
           )}
@@ -140,7 +141,7 @@ function HomeInner() {
           {isPlus && (
             <span
               aria-hidden="true"
-              className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-[#fff6c7]/55 blur-2xl"
+              className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-[#fff6c7]/20 blur-2xl"
             />
           )}
           <div className="relative z-10 grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 max-[430px]:gap-2 max-[340px]:gap-1.5 sm:gap-4">
@@ -168,7 +169,7 @@ function HomeInner() {
                   <span className="sr-only">BibleQuest Plus member</span>
                   <span
                     aria-hidden="true"
-                    className="flex items-center gap-1.5 whitespace-nowrap text-[0.625rem] font-semibold uppercase tracking-[0.2em] text-[#6f430c] @max-[8rem]:gap-1 @max-[8rem]:tracking-[0.1em]"
+                    className="home-hero-member flex items-center gap-1.5 whitespace-nowrap text-[0.625rem] font-semibold uppercase tracking-[0.2em] text-[#4f3108] @max-[8rem]:gap-1 @max-[8rem]:tracking-[0.1em]"
                   >
                     <span className="@max-[8rem]:hidden">✦</span>
                     <span>
@@ -181,17 +182,17 @@ function HomeInner() {
               )}
               <p
                 className={cn(
-                  "font-display text-[1rem] leading-tight max-[360px]:text-[0.875rem]",
-                  isPlus ? "text-[#704713]" : "text-accent",
+                  "home-hero-kicker font-display text-[1rem] leading-tight max-[360px]:text-[0.875rem]",
+                  isPlus ? "text-[#4f3108]" : "text-accent",
                 )}
               >
                 {name ? `${hello},` : season.label}
               </p>
               <h1
                 className={cn(
-                  "mt-1 truncate font-display text-[1.375rem] leading-tight text-graphite max-[360px]:text-[1.0625rem] min-[430px]:text-[1.5rem] sm:text-editorial",
+                  "home-hero-name mt-1 truncate font-display text-[1.375rem] leading-tight text-graphite max-[360px]:text-[1.0625rem] min-[430px]:text-[1.5rem] sm:text-editorial",
                   isPlus &&
-                    "bg-gradient-to-r from-[#7d5013] via-[#bb8124] to-[#7d5013] bg-clip-text text-transparent drop-shadow-[0_1px_0_rgba(255,255,255,0.75)]",
+                    "bg-gradient-to-r from-[#4d3008] via-[#765115] to-[#4d3008] bg-clip-text text-transparent drop-shadow-[0_1px_0_rgba(255,255,255,0.75)]",
                 )}
               >
                 {name || `${hello}.`}
@@ -199,8 +200,8 @@ function HomeInner() {
               {name && (
                 <p
                   className={cn(
-                    "mt-1 text-[0.8125rem] uppercase tracking-[0.14em] max-[360px]:text-[0.6875rem] max-[360px]:tracking-[0.08em]",
-                    isPlus ? "text-[#68512b]" : "text-ash",
+                    "home-hero-season mt-1 text-[0.8125rem] uppercase tracking-[0.14em] max-[360px]:text-[0.6875rem] max-[360px]:tracking-[0.08em]",
+                    isPlus ? "text-[#493816]" : "text-charcoal",
                   )}
                 >
                   {season.label}
@@ -286,112 +287,122 @@ function HomeInner() {
             </Link>
           </section>
 
-          {/* Secondary formation and promotional surfaces stay available without
-              asking a first-time reader to choose among all of them at once. */}
-          <Disclosure
-            variant="quiet"
-            label={
-              <span>
-                <span className="block font-display text-[1.0625rem] text-graphite">
-                  Explore more
-                </span>
-                <span className="mt-0.5 block text-caption font-normal text-ash">
-                  {nativeTarget
-                    ? "Your rhythm, guided Scripture, growth, and games"
-                    : "Your rhythm, guided Scripture, growth, games, and support"}
-                </span>
-              </span>
+          {/* The weekly rhythm stays attached to the daily quest. */}
+          <RhythmTodayCard dayKey={dayKey} now={now} />
+
+          {/* Guided Scripture remains a distinct daily formation choice. */}
+          <TodayFormation
+            dayKey={dayKey}
+            show="guide"
+            afterGuide={
+              isPlus ? (
+                <ShepherdCallout href="/app/shepherd" />
+              ) : nativeTarget ? undefined : (
+                <ShepherdCallout
+                  onClick={() => setShepherdDialogOpen(true)}
+                />
+              )
             }
-            contentClassName="pt-3"
-          >
-            <div className="space-y-7">
-              {/* The optional weekly rhythm stays near the daily quest while
-                  remaining out of the default first-use decision path. */}
-              <RhythmTodayCard dayKey={dayKey} now={now} />
+          />
 
-              {/* Guided Scripture remains a distinct daily formation choice. */}
-              <TodayFormation
-                dayKey={dayKey}
-                show="guide"
-                afterGuide={
-                  isPlus ? (
-                    <ShepherdCallout href="/app/shepherd" />
-                  ) : nativeTarget ? undefined : (
-                    <ShepherdCallout
-                      onClick={() => setShepherdDialogOpen(true)}
-                    />
-                  )
-                }
-              />
-
-              {/* Growth uses the same left-aligned category rhythm as every Home section. */}
-              <section aria-labelledby="growth-home-title">
-                <HomeSectionHeading
-                  id="growth-home-title"
-                  title={t.home.yourGrowth}
-                  subtitle="Your journey"
+          {/* Growth uses the same left-aligned category rhythm as every Home section. */}
+          <section aria-labelledby="growth-home-title">
+            <HomeSectionHeading
+              id="growth-home-title"
+              title={t.home.yourGrowth}
+              subtitle="Your journey"
+            />
+            <Link href="/app/journey" className="block">
+              <PaperCard
+                interactive
+                variant="linen"
+                padding="md"
+                className="flex min-h-28 items-center gap-4"
+              >
+                <GrowthTree
+                  state={tree}
+                  size={96}
+                  treeOnly
+                  className="shrink-0"
                 />
-                <Link href="/app/journey" className="block">
-                  <PaperCard
-                    interactive
-                    variant="linen"
-                    padding="md"
-                    className="flex min-h-28 items-center gap-4"
+                <div className="min-w-0 flex-1">
+                  <p className="font-display text-subheading text-graphite">
+                    {tree.stageLabel}
+                  </p>
+                  {/* Gentle progression bar — the caption carries the meaning. */}
+                  <div
+                    aria-hidden="true"
+                    className="mt-2 h-1.5 overflow-hidden rounded-full bg-mist/60"
                   >
-                    <GrowthTree
-                      state={tree}
-                      size={96}
-                      treeOnly
-                      className="shrink-0"
+                    <div
+                      className="h-full rounded-full bg-accent"
+                      style={{ width: `${(progress?.fraction ?? 1) * 100}%` }}
                     />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-display text-subheading text-graphite">
-                        {tree.stageLabel}
-                      </p>
-                      {/* Gentle progression bar — the caption carries the meaning. */}
-                      <div
-                        aria-hidden="true"
-                        className="mt-2 h-1.5 overflow-hidden rounded-full bg-mist/60"
-                      >
-                        <div
-                          className="h-full rounded-full bg-accent"
-                          style={{ width: `${(progress?.fraction ?? 1) * 100}%` }}
-                        />
-                      </div>
-                      <p className="mt-1.5 text-caption text-ash">
-                        {tree.toNextStage != null
-                          ? tree.toNextStage === 1
-                            ? t.journey.toNextOne
-                            : fmt(t.journey.toNext, { n: tree.toNextStage })
-                          : t.journey.fullGrown}
-                      </p>
-                    </div>
-                    <IconChevronRight className="shrink-0 text-fog max-[350px]:hidden" />
-                  </PaperCard>
-                </Link>
-              </section>
+                  </div>
+                  <p className="mt-1.5 text-caption text-ash">
+                    {tree.toNextStage != null
+                      ? tree.toNextStage === 1
+                        ? t.journey.toNextOne
+                        : fmt(t.journey.toNext, { n: tree.toNextStage })
+                      : t.journey.fullGrown}
+                  </p>
+                </div>
+                <IconChevronRight className="shrink-0 text-fog max-[350px]:hidden" />
+              </PaperCard>
+            </Link>
+          </section>
 
-              {/* The arcade follows growth as the lighter play surface. */}
-              <TodayFormation dayKey={dayKey} show="game" />
+          {/* The arcade follows growth as the lighter play surface. */}
+          <TodayFormation dayKey={dayKey} show="game" />
 
-              {/* A gentle, once-per-context invitation keeps a journey safe
-                  across devices without interrupting the primary daily path. */}
-              <AccountPrompt />
+          {/* Core devotional shortcuts close the formation path before promotions. */}
+          <div
+            role="group"
+            className="grid grid-cols-3 gap-2.5 sm:gap-4"
+            aria-label="Prayer, Bible, and reflection shortcuts"
+          >
+            <QuickActionTile
+              href="/app/prayer/new"
+              sprite="candle"
+              title="One minute of prayer"
+              animate
+            />
+            <QuickActionTile
+              href={
+                readingPosition
+                  ? chapterHref(readingPosition.bookSlug, readingPosition.chapter)
+                  : "/app/bible"
+              }
+              sprite="book"
+              title="Open the Bible"
+              ariaLabel={
+                readingPosition
+                  ? `Continue ${readingPosition.bookName} ${readingPosition.chapter}`
+                  : "Open the Bible"
+              }
+            />
+            <QuickActionTile
+              href="/app/prayer/reflections"
+              sprite="sun"
+              title="Reflect on Today"
+            />
+          </div>
 
-              {!isPlus && (
-                <ExplorePlusLink
-                  className="mt-1"
-                  description="See every wallpaper and the complete Plus experience."
-                />
-              )}
+          {/* A gentle, once-per-context invitation keeps a journey safe across devices. */}
+          <AccountPrompt />
 
-              {/* One-time support remains separate from membership. */}
-              <SupportLink />
+          {!isPlus && (
+            <ExplorePlusLink
+              className="mt-1"
+              description="See every wallpaper and the complete Plus experience."
+            />
+          )}
 
-              {/* Newsletter updates remain available after voluntary support. */}
-              <NewsletterLink />
-            </div>
-          </Disclosure>
+          {/* One-time support remains separate from membership. */}
+          <SupportLink />
+
+          {/* Newsletter updates remain available after voluntary support. */}
+          <NewsletterLink />
 
           <PlusFeatureDialog
             open={shepherdDialogOpen}
@@ -445,10 +456,7 @@ function ShepherdCallout({
       interactive
       variant="outlined"
       padding="md"
-      // Glass like the rest of the app, but the most opaque surface in it —
-      // see `.app-glass-shepherd`. The flat inline fill it replaces sat outside
-      // the material system entirely, which is why this card read as pasted on,
-      // and an inline style would have out-ranked the class anyway.
+      // This stronger glass treatment preserves white-text contrast.
       className="app-glass-shepherd flex min-h-24 items-center gap-4"
     >
       <span className="relative flex shrink-0 items-center justify-center">
@@ -460,9 +468,7 @@ function ShepherdCallout({
         />
       </span>
       <div className="min-w-0 flex-1">
-        {/* The badge leads rather than trailing the title. Sharing a wrapping
-            line with it, "Plus" kept being pushed onto a line of its own,
-            which read as a heading instead of a label. */}
+        {/* The membership badge leads the feature title at every width. */}
         <span className="inline-flex rounded-full border border-white/25 bg-[#173c52]/55 px-2 py-0.5 text-caption font-medium text-white">
           Plus
         </span>
@@ -494,6 +500,44 @@ function ShepherdCallout({
     >
       {content}
     </button>
+  );
+}
+
+/** Renders one of Home's matched devotional shortcuts. */
+function QuickActionTile({
+  href,
+  sprite,
+  title,
+  ariaLabel,
+  animate = false,
+}: {
+  href: string;
+  sprite: Parameters<typeof ArtIcon>[0]["name"];
+  title: string;
+  ariaLabel?: string;
+  animate?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-label={ariaLabel}
+      className="group block rounded-[var(--radius-card)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+    >
+      <PaperCard
+        interactive
+        variant="paper"
+        padding="sm"
+        className="flex h-full min-h-[7rem] flex-col items-center justify-center gap-2.5 text-center sm:min-h-[7.75rem]"
+      >
+        {/* The artwork lifts gently while the card keeps a stable touch target. */}
+        <span className="flex shrink-0 items-center justify-center transition-transform duration-300 group-hover:-translate-y-0.5">
+          <ArtIcon name={sprite} size={68} animate={animate} />
+        </span>
+        <span className="text-[0.75rem] font-medium leading-snug text-graphite min-[390px]:text-[0.8125rem] sm:text-small">
+          {title}
+        </span>
+      </PaperCard>
+    </Link>
   );
 }
 

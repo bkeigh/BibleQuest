@@ -7,7 +7,8 @@
  */
 import { useMemo } from "react";
 import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
-import { hashString, seededRandom, toDateKey } from "@/lib/utils/dates";
+import { hashString, seededRandom } from "@/lib/utils/dates";
+import { useCurrentDayKey } from "@/lib/use-current-day-key";
 
 type ParticleKind = "leaf" | "star" | "petal" | "snow" | "ember" | "dust";
 
@@ -39,6 +40,7 @@ export function SeasonalAtmosphere({
   density?: number;
   className?: string;
 }) {
+  const dayKey = useCurrentDayKey();
   const season = getCurrentSeason();
   const kind = SEASON_PARTICLE[season.key] ?? "leaf";
 
@@ -50,7 +52,7 @@ export function SeasonalAtmosphere({
   // Now, with animation off, the scatter simply holds still — intentional
   // in both modes.
   const particles = useMemo(() => {
-    const rand = seededRandom(hashString(`${toDateKey()}:${kind}`));
+    const rand = seededRandom(hashString(`${dayKey}:${kind}`));
     return Array.from({ length: density }, (_, i) => ({
       left: 3 + rand() * 94,
       top: 6 + rand() * 82,
@@ -61,7 +63,7 @@ export function SeasonalAtmosphere({
       opacity: 0.14 + rand() * 0.22,
       key: i,
     }));
-  }, [kind, density]);
+  }, [dayKey, kind, density]);
 
   return (
     <div

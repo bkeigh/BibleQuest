@@ -46,11 +46,8 @@ export interface AnalyticsEventProps {
   quest_started: undefined;
   quest_completed: { category: QuestCategory };
   quest_saved: undefined;
-  quest_paused: undefined;
   quest_resumed: undefined;
-  quest_archived: undefined;
   quest_removed: undefined;
-  quest_reopened: undefined;
   quest_step_completed: { step: QuestStep };
   quest_card_expanded: { category: QuestCategory };
   reflection_started: { source: "quest" };
@@ -137,11 +134,8 @@ const EVENT_RULES = {
   quest_started: noProps,
   quest_completed: categoryProps,
   quest_saved: noProps,
-  quest_paused: noProps,
   quest_resumed: noProps,
-  quest_archived: noProps,
   quest_removed: noProps,
-  quest_reopened: noProps,
   quest_step_completed: {
     props: { step: { kind: "enum", values: STEPS } },
   },

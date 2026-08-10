@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Projects account-bound billing state into React without treating the client
+ * as an entitlement authority. Requests are keyed to the active identity so a
+ * late response from a prior account cannot leak Plus access across sessions.
+ */
 import {
   createContext,
   createElement,

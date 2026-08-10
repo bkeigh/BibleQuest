@@ -16,8 +16,8 @@ import { SearchClearButton } from "@/components/design-system/SearchClearButton"
 import { JournalEntryBody } from "@/components/journal/JournalEntryBody";
 import { JournalPrivacyNote } from "@/components/journal/JournalPrivacyNote";
 import { JournalComposeMenu } from "@/components/journal/JournalComposeMenu";
-import { CATEGORY_LABEL } from "@/components/prayer/PrayerComposer";
-import { ReflectionCard } from "@/components/reflection/ReflectionScreen";
+import { ReflectionCard } from "@/components/reflection/ReflectionCard";
+import { PRAYER_CATEGORY_LABEL } from "@/lib/questos/prayer-presentation";
 import {
   IconEye,
   IconEyeOff,
@@ -500,7 +500,7 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
                 ? `Answered ${formatShortDate(prayer.answeredAt)}`
                 : "Prayer"}
             {" · "}
-            {CATEGORY_LABEL[prayer.category]}
+            {PRAYER_CATEGORY_LABEL[prayer.category]}
           </p>
 
           {showActions && (

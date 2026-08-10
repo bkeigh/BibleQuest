@@ -2,18 +2,10 @@ import { PaperCard } from "@/components/design-system/PaperCard";
 import { ArtIcon, CATEGORY_ART } from "@/components/design-system/ArtIcon";
 import { IconClock } from "@/components/design-system/icons";
 import type { QuestTemplate } from "@/lib/questos/types";
+import { formatQuestDuration } from "@/lib/questos/quest-presentation";
 
 /** Presentational (non-interactive) versions of the app cards for marketing.
  * The verse demo lives in ./VerseDemo.tsx — it's interactive (shuffle). */
-
-/** Local copy of the app's duration formatter — keeps marketing decoupled from app components. */
-function formatDuration(minutes: number): string {
-  if (minutes < 60) return `${minutes} min`;
-  if (minutes === 60) return "1 hour";
-  if (minutes === 240) return "Half day";
-  if (minutes === 480) return "Full day";
-  return `${Math.round(minutes / 60)} hours`;
-}
 
 export function QuestDemo({ quest }: { quest: QuestTemplate }) {
   return (
@@ -25,7 +17,7 @@ export function QuestDemo({ quest }: { quest: QuestTemplate }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-[0.75rem] text-ash">
             <IconClock size={13} />
-            {formatDuration(quest.durationMinutes)}
+            {formatQuestDuration(quest.durationMinutes)}
             <span className="text-mist">·</span>
             <span className="font-art-label text-[0.875rem] uppercase tracking-wide text-accent">
               {quest.category}

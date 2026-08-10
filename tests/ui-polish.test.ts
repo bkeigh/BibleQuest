@@ -24,6 +24,10 @@ describe("UX pass guardrails", () => {
     "src/components/design-system/InfoHint.tsx",
     "utf8",
   );
+  const supportLink = readFileSync(
+    "src/components/plus/SupportLink.tsx",
+    "utf8",
+  );
 
   it("never promises the reader something about credits", () => {
     // BibleQuest has no credit or quota concept; the old failure copy
@@ -91,6 +95,14 @@ describe("UX pass guardrails", () => {
     expect(formation).toContain('href="/app/games"');
     expect(formation).toContain("All games");
     expect(formation).not.toContain("Scroll to explore");
+  });
+
+  it("keeps voluntary support quieter than the primary Scripture action", () => {
+    // Two full evergreen banners on Home make a donation equal to Scripture.
+    // Support remains visible as a gold-edged paper surface instead.
+    expect(supportLink).toContain('data-paper-variant="quiet"');
+    expect(supportLink).toContain("app-glass-surface");
+    expect(supportLink).not.toContain("bg-evergreen-700");
   });
 
   it("wires InfoHint for assistive tech rather than styling alone", () => {

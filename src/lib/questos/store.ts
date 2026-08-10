@@ -16,7 +16,6 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { questBySlug } from "@/data/seed/quests";
 import { seedMilestones } from "@/data/seed/milestones";
 import {
-  FREE_QUEST_SLOTS,
   isQuestWindowOpen,
   normalizeAssignmentWindow,
   QUEST_WINDOW_MS,
@@ -255,7 +254,7 @@ interface QuestOSState {
   /** Add a quest to Ready without starting its 24-hour window. */
   pickQuest: (slug: string, isPlus?: boolean) => boolean;
   /** Remove a Ready quest and release its spot immediately. */
-  unpickQuest: (slug: string, isPlus?: boolean) => void;
+  unpickQuest: (slug: string) => void;
   /** Atomically add if needed, then begin or resume a fresh 24-hour window. */
   startQuest: (slug: string, isPlus?: boolean) => boolean;
   completeQuestBySlug: (
@@ -267,16 +266,8 @@ interface QuestOSState {
   /** Tuck a quest away for another day. Returns false when it's already
    *  underway or finished (nothing to save). */
   saveQuestForLater: (slug: string) => boolean;
-  /** Set an active quest down without losing its steps. */
-  pauseQuest: (slug: string) => void;
-  /** Take a saved or paused quest back up. */
-  resumeQuest: (slug: string) => void;
-  /** Keep the record out of the feed; Plus may also release its window. */
-  archiveQuest: (slug: string, isPlus?: boolean) => void;
   /** Take the quest off the shelf entirely (it stays in Browse). */
-  removeQuest: (slug: string, isPlus?: boolean) => void;
-  /** Walk a completed (or archived) quest again with fresh steps. */
-  reopenQuest: (slug: string) => void;
+  removeQuest: (slug: string) => void;
   /** Mark one movement of the walk done/undone (a bookmark, not a duty). */
   markQuestStep: (slug: string, step: QuestStepKey, done?: boolean) => void;
 
@@ -1204,37 +1195,6 @@ export const useQuestOS = create<QuestOSState>()(
           return true;
         },
 
-        pauseQuest: (slug) => {
-          const entry = get().myQuests[slug];
-          if (!entry || entry.status !== "active") return;
-          touchMyQuest(slug, {
-            status: "paused",
-            pausedAt: new Date().toISOString(),
-          });
-          track("quest_paused");
-        },
-
-        resumeQuest: (slug) => {
-          const entry = get().myQuests[slug];
-          if (!entry || (entry.status !== "paused" && entry.status !== "saved"))
-            return;
-          touchMyQuest(slug, { status: "active", pausedAt: undefined });
-          track("quest_resumed");
-        },
-
-        archiveQuest: (slug) => {
-          const s = get();
-          const entry = s.myQuests[slug];
-          if (!entry || entry.status === "archived") return;
-          touchMyQuest(slug, {
-            status: "archived",
-            archivedAt: new Date().toISOString(),
-            pausedAt: undefined,
-          });
-          releaseQuestWindow(slug);
-          track("quest_archived");
-        },
-
         removeQuest: (slug) => {
           const s = get();
           if (!s.myQuests[slug]) return;
@@ -1251,25 +1211,6 @@ export const useQuestOS = create<QuestOSState>()(
           });
           releaseQuestWindow(slug);
           track("quest_removed");
-        },
-
-        reopenQuest: (slug) => {
-          const entry = get().myQuests[slug];
-          if (
-            !entry ||
-            (entry.status !== "completed" && entry.status !== "archived")
-          )
-            return;
-          touchMyQuest(slug, {
-            status: "active",
-            stepsDone: [],
-            startedAt: undefined,
-            pausedAt: undefined,
-            archivedAt: undefined,
-            // completedAt and timesCompleted stay — the record of past
-            // walks is part of the journey, not something a reopen erases.
-          });
-          track("quest_reopened");
         },
 
         markQuestStep: (slug, step, done = true) => {
@@ -1996,5 +1937,3 @@ export function selectVerseRefreshCount(s: QuestOSState): number {
   const r = s.verseRefresh;
   return r && r.dateKey === toDateKey() ? r.count : 0;
 }
-
-export { FREE_QUEST_SLOTS };
