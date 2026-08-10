@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 /** Reads one checked-in release surface for static configuration contracts. */
@@ -130,6 +130,19 @@ describe("iOS App Store release configuration", () => {
     expect(workflow).toContain("DEVELOPER_DIR: /Applications/Xcode_26.3.app");
     expect(workflow).toContain("-configuration Release");
     expect(workflow).toContain("-disableAutomaticPackageResolution");
+  });
+
+  it("prepares Xcode Cloud dependencies before its archive action", () => {
+    const scriptPath = "ios/App/ci_scripts/ci_post_clone.sh";
+    const script = source(scriptPath);
+
+    expect(statSync(scriptPath).mode & 0o111).not.toBe(0);
+    expect(script.startsWith("#!/bin/zsh\nset -euo pipefail")).toBe(true);
+    expect(script).toContain("CI_PRIMARY_REPOSITORY_PATH");
+    expect(script).toContain("brew install node@24");
+    expect(script).toContain("corepack prepare pnpm@11.10.0 --activate");
+    expect(script).toContain("pnpm install --frozen-lockfile");
+    expect(script).toContain("pnpm ios:release:prepare");
   });
 
   it("documents a reusable App Store Connect upload and header-level CORS gate", () => {

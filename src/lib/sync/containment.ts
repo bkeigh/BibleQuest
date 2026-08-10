@@ -1,8 +1,4 @@
-/**
- * Temporary incident latch for the production Journey schema mismatch.
- * Account sync fails closed unless one reviewed build target explicitly
- * enables it after migrations through 0022 and the isolation gates pass.
- */
+/** Fail closed unless a reviewed build explicitly enables account sync. */
 export function accountSyncContained(enabled: string | undefined): boolean {
   return enabled !== "true";
 }
