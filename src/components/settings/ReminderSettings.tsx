@@ -25,29 +25,9 @@ import {
 import { useQuestOS } from "@/lib/questos/store";
 import { useSession } from "@/lib/supabase/useSession";
 import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
-
-const REMINDER_OPTIONS = [
-  {
-    key: "dailyVerse",
-    label: "Daily invitation",
-    description: "One gentle invitation to open BibleQuest.",
-  },
-  {
-    key: "dailyQuest",
-    label: "Daily quest rhythm",
-    description: "A neutral nudge when your chosen time arrives.",
-  },
-  {
-    key: "prayerReminders",
-    label: "Prayer rhythm",
-    description: "A private, content-free invitation—never prayer text.",
-  },
-  {
-    key: "weeklyRecap",
-    label: "Weekly reflection",
-    description: "One Sunday invitation to revisit your week.",
-  },
-] as const;
+import { isNativeTarget } from "@/lib/platform/target";
+import { NativeReminderSettings } from "./NativeReminderSettings";
+import { ReminderPreferenceFields } from "./ReminderPreferenceFields";
 
 function deviceTimezone(): string {
   try {
@@ -57,8 +37,17 @@ function deviceTimezone(): string {
   }
 }
 
-/** Full opt-in reminder UI; permission is requested only in enable(). */
+/** Selects local iOS reminders or account-bound web push without overlap. */
 export function ReminderSettings() {
+  return isNativeTarget() ? (
+    <NativeReminderSettings />
+  ) : (
+    <WebReminderSettings />
+  );
+}
+
+/** Full web-push UI; permission is requested only in enable(). */
+function WebReminderSettings() {
   const { user, configured, loading } = useSession();
   const updateSettings = useQuestOS((state) => state.updateSettings);
   const { toast } = useToast();
@@ -252,96 +241,12 @@ export function ReminderSettings() {
         Enable. Lock-screen copy stays neutral and never includes prayer,
         journal, quest, or Scripture details.
       </p>
-      <div className="mt-4 space-y-3">
-        {REMINDER_OPTIONS.map((option) => (
-          <label
-            key={option.key}
-            className="flex min-h-11 cursor-pointer items-start gap-3 rounded-[var(--radius-button)] border border-mist/80 px-3.5 py-3"
-          >
-            <input
-              type="checkbox"
-              className="mt-1 h-4 w-4 accent-accent"
-              checked={preferences[option.key]}
-              disabled={busy}
-              onChange={(event) =>
-                setPreferences((current) => ({
-                  ...current,
-                  [option.key]: event.target.checked,
-                }))
-              }
-            />
-            <span>
-              <span className="block text-small text-graphite">
-                {option.label}
-              </span>
-              <span className="mt-0.5 block text-caption leading-relaxed text-ash">
-                {option.description}
-              </span>
-            </span>
-          </label>
-        ))}
-      </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <label className="text-caption text-ash">
-          Delivery time
-          <input
-            type="time"
-            step={900}
-            value={preferences.deliveryTime}
-            disabled={busy}
-            onChange={(event) =>
-              setPreferences((current) => ({
-                ...current,
-                deliveryTime: event.target.value,
-              }))
-            }
-            className="mt-1 block min-h-11 w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3 text-small text-graphite"
-          />
-        </label>
-        <label className="text-caption text-ash">
-          Quiet hours start
-          <input
-            type="time"
-            step={900}
-            value={preferences.quietHoursStart}
-            disabled={busy}
-            onChange={(event) =>
-              setPreferences((current) => ({
-                ...current,
-                quietHoursStart: event.target.value,
-              }))
-            }
-            className="mt-1 block min-h-11 w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3 text-small text-graphite"
-          />
-        </label>
-        <label className="text-caption text-ash">
-          Quiet hours end
-          <input
-            type="time"
-            step={900}
-            value={preferences.quietHoursEnd}
-            disabled={busy}
-            onChange={(event) =>
-              setPreferences((current) => ({
-                ...current,
-                quietHoursEnd: event.target.value,
-              }))
-            }
-            className="mt-1 block min-h-11 w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3 text-small text-graphite"
-          />
-        </label>
-      </div>
-      <p className="mt-2 text-caption text-ash">
-        Time zone: {preferences.timezone}. Choices inside quiet hours move to
-        quiet-hours end.
-      </p>
-      {!validPreferences && (
-        <p role="alert" className="mt-2 text-caption text-rose-700">
-          Choose valid 15-minute times, with different quiet-hours start and
-          end.
-        </p>
-      )}
+      <ReminderPreferenceFields
+        preferences={preferences}
+        busy={busy}
+        valid={validPreferences}
+        onChange={setPreferences}
+      />
 
       <div className="mt-4 flex flex-wrap gap-2.5">
         {!subscription ? (
@@ -391,11 +296,11 @@ export function ReminderSettings() {
         )}
       </div>
       {currentNotificationPermission() === "denied" && (
-          <p role="alert" className="mt-3 text-caption text-rose-700">
-            Notifications are blocked. Re-enable them in browser or system
-            settings; BibleQuest will not keep asking.
-          </p>
-        )}
+        <p role="alert" className="mt-3 text-caption text-rose-700">
+          Notifications are blocked. Re-enable them in browser or system
+          settings; BibleQuest will not keep asking.
+        </p>
+      )}
     </div>
   );
 }

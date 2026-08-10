@@ -162,6 +162,9 @@ matrix instead and leave the provider round trips explicitly out of scope.
    browser that requested sign-in and can create a login-CSRF/session-swap
    path, so the server callback rejects it.
 
+   Production was reconciled and read back byte-for-byte against both checked-in
+   templates on August 10, 2026. Re-run this comparison after any dashboard edit.
+
 Do not put `{{ .Token }}` in the subject, where a locked-screen notification
 could expose it. Keep the code in the email body. A fresh iOS 17.2+ Home Screen
 install copies existing browser cookies once, but Safari and the installed app

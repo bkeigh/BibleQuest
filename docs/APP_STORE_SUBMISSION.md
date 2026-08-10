@@ -73,7 +73,7 @@ add an iPad set while the Xcode target remains iPhone-only.
 **Suggested notes**
 
 ```text
-BibleQuest 1.0 is a local-first, guest-only Christian companion. No login is required or offered in this build. Account sync, push reminders, profile-photo selection, native purchases, external purchase links, and Plus acquisition UI are disabled.
+BibleQuest 1.0 is a local-first, guest-only Christian companion. No login is required or offered in this build. Account sync, remote push, profile-photo selection, native purchases, external purchase links, and Plus acquisition UI are disabled. Readers may explicitly enable neutral, on-device reminders in Settings; no account or notification server is involved.
 
 The app bundles its core experience and the World English Bible for offline use. Optional reviewed online Bible editions are requested from https://www.biblequest.co. To verify that path: finish onboarding, open Home → profile icon → Bible translation, then use the translation search.
 

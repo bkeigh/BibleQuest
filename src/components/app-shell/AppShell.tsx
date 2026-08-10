@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { BottomNav } from "./BottomNav";
 import { InstallPrompt } from "./InstallPrompt";
@@ -16,6 +16,7 @@ import { WallpaperBackdrop } from "./WallpaperBackdrop";
 import { cn } from "@/lib/utils/cn";
 import { isNativeTarget } from "@/lib/platform/target";
 import { usePlus } from "@/lib/billing/usePlus";
+import { listenForNativeReminderOpen } from "@/lib/native/reminders";
 
 const FloatingMyShepherd = dynamic(
   () =>
@@ -34,6 +35,7 @@ const FloatingMyShepherd = dynamic(
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { isPlus } = usePlus();
   const floatingMyShepherd = useQuestOS(
     (state) => state.settings.appearance.myShepherdFloatingButton !== false,
@@ -75,6 +77,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       }),
     []
   );
+
+  useEffect(() => {
+    if (!isNativeTarget()) return;
+    let removeListener: (() => Promise<void>) | undefined;
+    let active = true;
+    void listenForNativeReminderOpen(() => router.push("/app"))
+      .then((remove) => {
+        if (active) removeListener = remove;
+        else void remove();
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      if (removeListener) void removeListener();
+    };
+  }, [router]);
 
   return (
     <ToastProvider>

@@ -4,7 +4,7 @@
 	Apple's privacy manifest for the app target.
 
 	Capacitor and Cordova ship their own manifests inside their binary
-	xcframeworks, and both are accurately empty. The five Capacitor plugin SPM
+	xcframeworks, and both are accurately empty. The seven Capacitor plugin SPM
 	packages ship none and compile straight into this target, so their API use
 	is declared here.
 
@@ -13,6 +13,8 @@
 	creation and modification dates, because src/lib/native/journey-backup.ts
 	keeps the durable journey mirror. Reason C617.1 is "files inside the app
 	container", which is precisely and only what that mirror touches.
+	The reinstall marker uses ordinary file existence and write operations in
+	Application Support; it does not introduce a UserDefaults category.
 
 	Deliberately NOT declared, each confirmed absent from the shipped binaries:
 	DiskSpace, SystemBootTime, ActiveKeyboards, UserDefaults. The web bundle

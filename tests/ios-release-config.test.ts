@@ -45,12 +45,14 @@ describe("iOS App Store release configuration", () => {
     expect(project).not.toContain('TARGETED_DEVICE_FAMILY = "1,2";');
     expect(project.match(/MARKETING_VERSION = 1\.0;/g)).toHaveLength(2);
     expect(project.match(/PRODUCT_BUNDLE_IDENTIFIER = co\.biblequest\.app;/g)).toHaveLength(2);
-    expect(plist).toMatch(/<key>CFBundleVersion<\/key>\s*<string>4<\/string>/);
+    expect(plist).toMatch(
+      /<key>CFBundleVersion<\/key>\s*<string>\$\(CURRENT_PROJECT_VERSION\)<\/string>/,
+    );
     expect(plist).not.toContain("UISupportedInterfaceOrientations~ipad");
     expect(plist).not.toMatch(/<key>NSCameraUsageDescription<\/key>/);
   });
 
-  it("keeps account, billing, reminders, and marketing acquisition dormant", () => {
+  it("keeps account, billing, and marketing acquisition dormant", () => {
     const api = source("src/lib/platform/api.ts");
     const billing = source("src/lib/billing/usePlus.ts");
     const settings = source("src/components/settings/SettingsScreen.tsx");
@@ -65,6 +67,69 @@ describe("iOS App Store release configuration", () => {
     expect(settings).toMatch(
       /\{!nativeTarget \? \([\s\S]*?BibleQuest website[\s\S]*?\) : null\}/,
     );
+  });
+
+  it("protects private snapshots, files, and native accessibility choices", () => {
+    const project = source("ios/App/App.xcodeproj/project.pbxproj");
+    const entitlements = source("ios/App/App/App.entitlements");
+    const scene = source("ios/App/App/SceneDelegate.swift");
+    const authStorage = source("src/lib/supabase/native-auth-storage.ts");
+    const config = source("capacitor.config.ts");
+    const privacy = source("ios/App/App/PrivacyInfo.xcprivacy");
+
+    expect(project.match(/CODE_SIGN_ENTITLEMENTS = App\/App\.entitlements;/g))
+      .toHaveLength(2);
+    expect(entitlements).toContain("NSFileProtectionComplete");
+    expect(scene).toContain("func sceneDidEnterBackground");
+    expect(scene).toContain("showPrivacyCover()");
+    expect(scene).toContain("UIAccessibility.isBoldTextEnabled");
+    const swiftPrefix = scene.match(/authKeyPrefix = "([^"]+)"/)?.[1];
+    const storagePrefix = authStorage.match(
+      /AUTH_KEY_PREFIX = "([^"]+)"/,
+    )?.[1];
+    expect(swiftPrefix).toBe("biblequest_auth_");
+    expect(swiftPrefix).toBe(storagePrefix);
+    expect(scene).toContain("SecItemDelete");
+    expect(scene).toContain("authInstallMarker");
+    expect(scene).toContain(".applicationSupportDirectory");
+    expect(scene).not.toContain("UserDefaults");
+    expect(privacy).toContain("NSPrivacyAccessedAPICategoryFileTimestamp");
+    expect(privacy).toContain("C617.1");
+    expect(privacy).not.toContain("NSPrivacyAccessedAPICategoryUserDefaults");
+    expect(privacy).not.toContain("CA92.1");
+    expect(config).toContain('preferredContentMode: "mobile"');
+    expect(config).toContain("LocalNotifications:");
+  });
+
+  it("purges obsolete plaintext native auth on every app startup", () => {
+    const startup = source(
+      "src/components/app-shell/NativeJourneyGuard.tsx",
+    );
+    const storage = source("src/lib/supabase/native-auth-storage.ts");
+
+    expect(startup).toContain("clearLegacyNativeAuthStorage()");
+    expect(storage).toContain('"biblequest:native-auth-cookies"');
+    expect(storage).toContain("storage ?? window.localStorage");
+  });
+
+  it("prunes web-only workers and acquisition media from the native stage", () => {
+    const builder = source("scripts/build-native.mjs");
+    const registrar = source(
+      "src/components/app-shell/ServiceWorkerRegistrar.tsx",
+    );
+
+    expect(builder).toContain('"--exclude=/public/marketing/"');
+    expect(builder).toContain('"--exclude=/public/sw.js"');
+    expect(builder).toContain('["src/app/offline"');
+    expect(registrar).toContain("isNativeTarget() ||");
+  });
+
+  it("compiles native CI with an Icon Composer-capable Xcode", () => {
+    const workflow = source(".github/workflows/ci.yml");
+
+    expect(workflow).toContain("DEVELOPER_DIR: /Applications/Xcode_26.3.app");
+    expect(workflow).toContain("-configuration Release");
+    expect(workflow).toContain("-disableAutomaticPackageResolution");
   });
 
   it("documents a reusable App Store Connect upload and header-level CORS gate", () => {

@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * Keeps the journey alive across iOS storage eviction.
+ * Runs native startup repair before the installed app becomes interactive.
  *
- * Renders nothing. On web it does nothing at all — every call inside is gated
- * on the native target, and the Filesystem plugin is imported lazily so it
- * never reaches the web bundle.
+ * It removes the retired plaintext auth blob, then keeps the journey alive
+ * across iOS storage eviction. On web it does nothing; native plugins remain
+ * lazily imported and never reach the browser bundle.
  *
  * Ordering note: the store hydrates from localStorage when its module is first
  * imported, which is before any component mounts. If the primary was evicted,
@@ -21,19 +21,19 @@ import {
   startJourneyBackup,
 } from "@/lib/native/journey-backup";
 import { isNativeTarget } from "@/lib/platform/target";
+import { clearLegacyNativeAuthStorage } from "@/lib/supabase/native-auth-storage";
 
 export function NativeJourneyGuard() {
   useEffect(() => {
     if (!isNativeTarget()) return;
+    clearLegacyNativeAuthStorage();
 
     let stopBackup: (() => void) | null = null;
     let cancelled = false;
 
     /**
-     * The splash is configured with `launchAutoHide: false` so it covers the
-     * restore rather than revealing an empty journey that then pops back. It
-     * must be hidden on every path — a failed restore that left the splash up
-     * would strand the app on a blank screen.
+     * Hide after restore when JavaScript is healthy. Capacitor's three-second
+     * auto-hide remains the bounded fallback if this bundle never executes.
      */
     const hideSplash = async () => {
       try {

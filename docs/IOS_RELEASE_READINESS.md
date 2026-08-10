@@ -9,7 +9,7 @@ is in [`APP_STORE_SUBMISSION.md`](APP_STORE_SUBMISSION.md).
 
 - iPhone-only, portrait, iOS 15 or later
 - local-first guest journey; no account creation or sync
-- no reminders or notification permission
+- optional on-device reminders; no account, APNs, or remote push
 - no native profile-photo picker or camera permission
 - no native purchase, pricing, external acquisition, or locked-content dead end
 - analytics disabled in the release bundle
@@ -28,8 +28,16 @@ pnpm ios:release:prepare
 
 - Capacitor loads `out-native` locally; no `server.url` thin shell exists.
 - The WebView origin is frozen at `capacitor://localhost` to preserve local data.
-- Guest-only containment suppresses account prompts, enrollment UI, reminders,
-  Supabase session refresh, native bearer tokens, and billing probes.
+- Guest-only containment suppresses account prompts, enrollment UI, Supabase
+  session refresh, native bearer tokens, and billing probes. Local reminders
+  remain device-only and use neutral copy.
+- Native auth prerequisites are dormant behind containment: email-code-only UI,
+  device-only Keychain session storage, a reinstall credential reset, and
+  explicit credential purge after deletion.
+- Dynamic Type, Bold Text, reduced motion, and resolved-theme status-bar
+  contrast follow iOS; the app switcher receives a synchronous privacy cover.
+- The durable journey mirror uses complete file protection and is upgraded in
+  place for installs that predate the entitlement.
 - Stripe checkout, billing portal, Arcade checkout, Plus/store routes, pricing
   links, and marketing-home links are absent or rejected on native.
 - Camera/photo input is absent and `NSCameraUsageDescription` is intentionally
@@ -42,8 +50,9 @@ pnpm ios:release:prepare
 ## External release gates
 
 1. Attach and triage the quality tester PDF; fix all P0/P1 findings.
-2. Enable `BIBLEQUEST_NATIVE_API_ORIGIN_ENABLED=true` for Vercel Production
-   only, redeploy, and verify the exact CORS header on preflight and GET.
+2. Re-run the exact Production CORS preflight and GET checks before each binary
+   is distributed. The production-only latch was enabled and verified on
+   August 10, 2026.
 3. Create/confirm the App ID and App Store Connect record, agreements, uploader
    role, and Xcode account.
 4. Pass the complete internal TestFlight device matrix.

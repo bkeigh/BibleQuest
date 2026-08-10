@@ -85,10 +85,10 @@ already wrong, and only running the app caught them.
 | `Sec-Fetch-Mode` | `cors`; `Referer` absent |
 | cookie on a cross-origin POST | **not sent** |
 | `document.cookie` at that origin | **silent no-op** (already worked around) |
-| direct `*.supabase.co` calls | reachable — Supabase serves its own CORS. Says nothing about `/api/*`, which serves none |
+| direct `*.supabase.co` calls | reachable — Supabase serves its own CORS; hosted `/api/*` uses BibleQuest's separate exact-origin latch |
 | `isSecureContext` / `crypto.subtle` | true / works, so PKCE is viable |
 
-## What already exists
+## What exists now
 
 - `src/lib/http/native-origin.ts` — the single decision point.
   `NATIVE_APP_ORIGIN`, `nativeApiOriginEnabled()`, `isNativeAppOrigin(request)`.
@@ -98,18 +98,18 @@ already wrong, and only running the app caught them.
   `src/lib/bible/provider-request-guard.ts:93` (`crossSiteBrowserRequest`,
   above the Fetch Metadata branch), `src/app/api/observability/client/route.ts`
   (`hasExactOrigin`), and denied at `src/app/api/support/checkout/route.ts:69`.
-- `src/lib/supabase/native-cookie-storage.ts` — session store standing in for
-  the no-op `document.cookie`, passed to `createBrowserClient` via the `cookies`
-  option (`auth.storage` is silently overwritten by that package; `cookies` is
-  honored).
-- A client-side access token already exists at
-  `src/lib/supabase/client.ts` in the `accessToken` callback.
+- `src/lib/supabase/native-auth-storage.ts` — an asynchronous, device-only
+  Keychain adapter used by the native `@supabase/supabase-js` auth singleton.
+  It also clears retained credentials after reinstall and after confirmed
+  account deletion.
+- Generation-bound data clients read their access token from that singleton
+  without owning or persisting a second session.
 - Tests: `tests/native-origin.test.ts`, `tests/native-session-storage.test.ts`.
 
-**The CORS layer is greenfield.** Verified: zero `Access-Control-*` anywhere in
-`src/`, `next.config.ts` or `vercel.json`, and zero `OPTIONS` exports. Nothing
-to remove, nothing to reconcile — a preflight to any `/api/*` route currently
-reaches a route file that exports no `OPTIONS`.
+The exact-origin CORS layer and bearer-authenticated server context described
+below are implemented and tested. Production opt-in remains a server-only
+latch and must pass the header gates in `IOS_TESTFLIGHT_RUNBOOK.md` for every
+candidate.
 
 ---
 
@@ -348,7 +348,8 @@ complete in-app until deep links exist.
 - OAuth deep links — needs `NEXT_PUBLIC_NATIVE_AUTH_CALLBACK_URL` plus a
   `CFBundleURLTypes` entry that does not exist, and Google blocks OAuth in
   embedded WebViews regardless.
-- Keychain migration for the session store.
+- Native OAuth deep links; email-code auth now has Keychain-backed storage and
+  remains behind the account-release latch.
 
 ## Release blockers carried from the audit
 
@@ -390,10 +391,12 @@ blocker rationale instead of adding a second, divergent deletion mechanism.
 
 ## Honest state
 
-iOS is guest-only, free-tier and English-WEB-only. Sign-in is unverified
-end-to-end: the cookie adapter is unit-tested against the package contract but
-has not been observed carrying a real session.
+iOS remains guest-only and free-tier for 1.0. The dormant account-beta path now
+uses email code only and device-only Keychain-backed Supabase storage, including
+a reinstall reset boundary, but sign-in is still unverified end-to-end on a
+physical device and must not be enabled for release.
 
-Internal TestFlight only until entitlements land. A paying member offline
-resolves to a confident free tier — `usePlus` sets `status: "error"`, which
-makes `loading` false — with the explanatory upsell suppressed on native.
+Signed Complete Data Protection provisioning and the physical-device matrix
+still need verification. Native commerce remains deferred; a paying member
+offline resolves to a confident free tier — `usePlus` sets `status: "error"`,
+which makes `loading` false — with the explanatory upsell suppressed on native.
