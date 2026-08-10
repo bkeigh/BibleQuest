@@ -10,7 +10,9 @@ migration `0015_transactional_daily_quest_sync.sql`, followed by the reviewed
 account-sync and deletion boundary `0016` through `0022`, sealed avatar/push
 and billing/support/console boundaries `0023` through `0027`, and lifetime
 Plus billing `0028`, user-row/trigger hardening `0029`, and sealed operator Plus
-grants `0030`. It is
+grants `0030`; Stripe corrections `0031`–`0032`; guided progress `0033`;
+distributed provider limits `0034`–`0035`; and the sealed Arcade store `0036`.
+It is
 deliberately local/staging-first. Do not run any linked or remote command until
 the project reference and exact command have been reviewed and explicitly
 approved.
@@ -223,6 +225,28 @@ The apply must report `"applied":true`. Then rerun the read-only check,
 production readiness, and the provider-rate pgTAP file. Never use normal linked
 `db push`, `--include-all`, or migration repair for this production history.
 
+### Production 0036 Arcade store packet
+
+Migration `0036` adds the sealed, server-owned Arcade purchase projection and
+idempotent Question Skip redemption boundary. Run its exact history, checksum,
+backup, and one-packet preflight with:
+
+```bash
+pnpm check:production-arcade-store
+```
+
+Apply only the reviewed long-version packet with the pinned confirmation:
+
+```bash
+BIBLEQUEST_PRODUCTION_MIGRATION_CONFIRM='apply 20260804035000 to iacnjqnssovaaojswjoh' \
+  node scripts/reconcile-production-arcade-store.mjs --apply
+```
+
+The apply must report `"applied":true`. Then rerun the read-only check,
+production readiness, and the Arcade store database tests. Never use normal
+linked `db push`, `--include-all`, or migration repair for this production
+history.
+
 ## Complete public-table inventory
 
 | Classification | Tables | Intended access |
@@ -230,10 +254,10 @@ production readiness, and the provider-rate pgTAP file. Never use normal linked
 | Public content | `faith_providers`, `bible_translations`, `bible_books`, `bible_chapters`, `bible_verses`, `daily_verses`, `quest_templates`, `prayer_prompts`, `reflection_prompts`, `milestones`, `feature_flags` | Anonymous and authenticated `SELECT` only. Reads are limited to active/approved content; disabled feature flags are hidden. No client writes. Prompt tables contain generic seed prompts, not a user's prayer or reflection text. |
 | User-owned | `profiles`, `user_sync_state`, `user_settings`, `user_daily_quests`, `user_daily_quest_days`, `user_quests`, `quest_completions`, `prayers`, `reflections`, `verse_bookmarks`, `user_recent_verses`, `user_guided_movements`, `reading_progress`, `chapters_read`, `journey_events`, `growth_events`, `user_milestones`, `notification_preferences` | Authenticated owner only. Most tables allow bounded owner operations; sync revisions and destructive account actions stay behind reviewed RPCs. |
 | Server-managed user state | `push_reminder_preferences`, `push_subscriptions`, `push_deliveries` | Normal users can reach only the reviewed owner-scoped functions or projections; delivery mutation is service-role only. |
-| Server-owned | `subscriptions`, `push_test_claims`, `stripe_customers`, `stripe_webhook_events`, `stripe_action_claims`, `stripe_billing_signals`, `stripe_support_payments`, `console_audit_logs`, `operator_plus_grants`, `provider_rate_limit_windows` | Only documented owner projections are client-readable. Provider identifiers, money, webhook state, test claims, operational rate buckets, operator audit, and manual entitlement history remain sealed behind server boundaries. |
+| Server-owned | `subscriptions`, `push_test_claims`, `stripe_customers`, `stripe_webhook_events`, `stripe_action_claims`, `stripe_billing_signals`, `stripe_support_payments`, `console_audit_logs`, `operator_plus_grants`, `provider_rate_limit_windows`, `arcade_orders`, `arcade_question_skip_redemptions` | Only documented owner projections are client-readable. Provider identifiers, money, webhook state, test claims, operational rate buckets, operator audit, purchase projections, redemptions, and manual entitlement history remain sealed behind server boundaries. |
 | Internal | Supabase-managed schemas remain outside the public-table inventory. Private avatar objects use the sealed `storage.objects` policies and non-public bucket. |
 
-RLS is enabled on all 42 tables. Private prayers, reflections, recent Scripture
+RLS is enabled on all 44 tables. Private prayers, reflections, recent Scripture
 history, notes, and
 journey data have no anonymous policy and every authenticated policy includes
 an `auth.uid()` owner condition.
@@ -291,9 +315,10 @@ Expected migration order:
 0033_guided_pilgrimage_progress.sql
 0034_distributed_provider_rate_limits.sql
 0035_fix_provider_rate_limit_claim_timestamp.sql
+0036_arcade_store_purchases.sql
 ```
 
-Evidence must show all 42 expected tables with `rowsecurity = true`, only the
+Evidence must show all 44 expected tables with `rowsecurity = true`, only the
 documented policy names, no `anon` role on user/server-owned policies, and
 `purge_user_data` as `security_definer = true`, `search_path=""`, anonymous
 execute false, authenticated execute true. Table grants must also match the

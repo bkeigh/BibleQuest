@@ -161,6 +161,12 @@ const POSTURE_CONTRACTS = [
     migration: "0035",
     label: "distributed provider rate-limit posture",
   },
+  {
+    rpc: "arcade_store_contract",
+    contract: "biblequest_arcade_store_v1",
+    migration: "0036",
+    label: "Arcade purchase and redemption posture",
+  },
 ];
 
 const supabaseUrlValue = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
@@ -269,7 +275,7 @@ function safeHealthBody(value) {
     typeof candidate.canonical_origin_matches !== "boolean" ||
     !["configured", "guest-only", "invalid"].includes(candidate.auth_posture) ||
     !["configured", "disabled", "invalid"].includes(candidate.analytics_posture) ||
-    candidate.schema_contract !== "0035" ||
+    candidate.schema_contract !== "0036" ||
     candidate.content_contract !== "seed-manifest-v1" ||
     !/^biblequest-v\d{1,4}$/.test(candidate.service_worker_version) ||
     !["coming-soon", "test", "live", "invalid"].includes(

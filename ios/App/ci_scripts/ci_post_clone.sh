@@ -14,7 +14,18 @@ export PATH="$(brew --prefix node@24)/bin:$PATH"
 corepack enable
 corepack prepare pnpm@11.10.0 --activate
 
-# Leave policy in the tested release command and expose only safe version evidence.
+# Use Xcode Cloud's increasing run number as Apple's unique bundle build string.
+cloud_build_number="${CI_BUILD_NUMBER:?CI_BUILD_NUMBER is required}"
+if [[ "$cloud_build_number" != <-> ]] || (( cloud_build_number < 1 )); then
+  echo "Invalid CI_BUILD_NUMBER: expected a positive integer." >&2
+  exit 1
+fi
+(
+  cd ios/App
+  xcrun agvtool new-version -all "$cloud_build_number"
+)
+
+# Leave release policy in the tested command and expose only safe version evidence.
 node --version
 pnpm --version
 pnpm install --frozen-lockfile
