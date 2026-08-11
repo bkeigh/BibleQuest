@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "profile": "ios-account-us-stripe-v1",
+  "commit": "PENDING_40_CHARACTER_COMMIT_SHA",
+  "reviewedExternalOrigins": [
+    "https://www.biblequest.co",
+    "https://checkout.stripe.com",
+    "https://billing.stripe.com",
+    "https://berean.bible",
+    "https://ebible.org",
+    "https://PENDING_PRODUCTION_SUPABASE_ORIGIN"
+  ],
+  "appStoreConnect": {
+    "storefronts": ["USA"],
+    "automaticallyIncludeFutureStorefronts": false,
+    "privacyAnswersProfile": "account-enabled-us-v1",
+    "manualRelease": false
+  },
+  "providers": {
+    "stripeMode": "PENDING_LIVE_RELEASE_CONFIRMATION",
+    "stripeTestObjectsSeparated": false,
+    "supabasePlan": "PENDING_OWNER_CONFIRMATION",
+    "supabaseBackupRetentionDays": "PENDING_OWNER_CONFIRMATION",
+    "supabaseLogRetentionDays": "PENDING_OWNER_CONFIRMATION"
+  },
+  "review": {
+    "privacyPolicyMatchesBinary": false,
+    "providerRetentionReviewed": false,
+    "accountDeletionMatrixPassed": false,
+    "activeSubscriptionDeletionReviewed": false,
+    "dataExportAndClearPassed": false,
+    "supportTermsPrivacyReachable": false,
+    "pricingAndRenewalCopyReviewed": false,
+    "ageRatingCompleted": false,
+    "contentRightsCompleted": false,
+    "exportComplianceCompleted": false,
+    "screenshotsMatchBuild": false,
+    "reviewPathPassed": false,
+    "reviewerAccountPrepared": false
+  }
+}

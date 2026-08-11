@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "profile": "ios-account-us-stripe-v1",
+  "receiptFile": "ios-account-us-release-receipt.json",
+  "privacyAnswersProfile": "account-enabled-us-v1",
+  "requiredStorefronts": ["USA"],
+  "requiredExternalOrigins": [
+    "https://www.biblequest.co",
+    "https://checkout.stripe.com",
+    "https://billing.stripe.com"
+  ],
+  "requiredPrivacyDataTypes": [
+    "NSPrivacyCollectedDataTypeName",
+    "NSPrivacyCollectedDataTypeEmailAddress",
+    "NSPrivacyCollectedDataTypeSensitiveInfo",
+    "NSPrivacyCollectedDataTypeOtherUserContent",
+    "NSPrivacyCollectedDataTypeUserID",
+    "NSPrivacyCollectedDataTypePurchaseHistory",
+    "NSPrivacyCollectedDataTypeProductInteraction"
+  ],
+  "requiredReviewChecks": [
+    "privacyPolicyMatchesBinary",
+    "providerRetentionReviewed",
+    "accountDeletionMatrixPassed",
+    "activeSubscriptionDeletionReviewed",
+    "dataExportAndClearPassed",
+    "supportTermsPrivacyReachable",
+    "pricingAndRenewalCopyReviewed",
+    "ageRatingCompleted",
+    "contentRightsCompleted",
+    "exportComplianceCompleted",
+    "screenshotsMatchBuild",
+    "reviewPathPassed",
+    "reviewerAccountPrepared"
+  ]
+}

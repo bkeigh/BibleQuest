@@ -76,3 +76,12 @@ Do not submit if any of these remain:
   reduced motion blocks a core journey;
 - App Store privacy answers do not match the observed binary and provider
   retention.
+
+## Separate account-enabled package
+
+This checklist and [`APP_STORE_SUBMISSION.md`](APP_STORE_SUBMISSION.md) remain
+guest-only. A future account-enabled, United States-only Stripe build has its
+own review notes, privacy worksheet, provider-retention decisions, receipt
+contract, and fail-closed gate in
+[`IOS_US_ACCOUNT_RELEASE_COMPLIANCE.md`](IOS_US_ACCOUNT_RELEASE_COMPLIANCE.md).
+Neither package clears the other.

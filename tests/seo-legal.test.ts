@@ -74,7 +74,7 @@ describe("launch legal documents", () => {
   it("uses final document names and an effective date", () => {
     expect(LEGAL_DOCUMENTS.privacy.title).toBe("Privacy Policy");
     expect(LEGAL_DOCUMENTS.terms.title).toBe("Terms of Use");
-    expect(LEGAL_DOCUMENTS.privacy.effectiveDate).toBe("July 24, 2026");
+    expect(LEGAL_DOCUMENTS.privacy.effectiveDate).toBe("August 11, 2026");
     expect(LEGAL_DOCUMENTS.terms.effectiveDate).toBe("July 24, 2026");
   });
 

@@ -26,6 +26,17 @@ The workflow has only `contents: read` permission. Checkout credentials are not
 persisted, actions are pinned to reviewed commit SHAs, and no artifacts or logs
 are published.
 
+## Account-enabled US release gate
+
+The account-enabled United States package remains separate from the required
+guest CI jobs above. Its gate logic and negative fixtures run inside
+`pnpm test`; an actual account artifact is checked at release freeze with
+`pnpm check:ios:account-us-release` and a restricted, non-secret owner
+attestation. See
+[`IOS_US_ACCOUNT_RELEASE_COMPLIANCE.md`](IOS_US_ACCOUNT_RELEASE_COMPLIANCE.md).
+Do not add production credentials or reviewer mailbox access to CI merely to
+turn that manual evidence gate green.
+
 ## Branch protection
 
 In the GitHub ruleset or branch protection rule for `main`:

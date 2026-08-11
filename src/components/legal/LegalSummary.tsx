@@ -40,7 +40,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
   privacy: {
     eyebrow: "Privacy",
     title: "Privacy Policy",
-    effectiveDate: "July 24, 2026",
+    effectiveDate: "August 11, 2026",
     intro:
       "BibleQuest is a product of Winterhill Studio. This policy explains what we collect, why we use it, and the choices you have.",
     sections: [
@@ -56,7 +56,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
       },
       {
         title: "Information created when you use BibleQuest",
-        body: `Without an account, app data is stored in your browser on your device. ${ACCOUNT_STORAGE_COPY} We may also receive limited technical information needed to authenticate you, prevent abuse, deliver requested passages, complete a purchase or one-time support payment, and keep the service reliable. ${ACCOUNT_SECURITY_COPY}`,
+        body: `Without an account, app data is stored in your browser on your device. ${ACCOUNT_STORAGE_COPY} On iOS, unfinished writing drafts, native reminder choices and schedules, standalone game state, and Rhythm state stay on that device and do not sync. We may also receive limited technical information needed to authenticate you, prevent abuse, deliver requested passages, complete a purchase or one-time support payment, and keep the service reliable. ${ACCOUNT_SECURITY_COPY}`,
       },
       {
         title: "How we use information",
@@ -71,7 +71,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
       {
         title: "Service providers",
         body:
-          "We use service providers only for defined tasks: Supabase for authentication and protected account storage; Vercel for hosting and operational delivery; Plausible for optional analytics; Stripe for optional subscriptions and one-time support payments; Tally for the BibleQuest newsletter; and reviewed Bible providers for requested online editions. Stripe receives the payment and contact details needed to run Checkout, subscriptions, receipts, refunds, and disputes; BibleQuest does not receive full card numbers. Providers process information under their own terms and privacy notices. Bible requests do not include your prayers, reflections, name, or BibleQuest account ID.",
+          "We use service providers only for defined tasks: Supabase for authentication and protected account storage; Vercel for hosting and operational delivery; Plausible for optional analytics; Stripe for optional subscriptions and one-time support payments; Tally for the BibleQuest newsletter; and reviewed Bible providers for requested online editions. Stripe receives the payment and contact details needed to run Checkout, subscriptions, receipts, refunds, and disputes; BibleQuest does not receive full card numbers. Providers process information under their own terms and privacy notices. A signed-in iOS request to BibleQuest may carry an account credential so BibleQuest can authenticate it, but BibleQuest does not send your prayers, reflections, name, or BibleQuest account ID to a Bible text provider.",
       },
       {
         title: "Online Bible editions",
@@ -86,7 +86,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
       {
         title: "Your choices and rights",
         body:
-          "Settings lets you export readable app data, clear app data, choose whether to use analytics, and change app preferences. Depending on where you live, you may also ask to access, correct, delete, restrict, or receive a copy of personal information, or object to or withdraw consent for certain processing. We will not discriminate against you for making a privacy request.",
+          "Settings lets you export a readable copy of the Journey data on the device, clear app data, choose whether to use analytics, and change app preferences. That Journey export is not an export of provider logs, account identity, or payment records; contact us for an applicable access or portability request covering those records. Depending on where you live, you may also ask to access, correct, delete, restrict, or receive a copy of personal information, or object to or withdraw consent for certain processing. We will not discriminate against you for making a privacy request.",
       },
       {
         title: "Deleting app data or an account",
