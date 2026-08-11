@@ -74,7 +74,11 @@ interface StoredPlusState {
   hasCustomer: boolean;
   synchronizedAt: string | null;
   error: string | null;
-  returnNotice: "checkout-returned" | "checkout-cancelled" | null;
+  returnNotice:
+    | "checkout-returned"
+    | "checkout-cancelled"
+    | "portal-returned"
+    | null;
 }
 
 const LOAD_ERROR =
@@ -140,10 +144,12 @@ const purchases = purchaseAdapter();
 
 function safeReturnNotice(): StoredPlusState["returnNotice"] {
   if (typeof window === "undefined") return null;
-  const value = new URLSearchParams(window.location.search).get("checkout");
-  return value === "returned"
+  const parameters = new URLSearchParams(window.location.search);
+  if (parameters.get("portal") === "returned") return "portal-returned";
+  const checkout = parameters.get("checkout");
+  return checkout === "returned"
     ? "checkout-returned"
-    : value === "cancelled"
+    : checkout === "cancelled"
       ? "checkout-cancelled"
       : null;
 }
@@ -157,6 +163,7 @@ export interface PlusState {
   isPlus: boolean;
   entitlementSource: "stripe" | "operator" | null;
   canPurchase: boolean;
+  canManage: boolean;
   plans: BillingPlan[];
   interval: BillingInterval | "unknown" | null;
   currentPeriodEnd: string | null;
@@ -186,9 +193,14 @@ function usePlusCoordinator(): PlusState {
   const sequence = useRef(0);
   const currentSubject = useRef(subjectKey);
   const reconciledReturn = useRef(false);
+  const portalReconciliationPending = useRef(false);
+  const portalActionInFlight = useRef(false);
 
   useEffect(() => {
     currentSubject.current = subjectKey;
+    reconciledReturn.current = false;
+    portalReconciliationPending.current = false;
+    portalActionInFlight.current = false;
     return () => {
       sequence.current += 1;
     };
@@ -329,25 +341,6 @@ function usePlusCoordinator(): PlusState {
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  useEffect(() => {
-    if (NATIVE_COMMERCE_CONTAINED) return;
-    if (session.loading) return;
-    const refreshOnReturn = () => void load();
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") refreshOnReturn();
-    };
-    window.addEventListener("focus", refreshOnReturn);
-    window.addEventListener("pageshow", refreshOnReturn);
-    window.addEventListener("online", refreshOnReturn);
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-    return () => {
-      window.removeEventListener("focus", refreshOnReturn);
-      window.removeEventListener("pageshow", refreshOnReturn);
-      window.removeEventListener("online", refreshOnReturn);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-    };
-  }, [load, session.loading]);
-
   const refresh = useCallback(async () => {
     if (NATIVE_COMMERCE_CONTAINED) {
       await load();
@@ -363,16 +356,44 @@ function usePlusCoordinator(): PlusState {
     await load();
   }, [load, session.user]);
 
-  // Checkout redirects back before Stripe's webhook is guaranteed to have
-  // landed, and a missed or blocked event would otherwise strand a paid
-  // membership at "free" until someone pressed a button. Reconcile against
-  // Stripe once on return; the server projection still decides entitlement.
+  // Returning focus after an external Portal visit reconciles current Stripe
+  // objects once; ordinary lifecycle events keep using the cheaper status load.
+  useEffect(() => {
+    if (NATIVE_COMMERCE_CONTAINED) return;
+    if (session.loading) return;
+    const refreshOnReturn = () => {
+      if (!portalReconciliationPending.current) {
+        void load();
+        return;
+      }
+      portalReconciliationPending.current = false;
+      void refresh().catch(() => void load());
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refreshOnReturn();
+    };
+    window.addEventListener("focus", refreshOnReturn);
+    window.addEventListener("pageshow", refreshOnReturn);
+    window.addEventListener("online", refreshOnReturn);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.removeEventListener("focus", refreshOnReturn);
+      window.removeEventListener("pageshow", refreshOnReturn);
+      window.removeEventListener("online", refreshOnReturn);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [load, refresh, session.loading]);
+
+  // Checkout and Portal redirects are display hints only. Reconcile against
+  // current Stripe objects once, then let the server projection decide access.
   useEffect(() => {
     if (NATIVE_COMMERCE_CONTAINED) return;
     if (session.loading || !session.user) return;
     if (reconciledReturn.current) return;
-    if (safeReturnNotice() !== "checkout-returned") return;
+    const notice = safeReturnNotice();
+    if (notice !== "checkout-returned" && notice !== "portal-returned") return;
     reconciledReturn.current = true;
+    portalReconciliationPending.current = false;
     // Deferred like the initial load so no state cascades in the effect body.
     const timer = window.setTimeout(() => {
       void refresh().catch(() => {
@@ -403,11 +424,30 @@ function usePlusCoordinator(): PlusState {
   );
 
   const openCustomerPortal = useCallback(async () => {
-    if (!session.user || !visible.hasCustomer) return false;
-    const outcome = await purchases.manage();
-    if (outcome !== "redirected") return false;
-    track("plus_billing_portal_opened");
-    return true;
+    if (
+      !session.user ||
+      !visible.hasCustomer ||
+      !purchases.available ||
+      portalActionInFlight.current
+    ) {
+      return false;
+    }
+    portalActionInFlight.current = true;
+    portalReconciliationPending.current = true;
+    try {
+      const outcome = await purchases.manage();
+      if (outcome !== "redirected") {
+        portalReconciliationPending.current = false;
+        return false;
+      }
+      track("plus_billing_portal_opened");
+      return true;
+    } catch {
+      portalReconciliationPending.current = false;
+      return false;
+    } finally {
+      portalActionInFlight.current = false;
+    }
   }, [session.user, visible.hasCustomer]);
 
   return {
@@ -424,6 +464,8 @@ function usePlusCoordinator(): PlusState {
       visible.purchasesEnabled &&
       visible.plans.length === 3 &&
       !visible.isPlus,
+    canManage:
+      Boolean(session.user) && purchases.available && visible.hasCustomer,
     plans: visible.plans,
     interval: visible.interval,
     currentPeriodEnd: visible.currentPeriodEnd,

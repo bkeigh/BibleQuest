@@ -20,14 +20,14 @@ const PURCHASE_SOURCE = readFileSync(
  */
 describe("Plus reconciliation after a Checkout return", () => {
   it("reconciles against Stripe once when Checkout redirects back", () => {
-    expect(SOURCE).toContain('safeReturnNotice() !== "checkout-returned"');
+    expect(SOURCE).toContain('notice !== "checkout-returned"');
     expect(SOURCE).toContain("reconciledReturn.current = true");
     expect(SOURCE).toContain("void refresh()");
   });
 
   it("never reconciles for a guest or a cancelled Checkout", () => {
     const effect = SOURCE.slice(
-      SOURCE.indexOf("// Checkout redirects back before"),
+      SOURCE.indexOf("// Checkout and Portal redirects are display hints only."),
       SOURCE.indexOf("const startCheckout"),
     );
     expect(effect).toContain("if (session.loading || !session.user) return;");

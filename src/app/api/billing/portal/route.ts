@@ -1,8 +1,9 @@
 import { hasSameOrigin, privateError } from "@/lib/http/request";
-import { isNativeAppOrigin } from "@/lib/http/native-origin";
 import { requireStripeBillingConfiguration } from "@/lib/billing/config.server";
 import {
   claimStripeAction,
+  mappedStripeCustomerForUser,
+  stripeBillingPortalUrl,
   stripeActionRateLimited,
 } from "@/lib/billing/records.server";
 import { stripeBillingContractReady } from "@/lib/billing/server";
@@ -16,11 +17,18 @@ export const runtime = "nodejs";
 
 /** Creates a hosted Customer Portal only for the current account mapping. */
 export async function POST(request: Request) {
-  // App Store builds cannot steer an account into external Stripe management.
-  if (isNativeAppOrigin(request)) return privateError("forbidden", 403);
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
   const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;
+
+  // The route has a zero-byte contract, so no caller can select Customer,
+  // return, mode, flow, or Portal configuration parameters.
+  if (
+    request.body !== null ||
+    ![null, "0"].includes(request.headers.get("content-length"))
+  ) {
+    return privateError("invalid_request", 400);
+  }
 
   try {
     const configuration = requireStripeBillingConfiguration();
@@ -35,35 +43,33 @@ export async function POST(request: Request) {
       10,
     );
     if (!claim.claimed) return stripeActionRateLimited(10);
-    const { data, error } = await admin
-      .from("stripe_customers")
-      .select("stripe_customer_id,livemode")
-      .eq("user_id", context.user.id)
-      .maybeSingle();
-    if (error) {
-      recordServerFailure("billing", "portal", error);
-      return privateError("unavailable", 503);
-    }
-    if (!data) return privateError("not_found", 404);
-    if (data.livemode !== configuration.livemode) {
-      return privateError("unavailable", 503);
-    }
+    const customerId = await mappedStripeCustomerForUser(
+      admin,
+      context.user.id,
+      configuration.livemode,
+    );
+    if (!customerId) return privateError("not_found", 404);
+
+    const returnUrl = `${configuration.appOrigin}/app/plus?portal=returned`;
     const portal = await createStripe(
       configuration,
     ).billingPortal.sessions.create(
       {
-        customer: data.stripe_customer_id,
-        return_url: `${configuration.appOrigin}/app/plus?portal=returned`,
+        customer: customerId,
+        return_url: returnUrl,
       },
       {
         idempotencyKey: `biblequest-portal-${context.user.id}-${claim.claimToken}`,
       },
     );
-    if (new URL(portal.url).origin !== "https://billing.stripe.com") {
-      return privateError("unavailable", 503);
-    }
+    const portalUrl = stripeBillingPortalUrl(portal, {
+      customerId,
+      livemode: configuration.livemode,
+      returnUrl,
+    });
+    if (!portalUrl) return privateError("unavailable", 503);
     return Response.json(
-      { url: portal.url },
+      { url: portalUrl },
       {
         status: 201,
         headers: { "Cache-Control": "private, no-store" },

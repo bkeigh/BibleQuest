@@ -26,6 +26,19 @@ interface ProjectionClaim {
 
 const STRIPE_PROJECTION_LEASE_SECONDS = 120;
 
+interface StripeCustomerMappingRow {
+  user_id: unknown;
+  stripe_customer_id: unknown;
+  livemode: unknown;
+}
+
+interface BillingPortalSessionShape {
+  customer: unknown;
+  livemode: unknown;
+  return_url: unknown;
+  url: unknown;
+}
+
 function parseActionClaim(value: unknown): ActionClaim {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Stripe action claim unavailable.");
@@ -153,6 +166,64 @@ function mappedCustomerId(
     throw new Error("Stripe customer unavailable.");
   }
   return row.stripe_customer_id;
+}
+
+/** Resolves only the current owner's sealed, mode-matched Customer mapping. */
+export async function mappedStripeCustomerForUser(
+  admin: SupabaseClient,
+  userId: string,
+  livemode: boolean,
+): Promise<string | null> {
+  const { data, error } = await admin
+    .from("stripe_customers")
+    .select("user_id,stripe_customer_id,livemode")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error("Stripe customer mapping unavailable.");
+  if (!data) return null;
+
+  const mapping = data as StripeCustomerMappingRow;
+  if (
+    mapping.user_id !== userId ||
+    mapping.livemode !== livemode ||
+    typeof mapping.stripe_customer_id !== "string" ||
+    !/^cus_[A-Za-z0-9]+$/.test(mapping.stripe_customer_id)
+  ) {
+    throw new Error("Stripe customer mapping unavailable.");
+  }
+  return mapping.stripe_customer_id;
+}
+
+/** Accepts a Portal URL only when Stripe echoes the complete server contract. */
+export function stripeBillingPortalUrl(
+  session: BillingPortalSessionShape,
+  expected: {
+    customerId: string;
+    livemode: boolean;
+    returnUrl: string;
+  },
+): string | null {
+  if (
+    session.customer !== expected.customerId ||
+    session.livemode !== expected.livemode ||
+    session.return_url !== expected.returnUrl ||
+    typeof session.url !== "string"
+  ) {
+    return null;
+  }
+  try {
+    const destination = new URL(session.url);
+    if (
+      destination.origin !== "https://billing.stripe.com" ||
+      destination.username ||
+      destination.password
+    ) {
+      return null;
+    }
+    return destination.toString();
+  } catch {
+    return null;
+  }
 }
 
 /** Finds or idempotently creates the one Stripe Customer for an account. */

@@ -10,6 +10,7 @@ import {
 } from "@/lib/billing/validation";
 import { usePlus } from "@/lib/billing/usePlus";
 import { buildPublicHref } from "@/lib/platform/api";
+import { isNativeTarget } from "@/lib/platform/target";
 
 function formattedDate(value: string | null): string | null {
   if (!value) return null;
@@ -27,6 +28,31 @@ export function PlusCta() {
   >(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const periodEnd = formattedDate(plus.currentPeriodEnd);
+  const native = isNativeTarget();
+  const portalReturnNotice =
+    plus.returnNotice === "portal-returned" ? (
+      <p className="text-[0.8125rem] leading-relaxed text-ash">
+        Welcome back. Billing changes take effect only after BibleQuest
+        reconciles them with Stripe; returning from the browser does not change
+        access by itself.
+      </p>
+    ) : null;
+
+  // Native Portal controls always explain that Stripe opens outside the app.
+  const portalButtonCopy = native
+    ? "Open Stripe in your browser to manage billing"
+    : "Manage renewal, payment method, or invoices";
+  const endedMembershipNotice =
+    plus.status === "canceled" ? (
+      <p className="text-[0.8125rem] leading-relaxed text-charcoal">
+        Stripe confirms the prior membership has ended, so Plus is not active.
+        Your local Scripture, prayers, reflections, and journey remain intact.
+      </p>
+    ) : plus.status === "incomplete_expired" ? (
+      <p className="text-[0.8125rem] leading-relaxed text-charcoal">
+        The earlier signup did not complete, and no Plus access was granted.
+      </p>
+    ) : null;
 
   const refresh = async () => {
     setBusy("refresh");
@@ -101,6 +127,7 @@ export function PlusCta() {
   if (plus.status === "error") {
     return (
       <div className="mt-5 space-y-2">
+        {portalReturnNotice}
         <p className="text-[0.8125rem] text-rose-700">{plus.error}</p>
         <GentleButton
           variant="text"
@@ -129,6 +156,7 @@ export function PlusCta() {
               : "Stripe confirms your membership is active.";
     return (
       <div className="mt-5 space-y-3">
+        {portalReturnNotice}
         <p className="text-[0.8125rem] leading-relaxed text-charcoal">
           You’re a Plus member. {membershipDescription}
         </p>
@@ -138,16 +166,31 @@ export function PlusCta() {
           </p>
         )}
         {plus.entitlementSource === "stripe" &&
-          plus.interval !== "lifetime" && (
+          plus.interval !== "lifetime" &&
+          plus.canManage && (
             <GentleButton
               variant="text"
               size="sm"
               onClick={() => void portal()}
-              disabled={!plus.hasCustomer || busy !== null}
+              disabled={busy !== null}
             >
-              Manage renewal, payment method, or invoices
-              {busy === "portal" ? " …" : ""}
+              {portalButtonCopy}{busy === "portal" ? " …" : ""}
             </GentleButton>
+          )}
+        {plus.entitlementSource === "stripe" &&
+          plus.interval !== "lifetime" &&
+          !plus.canManage && (
+            <p className="text-[0.75rem] leading-relaxed text-ash">
+              {plus.hasCustomer
+                ? "Billing management is unavailable from this app storefront."
+                : "No Stripe billing profile is linked to this account."} Your
+              local Scripture, prayers, reflections, and journey are unchanged.
+              Contact{" "}
+              <a href={SUPPORT_EMAIL_HREF} className="text-accent underline">
+                {SUPPORT_EMAIL}
+              </a>{" "}
+              if this looks wrong.
+            </p>
           )}
         {actionError && (
           <p className="text-[0.8125rem] text-rose-700">{actionError}</p>
@@ -161,18 +204,36 @@ export function PlusCta() {
   ) {
     return (
       <div className="mt-5 space-y-3">
+        {portalReturnNotice}
         <p className="text-[0.8125rem] leading-relaxed text-charcoal">
           Stripe says this membership needs attention. Plus access is not
           granted from a return link or stale browser state.
         </p>
-        <GentleButton
-          variant="text"
-          size="sm"
-          onClick={() => void portal()}
-          disabled={!plus.hasCustomer || busy !== null}
-        >
-          Review billing in Stripe{busy === "portal" ? " …" : ""}
-        </GentleButton>
+        {plus.canManage ? (
+          <GentleButton
+            variant="text"
+            size="sm"
+            onClick={() => void portal()}
+            disabled={busy !== null}
+          >
+            {native
+              ? "Review billing in your browser"
+              : "Review billing in Stripe"}
+            {busy === "portal" ? " …" : ""}
+          </GentleButton>
+        ) : (
+          <p className="text-[0.75rem] leading-relaxed text-ash">
+            {plus.hasCustomer
+              ? "Stripe billing management is unavailable from this app storefront."
+              : "No Stripe billing profile is linked to this account."} Your
+            local Scripture, prayers, reflections, and journey are unchanged.
+            Contact{" "}
+            <a href={SUPPORT_EMAIL_HREF} className="text-accent underline">
+              {SUPPORT_EMAIL}
+            </a>{" "}
+            for billing help.
+          </p>
+        )}
         <GentleButton
           variant="text"
           size="sm"
@@ -187,15 +248,20 @@ export function PlusCta() {
 
   if (!plus.canPurchase || plus.plans.length !== 3) {
     return (
-      <p className="mt-5 text-[0.8125rem] text-ash">
-        Membership purchase is unavailable. The core app stays complete while
-        setup remains closed.
-      </p>
+      <div className="mt-5 space-y-2">
+        {portalReturnNotice}
+        {endedMembershipNotice}
+        <p className="text-[0.8125rem] text-ash">
+          Membership purchase is unavailable. The core app stays complete while
+          setup remains closed.
+        </p>
+      </div>
     );
   }
 
   return (
     <div className="mt-5 space-y-3">
+      {portalReturnNotice}
       {plus.returnNotice === "checkout-cancelled" && (
         <p className="text-[0.8125rem] text-ash">
           Checkout was canceled. No membership change was inferred.
@@ -212,6 +278,7 @@ export function PlusCta() {
           Stripe test mode — these controls cannot make a real charge.
         </p>
       )}
+      {endedMembershipNotice}
       <div className="grid gap-2 sm:grid-cols-3">
         {plus.plans.map((plan) => (
           <GentleButton
@@ -252,14 +319,17 @@ export function PlusCta() {
         . Core Scripture, prayer, reflection, and daily faith formation remain
         available.
       </p>
-      {plus.hasCustomer && (
+      {plus.canManage && (
         <GentleButton
           variant="text"
           size="sm"
           onClick={() => void portal()}
           disabled={busy !== null}
         >
-          Open existing billing portal{busy === "portal" ? " …" : ""}
+          {native
+            ? "Open existing billing in your browser"
+            : "Open existing billing portal"}
+          {busy === "portal" ? " …" : ""}
         </GentleButton>
       )}
       {actionError && (

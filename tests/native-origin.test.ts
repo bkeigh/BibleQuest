@@ -80,13 +80,23 @@ describe("routes that must stay closed to the native origin", () => {
     const { readFileSync } = await import("node:fs");
     for (const path of [
       "src/app/api/support/checkout/route.ts",
-      "src/app/api/billing/portal/route.ts",
       "src/app/api/arcade/checkout/route.ts",
     ]) {
       expect(readFileSync(path, "utf8")).toContain(
         'if (isNativeAppOrigin(request)) return privateError("forbidden", 403);',
       );
     }
+  });
+
+  it("lets the Portal route reach exact-origin bearer authentication", async () => {
+    const { readFileSync } = await import("node:fs");
+    const portal = readFileSync(
+      "src/app/api/billing/portal/route.ts",
+      "utf8",
+    );
+    expect(portal).toContain("hasSameOrigin(request)");
+    expect(portal).toContain("authenticatedServerContext(request)");
+    expect(portal).not.toContain("if (isNativeAppOrigin(request))");
   });
 });
 

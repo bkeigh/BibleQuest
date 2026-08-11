@@ -110,11 +110,13 @@ describe("direct Stripe API boundary", () => {
     const checkout = source("src/app/api/billing/checkout/route.ts");
     const checkoutServer = source("src/lib/billing/stripe.server.ts");
     const portal = source("src/app/api/billing/portal/route.ts");
+    const records = source("src/lib/billing/records.server.ts");
     const client = source("src/lib/billing/usePlus.ts");
     const purchases = source("src/lib/platform/purchases.ts");
     expect(checkoutServer).toContain('"https://checkout.stripe.com"');
     expect(checkout).toContain('origin_context: "mobile_app"');
-    expect(portal).toContain('"https://billing.stripe.com"');
+    expect(portal).toContain("stripeBillingPortalUrl(portal");
+    expect(records).toContain('"https://billing.stripe.com"');
     expect(client).toContain("purchaseAdapter()");
     expect(purchases).toContain('"https://checkout.stripe.com"');
     expect(purchases).toContain('"https://billing.stripe.com"');
