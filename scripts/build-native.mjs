@@ -502,6 +502,9 @@ function stageTree() {
       // Web-only acquisition media and service-worker code cannot execute in
       // the local Capacitor scheme and should not inflate the signed binary.
       "--exclude=/public/marketing/",
+      // The hosted association file is deployed on the website, never inside
+      // the guest-only local bundle where no external purchase link exists.
+      "--exclude=/public/.well-known/apple-app-site-association",
       "--exclude=/public/sw.js",
       // 14 animated wallpaper loops, 67 MB — over half the bundle, and not one
       // is reachable: Settings omits the wallpaper picker from native builds

@@ -26,6 +26,16 @@ import { isNativeTarget } from "@/lib/platform/target";
 import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 import { NATIVE_COMMERCE_CONTAINED } from "./containment";
 import {
+  createCheckoutReturnRefreshController,
+  INITIAL_CHECKOUT_RETURN_STATE,
+  legacyWebCheckoutReturnHint,
+  subscribeToCheckoutReturns,
+  type BillingProjectionResult,
+  type BillingRefreshResult,
+  type CheckoutReturnRefreshController,
+  type CheckoutReturnState,
+} from "./checkout-return";
+import {
   BILLING_INTERVALS,
   type BillingInterval,
   type BillingPlan,
@@ -213,9 +223,11 @@ export interface PlusState {
   synchronizedAt: string | null;
   error: string | null;
   returnNotice: StoredPlusState["returnNotice"];
+  returnState: CheckoutReturnState;
   startCheckout: (interval: BillingInterval) => Promise<boolean>;
   openCustomerPortal: () => Promise<boolean>;
   refresh: () => Promise<void>;
+  retryReturnRefresh: () => void;
 }
 
 /** Coordinates one account-bound, server-authoritative Plus projection. */
@@ -230,6 +242,7 @@ function usePlusCoordinator(): PlusState {
     : sessionUserId
       ? `user:${sessionUserId}`
       : "guest";
+  const accountSubject = subjectKey.startsWith("user:") ? subjectKey : null;
   const [stored, setStored] = useState<StoredPlusState>(() =>
     nativeContained
       ? containedNativeState(subjectKey)
@@ -238,6 +251,10 @@ function usePlusCoordinator(): PlusState {
   const [storefrontAvailable, setStorefrontAvailable] = useState(
     purchases.channel === "web-stripe",
   );
+  const [returnDisplay, setReturnDisplay] = useState<{
+    subjectKey: string;
+    state: CheckoutReturnState;
+  }>(() => ({ subjectKey, state: INITIAL_CHECKOUT_RETURN_STATE }));
   const sequence = useRef(0);
   const storefrontSequence = useRef(0);
   const currentSubject = useRef(subjectKey);
@@ -245,6 +262,9 @@ function usePlusCoordinator(): PlusState {
   const reconciledReturn = useRef(false);
   const portalReconciliationPending = useRef(false);
   const portalActionInFlight = useRef(false);
+  const returnController = useRef<CheckoutReturnRefreshController | null>(
+    null,
+  );
 
   // Abort every billing side effect when its verified account boundary moves.
   useEffect(() => {
@@ -268,6 +288,10 @@ function usePlusCoordinator(): PlusState {
       : nativeContained
         ? containedNativeState(subjectKey)
         : initialState(subjectKey);
+  const visibleReturn =
+    returnDisplay.subjectKey === subjectKey
+      ? returnDisplay.state
+      : INITIAL_CHECKOUT_RETURN_STATE;
 
   const load = useCallback(async () => {
     if (session.loading) return;
@@ -448,51 +472,119 @@ function usePlusCoordinator(): PlusState {
     return () => window.clearTimeout(timer);
   }, [load]);
 
+  /** Reconciles Stripe for the captured account without trusting a return URL. */
+  const requestBillingRefresh = useCallback(
+    async (signal?: AbortSignal): Promise<BillingRefreshResult> => {
+      if (!sessionUserId || nativeContained) return "failed";
+      const outcome = await purchases.restore({
+        expectedUserId: sessionUserId,
+        signal: signal ?? accountActions.current.signal,
+      });
+      if (outcome === "restored") return "completed";
+      return outcome === "deferred" ? "deferred" : "failed";
+    },
+    [nativeContained, sessionUserId],
+  );
+
+  /** Reads only the sealed entitlement projection during return polling. */
+  const requestBillingStatus = useCallback(
+    async (signal: AbortSignal): Promise<BillingProjectionResult> => {
+      if (!sessionUserId || nativeContained) return "failed";
+      try {
+        const response = await billingFetch(
+          "/api/billing/status",
+          { signal },
+          sessionUserId,
+        );
+        if (!response.ok) return "failed";
+        const payload = (await response.json()) as BillingStatusResponse;
+        return payload.isPlus ? "plus" : "free";
+      } catch {
+        return "failed";
+      }
+    },
+    [nativeContained, sessionUserId],
+  );
+
   const refresh = useCallback(async () => {
     if (nativeContained) {
       await load();
       return;
     }
     if (sessionUserId) {
-      const outcome = await purchases.restore({
-        expectedUserId: sessionUserId,
-        signal: accountActions.current.signal,
-      });
-      if (outcome === "failed" || outcome === "unavailable") {
+      const outcome = await requestBillingRefresh();
+      if (outcome === "failed") {
         throw new Error("refresh failed");
       }
-      if (outcome === "restored") track("plus_billing_refreshed");
+      if (outcome === "completed") track("plus_billing_refreshed");
     }
     await load();
-  }, [load, nativeContained, sessionUserId]);
+  }, [load, nativeContained, requestBillingRefresh, sessionUserId]);
 
-  // Returning focus after an external Portal visit reconciles current Stripe
-  // objects once; ordinary lifecycle events keep using the cheaper status load.
+  // One account-keyed controller handles universal-link and legacy web returns.
   useEffect(() => {
     if (nativeContained) return;
     if (session.loading) return;
+    const controller = createCheckoutReturnRefreshController({
+      refresh: requestBillingRefresh,
+      status: requestBillingStatus,
+      isOnline: () => navigator.onLine !== false,
+      onState: (state) => {
+        setReturnDisplay({ subjectKey, state });
+        if (state.phase === "confirmed") void load();
+      },
+    });
+    returnController.current = controller;
+    const acceptReturn = ({ hint }: { hint: "returned" | "cancelled" }) => {
+      controller.begin(hint, accountSubject);
+    };
+    const unsubscribe = subscribeToCheckoutReturns(acceptReturn);
+    const initialHint = legacyWebCheckoutReturnHint(window.location.href);
+    const initialTimer = initialHint
+      ? window.setTimeout(
+          () => controller.begin(initialHint, accountSubject),
+          0,
+        )
+      : null;
+
     const refreshOnReturn = () => {
-      if (!portalReconciliationPending.current) {
-        void load();
+      if (portalReconciliationPending.current) {
+        portalReconciliationPending.current = false;
+        void refresh().catch(() => void load());
         return;
       }
-      portalReconciliationPending.current = false;
-      void refresh().catch(() => void load());
+      if (!controller.resume(accountSubject)) void load();
     };
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") refreshOnReturn();
+      else controller.pause();
     };
     window.addEventListener("focus", refreshOnReturn);
     window.addEventListener("pageshow", refreshOnReturn);
     window.addEventListener("online", refreshOnReturn);
     document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
+      if (initialTimer !== null) window.clearTimeout(initialTimer);
+      unsubscribe();
+      controller.dispose();
+      if (returnController.current === controller) {
+        returnController.current = null;
+      }
       window.removeEventListener("focus", refreshOnReturn);
       window.removeEventListener("pageshow", refreshOnReturn);
       window.removeEventListener("online", refreshOnReturn);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [load, nativeContained, refresh, session.loading]);
+  }, [
+    accountSubject,
+    load,
+    nativeContained,
+    refresh,
+    requestBillingRefresh,
+    requestBillingStatus,
+    session.loading,
+    subjectKey,
+  ]);
 
   // StoreKit availability is transient policy state, not profile data. Keep it
   // only in memory, invalidate it on every lifecycle/update signal, and expire
@@ -562,14 +654,13 @@ function usePlusCoordinator(): PlusState {
     visible.purchasesEnabled,
   ]);
 
-  // Checkout and Portal redirects are display hints only. Reconcile against
-  // current Stripe objects once, then let the server projection decide access.
+  // A Portal query is a display hint only; the server projection stays final.
   useEffect(() => {
     if (nativeContained) return;
     if (session.loading || !session.user) return;
     if (reconciledReturn.current) return;
     const notice = safeReturnNotice();
-    if (notice !== "checkout-returned" && notice !== "portal-returned") return;
+    if (notice !== "portal-returned") return;
     reconciledReturn.current = true;
     portalReconciliationPending.current = false;
     // Deferred like the initial load so no state cascades in the effect body.
@@ -586,6 +677,7 @@ function usePlusCoordinator(): PlusState {
 
   const startCheckout = useCallback(
     async (interval: BillingInterval) => {
+      returnController.current?.reset();
       if (
         !sessionUserId ||
         !storefrontAvailable ||
@@ -681,10 +773,21 @@ function usePlusCoordinator(): PlusState {
     hasCustomer: visible.hasCustomer,
     synchronizedAt: visible.synchronizedAt,
     error: visible.error,
-    returnNotice: visible.returnNotice,
+    returnNotice:
+      visible.returnNotice === "portal-returned"
+        ? "portal-returned"
+        : visibleReturn.hint === "returned"
+          ? "checkout-returned"
+          : visibleReturn.hint === "cancelled"
+            ? "checkout-cancelled"
+            : null,
+    returnState: visibleReturn,
     startCheckout,
     openCustomerPortal,
     refresh,
+    retryReturnRefresh: () => {
+      returnController.current?.retry(accountSubject);
+    },
   };
 }
 

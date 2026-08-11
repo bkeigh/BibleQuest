@@ -209,6 +209,17 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Universal links require JSON from this extensionless exact path.
+        source: "/.well-known/apple-app-site-association",
+        headers: [
+          { key: "Content-Type", value: "application/json" },
+          {
+            key: "Cache-Control",
+            value: "public, max-age=3600, must-revalidate",
+          },
+        ],
+      },
+      {
         // Let browsers revalidate the worker on every visit. Cache Storage has
         // a separate explicit version lifecycle in public/sw.js.
         source: "/sw.js",

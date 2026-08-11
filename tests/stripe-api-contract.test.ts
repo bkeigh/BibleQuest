@@ -67,6 +67,7 @@ describe("direct Stripe API boundary", () => {
   it("keeps provider identifiers and entitlement decisions off the client", () => {
     const status = source("src/app/api/billing/status/route.ts");
     const client = source("src/lib/billing/usePlus.ts");
+    const checkoutReturn = source("src/lib/billing/checkout-return.ts");
     expect(status).not.toMatch(
       /\.select\([\s\S]*?external_(?:customer|subscription)_id/,
     );
@@ -86,9 +87,9 @@ describe("direct Stripe API boundary", () => {
     expect(client.indexOf("if (value.isPlus)")).toBeLessThan(
       client.indexOf('value.availability === "coming-soon"'),
     );
-    const returnParser = client.slice(
-      client.indexOf("function safeReturnNotice"),
-      client.indexOf("export interface PlusState"),
+    const returnParser = checkoutReturn.slice(
+      checkoutReturn.indexOf("function checkoutReturnHintFromUrl"),
+      checkoutReturn.indexOf("function legacyWebCheckoutReturnHint"),
     );
     expect(returnParser).not.toMatch(/isPlus|plan|status.*plus/i);
     expect(client).toContain("safePlusStatus(statusPayload)");
@@ -101,7 +102,7 @@ describe("direct Stripe API boundary", () => {
       client.indexOf("// Native uses only the bearer-authenticated"),
     );
 
-    expect(guestBoundary).toContain('billingFetch("/api/billing/plans")');
+    expect(guestBoundary).toContain('billingFetch("/api/billing/plans"');
     expect(guestBoundary).not.toContain('billingFetch("/api/billing/status")');
     expect(guestBoundary).toContain('status: "sign-in-required"');
   });

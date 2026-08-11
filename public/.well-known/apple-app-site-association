@@ -1,0 +1,17 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["W8KU6X34XR.co.biblequest.app"],
+        "components": [
+          {
+            "/": "/checkout/plus/returned"
+          },
+          {
+            "/": "/checkout/plus/cancelled"
+          }
+        ]
+      }
+    ]
+  }
+}

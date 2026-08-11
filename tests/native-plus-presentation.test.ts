@@ -39,9 +39,11 @@ function plusState(overrides: Partial<PlusState> = {}): PlusState {
     synchronizedAt: null,
     error: null,
     returnNotice: null,
+    returnState: { hint: null, phase: "idle", attempt: 0 },
     startCheckout: vi.fn().mockResolvedValue(true),
     openCustomerPortal: vi.fn().mockResolvedValue(true),
     refresh: vi.fn().mockResolvedValue(undefined),
+    retryReturnRefresh: vi.fn(),
     ...overrides,
   };
 }

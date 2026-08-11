@@ -8,7 +8,7 @@ import {
   formatBillingAmount,
   type BillingInterval,
 } from "@/lib/billing/validation";
-import { usePlus } from "@/lib/billing/usePlus";
+import { type PlusState, usePlus } from "@/lib/billing/usePlus";
 import { buildPublicHref } from "@/lib/platform/api";
 import { isNativeTarget } from "@/lib/platform/target";
 
@@ -18,6 +18,58 @@ function formattedDate(value: string | null): string | null {
   return Number.isNaN(date.getTime())
     ? null
     : new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
+}
+
+/** Explains a Checkout return without treating navigation as entitlement. */
+function CheckoutReturnStatus({ plus }: { plus: PlusState }) {
+  const { hint, phase } = plus.returnState;
+  if (!hint) return null;
+  if (phase === "cancelled") {
+    return (
+      <p className="text-[0.8125rem] text-ash">
+        Checkout was closed. No membership change was assumed.
+      </p>
+    );
+  }
+  if (phase === "confirmed") {
+    return (
+      <p className="text-[0.8125rem] text-charcoal">
+        BibleQuest confirmed Plus from the protected server record.
+      </p>
+    );
+  }
+  if (phase === "checking" || phase === "waiting") {
+    return (
+      <p className="text-[0.8125rem] text-ash" aria-live="polite">
+        {phase === "checking"
+          ? "Welcome back. Checking the protected membership record…"
+          : "Stripe may still be finishing its update. Plus stays unchanged until the protected server record confirms it."}
+      </p>
+    );
+  }
+  const message =
+    phase === "offline"
+      ? "You’re offline, so no membership change was assumed. Reconnect and try again; the free experience remains available."
+      : phase === "paused"
+        ? "Membership checking paused while BibleQuest was in the background."
+        : phase === "failed"
+          ? "Membership status couldn’t be checked just now. No access was changed, and the free experience remains available."
+          : phase === "timed-out"
+            ? "The short check ended before a membership change was confirmed. The free experience remains available while Stripe finishes."
+            : "Welcome back. A browser return does not confirm a membership change.";
+  const canRetry = ["offline", "paused", "failed", "timed-out"].includes(
+    phase,
+  );
+  return (
+    <div className="space-y-2">
+      <p className="text-[0.8125rem] leading-relaxed text-ash">{message}</p>
+      {canRetry && (
+        <GentleButton variant="text" size="sm" onClick={plus.retryReturnRefresh}>
+          Check membership again
+        </GentleButton>
+      )}
+    </div>
+  );
 }
 
 /** Shows Plus access from the server entitlement union and Stripe controls. */
@@ -100,34 +152,44 @@ export function PlusCta() {
 
   if (plus.status === "coming-soon") {
     return (
-      <p className="mt-5 text-[0.8125rem] text-ash">
-        Plus is still being prepared. Production checkout is off, and the core
-        app stays complete either way.
-      </p>
+      <div className="mt-5 space-y-2">
+        <CheckoutReturnStatus plus={plus} />
+        <p className="text-[0.8125rem] text-ash">
+          Plus is still being prepared. Production checkout is off, and the core
+          app stays complete either way.
+        </p>
+      </div>
     );
   }
   if (plus.status === "sign-in-required") {
     return (
-      <p className="mt-5 text-[0.8125rem] leading-relaxed text-ash">
-        <Link href="/app/account" className="text-accent underline">
-          Sign in
-        </Link>{" "}
-        to view Plus plans or restore a membership. No account is created by a
-        billing redirect.
-      </p>
+      <div className="mt-5 space-y-2">
+        <CheckoutReturnStatus plus={plus} />
+        <p className="text-[0.8125rem] leading-relaxed text-ash">
+          <Link href="/app/account" className="text-accent underline">
+            Sign in
+          </Link>{" "}
+          to view Plus plans or restore a membership. No account is created by a
+          billing redirect.
+        </p>
+      </div>
     );
   }
   if (plus.loading) {
     return (
-      <p className="mt-5 text-[0.8125rem] text-ash">
-        Loading membership status…
-      </p>
+      <div className="mt-5 space-y-2">
+        <CheckoutReturnStatus plus={plus} />
+        <p className="text-[0.8125rem] text-ash">
+          Loading membership status…
+        </p>
+      </div>
     );
   }
   if (plus.status === "error") {
     return (
       <div className="mt-5 space-y-2">
         {portalReturnNotice}
+        <CheckoutReturnStatus plus={plus} />
         <p className="text-[0.8125rem] text-rose-700">{plus.error}</p>
         <GentleButton
           variant="text"
@@ -157,6 +219,7 @@ export function PlusCta() {
     return (
       <div className="mt-5 space-y-3">
         {portalReturnNotice}
+        <CheckoutReturnStatus plus={plus} />
         <p className="text-[0.8125rem] leading-relaxed text-charcoal">
           You’re a Plus member. {membershipDescription}
         </p>
@@ -205,6 +268,7 @@ export function PlusCta() {
     return (
       <div className="mt-5 space-y-3">
         {portalReturnNotice}
+        <CheckoutReturnStatus plus={plus} />
         <p className="text-[0.8125rem] leading-relaxed text-charcoal">
           Stripe says this membership needs attention. Plus access is not
           granted from a return link or stale browser state.
@@ -248,10 +312,17 @@ export function PlusCta() {
 
   if (!plus.canPurchase || plus.purchaseOptions.length !== 3) {
     // A non-US or unknown native storefront receives no acquisition surface.
-    if (plus.purchaseChannel === "native") return null;
+    if (plus.purchaseChannel === "native") {
+      return plus.returnState.hint ? (
+        <div className="mt-5">
+          <CheckoutReturnStatus plus={plus} />
+        </div>
+      ) : null;
+    }
     return (
       <div className="mt-5 space-y-2">
         {portalReturnNotice}
+        <CheckoutReturnStatus plus={plus} />
         {endedMembershipNotice}
         <p className="text-[0.8125rem] text-ash">
           Membership purchase is unavailable. The core app stays complete while
@@ -264,17 +335,7 @@ export function PlusCta() {
   return (
     <div className="mt-5 space-y-3">
       {portalReturnNotice}
-      {plus.returnNotice === "checkout-cancelled" && (
-        <p className="text-[0.8125rem] text-ash">
-          Checkout was canceled. No membership change was inferred.
-        </p>
-      )}
-      {plus.returnNotice === "checkout-returned" && (
-        <p className="text-[0.8125rem] text-ash">
-          Welcome back. Access appears only after the verified Stripe projection
-          confirms it.
-        </p>
-      )}
+      <CheckoutReturnStatus plus={plus} />
       {plus.mode === "test" && (
         <p className="text-[0.75rem] font-medium text-gilt">
           Stripe test mode — these controls cannot make a real charge.
@@ -288,7 +349,6 @@ export function PlusCta() {
           you confirm. BibleQuest does not collect card details in the app.
         </p>
       )}
-      {endedMembershipNotice}
       <div className="grid gap-2 sm:grid-cols-3">
         {plus.purchaseOptions.map((interval) => {
           const plan = plus.plans.find(

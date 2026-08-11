@@ -112,6 +112,19 @@ describe("Winterhill iframe security contract", () => {
 });
 
 describe("transport and payment header scope", () => {
+  it("serves the extensionless universal-link association as JSON", async () => {
+    const rules = await productionHeaderRules();
+    const association = ruleFor(
+      rules,
+      "/.well-known/apple-app-site-association",
+    );
+
+    expect(headerValue(association, "Content-Type")).toBe("application/json");
+    expect(headerValue(association, "Cache-Control")).toBe(
+      "public, max-age=3600, must-revalidate",
+    );
+  });
+
   it("serves HSTS while hosted billing needs no client-side origins", async () => {
     const rules = await headerRules("production");
     const policies = valuesFor(rules, "Content-Security-Policy");
