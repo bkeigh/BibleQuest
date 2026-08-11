@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   checkPermissions: vi.fn(),
   getDeliveredNotifications: vi.fn(),
   getPending: vi.fn(),
+  removeAllDeliveredNotifications: vi.fn(),
   removeDeliveredNotifications: vi.fn(),
   requestPermissions: vi.fn(),
   schedule: vi.fn(),
@@ -60,12 +61,14 @@ beforeEach(() => {
   mocks.schedule.mockResolvedValue({ notifications: [] });
   mocks.getDeliveredNotifications.mockResolvedValue({ notifications: [] });
   mocks.getPending.mockResolvedValue({ notifications: [] });
+  mocks.removeAllDeliveredNotifications.mockResolvedValue(undefined);
   mocks.removeDeliveredNotifications.mockResolvedValue(undefined);
   mocks.checkPermissions.mockResolvedValue({ display: "granted" });
   mocks.requestPermissions.mockResolvedValue({ display: "granted" });
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
@@ -156,26 +159,19 @@ describe("native reminder orchestration", () => {
     expect(ids).toEqual([271_001, 271_002, 271_099]);
   });
 
-  it("purges owned pending and delivered reminders with their preferences", async () => {
+  it("purges pending and delivered reminders with their preferences", async () => {
     localStorage.setItem(
       "biblequest:native-reminders:v1",
       JSON.stringify(PREFERENCES),
     );
-    mocks.getDeliveredNotifications.mockResolvedValueOnce({
-      notifications: [
-        { id: 271_001, title: "BibleQuest" },
-        { id: 88, title: "Other feature" },
-      ],
-    });
 
     await purgeNativeReminders();
 
     expect(mocks.cancel).toHaveBeenCalledWith({
       notifications: [{ id: 271_001 }, { id: 271_002 }, { id: 271_099 }],
     });
-    expect(mocks.removeDeliveredNotifications).toHaveBeenCalledWith({
-      notifications: [{ id: 271_001, title: "BibleQuest" }],
-    });
+    expect(mocks.removeAllDeliveredNotifications).toHaveBeenCalledOnce();
+    expect(mocks.getDeliveredNotifications).not.toHaveBeenCalled();
     expect(localStorage.getItem("biblequest:native-reminders:v1")).toBeNull();
   });
 
@@ -188,7 +184,25 @@ describe("native reminder orchestration", () => {
 
     await expect(purgeNativeReminders()).rejects.toThrow("fully purged");
 
-    expect(mocks.getDeliveredNotifications).toHaveBeenCalledOnce();
+    expect(mocks.removeAllDeliveredNotifications).toHaveBeenCalledOnce();
+    expect(localStorage.getItem("biblequest:native-reminders:v1")).toBeNull();
+  });
+
+  it("bounds a native bridge call that never settles", async () => {
+    vi.useFakeTimers();
+    localStorage.setItem(
+      "biblequest:native-reminders:v1",
+      JSON.stringify(PREFERENCES),
+    );
+    mocks.removeAllDeliveredNotifications.mockImplementationOnce(
+      () => new Promise(() => undefined),
+    );
+
+    const purge = purgeNativeReminders();
+    const assertion = expect(purge).rejects.toThrow("fully purged");
+    await vi.runAllTimersAsync();
+    await assertion;
+
     expect(localStorage.getItem("biblequest:native-reminders:v1")).toBeNull();
   });
 

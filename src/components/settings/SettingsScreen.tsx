@@ -48,6 +48,7 @@ import { stopSync } from "@/lib/sync/engine";
 import { clearStoredAccountSyncGenerations } from "@/lib/sync/generation";
 import { clearStoredDailyQuestSyncContext } from "@/lib/sync/daily-quests";
 import { clearStoredMutableRevisionContext } from "@/lib/sync/mutable-revisions";
+import { withDeadline } from "@/lib/async/deadline";
 import type { QuestOSSnapshot } from "@/lib/questos/types";
 import { useStrings, LANGUAGES, languageMeta, fmt } from "@/lib/i18n";
 import { IconCheck, IconChevronRight } from "@/components/design-system/icons";
@@ -102,6 +103,8 @@ interface PendingJourneyImport {
 }
 
 type DeleteAccountError = "request" | "device" | null;
+
+const CLEAR_DATA_DEADLINE_MS = 8_000;
 
 /** Clears game records that live outside the persisted journey store. */
 function clearStandaloneGameData(): void {
@@ -1173,40 +1176,73 @@ function SettingsInner() {
   async function clearJourneyData() {
     if (clearingData) return;
     setClearingData(true);
-    let reminderCleanupFailed = false;
+    let deviceCleanupFailed = false;
+    let journeyCleared = false;
     try {
-      if (user) await deleteRemoteAvatar(true);
+      if (user) {
+        await withDeadline(
+          deleteRemoteAvatar(true),
+          CLEAR_DATA_DEADLINE_MS,
+          "Remote avatar cleanup",
+        );
+      }
       // This await is the privacy boundary: local data remains intact unless
       // the native filesystem mirror is first made non-restorable.
-      if (!(await purgeJourneyBackup())) {
+      const mirrorPurged = await withDeadline(
+        purgeJourneyBackup(),
+        CLEAR_DATA_DEADLINE_MS,
+        "Native journey backup purge",
+      );
+      if (!mirrorPurged) {
         throw new Error("native journey backup could not be purged");
       }
       try {
-        await purgeNativeReminders();
+        await withDeadline(
+          purgeNativeReminders(),
+          CLEAR_DATA_DEADLINE_MS,
+          "Native reminder cleanup",
+        );
       } catch {
-        // Continue erasing private content after attempting every reminder ID.
-        reminderCleanupFailed = true;
+        // Reminders are best effort after their local preference is removed.
+        deviceCleanupFailed = true;
       }
       clearAllData(user ? { purgeAccount: user.id } : undefined);
+      journeyCleared = true;
       clearAllDeviceLocalJournalDrafts();
       clearRhythmState();
       clearStandaloneGameData();
-      await clearAvatar();
-      clearLastSyncedUserId();
-      if (reminderCleanupFailed) {
-        toast(
-          "Your journey was cleared, but iOS may still show an old BibleQuest reminder.",
+      try {
+        await withDeadline(
+          clearAvatar(),
+          CLEAR_DATA_DEADLINE_MS,
+          "Local avatar cleanup",
         );
+      } catch {
+        // The primary journey is already empty; report cache cleanup honestly.
+        deviceCleanupFailed = true;
       }
+      clearLastSyncedUserId();
+      toast(
+        deviceCleanupFailed
+          ? "Your journey was cleared, but some device-only cleanup could not finish. Restart BibleQuest before continuing."
+          : "Your BibleQuest journey was cleared.",
+        { variant: deviceCleanupFailed ? "default" : "success" },
+      );
+
+      // Keep native navigation inside Next's router: Capacitor cannot resolve
+      // extensionless routes as fresh document requests.
       router.replace("/onboarding");
     } catch {
       toast(
-        "Your data could not be fully cleared. Some cleanup may have completed; try again before continuing.",
+        journeyCleared
+          ? "Your journey was cleared, but this device could not finish cleanup. Restart BibleQuest before continuing."
+          : "BibleQuest could not safely clear your journey. Your saved journey remains on this device; restart the app and try again.",
       );
-      setClearingData(false);
     } finally {
       // A failed purge already resumes itself; this is harmless on that path.
       resumeJourneyBackupAfterPurge();
+      setConfirmClear(false);
+      setClearingData(false);
     }
   }
 

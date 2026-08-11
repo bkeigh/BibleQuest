@@ -1,8 +1,9 @@
 # iOS Phase 5 — release proof and controlled account beta
 
-**Status:** Milestone 0 complete; Milestone 1 physical-device QA is next
+**Status:** Milestone 1 passed except for Clear My Data; ship its bounded native
+cleanup fix in a new TestFlight build, then begin the isolated account beta
 
-**Successful Cloud archive baseline:** `1784cfa5ffd4818606c7e00113f8dbfb14f70e9e`
+**Current tested guest baseline:** `5359dbf` / TestFlight build 13
 
 **Canonical 1.0 procedure:** [`IOS_TESTFLIGHT_RUNBOOK.md`](IOS_TESTFLIGHT_RUNBOOK.md)
 
@@ -10,6 +11,21 @@ Phase 5 turns the existing guest-only iOS foundation into a signed, measured
 release candidate. It then validates account sync in a separate internal beta.
 Those are two independent decisions: passing the guest release does not enable
 accounts, and passing an account beta does not change the App Store build.
+
+## Immediate sequence
+
+1. Merge the Clear My Data repair without account or AI activation changes.
+2. Let Xcode Cloud produce the next build from that exact commit.
+3. On a physical iPhone, clear a populated journey, force quit, relaunch, and
+   prove that the journey, mirror, reminders, drafts, rhythm, game data, and
+   avatar do not return. Keep the automated never-settling bridge test as proof
+   that a native failure releases the button instead of remaining on
+   “Clearing…”.
+4. If the focused retest and one core smoke pass succeed, submit that same
+   guest-only build for 1.0. Account work must not delay the repaired release.
+5. Create a durable staging backend, then begin Milestone 3 in a separate
+   account-beta build. MyShepherd follows the stable account lifecycle in
+   Milestone 4.
 
 ## Guardrails
 
@@ -156,11 +172,26 @@ builder's containment pins.
   fixed and separately tested.
 - Use the Keychain-backed native Supabase client, exact native CORS allowlist,
   bearer verification, and explicit credential purge after account deletion.
+- Add a server/database account-availability contract before distributing the
+  beta. The compiled public flag is not a kill switch because an installed app
+  can call Supabase directly; the remote boundary must fail closed without
+  deleting the local journey.
+- Bound individual sync requests instead of wrapping the entire pull, merge,
+  and full push in one short deadline. Batch growing collections, skip an
+  unchanged foreground push, and test small, 1,000-row, and realistic mature
+  accounts on a constrained network.
+- Extend the two-user isolation probe whenever an account-owned table is added;
+  the first update must include guided movements. Select only the columns the
+  client contract needs and set explicit account-size/text limits.
+- Publish a short Settings explanation of what syncs. Core profile, Scripture,
+  quest, prayer, reflection, journey, and pilgrimage data sync; drafts and
+  native reminders remain device-only. Decide games and Rhythm separately
+  rather than implying they already travel between devices.
+- Define deleted-account behavior on a second offline device: erase data stamped
+  to that account only after a verified `user_not_found`, never after an
+  ordinary network, refresh, or token error.
 - Update App Store privacy answers and review notes before any account-enabled
   binary leaves internal testing.
-- Before public promotion, add and rehearse a reviewed server/runtime kill
-  switch that stops new auth, refresh, and sync without erasing the local
-  journey or requiring a replacement binary.
 
 ### Required device matrix
 
@@ -179,6 +210,50 @@ user data, device A reminder choices never change device B, and returning to
 guest containment is tested. The guest output must remain unchanged, and the
 beta output must be reproducible and unable to target production accidentally.
 Account rollout still requires a separate product and release decision.
+
+## Milestone 4 — prove MyShepherd inside the account beta
+
+MyShepherd should follow—not share—the account activation change. Its server
+route already keeps the provider key private, validates navigation actions,
+bounds input/output, avoids saving questions, and applies account-scoped rate
+limits. This milestone proves the remaining client, entitlement, disclosure,
+and model-safety contracts before any public exposure.
+
+### Implementation order
+
+- On native, load Plus entitlement from `/api/billing/status` without fetching
+  `/api/billing/plans`. Native has no StoreKit or web-plan acquisition path, and
+  the plans route is intentionally absent from its CORS allowlist.
+- Add a reviewed runtime MyShepherd switch so a bad provider response or safety
+  issue can disable new requests without a replacement binary.
+- Give client requests a bounded abort deadline with a calm retry state. Keep
+  each question independent and say so clearly; do not add transcript memory,
+  retrieval, or cross-device AI history in this phase.
+- Align the floating panel, standalone screen, Privacy Policy, About page, Plus
+  copy, QA guide, and App Store privacy answers. Name the AI processor, warn
+  that answers may be wrong, discourage private information, and direct crisis,
+  medical, legal, and pastoral emergencies to appropriate human help.
+- Add a mocked provider-response test and a secret-safe staging smoke command.
+  The smoke record may contain pass/fail metadata, never the user's question,
+  generated answer, email, token, or provider error body.
+- Run a reviewed safety set covering fabricated quotations, unsupported
+  certainty, claims of divine authority, denominational overreach, medical and
+  legal advice, abuse, self-harm, prompt injection, malformed provider output,
+  and citation/action relevance.
+
+### Internal proof
+
+Use an operator Plus grant for disposable beta accounts; StoreKit remains out
+of scope. Prove the same account on web and iPhone can receive a valid answer,
+open every allowed Scripture/action link, hit the rate limit safely, recover
+from offline and timeout states, relaunch without retained questions, and stay
+isolated from another account. Also prove MyShepherd is hidden for a non-Plus
+account and when its runtime switch is off.
+
+**Exit gate:** entitlement is correct on both clients, no question or answer is
+persisted or logged, disclosures match observed processing, failure states are
+bounded, reviewed safety prompts stay within policy, and the runtime switch has
+been rehearsed. Public enablement remains a separate release decision.
 
 ## Deferred vertical slices
 
