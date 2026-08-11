@@ -70,14 +70,21 @@ export async function POST(request: Request) {
     return privateError("invalid_request", 400);
   }
 
-  let event;
+  const raw = await boundedText(request, MAX_STRIPE_WEBHOOK_BYTES);
+  if (raw instanceof Response) return raw;
+
   let configuration;
   let stripe;
   try {
-    const raw = await boundedText(request, MAX_STRIPE_WEBHOOK_BYTES);
-    if (raw instanceof Response) return raw;
     configuration = requireStripeBillingConfiguration();
     stripe = createStripe(configuration);
+  } catch (error) {
+    recordServerFailure("billing_webhook", "config", error);
+    return privateError("unavailable", 503);
+  }
+
+  let event;
+  try {
     event = stripe.webhooks.constructEvent(
       raw,
       signature,
@@ -86,10 +93,8 @@ export async function POST(request: Request) {
     if (event.livemode !== configuration.livemode) {
       return privateError("invalid_request", 400);
     }
-  } catch (error) {
-    // A rejected signature is expected traffic, while a missing or malformed
-    // Stripe deployment secret is not; only the reason separates them.
-    recordServerFailure("billing_webhook", "verify", error);
+  } catch {
+    recordServerFailureReason("billing_webhook", "verify", "invalid");
     return privateError("invalid_request", 400);
   }
 
@@ -157,29 +162,42 @@ export async function POST(request: Request) {
     const category =
       processingError instanceof StripeWebhookProcessingError
         ? processingError.category
-        : "invalid";
+        : "database";
     recordServerFailureReason(
       "billing_webhook",
       "process",
       reviewedFailureReason(category),
     );
     try {
-      // Releasing the claim is best effort: Stripe retries either way, and a
-      // throw here would replace the bounded 503 with an unrecorded 500.
-      const { data: released, error: releaseError } = await admin.rpc(
+      // Deterministic current-object mismatches are terminal. Mark them as a
+      // safe no-fulfillment outcome so Stripe does not retry them as outages.
+      const terminal = category === "invalid";
+      const { data: completed, error: completionError } = await admin.rpc(
         "complete_stripe_webhook_event",
         {
           p_event_id: event.id,
           p_claim_token: claim.token,
-          p_outcome: "failed",
-          p_error_category: category,
+          p_outcome: terminal ? "processed" : "failed",
+          p_error_category: terminal ? "ignored" : category,
         },
       );
-      if (releaseError || released !== true) {
-        recordServerFailure("billing_webhook", "complete", releaseError);
+      if (completionError || completed !== true) {
+        recordServerFailure(
+          "billing_webhook",
+          "complete",
+          completionError,
+        );
+        return privateError("unavailable", 503);
+      }
+      if (terminal) {
+        return Response.json(
+          { received: true },
+          { headers: { "Cache-Control": "private, no-store" } },
+        );
       }
     } catch (releaseError) {
       recordServerFailure("billing_webhook", "complete", releaseError);
+      return privateError("unavailable", 503);
     }
     return privateError("unavailable", 503);
   }

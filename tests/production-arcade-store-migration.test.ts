@@ -53,7 +53,7 @@ function frozenManifest() {
 describe("production Arcade store migration", () => {
   it("is required by the production readiness contract", () => {
     expect(PRODUCTION_READINESS).toContain(
-      'candidate.schema_contract !== "0036"',
+      'candidate.schema_contract !== "0038"',
     );
     expect(PRODUCTION_READINESS).toContain('rpc: "arcade_store_contract"');
     expect(PRODUCTION_READINESS).toContain(

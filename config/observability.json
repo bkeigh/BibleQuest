@@ -1,7 +1,7 @@
 {
   "contract": "biblequest_observability_v1",
   "canonicalOrigin": "https://www.biblequest.co",
-  "schemaContract": "0036",
+  "schemaContract": "0038",
   "contentContract": "seed-manifest-v1",
   "serviceWorkerVersion": "biblequest-v25",
   "thresholds": {

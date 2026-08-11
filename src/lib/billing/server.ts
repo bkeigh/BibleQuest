@@ -38,6 +38,13 @@ export interface OperatorPlusGrantRow {
   revoked_at: string | null;
 }
 
+export class StripeSubscriptionProjectionError extends Error {
+  constructor() {
+    super("Stripe subscription shape unavailable.");
+    this.name = "StripeSubscriptionProjectionError";
+  }
+}
+
 function isBillingContract(value: unknown): boolean {
   return (
     value !== null &&
@@ -89,7 +96,7 @@ export function subscriptionProjection(
 ) {
   const item = subscription.items.data[0];
   if (!item || subscription.items.data.length !== 1) {
-    throw new Error("Stripe subscription shape unavailable.");
+    throw new StripeSubscriptionProjectionError();
   }
   const priceId = item.price.id;
   const recognizedInterval: BillingInterval | null =
@@ -101,10 +108,27 @@ export function subscriptionProjection(
   const product = stripeObjectId(item.price.product);
   const customer = stripeObjectId(subscription.customer);
   if (!customer || !product) {
-    throw new Error("Stripe subscription shape unavailable.");
+    throw new StripeSubscriptionProjectionError();
   }
-  const entitled =
+  const expectedRecurringInterval =
+    recognizedInterval === "monthly"
+      ? "month"
+      : recognizedInterval === "annual"
+        ? "year"
+        : null;
+  const recognizedPurchase =
+    userId !== null &&
     recognizedInterval !== null &&
+    subscription.metadata?.purpose === "biblequest_plus" &&
+    subscription.metadata?.biblequest_user_id === userId &&
+    subscription.metadata?.billing_interval === recognizedInterval &&
+    subscription.collection_method === "charge_automatically" &&
+    item.quantity === 1 &&
+    item.price.type === "recurring" &&
+    item.price.recurring?.interval === expectedRecurringInterval &&
+    item.price.recurring.interval_count === 1;
+  const entitled =
+    recognizedPurchase &&
     (subscription.status === "trialing" ||
       subscription.status === "active");
 
@@ -148,6 +172,10 @@ export function billingStatusFromRows(
   now = Date.now(),
 ) {
   const ordered = [...rows].sort((left, right) => {
+    const lifetimeOrder =
+      Number(right.billing_interval === "lifetime") -
+      Number(left.billing_interval === "lifetime");
+    if (lifetimeOrder !== 0) return lifetimeOrder;
     const leftEnd = Date.parse(left.current_period_end ?? "") || 0;
     const rightEnd = Date.parse(right.current_period_end ?? "") || 0;
     return rightEnd - leftEnd;

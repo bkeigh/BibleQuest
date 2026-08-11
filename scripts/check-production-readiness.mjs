@@ -133,8 +133,8 @@ const POSTURE_CONTRACTS = [
   },
   {
     rpc: "stripe_billing_contract",
-    contract: "biblequest_stripe_test_billing_v2",
-    migration: "0028",
+    contract: "biblequest_stripe_test_billing_v3",
+    migration: "0038",
     label: "direct Stripe billing posture",
   },
   {
@@ -275,7 +275,7 @@ function safeHealthBody(value) {
     typeof candidate.canonical_origin_matches !== "boolean" ||
     !["configured", "guest-only", "invalid"].includes(candidate.auth_posture) ||
     !["configured", "disabled", "invalid"].includes(candidate.analytics_posture) ||
-    candidate.schema_contract !== "0036" ||
+    candidate.schema_contract !== "0038" ||
     candidate.content_contract !== "seed-manifest-v1" ||
     !/^biblequest-v\d{1,4}$/.test(candidate.service_worker_version) ||
     !["coming-soon", "test", "live", "invalid"].includes(

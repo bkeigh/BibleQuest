@@ -27,6 +27,7 @@ const CONFIGURATION: StripeBillingConfiguration = {
   purchasesEnabled: true,
   supportEnabled: false,
 };
+const USER_ID = "c1000000-0000-4000-8000-000000000001";
 
 /** Builds the current Stripe shape without embedding stale event fields. */
 function subscription(
@@ -39,6 +40,12 @@ function subscription(
     status,
     livemode: false,
     currency: "usd",
+    collection_method: "charge_automatically",
+    metadata: {
+      purpose: "biblequest_plus",
+      biblequest_user_id: USER_ID,
+      billing_interval: "monthly",
+    },
     cancel_at_period_end: false,
     cancel_at: null,
     canceled_at: null,
@@ -47,11 +54,14 @@ function subscription(
     items: {
       data: [
         {
+          quantity: 1,
           current_period_start: 1_784_916_000,
           current_period_end: 1_787_594_400,
           price: {
             id: priceId,
             product: "prod_TestPlus123",
+            type: "recurring",
+            recurring: { interval: "month", interval_count: 1 },
           },
         },
       ],
@@ -63,7 +73,7 @@ describe("server-authoritative Stripe projection", () => {
   it("grants Plus only for an active recognized server Price", () => {
     const active = subscriptionProjection(
       subscription("active"),
-      "c1000000-0000-4000-8000-000000000001",
+      USER_ID,
       CONFIGURATION,
     );
     expect(active).toMatchObject({
@@ -77,7 +87,7 @@ describe("server-authoritative Stripe projection", () => {
 
     const unknown = subscriptionProjection(
       subscription("active", "price_Unrecognized123"),
-      "c1000000-0000-4000-8000-000000000001",
+      USER_ID,
       CONFIGURATION,
     );
     expect(unknown).toMatchObject({
@@ -88,16 +98,58 @@ describe("server-authoritative Stripe projection", () => {
 
     const pastDue = subscriptionProjection(
       subscription("past_due"),
-      "c1000000-0000-4000-8000-000000000001",
+      USER_ID,
       CONFIGURATION,
     );
     expect(pastDue.plan_key).toBe("free");
   });
 
+  it("requires sealed owner and server-authored recurring purpose metadata", () => {
+    const forged = subscription("active");
+    forged.metadata.biblequest_user_id =
+      "c2000000-0000-4000-8000-000000000002";
+    expect(
+      subscriptionProjection(forged, USER_ID, CONFIGURATION).plan_key,
+    ).toBe("free");
+
+    const wrongPurpose = subscription("active");
+    wrongPurpose.metadata.purpose = "biblequest_support";
+    expect(
+      subscriptionProjection(wrongPurpose, USER_ID, CONFIGURATION).plan_key,
+    ).toBe("free");
+
+    const wrongInterval = subscription("active");
+    wrongInterval.metadata.billing_interval = "annual";
+    expect(
+      subscriptionProjection(wrongInterval, USER_ID, CONFIGURATION).plan_key,
+    ).toBe("free");
+    expect(
+      subscriptionProjection(subscription("active"), null, CONFIGURATION)
+        .plan_key,
+    ).toBe("free");
+  });
+
+  it("denies every non-entitled current subscription state", () => {
+    const denied: Stripe.Subscription.Status[] = [
+      "incomplete",
+      "incomplete_expired",
+      "past_due",
+      "canceled",
+      "unpaid",
+      "paused",
+    ];
+    for (const status of denied) {
+      expect(
+        subscriptionProjection(subscription(status), USER_ID, CONFIGURATION)
+          .plan_key,
+      ).toBe("free");
+    }
+  });
+
   it("uses current item period dates and bounded event identity", () => {
     const projection = subscriptionProjection(
       subscription("trialing"),
-      "c1000000-0000-4000-8000-000000000001",
+      USER_ID,
       CONFIGURATION,
       { id: "evt_TestEvent123", created: 1_784_916_100 },
     );
@@ -122,7 +174,7 @@ describe("server-authoritative Stripe projection", () => {
     expect(
       subscriptionProjection(
         scheduled,
-        "c1000000-0000-4000-8000-000000000001",
+        USER_ID,
         CONFIGURATION,
       ),
     ).toMatchObject({
@@ -209,13 +261,43 @@ describe("server-authoritative Stripe projection", () => {
     });
   });
 
+  it("reports active lifetime access ahead of finite recurring access", () => {
+    const recurring = {
+      id: "d1000000-0000-4000-8000-000000000001",
+      user_id: USER_ID,
+      status: "active",
+      plan_key: "plus",
+      current_period_start: "2026-08-01T00:00:00.000Z",
+      current_period_end: "2026-09-01T00:00:00.000Z",
+      billing_interval: "monthly",
+      currency: "usd",
+      cancel_at_period_end: false,
+      canceled_at: null,
+      trial_end: null,
+      synchronized_at: "2026-08-01T00:00:00.000Z",
+    } satisfies SubscriptionProjectionRow;
+    const lifetime = {
+      ...recurring,
+      id: "d2000000-0000-4000-8000-000000000002",
+      current_period_start: null,
+      current_period_end: null,
+      billing_interval: "lifetime",
+    } satisfies SubscriptionProjectionRow;
+
+    expect(billingStatusFromRows([recurring, lifetime], true)).toMatchObject({
+      isPlus: true,
+      interval: "lifetime",
+      currentPeriodEnd: null,
+    });
+  });
+
   it("rejects ambiguous multi-item subscription shapes", () => {
     const invalid = subscription("active");
     invalid.items.data.push(invalid.items.data[0]);
     expect(() =>
       subscriptionProjection(
         invalid,
-        "c1000000-0000-4000-8000-000000000001",
+        USER_ID,
         CONFIGURATION,
       ),
     ).toThrow("Stripe subscription shape unavailable.");

@@ -1,4 +1,4 @@
-export const STRIPE_BILLING_CONTRACT = "biblequest_stripe_test_billing_v2";
+export const STRIPE_BILLING_CONTRACT = "biblequest_stripe_test_billing_v3";
 export const MAX_BILLING_REQUEST_BYTES = 8 * 1024;
 
 export const BILLING_INTERVALS = ["monthly", "annual", "lifetime"] as const;

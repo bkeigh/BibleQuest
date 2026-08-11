@@ -10,9 +10,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StripeBillingConfiguration } from "./config.server";
 import { stripeObjectId } from "./stripe-object.server";
 import {
+  hasProjectedLifetimePayment,
+  synchronizeCurrentSubscription,
   synchronizeLifetimeCharge,
   synchronizeLifetimeSession,
-  synchronizeSubscription,
+  withStripeProjectionLease,
+  type StripeDisputeSnapshot,
 } from "./records.server";
 import {
   synchronizeSupportDispute,
@@ -34,6 +37,7 @@ const HANDLED_SUBSCRIPTION_EVENTS = new Set([
 ]);
 const HANDLED_INVOICE_EVENTS = new Set([
   "invoice.paid",
+  "invoice.payment_succeeded",
   "invoice.payment_failed",
   "invoice.payment_action_required",
   "invoice.finalization_failed",
@@ -53,6 +57,8 @@ const HANDLED_DISPUTE_EVENTS = new Set([
   "charge.dispute.created",
   "charge.dispute.updated",
   "charge.dispute.closed",
+  "charge.dispute.funds_withdrawn",
+  "charge.dispute.funds_reinstated",
 ]);
 
 export class StripeWebhookProcessingError extends Error {
@@ -68,19 +74,6 @@ function invoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
   return stripeObjectId(invoice.parent?.subscription_details?.subscription ?? null);
 }
 
-async function currentSubscription(
-  stripe: Stripe,
-  subscriptionId: string,
-): Promise<Stripe.Subscription> {
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
-    expand: ["items.data.price.product", "latest_invoice"],
-  });
-  if ("deleted" in subscription && subscription.deleted) {
-    throw new StripeWebhookProcessingError("invalid");
-  }
-  return subscription;
-}
-
 async function reconcileSubscriptionId(
   admin: SupabaseClient,
   stripe: Stripe,
@@ -89,8 +82,22 @@ async function reconcileSubscriptionId(
   subscriptionId: string | null,
 ): Promise<void> {
   if (!subscriptionId) return;
-  const subscription = await currentSubscription(stripe, subscriptionId);
-  await synchronizeSubscription(admin, subscription, configuration, event);
+  await synchronizeCurrentSubscription(
+    admin,
+    stripe,
+    subscriptionId,
+    configuration,
+    event,
+  );
+}
+
+/** Retrieves a bounded complete dispute set for one current Charge. */
+async function currentDisputes(
+  stripe: Stripe,
+  chargeId: string,
+): Promise<StripeDisputeSnapshot> {
+  const disputes = await stripe.disputes.list({ charge: chargeId, limit: 100 });
+  return { data: disputes.data, hasMore: disputes.has_more };
 }
 
 async function storeBillingSignal(
@@ -167,12 +174,20 @@ async function processInvoice(
 ): Promise<void> {
   const eventInvoice = event.data.object as Stripe.Invoice;
   const invoice = await stripe.invoices.retrieve(eventInvoice.id);
+  if (invoice.livemode !== configuration.livemode) {
+    throw new StripeWebhookProcessingError("invalid");
+  }
   const subscriptionId = invoiceSubscriptionId(invoice);
-  if (event.type === "invoice.paid" || event.type === "invoice.payment_failed") {
+  if (
+    event.type === "invoice.paid" ||
+    event.type === "invoice.payment_succeeded" ||
+    event.type === "invoice.payment_failed"
+  ) {
     await storeBillingSignal(admin, {
       event_id: event.id,
       signal_kind:
-        event.type === "invoice.paid"
+        event.type === "invoice.paid" ||
+        event.type === "invoice.payment_succeeded"
           ? "invoice_paid"
           : "invoice_payment_failed",
       stripe_object_id: invoice.id,
@@ -180,7 +195,8 @@ async function processInvoice(
       stripe_subscription_id: subscriptionId,
       status: invoice.status,
       amount:
-        event.type === "invoice.paid"
+        event.type === "invoice.paid" ||
+        event.type === "invoice.payment_succeeded"
           ? invoice.amount_paid
           : invoice.amount_due,
       currency: invoice.currency,
@@ -206,6 +222,9 @@ async function processCheckout(
   const session = await stripe.checkout.sessions.retrieve(eventSession.id, {
     expand: ["line_items.data.price.product"],
   });
+  if (session.livemode !== configuration.livemode) {
+    throw new StripeWebhookProcessingError("invalid");
+  }
   if (
     session.mode === "payment" &&
     session.metadata?.purpose === "biblequest_support"
@@ -243,20 +262,58 @@ async function processCheckout(
     session.metadata?.purpose === "biblequest_plus" &&
     session.metadata?.billing_interval === "lifetime"
   ) {
+    // Expired, failed, and delayed unpaid sessions are terminal no-grant
+    // states; a later async success event performs the authoritative grant.
+    if (session.status !== "complete" || session.payment_status !== "paid") {
+      return;
+    }
     const paymentIntentId = stripeObjectId(session.payment_intent);
     if (!paymentIntentId) {
       throw new StripeWebhookProcessingError("invalid");
     }
-    const paymentIntent = await stripe.paymentIntents.retrieve(
-      paymentIntentId,
-      { expand: ["latest_charge"] },
-    );
-    await synchronizeLifetimeSession(
+    await withStripeProjectionLease(
       admin,
-      session,
-      paymentIntent,
-      configuration,
-      event,
+      `lifetime:${paymentIntentId}`,
+      async (claimToken) => {
+        // Re-read every fulfillment object after acquiring the canonical
+        // PaymentIntent lease so concurrent adjustment events cannot race it.
+        const currentSession = await stripe.checkout.sessions.retrieve(
+          eventSession.id,
+          { expand: ["line_items.data.price.product"] },
+        );
+        if (
+          currentSession.status !== "complete" ||
+          currentSession.payment_status !== "paid"
+        ) {
+          return;
+        }
+        if (
+          currentSession.livemode !== configuration.livemode ||
+          stripeObjectId(currentSession.payment_intent) !== paymentIntentId
+        ) {
+          throw new StripeWebhookProcessingError("invalid");
+        }
+        const paymentIntent = await stripe.paymentIntents.retrieve(
+          paymentIntentId,
+          { expand: ["latest_charge"] },
+        );
+        const charge =
+          paymentIntent.latest_charge &&
+          typeof paymentIntent.latest_charge !== "string"
+            ? paymentIntent.latest_charge
+            : null;
+        if (!charge) throw new StripeWebhookProcessingError("invalid");
+        const disputes = await currentDisputes(stripe, charge.id);
+        await synchronizeLifetimeSession(
+          admin,
+          currentSession,
+          paymentIntent,
+          disputes,
+          configuration,
+          event,
+          claimToken,
+        );
+      },
     );
     return;
   }
@@ -284,13 +341,36 @@ async function processRefund(
   let currentCharge: Stripe.Charge | null = null;
   if (chargeId) {
     currentCharge = await stripe.charges.retrieve(chargeId);
+    if (currentCharge.livemode !== configuration.livemode) {
+      throw new StripeWebhookProcessingError("invalid");
+    }
     customerId = stripeObjectId(currentCharge.customer);
+    const paymentIntentId = stripeObjectId(currentCharge.payment_intent);
+    let lifetimePayment = false;
+    if (paymentIntentId) {
+      await withStripeProjectionLease(
+        admin,
+        `lifetime:${paymentIntentId}`,
+        async (claimToken) => {
+          const lockedCharge = await stripe.charges.retrieve(chargeId);
+          if (lockedCharge.livemode !== configuration.livemode) {
+            throw new StripeWebhookProcessingError("invalid");
+          }
+          if (await hasProjectedLifetimePayment(admin, paymentIntentId)) {
+            const disputes = await currentDisputes(stripe, lockedCharge.id);
+            lifetimePayment = await synchronizeLifetimeCharge(
+              admin,
+              lockedCharge,
+              event,
+              disputes,
+              claimToken,
+            );
+          }
+          currentCharge = lockedCharge;
+        },
+      );
+    }
     // A known one-time payment has no invoice, so skip the unrelated lookup.
-    const lifetimePayment = await synchronizeLifetimeCharge(
-      admin,
-      currentCharge,
-      event,
-    );
     const arcadePayment = lifetimePayment
       ? false
       : await synchronizeArcadeCharge(admin, currentCharge, event);
@@ -347,20 +427,45 @@ async function processDispute(
 ): Promise<void> {
   const eventDispute = event.data.object as Stripe.Dispute;
   const dispute = await stripe.disputes.retrieve(eventDispute.id);
+  if (dispute.livemode !== configuration.livemode) {
+    throw new StripeWebhookProcessingError("invalid");
+  }
   const chargeId = stripeObjectId(dispute.charge);
   let customerId: string | null = null;
   let subscriptionId: string | null = null;
   let currentCharge: Stripe.Charge | null = null;
   if (chargeId) {
     currentCharge = await stripe.charges.retrieve(chargeId);
+    if (currentCharge.livemode !== configuration.livemode) {
+      throw new StripeWebhookProcessingError("invalid");
+    }
     customerId = stripeObjectId(currentCharge.customer);
+    const paymentIntentId = stripeObjectId(currentCharge.payment_intent);
+    let lifetimePayment = false;
+    if (paymentIntentId) {
+      await withStripeProjectionLease(
+        admin,
+        `lifetime:${paymentIntentId}`,
+        async (claimToken) => {
+          const lockedCharge = await stripe.charges.retrieve(chargeId);
+          if (lockedCharge.livemode !== configuration.livemode) {
+            throw new StripeWebhookProcessingError("invalid");
+          }
+          if (await hasProjectedLifetimePayment(admin, paymentIntentId)) {
+            const disputes = await currentDisputes(stripe, lockedCharge.id);
+            lifetimePayment = await synchronizeLifetimeCharge(
+              admin,
+              lockedCharge,
+              event,
+              disputes,
+              claimToken,
+            );
+          }
+          currentCharge = lockedCharge;
+        },
+      );
+    }
     // A known one-time payment has no invoice, so skip the unrelated lookup.
-    const lifetimePayment = await synchronizeLifetimeCharge(
-      admin,
-      currentCharge,
-      event,
-      dispute,
-    );
     const arcadePayment = lifetimePayment
       ? false
       : await synchronizeArcadeCharge(
@@ -461,6 +566,7 @@ export async function processStripeWebhookEvent(
       error instanceof Error &&
       (
         error.name === "StripeSupportProjectionError" ||
+        error.name === "StripeSubscriptionProjectionError" ||
         error.name === "StripeLifetimeProjectionError" ||
         error.name === "StripeArcadeProjectionError"
       )
@@ -474,6 +580,14 @@ export async function processStripeWebhookEvent(
       typeof error.type === "string" &&
       error.type.startsWith("Stripe")
     ) {
+      if (
+        error.type === "StripeInvalidRequestError" &&
+        (!("statusCode" in error) ||
+          typeof error.statusCode !== "number" ||
+          error.statusCode < 500)
+      ) {
+        throw new StripeWebhookProcessingError("invalid");
+      }
       throw new StripeWebhookProcessingError("provider");
     }
     throw new StripeWebhookProcessingError("database");

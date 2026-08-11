@@ -4,9 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/billing/records.server", () => ({
-  synchronizeSubscription: vi.fn(),
+  hasProjectedLifetimePayment: vi.fn(),
+  synchronizeCurrentSubscription: vi.fn(),
   synchronizeLifetimeSession: vi.fn(),
   synchronizeLifetimeCharge: vi.fn(),
+  withStripeProjectionLease: vi.fn(),
 }));
 vi.mock("@/lib/support/records.server", () => ({
   synchronizeSupportSession: vi.fn(),
@@ -19,9 +21,11 @@ vi.mock("@/lib/games/arcade/records.server", () => ({
 }));
 
 import {
+  hasProjectedLifetimePayment,
+  synchronizeCurrentSubscription,
   synchronizeLifetimeCharge,
   synchronizeLifetimeSession,
-  synchronizeSubscription,
+  withStripeProjectionLease,
 } from "@/lib/billing/records.server";
 import {
   synchronizeSupportDispute,
@@ -54,6 +58,7 @@ const CONFIGURATION = {
   purchasesEnabled: true,
   supportEnabled: false,
 } satisfies StripeBillingConfiguration;
+const CLAIM_TOKEN = "d1000000-0000-4000-8000-000000000099";
 
 /** Creates only the fixed envelope fields used by the webhook dispatcher. */
 function event(type: string, object: object): Stripe.Event {
@@ -68,9 +73,15 @@ function event(type: string, object: object): Stripe.Event {
 
 describe("order-tolerant Stripe webhook processing", () => {
   beforeEach(() => {
-    vi.mocked(synchronizeSubscription).mockReset();
+    vi.mocked(hasProjectedLifetimePayment).mockReset();
+    vi.mocked(hasProjectedLifetimePayment).mockResolvedValue(false);
+    vi.mocked(synchronizeCurrentSubscription).mockReset();
     vi.mocked(synchronizeLifetimeSession).mockReset();
     vi.mocked(synchronizeLifetimeCharge).mockReset();
+    vi.mocked(withStripeProjectionLease).mockReset();
+    vi.mocked(withStripeProjectionLease).mockImplementation(
+      async (_admin, _key, work) => work(CLAIM_TOKEN),
+    );
     vi.mocked(synchronizeSupportSession).mockReset();
     vi.mocked(synchronizeSupportRefund).mockReset();
     vi.mocked(synchronizeSupportDispute).mockReset();
@@ -78,12 +89,8 @@ describe("order-tolerant Stripe webhook processing", () => {
     vi.mocked(synchronizeArcadeCharge).mockReset();
   });
 
-  it("rehydrates the current subscription instead of trusting event payload", async () => {
-    const current = { id: "sub_Current123", livemode: false };
-    const retrieve = vi.fn().mockResolvedValue(current);
-    const stripe = {
-      subscriptions: { retrieve },
-    } as unknown as Stripe;
+  it("leases and rehydrates the current subscription by provider ID", async () => {
+    const stripe = {} as Stripe;
     const admin = {} as SupabaseClient;
     const payload = { id: "sub_Current123", status: "active" };
 
@@ -95,25 +102,16 @@ describe("order-tolerant Stripe webhook processing", () => {
         event("customer.subscription.updated", payload),
       ),
     ).resolves.toBe("processed");
-    expect(retrieve).toHaveBeenCalledWith("sub_Current123", {
-      expand: ["items.data.price.product", "latest_invoice"],
-    });
-    expect(synchronizeSubscription).toHaveBeenCalledWith(
+    expect(synchronizeCurrentSubscription).toHaveBeenCalledWith(
       admin,
-      current,
+      stripe,
+      "sub_Current123",
       CONFIGURATION,
       expect.objectContaining({ id: "evt_TestEvent123" }),
-    );
-    expect(synchronizeSubscription).not.toHaveBeenCalledWith(
-      admin,
-      payload,
-      CONFIGURATION,
-      expect.anything(),
     );
   });
 
   it("rehydrates invoice context and stores only a bounded signal", async () => {
-    const current = { id: "sub_Current123", livemode: false };
     const invoice = {
       id: "in_TestInvoice123",
       customer: "cus_TestCustomer123",
@@ -124,6 +122,7 @@ describe("order-tolerant Stripe webhook processing", () => {
       amount_paid: 500,
       amount_due: 500,
       currency: "usd",
+      livemode: false,
     };
     const upsert = vi.fn().mockResolvedValue({ error: null });
     const admin = {
@@ -131,7 +130,6 @@ describe("order-tolerant Stripe webhook processing", () => {
     } as unknown as SupabaseClient;
     const stripe = {
       invoices: { retrieve: vi.fn().mockResolvedValue(invoice) },
-      subscriptions: { retrieve: vi.fn().mockResolvedValue(current) },
     } as unknown as Stripe;
 
     await processStripeWebhookEvent(
@@ -155,9 +153,10 @@ describe("order-tolerant Stripe webhook processing", () => {
       { onConflict: "event_id" },
     );
     expect(JSON.stringify(upsert.mock.calls)).not.toContain("private");
-    expect(synchronizeSubscription).toHaveBeenCalledWith(
+    expect(synchronizeCurrentSubscription).toHaveBeenCalledWith(
       admin,
-      current,
+      stripe,
+      "sub_Current123",
       CONFIGURATION,
       expect.anything(),
     );
@@ -184,6 +183,7 @@ describe("order-tolerant Stripe webhook processing", () => {
     const current = {
       id: "cs_test_SupportSession123",
       mode: "payment",
+      livemode: false,
       metadata: { purpose: "biblequest_support" },
     };
     const stripe = {
@@ -210,13 +210,16 @@ describe("order-tolerant Stripe webhook processing", () => {
       current,
       supportEvent,
     );
-    expect(synchronizeSubscription).not.toHaveBeenCalled();
+    expect(synchronizeCurrentSubscription).not.toHaveBeenCalled();
   });
 
   it("rehydrates and projects one-time lifetime Checkout events", async () => {
     const current = {
       id: "cs_test_LifetimeSession123",
       mode: "payment",
+      livemode: false,
+      status: "complete",
+      payment_status: "paid",
       payment_intent: "pi_LifetimeIntent123",
       metadata: {
         purpose: "biblequest_plus",
@@ -233,6 +236,9 @@ describe("order-tolerant Stripe webhook processing", () => {
       },
       paymentIntents: {
         retrieve: vi.fn().mockResolvedValue(paymentIntent),
+      },
+      disputes: {
+        list: vi.fn().mockResolvedValue({ data: [], has_more: false }),
       },
     } as unknown as Stripe;
     const admin = {} as SupabaseClient;
@@ -260,16 +266,56 @@ describe("order-tolerant Stripe webhook processing", () => {
       admin,
       current,
       paymentIntent,
+      { data: [], hasMore: false },
       CONFIGURATION,
       lifetimeEvent,
+      CLAIM_TOKEN,
     );
-    expect(synchronizeSubscription).not.toHaveBeenCalled();
+    expect(withStripeProjectionLease).toHaveBeenCalledWith(
+      admin,
+      "lifetime:pi_LifetimeIntent123",
+      expect.any(Function),
+    );
+    expect(synchronizeCurrentSubscription).not.toHaveBeenCalled();
+  });
+
+  it("acknowledges expired and unpaid lifetime sessions without fulfillment", async () => {
+    const current = {
+      id: "cs_test_UnpaidLifetime123",
+      mode: "payment",
+      livemode: false,
+      status: "expired",
+      payment_status: "unpaid",
+      payment_intent: null,
+      metadata: {
+        purpose: "biblequest_plus",
+        billing_interval: "lifetime",
+      },
+    };
+    const stripe = {
+      checkout: {
+        sessions: { retrieve: vi.fn().mockResolvedValue(current) },
+      },
+      paymentIntents: { retrieve: vi.fn() },
+    } as unknown as Stripe;
+
+    await expect(
+      processStripeWebhookEvent(
+        {} as SupabaseClient,
+        stripe,
+        CONFIGURATION,
+        event("checkout.session.expired", { id: current.id }),
+      ),
+    ).resolves.toBe("processed");
+    expect(stripe.paymentIntents.retrieve).not.toHaveBeenCalled();
+    expect(synchronizeLifetimeSession).not.toHaveBeenCalled();
   });
 
   it("rehydrates and projects a paid arcade Checkout event", async () => {
     const current = {
       id: "cs_test_ArcadeSession123",
       mode: "payment",
+      livemode: false,
       status: "complete",
       payment_status: "paid",
       payment_intent: "pi_ArcadeIntent123",
@@ -309,7 +355,7 @@ describe("order-tolerant Stripe webhook processing", () => {
     );
   });
 
-  it("projects one-time support refunds from the current Charge", async () => {
+  it("leases a refund before routing when no lifetime row exists", async () => {
     vi.mocked(synchronizeSupportRefund).mockResolvedValue(true);
     const refund = {
       id: "re_SupportRefund123",
@@ -317,11 +363,13 @@ describe("order-tolerant Stripe webhook processing", () => {
       status: "succeeded",
       amount: 1_000,
       currency: "usd",
+      livemode: false,
     };
     const charge = {
       id: "ch_SupportCharge123",
       payment_intent: "pi_SupportIntent123",
       customer: "cus_SupportCustomer123",
+      livemode: false,
     };
     const upsert = vi.fn().mockResolvedValue({ error: null });
     const admin = {
@@ -349,10 +397,19 @@ describe("order-tolerant Stripe webhook processing", () => {
       charge,
       refundEvent,
     );
+    expect(withStripeProjectionLease).toHaveBeenCalledWith(
+      admin,
+      "lifetime:pi_SupportIntent123",
+      expect.any(Function),
+    );
+    expect(hasProjectedLifetimePayment).toHaveBeenCalledWith(
+      admin,
+      "pi_SupportIntent123",
+    );
     expect(stripe.invoicePayments.list).not.toHaveBeenCalled();
   });
 
-  it("projects one-time support disputes from current provider objects", async () => {
+  it("leases a dispute before routing when no lifetime row exists", async () => {
     vi.mocked(synchronizeSupportDispute).mockResolvedValue(true);
     const dispute = {
       id: "dp_SupportDispute123",
@@ -360,11 +417,13 @@ describe("order-tolerant Stripe webhook processing", () => {
       status: "needs_response",
       amount: 1_000,
       currency: "usd",
+      livemode: false,
     };
     const charge = {
       id: "ch_SupportCharge123",
       payment_intent: "pi_SupportIntent123",
       customer: "cus_SupportCustomer123",
+      livemode: false,
     };
     const upsert = vi.fn().mockResolvedValue({ error: null });
     const admin = {
@@ -393,6 +452,11 @@ describe("order-tolerant Stripe webhook processing", () => {
       dispute,
       disputeEvent,
     );
+    expect(withStripeProjectionLease).toHaveBeenCalledWith(
+      admin,
+      "lifetime:pi_SupportIntent123",
+      expect.any(Function),
+    );
     expect(stripe.invoicePayments.list).not.toHaveBeenCalled();
   });
 
@@ -407,11 +471,13 @@ describe("order-tolerant Stripe webhook processing", () => {
       status: "needs_response",
       amount: 2_500,
       currency: "usd",
+      livemode: false,
     };
     const charge = {
       id: "ch_SupportChargeOutOfOrder123",
       payment_intent: "pi_SupportIntentOutOfOrder123",
       customer: "cus_SupportCustomerOutOfOrder123",
+      livemode: false,
     };
     const requestId = "d2000000-0000-4000-8000-000000000002";
     const upsert = vi.fn().mockResolvedValue({ error: null });
@@ -455,13 +521,11 @@ describe("order-tolerant Stripe webhook processing", () => {
   });
 
   it("categorizes provider failures without retaining provider details", async () => {
-    const stripe = {
-      subscriptions: {
-        retrieve: vi
-          .fn()
-          .mockRejectedValue({ type: "StripeAPIError", message: "private" }),
-      },
-    } as unknown as Stripe;
+    vi.mocked(synchronizeCurrentSubscription).mockRejectedValue({
+      type: "StripeAPIError",
+      message: "private",
+    });
+    const stripe = {} as Stripe;
 
     await expect(
       processStripeWebhookEvent(
@@ -488,6 +552,7 @@ describe("order-tolerant Stripe webhook processing", () => {
           retrieve: vi.fn().mockResolvedValue({
             id: "cs_test_SupportSession123",
             mode: "payment",
+            livemode: false,
             metadata: { purpose: "biblequest_support" },
           }),
         },

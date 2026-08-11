@@ -9,7 +9,7 @@ select plan(9);
 
 select is(
   public.stripe_billing_contract(),
-  '{"contract":"biblequest_stripe_test_billing_v2","ok":true}'::jsonb,
+  '{"contract":"biblequest_stripe_test_billing_v3","ok":true}'::jsonb,
   'the sealed billing contract includes lifetime Plus'
 );
 

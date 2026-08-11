@@ -44,6 +44,7 @@ const EXPECTED_MIGRATIONS = [
   "0035_fix_provider_rate_limit_claim_timestamp.sql",
   "0036_arcade_store_purchases.sql",
   "0037_native_account_beta_availability.sql",
+  "0038_stripe_projection_leases.sql",
 ];
 
 /** Hash a migration exactly as the release manifest does. */
