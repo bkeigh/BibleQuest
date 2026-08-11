@@ -5,9 +5,22 @@ import {
   type PlatformRuntime,
 } from "./runtime";
 import { isNativeTarget } from "./target";
-import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
+import {
+  ACCOUNT_SYNC_CONTAINED,
+  NATIVE_ACCOUNT_BETA_ENABLED,
+} from "@/lib/sync/containment";
+import {
+  ACCOUNT_DELETION_CLEANUP_HEADER,
+  ACCOUNT_DELETION_CLEANUP_HEADER_VALUE,
+  EXPECTED_ACCOUNT_USER_HEADER,
+  NATIVE_ACCOUNT_BETA_HEADER,
+  NATIVE_ACCOUNT_BETA_HEADER_VALUE,
+} from "@/lib/sync/native-beta-headers";
+import { NativeAccountBetaUnavailableError } from "@/lib/sync/native-beta-contract";
 
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /** Restricts client API requests to BibleQuest's internal API namespace. */
 export function validatedApiPath(path: string): string {
@@ -58,51 +71,121 @@ export function apiFetch(
   // the caller's own init reference.
   const url = buildApiUrl(path);
   if (!isNativeTarget()) return fetch(url, init);
-  return nativeApiFetch(url, init);
+  return nativePublicApiFetch(url, init);
 }
 
 /**
- * Native requests are cross-origin, so the cookie session never rides; the
- * account travels as a bearer token instead. Headers MERGE via the caller's
- * init — never set Content-Type here, because the avatar upload deliberately
- * omits it so the browser generates the multipart boundary.
+ * Sends a caller-captured account request. Native checks the live beta switch
+ * before reading Keychain, then binds the bearer to that exact subject. Web
+ * keeps cookie auth but receives the same expected-subject server boundary.
  */
-async function nativeApiFetch(
+export function authenticatedApiFetch(
+  expectedUserId: string,
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
+  if (!UUID.test(expectedUserId)) {
+    return Promise.reject(new NativeAccountBetaUnavailableError());
+  }
+  const url = buildApiUrl(path);
+  const headers = new Headers(init?.headers);
+  headers.set(EXPECTED_ACCOUNT_USER_HEADER, expectedUserId);
+  if (!isNativeTarget()) return fetch(url, { ...init, headers });
+  return nativeAuthenticatedApiFetch(url, expectedUserId, init, headers);
+}
+
+/**
+ * Carries only the explicit account-deletion avatar sweep while the live beta
+ * switch is off. The path, verb, body, cleanup marker, and subject are fixed;
+ * no other account request can use this exception.
+ */
+export function accountDeletionAvatarFetch(
+  expectedUserId: string,
+  signal?: AbortSignal,
+): Promise<Response> {
+  if (!UUID.test(expectedUserId)) {
+    return Promise.reject(new NativeAccountBetaUnavailableError());
+  }
+  const url = buildApiUrl("/api/profile/avatar");
+  const init: RequestInit = {
+    method: "DELETE",
+    cache: "no-store",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+      [EXPECTED_ACCOUNT_USER_HEADER]: expectedUserId,
+      [ACCOUNT_DELETION_CLEANUP_HEADER]:
+        ACCOUNT_DELETION_CLEANUP_HEADER_VALUE,
+    },
+    body: JSON.stringify({ allOwnedObjects: true }),
+    signal,
+  };
+  if (!isNativeTarget()) return fetch(url, init);
+  return nativeAuthenticatedApiFetch(
+    url,
+    expectedUserId,
+    init,
+    new Headers(init.headers),
+    true,
+  );
+}
+
+/**
+ * Native public requests never inspect Keychain or carry account markers.
+ * Removing reserved headers also prevents a future caller from accidentally
+ * turning the public helper into a stale-session transport.
+ */
+function nativePublicApiFetch(
   url: string,
   init?: RequestInit,
 ): Promise<Response> {
   const headers = new Headers(init?.headers);
-  if (!headers.has("authorization")) {
-    const token = await nativeSessionAccessToken();
-    if (token) headers.set("Authorization", `Bearer ${token}`);
+  for (const reserved of [
+    "authorization",
+    EXPECTED_ACCOUNT_USER_HEADER,
+    NATIVE_ACCOUNT_BETA_HEADER,
+    ACCOUNT_DELETION_CLEANUP_HEADER,
+  ]) {
+    headers.delete(reserved);
   }
   return fetch(url, { ...init, headers });
 }
 
-/**
- * Reads the current session token, or null for guests, misconfiguration, and
- * every failure — a request without a token simply answers 401 server-side.
- * The dynamic import keeps supabase-js out of web chunks that only route API
- * calls (chunking hygiene, not a security boundary: on web the guarantee is
- * the runtime no-op — isNativeTarget() is false, so this import never
- * executes; whether the minifier also drops the branch is minifier-dependent).
- */
-async function nativeSessionAccessToken(): Promise<string | null> {
-  // Guest-only releases must not inspect, refresh, or revive a stale native
-  // Supabase session merely because an older build left one in WebView storage.
-  if (ACCOUNT_SYNC_CONTAINED) return null;
-  try {
-    const { createClient, isSupabaseConfigured } = await import(
-      "@/lib/supabase/client"
-    );
-    if (!isSupabaseConfigured()) return null;
-    // getSession refreshes an expired access token before returning it.
-    const { data, error } = await createClient().auth.getSession();
-    if (error) return null;
-    return data.session?.access_token ?? null;
-  } catch {
-    return null;
+/** Attach one live, exact-user bearer after the anonymous availability probe. */
+async function nativeAuthenticatedApiFetch(
+  url: string,
+  expectedUserId: string,
+  init: RequestInit | undefined,
+  headers: Headers,
+  deletionOnly = false,
+): Promise<Response> {
+  if (ACCOUNT_SYNC_CONTAINED || !NATIVE_ACCOUNT_BETA_ENABLED) {
+    throw new NativeAccountBetaUnavailableError();
   }
+  if (!deletionOnly) {
+    const { requireNativeAccountBetaAvailability } = await import(
+      "@/lib/sync/availability"
+    );
+    await requireNativeAccountBetaAvailability();
+  }
+
+  const { createClient, isSupabaseConfigured } = await import(
+    "@/lib/supabase/client"
+  );
+  if (!isSupabaseConfigured()) throw new NativeAccountBetaUnavailableError();
+  const { data, error } = await createClient().auth.getSession();
+  const session = data.session;
+  if (
+    error ||
+    !session ||
+    session.user.id !== expectedUserId ||
+    !session.access_token
+  ) {
+    throw new NativeAccountBetaUnavailableError();
+  }
+  headers.set(NATIVE_ACCOUNT_BETA_HEADER, NATIVE_ACCOUNT_BETA_HEADER_VALUE);
+  headers.set("Authorization", `Bearer ${session.access_token}`);
+  return fetch(url, { ...init, credentials: "omit", headers });
 }
 
 /** Builds share-safe public links against the web page or the native hosted origin. */

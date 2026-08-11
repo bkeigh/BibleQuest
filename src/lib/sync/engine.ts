@@ -21,7 +21,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  createClient,
+  createSyncControlClient,
   createSyncClient,
   isSupabaseConfigured,
 } from "@/lib/supabase/client";
@@ -36,12 +36,14 @@ import { useSyncStatus } from "./status";
 import {
   clearInitialSyncPending,
   clearLocalJourneyClaimPending,
-  getLastSyncedUserId,
-  localDataBelongsToOtherUser,
+  initialSyncIsPending,
   localJourneyClaimIsPending,
   markInitialSyncPending,
+  readLocalJourneyOwner,
   setLastSyncedUserId,
 } from "./last-user";
+import { sealJourneyBackupOwner } from "@/lib/native/journey-backup";
+import { accountLifecycleIsActive } from "@/lib/auth/account-lifecycle";
 import { track } from "@/lib/analytics/events";
 import {
   classifyOperationalError,
@@ -127,7 +129,8 @@ import {
   readAccountSyncGeneration,
   type AccountDeletion,
 } from "./generation-boundary";
-import { DeadlineError, withDeadline } from "@/lib/async/deadline";
+import { DeadlineError } from "@/lib/async/deadline";
+import { withSyncRequestDeadline } from "./request";
 
 type SyncedField =
   | "profile"
@@ -166,7 +169,6 @@ const SYNCED_FIELDS: SyncedField[] = [
 
 const PUSH_DEBOUNCE_MS = 2_500;
 const RETRY_MS = 30_000;
-export const INITIAL_SYNC_DEADLINE_MS = 15_000;
 
 /** Ignores media-only metadata that has its own authenticated RPC boundary. */
 export function syncedProfileChanged(
@@ -298,18 +300,24 @@ export function stopSync() {
 
 export async function startSync(userId: string, retryingFailure = false) {
   // Fail closed before creating a Supabase client or changing local ownership.
+  if (accountLifecycleIsActive()) return;
   if (!accountSyncAvailable(isSupabaseConfigured())) {
     stopSync();
     return;
   }
   if (currentUserId === userId) return;
-  const lastSyncedUserId = getLastSyncedUserId();
+  const localOwner = readLocalJourneyOwner();
+  const lastSyncedUserId =
+    localOwner.status === "owned" ? localOwner.userId : null;
   // The device still holds a journey last synced by a DIFFERENT account.
   // Refuse to sync — merging here would copy that user's private prayers and
   // reflections into this account's rows. SyncManager detects the same
   // condition and asks the person to either start fresh or claim the data;
   // resolution calls setLastSyncedUserId and retries.
-  if (localDataBelongsToOtherUser(userId)) {
+  if (
+    localOwner.status === "unavailable" ||
+    (localOwner.status === "owned" && localOwner.userId !== userId)
+  ) {
     // Also tear down any previous account subscriber. Refusing the new merge
     // is not enough if an older engine could keep writing through the newly
     // changed auth session while the privacy hand-off is unanswered.
@@ -317,7 +325,12 @@ export async function startSync(userId: string, retryingFailure = false) {
     return;
   }
   if (lastSyncedUserId !== userId) {
-    markInitialSyncPending(userId);
+    try {
+      markInitialSyncPending(userId);
+    } catch {
+      stopSync();
+      return;
+    }
   }
   const previousStatus = useSyncStatus.getState();
   const wasError =
@@ -361,10 +374,13 @@ export async function startSync(userId: string, retryingFailure = false) {
   });
 
   try {
-    await withDeadline(
-      initialSync(createClient(), userId, isCurrent),
-      INITIAL_SYNC_DEADLINE_MS,
-      "Initial account sync",
+    // Each remote request is bounded independently; large local merges and
+    // paginated restores are allowed to take as long as their real work needs.
+    await initialSync(
+      createSyncControlClient(userId),
+      userId,
+      lastSyncedUserId,
+      isCurrent,
     );
     if (!isCurrent()) return; // stopped/restarted mid-sync
     clearInitialSyncPending(userId);
@@ -533,7 +549,7 @@ async function runPush() {
   const wasError = useSyncStatus.getState().state === "error";
   setStatus("syncing", { initialSyncComplete: true });
   try {
-    const controlClient = createClient();
+    const controlClient = createSyncControlClient(userId);
     const state = useQuestOS.getState();
     const tombstones = state.tombstones;
     // A purge empties the whole account copy, so the push that follows must
@@ -607,6 +623,10 @@ async function runPush() {
     // settings drops the marker, but anything written afterwards while still
     // signed in lands in this account's rows and belongs to it.
     setLastSyncedUserId(userId);
+    if (!(await sealJourneyBackupOwner(userId))) {
+      throw new Error("The protected journey owner could not be sealed.");
+    }
+    if (!isCurrent()) return;
     if (currentUserId === userId) {
       setStatus("idle", { syncedNow: true, initialSyncComplete: true });
       reportClientSignal({
@@ -675,6 +695,7 @@ async function runPush() {
 async function initialSync(
   controlClient: SupabaseClient,
   userId: string,
+  previousOwner: string | null,
   isCurrent: () => boolean
 ) {
   // Fail closed before touching user-owned tables when a deployment is paired
@@ -682,7 +703,6 @@ async function initialSync(
   await assertAccountSyncContracts(controlClient);
   if (!isCurrent()) return;
   const storedGeneration = getAccountSyncGeneration(userId);
-  const previousOwner = getLastSyncedUserId();
   const observedGeneration = await readAccountSyncGeneration(
     controlClient,
     userId,
@@ -696,12 +716,20 @@ async function initialSync(
       storedGeneration === observedGeneration &&
       !accountSyncResetRequired(userId),
   );
+  // Owner is stamped immediately before the first import. If iOS terminates in
+  // that crash window, the pending marker proves this is the interrupted guest
+  // adoption rather than an older same-owner journey with a lost generation.
+  const interruptedInitialAdoption =
+    storedGeneration === null &&
+    previousOwner === userId &&
+    initialSyncIsPending(userId);
   let requiresServerReset =
     accountSyncResetRequired(userId) ||
     (storedGeneration !== null && storedGeneration !== observedGeneration) ||
     (storedGeneration === null &&
       previousOwner === userId &&
-      !localJourneyClaimIsPending(userId));
+      !localJourneyClaimIsPending(userId) &&
+      !interruptedInitialAdoption);
 
   // Resolve destructive intent before the pull so condemned rows can never
   // enter the merge. A successful whole-account purge intentionally makes
@@ -774,7 +802,8 @@ async function initialSync(
     // same-owner v4 upgrade remain server-authoritative when no CAS baseline
     // exists, so default local settings cannot replace an account copy.
     const firstGuestAdoption =
-      previousOwner === null && Boolean(local.profile?.onboardingCompleted);
+      (previousOwner === null || interruptedInitialAdoption) &&
+      Boolean(local.profile?.onboardingCompleted);
     const existingOnboardedAccount = pulled.mutableRows.profile.some(
       (row) => row.onboarding_completed === true,
     );
@@ -814,6 +843,9 @@ async function initialSync(
     assignments: dailyAssignments,
   });
 
+  // Stamp the owner before applying account data. A failed durable write must
+  // never leave an account journey looking like adoptable guest data.
+  setLastSyncedUserId(userId);
   applyingRemote = true;
   try {
     useQuestOS.getState().importData(merged);
@@ -822,9 +854,10 @@ async function initialSync(
   }
   setAccountSyncGeneration(userId, propagated.generation);
   clearAccountSyncResetRequired(userId);
-  // From this moment the local store holds this account's (merged) journey —
-  // record the owner even if the pushes below fail and retry later.
-  setLastSyncedUserId(userId);
+  if (!(await sealJourneyBackupOwner(userId))) {
+    throw new Error("The protected journey owner could not be sealed.");
+  }
+  if (!isCurrent()) return;
 
   // importData repairs legacy ledgers; push that normalized store snapshot so
   // its stable Journey sources survive deletion and the next device restore.
@@ -952,6 +985,21 @@ interface PaginatedPullResult {
 
 const ACCOUNT_PULL_PAGE_SIZE = 1_000;
 const ACCOUNT_PULL_MAX_PAGES = 100;
+const ACCOUNT_PULL_MAX_ROWS: Readonly<Record<string, number>> = {
+  user_daily_quest_days: 5_000,
+  user_daily_quests: 20_000,
+  user_quests: 5_000,
+  quest_completions: 25_000,
+  prayers: 10_000,
+  reflections: 10_000,
+  verse_bookmarks: 10_000,
+  chapters_read: 2_000,
+  user_recent_verses: 100,
+  user_guided_movements: 20_000,
+  journey_events: 50_000,
+  growth_events: 50_000,
+  user_milestones: 1_000,
+};
 
 /**
  * Read a complete account collection without trusting PostgREST's 1,000-row
@@ -966,6 +1014,10 @@ async function pullAccountRows(
   orders: readonly PullOrder[],
   userId?: string,
 ): Promise<PaginatedPullResult> {
+  const maxRows = ACCOUNT_PULL_MAX_ROWS[table];
+  if (!maxRows) {
+    throw new Error(`Account pull limit is missing for ${table}.`);
+  }
   const rows: Record<string, unknown>[] = [];
   let start = 0;
   for (let page = 0; page < ACCOUNT_PULL_MAX_PAGES; page += 1) {
@@ -976,9 +1028,9 @@ async function pullAccountRows(
         ascending: order.ascending ?? true,
       });
     }
-    const response = await query.range(
-      start,
-      start + ACCOUNT_PULL_PAGE_SIZE - 1,
+    const response = await withSyncRequestDeadline(
+      query.range(start, start + ACCOUNT_PULL_PAGE_SIZE - 1),
+      `Account ${table} pull`,
     );
     if (response.error) return { data: null, error: response.error };
     const pageRows = (response.data ?? []) as unknown as Record<
@@ -989,6 +1041,9 @@ async function pullAccountRows(
       return { data: rows, error: null };
     }
     rows.push(...pageRows);
+    if (rows.length > maxRows) {
+      throw new Error(`Account pull exceeded the safe row limit for ${table}.`);
+    }
     // Advance by what the server actually returned because a project-level
     // max_rows setting may be lower than the requested 1,000-row range.
     start += pageRows.length;
@@ -1098,17 +1153,26 @@ async function pullAll(
     growthRes,
     milestonesRes,
   ] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
-    supabase
-      .from("user_settings")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle(),
-    supabase
-      .from("notification_preferences")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle(),
+    withSyncRequestDeadline(
+      supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+      "Account profile pull",
+    ),
+    withSyncRequestDeadline(
+      supabase
+        .from("user_settings")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle(),
+      "Account settings pull",
+    ),
+    withSyncRequestDeadline(
+      supabase
+        .from("notification_preferences")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle(),
+      "Account notification preferences pull",
+    ),
     pullAccountRows(
       supabase,
       "user_daily_quests",
@@ -1151,11 +1215,14 @@ async function pullAll(
       [{ column: "created_at" }, { column: "id" }],
       userId,
     ),
-    supabase
-      .from("reading_progress")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle(),
+    withSyncRequestDeadline(
+      supabase
+        .from("reading_progress")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle(),
+      "Account reading position pull",
+    ),
     pullAccountRows(
       supabase,
       "chapters_read",
@@ -2059,9 +2126,23 @@ async function pushFields(
   isCurrent: () => boolean,
 ) {
   const jobs: Array<() => Promise<void>> = [];
-  const run = async (p: PromiseLike<{ error: unknown }>) => {
-    const { error } = await p;
+  const run = async (
+    request: PromiseLike<{ error: unknown }>,
+    operation: string,
+  ) => {
+    const { error } = await withSyncRequestDeadline(request, operation);
     if (error) throw error;
+  };
+  const directBatched = async <Row>(
+    rows: readonly Row[],
+    operation: string,
+    write: (batch: readonly Row[]) => PromiseLike<{ error: unknown }>,
+  ) => {
+    for (let index = 0; index < rows.length; index += 200) {
+      if (!isCurrent()) return;
+      await run(write(rows.slice(index, index + 200)), operation);
+      if (!isCurrent()) return;
+    }
   };
   const guarded = async <Row extends object>(
     table: MutableAccountTable,
@@ -2077,7 +2158,9 @@ async function pushFields(
         table,
         rows.slice(index, index + 200),
         mutableRevisionContext,
+        isCurrent,
       );
+      if (!isCurrent()) return;
       stale += result.stale;
     }
     if (stale) throw new MutableAccountSyncConflictError(stale);
@@ -2102,6 +2185,7 @@ async function pushFields(
           dailyQuestSyncContext,
           generation,
           false,
+          isCurrent,
         );
         if (!Object.keys(result.conflicts).length) return;
 
@@ -2129,12 +2213,14 @@ async function pushFields(
     }
   }
   if (fields.has("completions") && snap.completions.length) {
+    const rows = snap.completions.map((completion) =>
+      completionToRow(uid, completion),
+    );
     jobs.push(
-      () => run(
-        supabase
-          .from("quest_completions")
-          .upsert(snap.completions.map((c) => completionToRow(uid, c)))
-      )
+      () =>
+        directBatched(rows, "Quest completion sync write", (batch) =>
+          supabase.from("quest_completions").upsert(batch),
+        ),
     );
   }
   if (fields.has("prayers") && snap.prayers.length) {
@@ -2152,33 +2238,45 @@ async function pushFields(
   }
   if (fields.has("journeyEvents") && snap.journeyEvents.length) {
     // Append-only table (no UPDATE policy): insert new rows, skip existing.
+    const rows = snap.journeyEvents.map((event) =>
+      journeyEventToRow(uid, event),
+    );
     jobs.push(
-      () => run(
-        supabase.from("journey_events").upsert(
-          snap.journeyEvents.map((e) => journeyEventToRow(uid, e)),
-          { onConflict: "id", ignoreDuplicates: true }
-        )
-      )
+      () =>
+        directBatched(rows, "Journey event sync write", (batch) =>
+          supabase.from("journey_events").upsert(batch, {
+            onConflict: "id",
+            ignoreDuplicates: true,
+          }),
+        ),
     );
   }
   if (fields.has("growthEvents") && snap.growthEvents.length) {
+    const rows = snap.growthEvents.map((event) =>
+      growthEventToRow(uid, event),
+    );
     jobs.push(
-      () => run(
-        supabase.from("growth_events").upsert(
-          snap.growthEvents.map((e) => growthEventToRow(uid, e)),
-          { onConflict: "id", ignoreDuplicates: true }
-        )
-      )
+      () =>
+        directBatched(rows, "Growth event sync write", (batch) =>
+          supabase.from("growth_events").upsert(batch, {
+            onConflict: "id",
+            ignoreDuplicates: true,
+          }),
+        ),
     );
   }
   if (fields.has("earnedMilestones") && snap.earnedMilestones.length) {
+    const rows = snap.earnedMilestones.map((milestone) =>
+      milestoneToRow(uid, milestone),
+    );
     jobs.push(
-      () => run(
-        supabase.from("user_milestones").upsert(
-          snap.earnedMilestones.map((m) => milestoneToRow(uid, m)),
-          { onConflict: "user_id,milestone_key", ignoreDuplicates: true }
-        )
-      )
+      () =>
+        directBatched(rows, "Milestone sync write", (batch) =>
+          supabase.from("user_milestones").upsert(batch, {
+            onConflict: "user_id,milestone_key",
+            ignoreDuplicates: true,
+          }),
+        ),
     );
   }
   if (fields.has("bookmarks") && snap.bookmarks.length) {
@@ -2196,13 +2294,17 @@ async function pushFields(
     );
   }
   if (fields.has("chaptersRead") && snap.chaptersRead.length) {
+    const rows = snap.chaptersRead.map((chapter) =>
+      chapterReadToRow(uid, chapter),
+    );
     jobs.push(
-      () => run(
-        supabase.from("chapters_read").upsert(
-          snap.chaptersRead.map((c) => chapterReadToRow(uid, c)),
-          { onConflict: "user_id,book_slug,chapter", ignoreDuplicates: true }
-        )
-      )
+      () =>
+        directBatched(rows, "Chapter progress sync write", (batch) =>
+          supabase.from("chapters_read").upsert(batch, {
+            onConflict: "user_id,book_slug,chapter",
+            ignoreDuplicates: true,
+          }),
+        ),
     );
   }
   if (fields.has("recentVerses") && (snap.recentVerses?.length ?? 0) > 0) {
@@ -2221,8 +2323,8 @@ async function pushFields(
     if (rows.length) {
       jobs.push(
         () =>
-          run(
-            supabase.from("user_guided_movements").upsert(rows, {
+          directBatched(rows, "Guided progress sync write", (batch) =>
+            supabase.from("user_guided_movements").upsert(batch, {
               onConflict: "user_id,session_key,movement_key",
               ignoreDuplicates: true,
             }),

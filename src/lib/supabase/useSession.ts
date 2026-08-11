@@ -5,10 +5,15 @@
  * loading, and user state consistently while deduplicating sign-in analytics
  * across the several mounted consumers and open browser tabs.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
-import { createClient, isSupabaseConfigured } from "./client";
+import {
+  createClient,
+  isSupabaseConfigured,
+  resumeExistingNativeAuthClient,
+  suspendExistingNativeAuthClient,
+} from "./client";
 import { track } from "@/lib/analytics/events";
 import {
   classifyOperationalError,
@@ -19,12 +24,20 @@ import {
   consumeAuthCompletionSignal,
 } from "@/lib/auth/completion-signal";
 import { accountSyncAvailable } from "@/lib/sync/containment";
+import { useAccountAvailability } from "@/lib/sync/availability";
 import { withDeadline } from "@/lib/async/deadline";
 import {
   authEventRequiresUserVerification,
   decideSessionVerification,
   observedSessionBoundary,
 } from "./session-verification";
+import { purgeDeletedAccountDeviceData } from "@/lib/auth/device-account-cleanup";
+import {
+  accountLifecycleIsActive,
+  accountLifecycleSnapshot,
+  subscribeAccountLifecycle,
+} from "@/lib/auth/account-lifecycle";
+import { isNativeTarget } from "@/lib/platform/target";
 
 // One funnel event per real sign-in — not per mounted hook instance
 // (several components subscribe at once) and not per open tab (supabase
@@ -126,15 +139,38 @@ function trackCompletedSignIn(userId: string) {
  * returns a stable signed-out state so guest mode renders normally.
  */
 export function useSession(): SessionState {
-  // Guest-only containment suppresses auth enrollment and session-driven sync.
-  const configured = accountSyncAvailable(isSupabaseConfigured());
+  // Native beta availability is checked anonymously before Keychain auth starts.
+  const availability = useAccountAvailability();
+  const configured = availability.available;
+  const lifecycleRevision = useSyncExternalStore(
+    subscribeAccountLifecycle,
+    accountLifecycleSnapshot,
+    accountLifecycleSnapshot,
+  );
+  const lifecycleActive = accountLifecycleIsActive();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(configured);
+  const [sessionLoading, setSessionLoading] = useState(
+    accountSyncAvailable(isSupabaseConfigured()),
+  );
   const verifiedUserId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!configured) return;
+    if (!configured || lifecycleActive) {
+      verifiedUserId.current = null;
+      void suspendExistingNativeAuthClient();
+      let cancelled = false;
+      void Promise.resolve().then(() => {
+        if (cancelled) return;
+        setUser(null);
+        // Keep the next availability recovery provisional until Auth answers.
+        setSessionLoading(true);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+    void resumeExistingNativeAuthClient();
     const supabase = createClient();
     let active = true;
     let verificationRun = 0;
@@ -165,7 +201,7 @@ export function useSession(): SessionState {
             verifiedUserId.current = verifiedUser.id;
             if (completedSignIn) trackCompletedSignIn(verifiedUser.id);
             setUser(verifiedUser);
-            setLoading(false);
+            setSessionLoading(false);
             return;
           }
 
@@ -178,13 +214,25 @@ export function useSession(): SessionState {
             });
           }
           if (
+            decision === "purge-deleted-account"
+          ) {
+            verifiedUserId.current = null;
+            setUser(null);
+            setSessionLoading(true);
+            const cleanup = purgeDeletedAccountDeviceData(session.user.id);
+            if (!isNativeTarget()) {
+              void cleanup.finally(() => clearInvalidLocalSession(supabase));
+            }
+            return;
+          }
+          if (
             decision === "clear-local-auth" ||
             (decision === "accept" &&
               verifiedUser?.id !== session.user.id)
           ) {
             verifiedUserId.current = null;
             setUser(null);
-            setLoading(false);
+            setSessionLoading(false);
             void clearInvalidLocalSession(supabase);
             return;
           }
@@ -195,7 +243,7 @@ export function useSession(): SessionState {
             verifiedUserId.current = null;
             setUser(null);
           }
-          setLoading(false);
+          setSessionLoading(false);
         })
         .catch((error: unknown) => {
           if (!active || run !== verificationRun) return;
@@ -205,7 +253,7 @@ export function useSession(): SessionState {
             outcome: "failure",
             category: classifyOperationalError(error),
           });
-          setLoading(false);
+          setSessionLoading(false);
         });
     };
 
@@ -221,7 +269,7 @@ export function useSession(): SessionState {
       if (boundary.isolateUntilVerified) {
         verifiedUserId.current = null;
         setUser(null);
-        setLoading(true);
+        setSessionLoading(true);
       }
       verifySession(
         session,
@@ -237,7 +285,7 @@ export function useSession(): SessionState {
         verifiedUserId.current = null;
         if (event === "SIGNED_OUT") signInTracked = false;
         setUser(null);
-        setLoading(false);
+        setSessionLoading(false);
         return;
       }
       if (!authEventRequiresUserVerification(event)) return;
@@ -263,7 +311,12 @@ export function useSession(): SessionState {
       window.removeEventListener("online", verifyAfterReconnect);
       sub.subscription.unsubscribe();
     };
-  }, [configured, pathname]);
+  }, [configured, lifecycleActive, lifecycleRevision, pathname]);
 
-  return { user, loading, configured };
+  return {
+    user: configured && !lifecycleActive ? user : null,
+    loading:
+      availability.loading || lifecycleActive || (configured && sessionLoading),
+    configured,
+  };
 }

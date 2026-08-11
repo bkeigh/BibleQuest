@@ -132,9 +132,10 @@ export default function RootLayout({
             {stagingLabel}
           </div>
         ) : null}
-        {children}
-        <JournalDraftJanitor />
-        <NativeJourneyGuard />
+        <NativeJourneyGuard>
+          {children}
+          <JournalDraftJanitor />
+        </NativeJourneyGuard>
         <ServiceWorkerRegistrar />
       </body>
     </html>

@@ -14,7 +14,7 @@
  * restored value. The healthy path never calls it, so normal launches keep
  * exactly the timing they had before.
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuestOS } from "@/lib/questos/store";
 import {
   restoreJourneyIfEvicted,
@@ -23,9 +23,14 @@ import {
 import { isNativeTarget } from "@/lib/platform/target";
 import { clearLegacyNativeAuthStorage } from "@/lib/supabase/native-auth-storage";
 
-export function NativeJourneyGuard() {
+export function NativeJourneyGuard({ children }: { children: React.ReactNode }) {
+  const nativeTarget = isNativeTarget();
+  const [status, setStatus] = useState<"pending" | "ready" | "failed">(
+    nativeTarget ? "pending" : "ready",
+  );
+
   useEffect(() => {
-    if (!isNativeTarget()) return;
+    if (!nativeTarget) return;
     clearLegacyNativeAuthStorage();
 
     let stopBackup: (() => void) | null = null;
@@ -44,25 +49,52 @@ export function NativeJourneyGuard() {
       }
     };
 
-    void restoreJourneyIfEvicted()
-      .then((outcome) => {
+    void (async () => {
+      try {
+        const outcome = await restoreJourneyIfEvicted();
         if (cancelled) return;
-        if (outcome === "restored") {
-          void useQuestOS.persist.rehydrate();
+        if (outcome === "failed") {
+          setStatus("failed");
+          return;
         }
+        if (outcome === "restored") {
+          // Child auth and sync effects may mount only after the restored owner
+          // and journey have both reached the live Zustand store.
+          await useQuestOS.persist.rehydrate();
+        }
+        if (cancelled) return;
         // Started only after the restore decision, so the mirror can never be
         // overwritten with the empty state we were about to repair.
         stopBackup = startJourneyBackup();
-      })
-      .finally(() => {
+        setStatus("ready");
+      } catch {
+        if (!cancelled) setStatus("failed");
+      } finally {
         void hideSplash();
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
       stopBackup?.();
     };
-  }, []);
+  }, [nativeTarget]);
 
-  return null;
+  if (status === "pending") return null;
+  if (status === "failed") {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-parchment px-6 text-charcoal">
+        <div className="max-w-sm text-center" role="alert">
+          <h1 className="font-display text-xl text-graphite">
+            Your journey could not be restored safely
+          </h1>
+          <p className="mt-3 text-sm leading-relaxed text-ash">
+            Nothing was synced or replaced. Close BibleQuest, then reopen it to
+            try again.
+          </p>
+        </div>
+      </main>
+    );
+  }
+  return children;
 }

@@ -19,8 +19,7 @@ import { useSession } from "@/lib/supabase/useSession";
 import type { PlanKey } from "@/lib/questos/types";
 import { apiFetch } from "@/lib/platform/api";
 import { purchaseAdapter } from "@/lib/platform/purchases";
-import { isNativeTarget } from "@/lib/platform/target";
-import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
+import { NATIVE_COMMERCE_CONTAINED } from "./containment";
 import type { BillingInterval, BillingPlan } from "./validation";
 
 export type PlusStatus =
@@ -174,14 +173,13 @@ export interface PlusState {
 /** Coordinates one account-bound, server-authoritative Plus projection. */
 function usePlusCoordinator(): PlusState {
   const session = useSession();
-  const nativeGuestOnly = isNativeTarget() && ACCOUNT_SYNC_CONTAINED;
   const subjectKey = session.loading
     ? "session:pending"
     : session.user
       ? `user:${session.user.id}`
       : "guest";
   const [stored, setStored] = useState<StoredPlusState>(() =>
-    nativeGuestOnly
+    NATIVE_COMMERCE_CONTAINED
       ? containedNativeState(subjectKey)
       : initialState(subjectKey),
   );
@@ -199,13 +197,13 @@ function usePlusCoordinator(): PlusState {
   const visible =
     stored.subjectKey === subjectKey
       ? stored
-      : nativeGuestOnly
+      : NATIVE_COMMERCE_CONTAINED
         ? containedNativeState(subjectKey)
         : initialState(subjectKey);
 
   const load = useCallback(async () => {
     if (session.loading) return;
-    if (nativeGuestOnly) {
+    if (NATIVE_COMMERCE_CONTAINED) {
       setStored(containedNativeState(subjectKey));
       return;
     }
@@ -323,7 +321,7 @@ function usePlusCoordinator(): PlusState {
         returnNotice: safeReturnNotice(),
       });
     }
-  }, [nativeGuestOnly, session.loading, subjectKey]);
+  }, [session.loading, subjectKey]);
 
   // Start after the effect commits so async state never cascades in its body.
   useEffect(() => {
@@ -332,7 +330,7 @@ function usePlusCoordinator(): PlusState {
   }, [load]);
 
   useEffect(() => {
-    if (nativeGuestOnly) return;
+    if (NATIVE_COMMERCE_CONTAINED) return;
     if (session.loading) return;
     const refreshOnReturn = () => void load();
     const refreshWhenVisible = () => {
@@ -348,9 +346,13 @@ function usePlusCoordinator(): PlusState {
       window.removeEventListener("online", refreshOnReturn);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [load, nativeGuestOnly, session.loading]);
+  }, [load, session.loading]);
 
   const refresh = useCallback(async () => {
+    if (NATIVE_COMMERCE_CONTAINED) {
+      await load();
+      return;
+    }
     if (session.user) {
       const outcome = await purchases.restore();
       if (outcome === "failed" || outcome === "unavailable") {
@@ -366,6 +368,7 @@ function usePlusCoordinator(): PlusState {
   // membership at "free" until someone pressed a button. Reconcile against
   // Stripe once on return; the server projection still decides entitlement.
   useEffect(() => {
+    if (NATIVE_COMMERCE_CONTAINED) return;
     if (session.loading || !session.user) return;
     if (reconciledReturn.current) return;
     if (safeReturnNotice() !== "checkout-returned") return;

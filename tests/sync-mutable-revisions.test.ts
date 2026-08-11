@@ -4,12 +4,17 @@ import {
   advanceMutableRevisionGeneration,
   clearStoredMutableRevisionContext,
   createMutableRevisionContext,
+  MAX_DURABLE_MUTABLE_OBSERVATIONS,
+  MutableRevisionPersistenceError,
   prepareMutableWrites,
   reconcileMutableRows,
+  removeStoredMutableRevisionContext,
+  replaceMutableRevisionGeneration,
   restoreMutableRevisionContext,
 } from "@/lib/sync/mutable-revisions";
 
 const USER_ID = "7bbfc4ec-ed55-4bf8-a07f-e0f8d4c40527";
+const USER_B = "8bbfc4ec-ed55-4bf8-a07f-e0f8d4c40528";
 
 /** Minimal memory storage exercises reload behavior without browser globals. */
 class MemoryStorage {
@@ -88,6 +93,28 @@ function apply(
 }
 
 describe("mutable revision reconciliation", () => {
+  it("rejects an aggregate pull that cannot retain a durable CAS baseline", async () => {
+    const context = createMutableRevisionContext();
+    restoreMutableRevisionContext(context, USER_ID, 0, false, null);
+    for (let index = 0; index < MAX_DURABLE_MUTABLE_OBSERVATIONS; index += 1) {
+      context.entries.set(`existing-${index}`, {
+        fingerprint: null,
+        revision: 0,
+      });
+    }
+
+    await expect(
+      reconcileMutableRows(
+        context,
+        "profiles",
+        [],
+        [profile("Remote", "2026-07-22T12:00:00.000Z", 1)],
+        { expectedUserId: USER_ID },
+      ),
+    ).rejects.toThrow("exceeds durable capacity");
+    expect(context.entries).toHaveLength(MAX_DURABLE_MUTABLE_OBSERVATIONS);
+  });
+
   it("removes persisted revision metadata with a deleted device journey", async () => {
     const active = await device(
       profile("Base", "2026-07-22T12:00:00.000Z", 1),
@@ -97,6 +124,25 @@ describe("mutable revision reconciliation", () => {
     clearStoredMutableRevisionContext(active.storage);
 
     expect(active.storage.dump()).toBe("");
+  });
+
+  it("removes only the deleted account from a multi-account ledger", () => {
+    const storage = new MemoryStorage();
+    const accountA = createMutableRevisionContext();
+    restoreMutableRevisionContext(accountA, USER_ID, 1, false, storage);
+    replaceMutableRevisionGeneration(accountA, USER_ID, 1);
+    const accountB = createMutableRevisionContext();
+    restoreMutableRevisionContext(accountB, USER_B, 7, false, storage);
+    replaceMutableRevisionGeneration(accountB, USER_B, 7);
+    const before = JSON.parse(storage.dump()) as {
+      accounts: Array<{ userId: string; generation: number }>;
+    };
+    const preserved = before.accounts.find((account) => account.userId === USER_B);
+
+    removeStoredMutableRevisionContext(USER_ID, storage);
+
+    const after = JSON.parse(storage.dump()) as typeof before;
+    expect(after.accounts).toEqual([preserved]);
   });
 
   it("orders ahead and behind clocks only by server CAS", async () => {
@@ -215,17 +261,19 @@ describe("mutable revision reconciliation", () => {
     const newest = profile("C", "2026-07-22T14:00:00.000Z", 3);
     const active = await device(base, storage);
 
-    const imported = await reconcileMutableRows(
-      active.context,
-      "profiles",
-      [base],
-      [canonical],
-      { expectedUserId: USER_ID },
-    );
-    expect(imported[0].row.display_name).toBe("B");
+    await expect(
+      reconcileMutableRows(
+        active.context,
+        "profiles",
+        [base],
+        [canonical],
+        { expectedUserId: USER_ID },
+      ),
+    ).rejects.toBeInstanceOf(MutableRevisionPersistenceError);
+    expect(storage.dump()).toBe("");
 
     const reopened = createMutableRevisionContext();
-    restoreMutableRevisionContext(reopened, USER_ID, 0, true, storage);
+    restoreMutableRevisionContext(reopened, USER_ID, 0, true, null);
     const merged = await reconcileMutableRows(
       reopened,
       "profiles",

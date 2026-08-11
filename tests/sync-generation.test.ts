@@ -5,6 +5,7 @@ import {
   clearStoredAccountSyncGenerations,
   getAccountSyncGeneration,
   markAccountSyncResetRequired,
+  removeStoredAccountSyncGeneration,
   setAccountSyncGeneration,
 } from "@/lib/sync/generation";
 
@@ -72,5 +73,20 @@ describe("account sync generation storage", () => {
 
     expect(getAccountSyncGeneration(first, storage)).toBeNull();
     expect(getAccountSyncGeneration(second, storage)).toBeNull();
+  });
+
+  it("removes only the deleted account from a multi-account ledger", () => {
+    const storage = memoryStorage();
+    const first = "71000000-0000-4000-8000-000000000001";
+    const second = "72000000-0000-4000-8000-000000000002";
+    markAccountSyncResetRequired(first, 2, storage);
+    markAccountSyncResetRequired(second, 7, storage);
+
+    removeStoredAccountSyncGeneration(first, storage);
+
+    expect(getAccountSyncGeneration(first, storage)).toBeNull();
+    expect(accountSyncResetRequired(first, storage)).toBe(false);
+    expect(getAccountSyncGeneration(second, storage)).toBe(7);
+    expect(accountSyncResetRequired(second, storage)).toBe(true);
   });
 });

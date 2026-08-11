@@ -194,6 +194,24 @@ export function clearAllDeviceLocalJournalDrafts(
   return removed;
 }
 
+/** Prove the destructive draft epoch and every private draft key were removed. */
+export function purgeAllDeviceLocalJournalDrafts(
+  storage?: Storage | null,
+): boolean {
+  const target = resolveStorage(storage);
+  if (!target) return false;
+  clearAllDeviceLocalJournalDrafts(target);
+  try {
+    if (!target.getItem(DRAFTS_CLEARED_STORAGE_KEY)) return false;
+    for (let index = 0; index < target.length; index += 1) {
+      if (target.key(index)?.startsWith(`${STORAGE_PREFIX}:`)) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Sweep stale or malformed drafts on application startup. Browser storage
  * cannot run its own clock while BibleQuest is closed, so expiry is enforced

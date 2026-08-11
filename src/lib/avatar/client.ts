@@ -4,7 +4,10 @@ import {
   isSafeAvatarMarker,
   MAX_AVATAR_OUTPUT_BYTES,
 } from "./validation";
-import { apiFetch } from "@/lib/platform/api";
+import {
+  accountDeletionAvatarFetch,
+  authenticatedApiFetch,
+} from "@/lib/platform/api";
 
 export interface RemoteAvatar {
   blob: Blob;
@@ -17,6 +20,12 @@ export class AvatarRequestError extends Error {
     super("BibleQuest could not update the profile photo.");
     this.name = "AvatarRequestError";
   }
+}
+
+export interface DeleteRemoteAvatarOptions {
+  allOwnedObjects?: boolean;
+  accountDeletionCleanup?: boolean;
+  signal?: AbortSignal;
 }
 
 function remoteAvatarFromResponse(response: Response): Promise<RemoteAvatar> {
@@ -46,47 +55,68 @@ function remoteAvatarFromResponse(response: Response): Promise<RemoteAvatar> {
 
 /** Uploads one file and returns the server-normalized private image. */
 export async function uploadRemoteAvatar(
+  expectedUserId: string,
   file: File,
   signal?: AbortSignal,
 ): Promise<RemoteAvatar> {
   const body = new FormData();
   body.set("avatar", file);
-  const response = await apiFetch("/api/profile/avatar", {
-    method: "POST",
-    body,
-    cache: "no-store",
-    credentials: "same-origin",
-    signal,
-  });
+  const response = await authenticatedApiFetch(
+    expectedUserId,
+    "/api/profile/avatar",
+    {
+      method: "POST",
+      body,
+      cache: "no-store",
+      credentials: "same-origin",
+      signal,
+    },
+  );
   return remoteAvatarFromResponse(response);
 }
 
 /** Downloads the current account avatar without persisting a signed URL. */
 export async function downloadRemoteAvatar(
+  expectedUserId: string,
   signal?: AbortSignal,
 ): Promise<RemoteAvatar | null> {
-  const response = await apiFetch("/api/profile/avatar", {
-    cache: "no-store",
-    credentials: "same-origin",
-    signal,
-  });
+  const response = await authenticatedApiFetch(
+    expectedUserId,
+    "/api/profile/avatar",
+    {
+      cache: "no-store",
+      credentials: "same-origin",
+      signal,
+    },
+  );
   if (response.status === 404) return null;
   return remoteAvatarFromResponse(response);
 }
 
 /** Removes the current object, or every owned object during account deletion. */
 export async function deleteRemoteAvatar(
-  allOwnedObjects = false,
-  signal?: AbortSignal,
-): Promise<void> {
-  const response = await apiFetch("/api/profile/avatar", {
-    method: "DELETE",
-    cache: "no-store",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ allOwnedObjects }),
+  expectedUserId: string,
+  {
+    allOwnedObjects = false,
+    accountDeletionCleanup = false,
     signal,
-  });
+  }: DeleteRemoteAvatarOptions = {},
+): Promise<void> {
+  const response =
+    allOwnedObjects && accountDeletionCleanup
+      ? await accountDeletionAvatarFetch(expectedUserId, signal)
+      : await authenticatedApiFetch(
+          expectedUserId,
+          "/api/profile/avatar",
+          {
+            method: "DELETE",
+            cache: "no-store",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ allOwnedObjects }),
+            signal,
+          },
+        );
   if (!response.ok && response.status !== 404) {
     throw new AvatarRequestError();
   }

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuestOS } from "@/lib/questos/store";
 import { useSession } from "@/lib/supabase/useSession";
-import { createClient } from "@/lib/supabase/client";
 import { retrySync } from "@/lib/sync/engine";
 import { useSyncStatus } from "@/lib/sync/status";
 import {
@@ -30,6 +29,10 @@ import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { accountSyncResetRequired } from "@/lib/sync/generation";
 import { isNativeTarget } from "@/lib/platform/target";
+import {
+  AccountSignOutError,
+  signOutExpectedAccount,
+} from "@/lib/auth/account-sign-out";
 
 /** Redirects stale web-only Plus hand-offs to the native app home. */
 function safeLaunchDestination(stage: ReturnType<typeof getOnboardingResumeStage>) {
@@ -155,10 +158,21 @@ function RestoreError({
   async function signOut() {
     setSigningOut(true);
     setSignOutError(false);
-    const { error } = await createClient().auth.signOut();
-    if (error) {
+    try {
+      const result = await signOutExpectedAccount(userId);
+      if (result.reloadRequired) {
+        window.location.reload();
+      }
+    } catch (error) {
       setSigningOut(false);
       setSignOutError(true);
+      if (
+        error instanceof AccountSignOutError &&
+        error.reloadRequired &&
+        isNativeTarget()
+      ) {
+        window.location.reload();
+      }
     }
   }
 

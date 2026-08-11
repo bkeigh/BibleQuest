@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { withSyncRequestDeadline } from "./request";
 
 /** Report a retained-generation mismatch that requires a fresh account pull. */
 export class AccountSyncGenerationConflictError extends Error {
@@ -33,9 +34,12 @@ export async function readAccountSyncGeneration(
   supabase: SupabaseClient,
   expectedUserId: string,
 ): Promise<number> {
-  const result = await supabase.rpc("account_sync_generation", {
-    p_expected_user_id: expectedUserId,
-  });
+  const result = await withSyncRequestDeadline(
+    supabase.rpc("account_sync_generation", {
+      p_expected_user_id: expectedUserId,
+    }),
+    "Account sync generation",
+  );
   if (result.error) throwAccountSyncError(result.error);
   const value = result.data;
   const generation = (value as { generation?: unknown } | null)?.generation;
@@ -167,12 +171,15 @@ export async function deleteAccountSyncRows(
     "delete",
     deletions,
   );
-  const result = await supabase.rpc("delete_user_sync_rows", {
-    p_expected_user_id: expectedUserId,
-    p_expected_generation: expectedGeneration,
-    p_request_id: requestId,
-    p_deletions: deletions,
-  });
+  const result = await withSyncRequestDeadline(
+    supabase.rpc("delete_user_sync_rows", {
+      p_expected_user_id: expectedUserId,
+      p_expected_generation: expectedGeneration,
+      p_request_id: requestId,
+      p_deletions: deletions,
+    }),
+    "Account sync deletion",
+  );
   if (result.error) throwAccountSyncError(result.error);
   return parseDestructiveResult(result.data, "delete");
 }
@@ -189,11 +196,14 @@ export async function purgeAccountSyncRows(
     "purge",
     null,
   );
-  const result = await supabase.rpc("purge_user_data", {
-    p_expected_user_id: expectedUserId,
-    p_expected_generation: expectedGeneration,
-    p_request_id: requestId,
-  });
+  const result = await withSyncRequestDeadline(
+    supabase.rpc("purge_user_data", {
+      p_expected_user_id: expectedUserId,
+      p_expected_generation: expectedGeneration,
+      p_request_id: requestId,
+    }),
+    "Account sync purge",
+  );
   if (result.error) throwAccountSyncError(result.error);
   return parseDestructiveResult(result.data, "purge");
 }

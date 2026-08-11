@@ -93,11 +93,17 @@ function parseJson(output, label) {
   }
 }
 
-// Verifies the complete 35-file manifest and the immutable 0035 source.
+// Verifies the frozen production prefix and immutable 0035 source.
 async function verifyReleaseInputs() {
   const migrationsDir = join(ROOT, "supabase", "migrations");
   const manifest = await readFile(join(migrationsDir, "manifest.sha256"));
-  if (sha256(manifest) !== EXPECTED_MANIFEST_SHA256) {
+  const frozenManifest = `${manifest
+    .toString("utf8")
+    .trim()
+    .split("\n")
+    .slice(0, 35)
+    .join("\n")}\n`;
+  if (sha256(frozenManifest) !== EXPECTED_MANIFEST_SHA256) {
     fail("Reviewed 35-file manifest checksum changed");
   }
   const source = await readFile(join(migrationsDir, PACKET.source));
