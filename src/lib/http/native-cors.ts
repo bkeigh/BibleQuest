@@ -1,6 +1,11 @@
 import "server-only";
 
 import { isNativeAppOrigin, NATIVE_APP_ORIGIN } from "./native-origin";
+import {
+  ACCOUNT_DELETION_CLEANUP_HEADER,
+  EXPECTED_ACCOUNT_USER_HEADER,
+  NATIVE_ACCOUNT_BETA_HEADER,
+} from "@/lib/sync/native-beta-headers";
 
 /**
  * CORS decoration for the one reviewed native origin.
@@ -35,6 +40,15 @@ const EXCLUDED_API_PATH = "/api/billing/plans";
 
 const EXPOSED_RESPONSE_HEADERS =
   "X-BibleQuest-Avatar-Version, X-BibleQuest-Avatar-Updated-At";
+// Match only the bearer, subject, beta, and deletion markers emitted by the
+// reviewed native account transport; no arbitrary client header is reflected.
+const ALLOWED_REQUEST_HEADERS = [
+  "Authorization",
+  "Content-Type",
+  EXPECTED_ACCOUNT_USER_HEADER,
+  NATIVE_ACCOUNT_BETA_HEADER,
+  ACCOUNT_DELETION_CLEANUP_HEADER,
+].join(", ");
 
 /** True for API paths the native CORS decoration may touch. */
 export function corsEligibleApiPath(pathname: string): boolean {
@@ -73,7 +87,7 @@ export function nativeCorsPreflightResponse(request: Request): Response | null {
     headers: {
       "Access-Control-Allow-Origin": NATIVE_APP_ORIGIN,
       "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE",
-      "Access-Control-Allow-Headers": "Authorization, Content-Type",
+      "Access-Control-Allow-Headers": ALLOWED_REQUEST_HEADERS,
       "Access-Control-Max-Age": "600",
       Vary: "Origin",
       // Set explicitly rather than trusting the next.config /api/:path* rule

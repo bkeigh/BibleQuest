@@ -30,6 +30,12 @@ import {
   type ServerFailureStage,
 } from "@/lib/observability/server-failures";
 import { authenticatedServerContext } from "@/lib/supabase/authenticated.server";
+import { isNativeAppOrigin } from "@/lib/http/native-origin";
+import {
+  ACCOUNT_DELETION_CLEANUP_HEADER,
+  ACCOUNT_DELETION_CLEANUP_HEADER_VALUE,
+  EXPECTED_ACCOUNT_USER_HEADER,
+} from "@/lib/sync/native-beta-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -384,26 +390,52 @@ export async function DELETE(request: Request) {
   }
 
   try {
-    const profile = await avatarProfile(supabase, user.id);
-    if (allOwnedObjects) {
-      if (!(await removeAllOwnedObjects(supabase, user.id))) {
-        return privateError("delete_failed", 503);
-      }
-    } else if (profile?.avatar_path) {
-      if (!ownedAvatarPath(user.id, profile.avatar_path)) {
-        return privateError("delete_failed", 503);
-      }
-      const { error } = await supabase.storage
-        .from(AVATAR_BUCKET)
-        .remove([profile.avatar_path]);
+    const accountDeletionCleanup =
+      allOwnedObjects &&
+      request.headers.get(ACCOUNT_DELETION_CLEANUP_HEADER) ===
+        ACCOUNT_DELETION_CLEANUP_HEADER_VALUE &&
+      request.headers.get(EXPECTED_ACCOUNT_USER_HEADER) === user.id;
+    const nativeDeletionCleanup =
+      accountDeletionCleanup && isNativeAppOrigin(request);
+    let expectedPath: string | null = null;
+    if (!nativeDeletionCleanup) {
+      // Normal clears prove the profile read before touching Storage. When the
+      // beta is disabled, restrictive RLS stops this path with data intact.
+      const profile = await avatarProfile(supabase, user.id);
+      expectedPath = profile?.avatar_path ?? null;
+    }
+    if (accountDeletionCleanup) {
+      // The durable database latch waits out in-flight uploads and denies new
+      // ones before the final owner-folder sweep begins.
+      const { error } = await supabase.rpc("begin_own_account_deletion");
       if (error) {
         recordServerFailure("avatar", "delete", error);
         return privateError("delete_failed", 503);
       }
     }
+    if (allOwnedObjects) {
+      // Deletion cleanup cannot pre-read a disabled beta profile. The exact
+      // cleanup header lets the RPC clear this authenticated owner's pointer.
+      if (!(await removeAllOwnedObjects(supabase, user.id))) {
+        return privateError("delete_failed", 503);
+      }
+    } else {
+      if (expectedPath) {
+        if (!ownedAvatarPath(user.id, expectedPath)) {
+          return privateError("delete_failed", 503);
+        }
+        const { error } = await supabase.storage
+          .from(AVATAR_BUCKET)
+          .remove([expectedPath]);
+        if (error) {
+          recordServerFailure("avatar", "delete", error);
+          return privateError("delete_failed", 503);
+        }
+      }
+    }
 
     const { data, error } = await supabase.rpc("clear_profile_avatar", {
-      p_expected_path: profile?.avatar_path ?? null,
+      p_expected_path: expectedPath,
     });
     const result = data as AvatarClearResult | null;
     if (error || !result) {

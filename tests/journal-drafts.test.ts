@@ -4,6 +4,7 @@ import {
   clearAllDeviceLocalJournalDrafts,
   clearDeviceLocalJournalDraft,
   journalDraftStorageKey,
+  purgeAllDeviceLocalJournalDrafts,
   purgeExpiredDeviceLocalJournalDrafts,
   readDeviceLocalJournalDraft,
   writeDeviceLocalJournalDraft,
@@ -212,6 +213,7 @@ describe("device-local journal drafts", () => {
     ).toBe(true);
 
     expect(clearAllDeviceLocalJournalDrafts(quotaStorage)).toBe(1);
+    expect(purgeAllDeviceLocalJournalDrafts(quotaStorage)).toBe(true);
     expect(
       quotaStorage.getItem("biblequest:journal-drafts-cleared-at"),
     ).toBeTruthy();
@@ -263,5 +265,6 @@ describe("device-local journal drafts", () => {
     expect(
       clearDeviceLocalJournalDraft("prayer", undefined, throwingStorage),
     ).toBe(false);
+    expect(purgeAllDeviceLocalJournalDrafts(throwingStorage)).toBe(false);
   });
 });

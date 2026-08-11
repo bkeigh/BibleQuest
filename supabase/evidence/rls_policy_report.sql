@@ -17,6 +17,7 @@ with expected (table_name, classification) as (
     ('milestones', 'public content'),
     ('feature_flags', 'public content'),
     ('profiles', 'user-owned'),
+    ('account_deletion_latches', 'server-owned account deletion state'),
     ('user_sync_state', 'retained user-owned state'),
     ('user_settings', 'user-owned'),
     ('user_daily_quests', 'user-owned'),
@@ -154,7 +155,12 @@ where namespace.nspname = 'public'
     'delete_user_sync_rows',
     'account_sync_generation',
     'account_sync_contract',
+    'native_account_beta_availability',
+    'native_account_beta_request_allowed',
+    'enforce_native_account_beta_availability',
     'guided_progress_sync_contract',
+    'avatar_upload_allowed',
+    'begin_own_account_deletion',
     'delete_own_account',
     'account_deletion_contract',
     'set_profile_avatar',
@@ -257,7 +263,8 @@ where table_namespace.nspname = 'public'
     'user_milestones',
     'verse_bookmarks',
     'reading_progress',
-    'chapters_read'
+    'chapters_read',
+    'user_sync_state'
   )
   and not trigger.tgisinternal
 order by table_class.relname, trigger.tgname;

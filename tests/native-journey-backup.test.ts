@@ -1,12 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const PLATFORM = "NEXT_PUBLIC_APP_PLATFORM";
+const ACCOUNT_BETA = "NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED";
 const KEY = "biblequest:v1";
+const OWNER_KEY = "biblequest:last-sync-user";
 
 /** Stands in for the app's Documents directory. */
 const disk = new Map<string, string>();
 let writeFailure: Error | null = null;
 let deleteFailure: Error | null = null;
+let readFailure: Error | null = null;
+let readBarrier: Promise<void> | null = null;
 
 vi.mock("@capacitor/filesystem", () => ({
   Directory: { Data: "DATA" },
@@ -17,8 +21,14 @@ vi.mock("@capacitor/filesystem", () => ({
       disk.set(path, data);
     }),
     readFile: vi.fn(async ({ path }: { path: string }) => {
+      if (readBarrier) await readBarrier;
+      if (readFailure) throw readFailure;
       const data = disk.get(path);
-      if (data === undefined) throw new Error("File does not exist");
+      if (data === undefined) {
+        throw Object.assign(new Error("File does not exist"), {
+          code: "OS-PLUG-FILE-0008",
+        });
+      }
       return { data };
     }),
     deleteFile: vi.fn(async ({ path }: { path: string }) => {
@@ -64,6 +74,8 @@ beforeEach(() => {
   disk.clear();
   writeFailure = null;
   deleteFailure = null;
+  readFailure = null;
+  readBarrier = null;
   const storage = new MemoryStorage();
   vi.stubGlobal("localStorage", storage);
   vi.stubGlobal("window", {
@@ -87,6 +99,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env[PLATFORM];
+  delete process.env[ACCOUNT_BETA];
   vi.unstubAllGlobals();
 });
 
@@ -96,6 +109,7 @@ describe("journey backup on native", () => {
     localStorage.setItem(KEY, JOURNEY);
 
     expect(await writeJourneyBackup()).toBe(true);
+    expect(disk.get("journey-backup.json")).toBe(JOURNEY);
     expect(await readJourneyBackup()).toBe(JOURNEY);
   });
 
@@ -129,6 +143,15 @@ describe("journey backup on native", () => {
   it("reports no-backup on a genuine first launch", async () => {
     const { restoreJourneyIfEvicted } = await load();
     expect(await restoreJourneyIfEvicted()).toBe("no-backup");
+  });
+
+  it("fails closed on a transient filesystem read error", async () => {
+    const { restoreJourneyIfEvicted, writeJourneyBackup } = await load();
+    readFailure = new Error("filesystem temporarily unavailable");
+
+    expect(await restoreJourneyIfEvicted()).toBe("failed");
+    localStorage.setItem(KEY, JOURNEY);
+    expect(await writeJourneyBackup()).toBe(false);
   });
 
   it("refuses to restore a corrupt mirror over an empty primary", async () => {
@@ -250,6 +273,154 @@ describe("journey backup on native", () => {
     await vi.advanceTimersByTimeAsync(2000);
     expect(await readJourneyBackup()).toBe(JOURNEY);
     vi.useRealTimers();
+  });
+});
+
+describe("account-beta protected journey ownership", () => {
+  it("never overwrites a newer owner established during a filesystem read", async () => {
+    process.env[ACCOUNT_BETA] = "true";
+    const first = await load();
+    const { readLocalJourneyOwner, setLastSyncedUserId } = await import(
+      "@/lib/sync/last-user"
+    );
+    localStorage.setItem(KEY, JOURNEY);
+    setLastSyncedUserId("account-a");
+    expect(await first.sealJourneyBackupOwner("account-a")).toBe(true);
+    localStorage.clear();
+
+    let releaseRead!: () => void;
+    readBarrier = new Promise<void>((resolve) => {
+      releaseRead = resolve;
+    });
+    const { restoreJourneyIfEvicted } = await load();
+    const restoring = restoreJourneyIfEvicted();
+    const newer = JSON.stringify({ state: { prayers: [] }, version: 20 });
+    localStorage.setItem(KEY, newer);
+    setLastSyncedUserId("account-b");
+    releaseRead();
+
+    expect(await restoring).toBe("primary-intact");
+    expect(localStorage.getItem(KEY)).toBe(newer);
+    expect(readLocalJourneyOwner()).toEqual({
+      status: "owned",
+      userId: "account-b",
+    });
+  });
+
+  it("restores an evicted account journey with its owner before B can adopt it", async () => {
+    process.env[ACCOUNT_BETA] = "true";
+    const { restoreJourneyIfEvicted, sealJourneyBackupOwner } = await load();
+    const { localDataBelongsToOtherUser, readLocalJourneyOwner, setLastSyncedUserId } =
+      await import("@/lib/sync/last-user");
+    localStorage.setItem(KEY, JOURNEY);
+    setLastSyncedUserId("account-a");
+
+    expect(await sealJourneyBackupOwner("account-a")).toBe(true);
+    expect(JSON.parse(disk.get("journey-backup.json") ?? "{}")).toMatchObject({
+      kind: "biblequest-native-journey-backup",
+      version: 1,
+      ownerUserId: "account-a",
+    });
+    localStorage.clear();
+
+    expect(await restoreJourneyIfEvicted()).toBe("restored");
+    expect(localStorage.getItem(KEY)).toBe(JOURNEY);
+    expect(readLocalJourneyOwner()).toEqual({
+      status: "owned",
+      userId: "account-a",
+    });
+    expect(localDataBelongsToOtherUser("account-b")).toBe(true);
+  });
+
+  it("repairs a selectively evicted owner only for the identical protected body", async () => {
+    process.env[ACCOUNT_BETA] = "true";
+    const { restoreJourneyIfEvicted, sealJourneyBackupOwner } = await load();
+    const { readLocalJourneyOwner, setLastSyncedUserId } = await import(
+      "@/lib/sync/last-user"
+    );
+    localStorage.setItem(KEY, JOURNEY);
+    setLastSyncedUserId("account-a");
+    expect(await sealJourneyBackupOwner("account-a")).toBe(true);
+
+    localStorage.removeItem(OWNER_KEY);
+    expect(await restoreJourneyIfEvicted()).toBe("primary-intact");
+    expect(readLocalJourneyOwner()).toEqual({
+      status: "owned",
+      userId: "account-a",
+    });
+  });
+
+  it("keeps a pre-beta raw guest backup compatible and genuinely unowned", async () => {
+    process.env[ACCOUNT_BETA] = "true";
+    disk.set("journey-backup.json", JOURNEY);
+    const { restoreJourneyIfEvicted } = await load();
+    const { localDataBelongsToOtherUser, readLocalJourneyOwner } = await import(
+      "@/lib/sync/last-user"
+    );
+
+    expect(await restoreJourneyIfEvicted()).toBe("restored");
+    expect(readLocalJourneyOwner()).toEqual({ status: "unowned" });
+    expect(localDataBelongsToOtherUser("account-b")).toBe(false);
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["corrupt", " account-a\n"],
+  ])("quarantines an account envelope with a %s owner", async (_label, owner) => {
+    process.env[ACCOUNT_BETA] = "true";
+    const envelope: Record<string, unknown> = {
+      kind: "biblequest-native-journey-backup",
+      version: 1,
+      journey: JSON.parse(JOURNEY),
+    };
+    if (owner !== undefined) envelope.ownerUserId = owner;
+    disk.set("journey-backup.json", JSON.stringify(envelope));
+    const { readJourneyBackup, restoreJourneyIfEvicted, writeJourneyBackup } =
+      await load();
+    const { localDataBelongsToOtherUser, readLocalJourneyOwner } = await import(
+      "@/lib/sync/last-user"
+    );
+
+    expect(await restoreJourneyIfEvicted()).toBe("failed");
+    expect(localStorage.getItem(KEY)).toBeNull();
+    expect(await readJourneyBackup()).toBeNull();
+    expect(readLocalJourneyOwner()).toMatchObject({ status: "unavailable" });
+    expect(localDataBelongsToOtherUser("account-b")).toBe(true);
+
+    localStorage.setItem(KEY, JOURNEY);
+    expect(await writeJourneyBackup()).toBe(false);
+  });
+
+  it("preserves the account envelope and owner when its purge tombstone fails", async () => {
+    process.env[ACCOUNT_BETA] = "true";
+    const {
+      purgeJourneyBackup,
+      readJourneyBackup,
+      restoreJourneyIfEvicted,
+      sealJourneyBackupOwner,
+    } = await load();
+    const { readLocalJourneyOwner, setLastSyncedUserId } = await import(
+      "@/lib/sync/last-user"
+    );
+    localStorage.setItem(KEY, JOURNEY);
+    setLastSyncedUserId("account-a");
+    expect(await sealJourneyBackupOwner("account-a")).toBe(true);
+
+    writeFailure = new Error("disk full");
+    expect(await purgeJourneyBackup()).toBe(false);
+    writeFailure = null;
+    expect(await readJourneyBackup()).toBe(JOURNEY);
+    expect(readLocalJourneyOwner()).toEqual({
+      status: "owned",
+      userId: "account-a",
+    });
+
+    localStorage.clear();
+    expect(await restoreJourneyIfEvicted()).toBe("restored");
+    expect(readLocalJourneyOwner()).toEqual({
+      status: "owned",
+      userId: "account-a",
+    });
   });
 });
 

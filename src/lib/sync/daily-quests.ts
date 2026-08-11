@@ -11,6 +11,7 @@ import {
   rowToAssignment,
   type DailyQuestRow,
 } from "./mapping";
+import { withSyncRequestDeadline } from "./request";
 
 type DailyQuestPayloadRow = Omit<
   DailyQuestRow,
@@ -51,6 +52,7 @@ const MAX_OBSERVED_DAYS = 120;
 const MAX_ROWS_PER_DAY = 200;
 
 export interface DailyQuestSyncContext {
+  epoch: number;
   mode: "unknown" | "transactional" | "legacy";
   revisions: Map<string, number>;
   bases: Map<string, DailyQuestAssignment[]>;
@@ -81,11 +83,22 @@ export class DailyQuestConflictError extends Error {
   }
 }
 
+/** Content-free failure used when a daily CAS base cannot survive relaunch. */
+export class DailyQuestPersistenceError extends Error {
+  readonly code = "daily_quest_persistence_unavailable";
+
+  constructor() {
+    super("Daily quest sync metadata could not be persisted.");
+    this.name = "DailyQuestPersistenceError";
+  }
+}
+
 /** Create isolated protocol state so tests and account handoffs cannot share revisions. */
 export function createDailyQuestSyncContext(
   requestId: () => string = () => crypto.randomUUID(),
 ): DailyQuestSyncContext {
   return {
+    epoch: 0,
     mode: "unknown",
     revisions: new Map(),
     bases: new Map(),
@@ -98,6 +111,7 @@ export function createDailyQuestSyncContext(
 
 /** Reset in-memory protocol state without deleting safe retry metadata. */
 export function resetDailyQuestSyncContext(context: DailyQuestSyncContext) {
+  context.epoch += 1;
   context.mode = "unknown";
   context.revisions.clear();
   context.bases.clear();
@@ -115,6 +129,32 @@ export function clearStoredDailyQuestSyncContext(
     storage.removeItem(DAILY_QUEST_SYNC_STORAGE_KEY);
   } catch {
     // Private browsing may make local storage unavailable.
+  }
+}
+
+/** Remove daily CAS metadata only when its durable owner is the deleted account. */
+export function removeStoredDailyQuestSyncContext(
+  userId: string,
+  storage: DailyQuestSyncStorage | null = browserDailyQuestSyncStorage(),
+): boolean {
+  if (!userId || !storage) return false;
+  try {
+    const raw = storage.getItem(DAILY_QUEST_SYNC_STORAGE_KEY);
+    if (!raw) return true;
+    const decoded: unknown = JSON.parse(raw);
+    const storedUserId =
+      decoded && typeof decoded === "object" && !Array.isArray(decoded)
+        ? (decoded as { userId?: unknown }).userId
+        : null;
+    if (typeof storedUserId !== "string") return false;
+    const parsed = parseStoredDailyQuestSyncState(decoded, storedUserId);
+    if (!parsed) return false;
+    if (storedUserId !== userId) return true;
+    storage.removeItem(DAILY_QUEST_SYNC_STORAGE_KEY);
+    return storage.getItem(DAILY_QUEST_SYNC_STORAGE_KEY) === null;
+  } catch {
+    // Unknown or inaccessible ownership must preserve the existing metadata.
+    return false;
   }
 }
 
@@ -209,11 +249,20 @@ export function reconcileDailyQuestPull(
   for (const day of [...days].sort()) {
     const localRows = local[day] ?? [];
     const remoteRows = remote[day] ?? [];
-    const previousBase = previousRevisions.has(day)
-      ? previousBases.get(day) ?? []
+    const pulledRevision = pulledRevisions.get(day) ?? 0;
+    const hasTrustedBase =
+      previousRevisions.has(day) && previousBases.has(day);
+    const previousBase = hasTrustedBase
+      ? previousBases.get(day)
       : undefined;
-    merged[day] = mergeDailyQuestDay(localRows, remoteRows, previousBase);
-    context.revisions.set(day, pulledRevisions.get(day) ?? 0);
+    // A positive server revision proves this account already had canonical
+    // history. If its bounded local base aged out, use the server day instead
+    // of resurrecting a stale local assignment as a first-time guest row.
+    merged[day] =
+      !hasTrustedBase && pulledRevision > 0
+        ? cloneAssignments(remoteRows)
+        : mergeDailyQuestDay(localRows, remoteRows, previousBase);
+    context.revisions.set(day, pulledRevision);
     context.bases.set(day, cloneAssignments(remoteRows));
 
     const pending = context.pending.get(day);
@@ -260,6 +309,7 @@ export async function writeDailyQuestAssignments(
   context: DailyQuestSyncContext,
   expectedGeneration = 0,
   allowLegacyFallback = true,
+  responseIsCurrent: () => boolean = () => true,
 ): Promise<DailyQuestWriteResult> {
   if (context.mode === "legacy") {
     if (!allowLegacyFallback) {
@@ -270,7 +320,11 @@ export async function writeDailyQuestAssignments(
   }
 
   const conflicts: Record<string, DailyQuestAssignment[]> = {};
+  const epoch = context.epoch;
   for (const day of Object.keys(assignments).sort()) {
+    if (!responseIsCurrent() || context.epoch !== epoch) {
+      throw new Error("Daily quest sync request became stale.");
+    }
     const local = assignments[day] ?? [];
     const payloadRows = local
       .map((assignment) => assignmentPayload(userId, assignment))
@@ -287,14 +341,20 @@ export async function writeDailyQuestAssignments(
     context.pending.set(day, pending);
     persistDailyQuestSyncContext(context);
 
-    const result = await supabase.rpc("replace_user_daily_quests", {
-      p_expected_user_id: userId,
-      p_expected_generation: expectedGeneration,
-      p_assigned_date: day,
-      p_expected_revision: context.revisions.get(day) ?? 0,
-      p_request_id: pending.requestId,
-      p_rows: payloadRows,
-    });
+    const result = await withSyncRequestDeadline(
+      supabase.rpc("replace_user_daily_quests", {
+        p_expected_user_id: userId,
+        p_expected_generation: expectedGeneration,
+        p_assigned_date: day,
+        p_expected_revision: context.revisions.get(day) ?? 0,
+        p_request_id: pending.requestId,
+        p_rows: payloadRows,
+      }),
+      "Daily quest sync write",
+    );
+    if (!responseIsCurrent() || context.epoch !== epoch) {
+      throw new Error("Daily quest sync response became stale.");
+    }
     if (result.error) {
       if (!isMissingDailyQuestRpc(result.error) || !allowLegacyFallback) {
         throw result.error;
@@ -474,11 +534,15 @@ function browserDailyQuestSyncStorage(): DailyQuestSyncStorage | null {
 /** Persist only bounded canonical bases and in-flight idempotency requests. */
 function persistDailyQuestSyncContext(context: DailyQuestSyncContext) {
   if (!context.storage || !context.userId) return;
-  try {
-    if (context.mode === "legacy") {
+  if (context.mode === "legacy") {
+    try {
       context.storage.removeItem(DAILY_QUEST_SYNC_STORAGE_KEY);
-      return;
+    } catch {
+      // Legacy mode keeps no trusted CAS base, so removal remains best effort.
     }
+    return;
+  }
+  try {
     const assignedDates = [...context.revisions.keys()]
       .sort((left, right) => right.localeCompare(left))
       .slice(0, MAX_OBSERVED_DAYS);
@@ -497,7 +561,11 @@ function persistDailyQuestSyncContext(context: DailyQuestSyncContext) {
         .filter(([assignedDate]) => assignedDates.includes(assignedDate))
         .map(([assignedDate, pending]) => ({ assignedDate, ...pending })),
     };
-    context.storage.setItem(DAILY_QUEST_SYNC_STORAGE_KEY, JSON.stringify(state));
+    const encoded = JSON.stringify(state);
+    context.storage.setItem(DAILY_QUEST_SYNC_STORAGE_KEY, encoded);
+    if (context.storage.getItem(DAILY_QUEST_SYNC_STORAGE_KEY) !== encoded) {
+      throw new DailyQuestPersistenceError();
+    }
   } catch {
     // Never leave an older daily CAS base behind after a failed rewrite.
     try {
@@ -505,6 +573,9 @@ function persistDailyQuestSyncContext(context: DailyQuestSyncContext) {
     } catch {
       // Storage can be wholly unavailable; this session still uses memory.
     }
+    // A successful import without this canonical base could discard the next
+    // offline daily edit after relaunch, so stop the enclosing sync here.
+    throw new DailyQuestPersistenceError();
   }
 }
 
@@ -687,17 +758,31 @@ async function writeLegacyDailyQuestAssignments(
   const rows = Object.values(assignments)
     .flat()
     .map((assignment) => assignmentToRow(userId, assignment));
-  const deleted = await supabase
-    .from("user_daily_quests")
-    .delete()
-    .eq("user_id", userId)
-    .in("assigned_date", days);
+  const deleted = await withSyncRequestDeadline(
+    supabase
+      .from("user_daily_quests")
+      .delete()
+      .eq("user_id", userId)
+      .in("assigned_date", days),
+    "Legacy daily quest cleanup",
+  );
   if (deleted.error) throw deleted.error;
   if (!rows.length) return;
 
-  const current = await supabase.from("user_daily_quests").insert(rows);
-  if (!current.error) return;
-  if (!isMissingQuestWindowColumn(current.error)) throw current.error;
+  let missingWindowColumns = false;
+  for (let index = 0; index < rows.length; index += MAX_ROWS_PER_DAY) {
+    const current = await withSyncRequestDeadline(
+      supabase
+        .from("user_daily_quests")
+        .insert(rows.slice(index, index + MAX_ROWS_PER_DAY)),
+      "Legacy daily quest write",
+    );
+    if (!current.error) continue;
+    if (!isMissingQuestWindowColumn(current.error)) throw current.error;
+    missingWindowColumns = true;
+    break;
+  }
+  if (!missingWindowColumns) return;
   const legacyRows = rows.map(
     ({ picked_at: _pickedAt, expires_at: _expiresAt, ...row }) => {
       void _pickedAt;
@@ -705,8 +790,15 @@ async function writeLegacyDailyQuestAssignments(
       return row;
     },
   );
-  const legacy = await supabase.from("user_daily_quests").insert(legacyRows);
-  if (legacy.error) throw legacy.error;
+  for (let index = 0; index < legacyRows.length; index += MAX_ROWS_PER_DAY) {
+    const legacy = await withSyncRequestDeadline(
+      supabase
+        .from("user_daily_quests")
+        .insert(legacyRows.slice(index, index + MAX_ROWS_PER_DAY)),
+      "Legacy daily quest compatibility write",
+    );
+    if (legacy.error) throw legacy.error;
+  }
 }
 
 /** Recognize the two rolling-window columns only during a pre-0010 fallback. */

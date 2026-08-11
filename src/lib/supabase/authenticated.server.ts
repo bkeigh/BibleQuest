@@ -15,8 +15,46 @@ import {
   createServerSupabase,
   isSupabaseConfigured,
 } from "@/lib/supabase/server";
+import {
+  ACCOUNT_DELETION_CLEANUP_HEADER,
+  ACCOUNT_DELETION_CLEANUP_HEADER_VALUE,
+  EXPECTED_ACCOUNT_USER_HEADER,
+  NATIVE_ACCOUNT_BETA_HEADER,
+  NATIVE_ACCOUNT_BETA_HEADER_VALUE,
+} from "@/lib/sync/native-beta-headers";
 
 type AuthenticatedContext = { supabase: SupabaseClient; user: User };
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Enforce an optional caller-captured owner before any account route runs. */
+function expectedUserBoundary(request: Request, user: User): Response | null {
+  const expected = request.headers.get(EXPECTED_ACCOUNT_USER_HEADER);
+  if (expected === null) return null;
+  return UUID.test(expected) && expected === user.id
+    ? null
+    : privateError("forbidden", 403);
+}
+
+/** Forward only reviewed account-boundary headers into PostgREST requests. */
+function databaseBoundaryHeaders(
+  request: Request,
+  native: boolean,
+): Record<string, string> {
+  const expected = request.headers.get(EXPECTED_ACCOUNT_USER_HEADER);
+  const cleanup = request.headers.get(ACCOUNT_DELETION_CLEANUP_HEADER);
+  return {
+    ...(expected && UUID.test(expected)
+      ? { [EXPECTED_ACCOUNT_USER_HEADER]: expected }
+      : {}),
+    ...(cleanup === ACCOUNT_DELETION_CLEANUP_HEADER_VALUE
+      ? { [ACCOUNT_DELETION_CLEANUP_HEADER]: cleanup }
+      : {}),
+    ...(native
+      ? { [NATIVE_ACCOUNT_BETA_HEADER]: NATIVE_ACCOUNT_BETA_HEADER_VALUE }
+      : {}),
+  };
+}
 
 /**
  * Creates an RLS client and verifies the caller's identity with Auth.
@@ -32,14 +70,27 @@ type AuthenticatedContext = { supabase: SupabaseClient; user: User };
 export async function authenticatedServerContext(
   request: Request,
 ): Promise<AuthenticatedContext | Response> {
+  const deletionCleanup = request.headers.get(
+    ACCOUNT_DELETION_CLEANUP_HEADER,
+  );
+  if (
+    deletionCleanup !== null &&
+    deletionCleanup !== ACCOUNT_DELETION_CLEANUP_HEADER_VALUE
+  ) {
+    return privateError("forbidden", 403);
+  }
   if (isNativeAppOrigin(request)) return nativeBearerContext(request);
   try {
-    const supabase = await createServerSupabase();
+    const supabase = await createServerSupabase(
+      databaseBoundaryHeaders(request, false),
+    );
     const {
       data: { user },
       error,
     } = await supabase.auth.getUser();
     if (error || !user) return privateError("unauthorized", 401);
+    const boundary = expectedUserBoundary(request, user);
+    if (boundary) return boundary;
     return { supabase, user };
   } catch (error) {
     // Every authenticated route depends on this, so a missing Supabase
@@ -66,8 +117,17 @@ async function nativeBearerContext(
 ): Promise<AuthenticatedContext | Response> {
   const token = parsedBearerToken(request.headers.get("authorization"));
   if (!token) return privateError("unauthorized", 401);
+  if (
+    request.headers.get(NATIVE_ACCOUNT_BETA_HEADER) !==
+    NATIVE_ACCOUNT_BETA_HEADER_VALUE
+  ) {
+    return privateError("forbidden", 403);
+  }
   try {
-    const supabase = createBearerSupabase(token);
+    const supabase = createBearerSupabase(
+      token,
+      databaseBoundaryHeaders(request, true),
+    );
     const {
       data: { user },
       error,
@@ -82,6 +142,8 @@ async function nativeBearerContext(
       }
       return privateError("unauthorized", 401);
     }
+    const boundary = expectedUserBoundary(request, user);
+    if (boundary) return boundary;
     return { supabase, user };
   } catch (error) {
     recordServerFailure("auth", "session", error);
@@ -90,7 +152,10 @@ async function nativeBearerContext(
 }
 
 /** Builds the per-request RLS client that carries the caller's own JWT. */
-function createBearerSupabase(accessToken: string): SupabaseClient {
+function createBearerSupabase(
+  accessToken: string,
+  boundaryHeaders: Record<string, string>,
+): SupabaseClient {
   if (!isSupabaseConfigured()) {
     throw new Error(
       "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY — see docs/SETUP.md.",
@@ -111,7 +176,10 @@ function createBearerSupabase(accessToken: string): SupabaseClient {
         // load-bearing: supabase-js spreads header objects case-sensitively
         // over its own Authorization default, so a lowercase key would send
         // both values and Auth rejects the pair.
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          ...boundaryHeaders,
+        },
       },
     },
   );

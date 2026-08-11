@@ -24,6 +24,7 @@ describe("iOS App Store release configuration", () => {
       'NEXT_PUBLIC_APP_PLATFORM: "native"',
       'NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED: "false"',
       'NEXT_PUBLIC_ACCOUNT_GATE_ENABLED: "false"',
+      'NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED: "false"',
       'NEXT_PUBLIC_ANALYTICS_ENABLED: "false"',
       'NEXT_PUBLIC_SUPABASE_URL: ""',
     ]) {
@@ -57,13 +58,17 @@ describe("iOS App Store release configuration", () => {
     const billing = source("src/lib/billing/usePlus.ts");
     const settings = source("src/components/settings/SettingsScreen.tsx");
 
-    expect(api).toContain("if (ACCOUNT_SYNC_CONTAINED) return null;");
-    expect(api.indexOf("if (ACCOUNT_SYNC_CONTAINED) return null;")).toBeLessThan(
-      api.indexOf('await import(\n      "@/lib/supabase/client"'),
+    expect(api).toContain("return nativePublicApiFetch(url, init);");
+    expect(api).toContain('headers.delete(reserved);');
+    expect(api).toContain('"authorization",');
+    expect(
+      api.indexOf(
+        "if (ACCOUNT_SYNC_CONTAINED || !NATIVE_ACCOUNT_BETA_ENABLED)",
+      ),
+    ).toBeLessThan(
+      api.indexOf('await import(\n    "@/lib/supabase/client"'),
     );
-    expect(billing).toContain(
-      "const nativeGuestOnly = isNativeTarget() && ACCOUNT_SYNC_CONTAINED",
-    );
+    expect(billing).toContain("if (NATIVE_COMMERCE_CONTAINED) return;");
     expect(settings).toMatch(
       /\{!nativeTarget \? \([\s\S]*?BibleQuest website[\s\S]*?\) : null\}/,
     );
@@ -105,9 +110,18 @@ describe("iOS App Store release configuration", () => {
     const startup = source(
       "src/components/app-shell/NativeJourneyGuard.tsx",
     );
+    const layout = source("src/app/layout.tsx");
     const storage = source("src/lib/supabase/native-auth-storage.ts");
 
     expect(startup).toContain("clearLegacyNativeAuthStorage()");
+    expect(startup).toContain("await restoreJourneyIfEvicted()");
+    expect(startup).toContain("await useQuestOS.persist.rehydrate()");
+    expect(startup.indexOf("await restoreJourneyIfEvicted()")).toBeLessThan(
+      startup.indexOf("startJourneyBackup()"),
+    );
+    expect(layout).toMatch(
+      /<NativeJourneyGuard>\s*\{children\}[\s\S]*?<\/NativeJourneyGuard>/,
+    );
     expect(storage).toContain('"biblequest:native-auth-cookies"');
     expect(storage).toContain("storage ?? window.localStorage");
   });

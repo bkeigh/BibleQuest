@@ -10,7 +10,9 @@ import { supabasePublishableKey } from "./config";
 
 export { isSupabaseConfigured };
 
-export async function createServerSupabase() {
+export async function createServerSupabase(
+  boundaryHeaders: Record<string, string> = {},
+) {
   if (!isSupabaseConfigured()) {
     throw new Error(
       "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY — see docs/SETUP.md.",
@@ -21,6 +23,7 @@ export async function createServerSupabase() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     supabasePublishableKey()!,
     {
+      global: { headers: boundaryHeaders },
       cookies: {
         getAll() {
           return cookieStore.getAll();

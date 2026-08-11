@@ -10,10 +10,25 @@ const LATCH = "BIBLEQUEST_NATIVE_API_ORIGIN_ENABLED";
 const SEGMENT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
 const TOKEN = `${SEGMENT}.${"a1-_".repeat(340)}.${SEGMENT}`;
 
-function req(origin: string | null, authorization?: string) {
+function req(
+  origin: string | null,
+  authorization?: string,
+  betaMarker: string | null = authorization ? "v1" : null,
+  deletionCleanup: string | null = null,
+  expectedUser: string | null = null,
+) {
   const headers = new Headers({ host: "www.biblequest.co" });
   if (origin !== null) headers.set("origin", origin);
   if (authorization !== undefined) headers.set("authorization", authorization);
+  if (betaMarker !== null) {
+    headers.set("x-biblequest-native-account-beta", betaMarker);
+  }
+  if (deletionCleanup !== null) {
+    headers.set("x-biblequest-account-deletion-cleanup", deletionCleanup);
+  }
+  if (expectedUser !== null) {
+    headers.set("x-biblequest-expected-user", expectedUser);
+  }
   return new Request("https://www.biblequest.co/api/arcade/status", {
     headers,
   });
@@ -106,6 +121,24 @@ describe("the native bearer branch", () => {
     });
   });
 
+  it("rejects a bearer request outside the exact account-beta marker", async () => {
+    process.env[LATCH] = "true";
+    for (const marker of [null, "", "v2"]) {
+      const result = await context(
+        req(NATIVE_APP_ORIGIN, `Bearer ${TOKEN}`, marker),
+      );
+      expect((result as Response).status).toBe(403);
+    }
+  });
+
+  it("rejects a malformed deletion-cleanup marker", async () => {
+    process.env[LATCH] = "true";
+    const result = await context(
+      req(NATIVE_APP_ORIGIN, `Bearer ${TOKEN}`, "v1", "wrong"),
+    );
+    expect((result as Response).status).toBe(403);
+  });
+
   it("ignores the Authorization header entirely while the latch is off", async () => {
     // Latch off is production today: a bearer header must change nothing.
     // Both requests take the cookie path, which fails identically in this
@@ -140,8 +173,13 @@ describe("the bearer client construction", () => {
   async function mockedContext(
     getUser: ReturnType<typeof vi.fn>,
     authorization = `Bearer ${TOKEN}`,
+    expectedUser: string | null = null,
   ) {
-    const createClient = vi.fn(() => ({ auth: { getUser } }));
+    const createClient = vi.fn<
+      (url: string, key: string, options: unknown) => {
+        auth: { getUser: typeof getUser };
+      }
+    >(() => ({ auth: { getUser } }));
     vi.doMock("@supabase/supabase-js", async () => {
       const actual = await vi.importActual("@supabase/supabase-js");
       return { ...actual, createClient };
@@ -150,7 +188,7 @@ describe("the bearer client construction", () => {
       "@/lib/supabase/authenticated.server"
     );
     const result = await authenticatedServerContext(
-      req(NATIVE_APP_ORIGIN, authorization),
+      req(NATIVE_APP_ORIGIN, authorization, "v1", null, expectedUser),
     );
     return { createClient, getUser, result };
   }
@@ -190,7 +228,63 @@ describe("the bearer client construction", () => {
     // spreads header objects case-sensitively over its own Authorization
     // default, so a lowercase key would send both values.
     expect(options.global.headers.Authorization).toBe(`Bearer ${TOKEN}`);
-    expect(Object.keys(options.global.headers)).toEqual(["Authorization"]);
+    expect(options.global.headers).toMatchObject({
+      "x-biblequest-native-account-beta": "v1",
+    });
+    expect(Object.keys(options.global.headers).sort()).toEqual([
+      "Authorization",
+      "x-biblequest-native-account-beta",
+    ]);
+  });
+
+  it("forwards the exact deletion-cleanup marker to the bearer client", async () => {
+    const user = { id: "10000000-0000-4000-8000-000000000001" };
+    const getUser = vi.fn(async () => ({ data: { user }, error: null }));
+    const createClient = vi.fn<
+      (url: string, key: string, options: unknown) => {
+        auth: { getUser: typeof getUser };
+      }
+    >(() => ({ auth: { getUser } }));
+    vi.doMock("@supabase/supabase-js", async () => {
+      const actual = await vi.importActual("@supabase/supabase-js");
+      return { ...actual, createClient };
+    });
+    const { authenticatedServerContext } = await import(
+      "@/lib/supabase/authenticated.server"
+    );
+
+    await authenticatedServerContext(
+      req(
+        NATIVE_APP_ORIGIN,
+        `Bearer ${TOKEN}`,
+        "v1",
+        "v1",
+        user.id,
+      ),
+    );
+
+    const options = createClient.mock.calls[0]?.[2] as unknown;
+    expect(options).toMatchObject({
+      global: {
+        headers: {
+          "x-biblequest-account-deletion-cleanup": "v1",
+          "x-biblequest-expected-user": user.id,
+        },
+      },
+    });
+  });
+
+  it("rejects a stale caller-captured user before an account route runs", async () => {
+    const user = { id: "10000000-0000-4000-8000-000000000001" };
+    const getUser = vi.fn(async () => ({ data: { user }, error: null }));
+    const { result } = await mockedContext(
+      getUser,
+      `Bearer ${TOKEN}`,
+      "20000000-0000-4000-8000-000000000002",
+    );
+
+    expect(result).toBeInstanceOf(Response);
+    expect((result as Response).status).toBe(403);
   });
 
   it("returns 401 when verification rejects the token", async () => {

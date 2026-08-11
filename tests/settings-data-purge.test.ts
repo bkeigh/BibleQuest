@@ -5,6 +5,10 @@ const SETTINGS = readFileSync(
   "src/components/settings/SettingsScreen.tsx",
   "utf8",
 );
+const DEVICE_CLEANUP = readFileSync(
+  "src/lib/auth/device-account-cleanup.ts",
+  "utf8",
+);
 
 /** Returns one Settings handler so ordering assertions stay narrowly scoped. */
 function handler(name: string, nextMarker: string): string {
@@ -26,9 +30,9 @@ describe("Settings device-data purge", () => {
   });
 
   it("also purges standalone Seven Days, tutorial, and boost records", () => {
-    const standalone = SETTINGS.slice(
-      SETTINGS.indexOf("function clearStandaloneGameData"),
-      SETTINGS.indexOf("function Row"),
+    const standalone = DEVICE_CLEANUP.slice(
+      DEVICE_CLEANUP.indexOf("function clearStandaloneGameData"),
+      DEVICE_CLEANUP.indexOf("export function purgeDeletedAccountDeviceData"),
     );
 
     expect(standalone).toContain("clearGameProgress()");
@@ -38,7 +42,8 @@ describe("Settings device-data purge", () => {
 
     const deletion = handler("deleteAccount", "\n\n  /** Removes account");
     const clear = handler("clearJourneyData", "\n\n  return (");
-    expect(deletion).toContain("clearStandaloneGameData()");
+    expect(deletion).toContain("purgeDeletedAccountDeviceData(");
+    expect(DEVICE_CLEANUP).toContain("clearStandaloneGameData,");
     expect(clear).toContain("clearStandaloneGameData()");
   });
 
@@ -46,7 +51,8 @@ describe("Settings device-data purge", () => {
     const deletion = handler("deleteAccount", "\n\n  /** Removes account");
     const clear = handler("clearJourneyData", "\n\n  return (");
 
-    expect(deletion).toContain("await purgeNativeReminders()");
+    expect(deletion).toContain("purgeDeletedAccountDeviceData(");
+    expect(DEVICE_CLEANUP).toContain("purgeNativeReminders");
     expect(clear).toContain("purgeNativeReminders(),");
   });
 

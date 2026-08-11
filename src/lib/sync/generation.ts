@@ -137,6 +137,60 @@ export function clearStoredAccountSyncGenerations(
   }
 }
 
+/** Remove one deleted account while retaining every other valid ledger entry. */
+export function removeStoredAccountSyncGeneration(
+  userId: string,
+  storage: GenerationStorage | null = browserStorage(),
+): boolean {
+  if (!UUID.test(userId) || !storage) return false;
+  try {
+    const raw = storage.getItem(STORAGE_KEY);
+    if (!raw) return true;
+    const accounts = parseCompleteLedger(raw);
+    if (!accounts) return false;
+    const remaining = accounts.filter((entry) => entry.userId !== userId);
+    if (remaining.length === accounts.length) return true;
+    if (remaining.length === 0) {
+      storage.removeItem(STORAGE_KEY);
+      return storage.getItem(STORAGE_KEY) === null;
+    }
+    const encoded = JSON.stringify({ version: 1, accounts: remaining });
+    storage.setItem(STORAGE_KEY, encoded);
+    return storage.getItem(STORAGE_KEY) === encoded;
+  } catch {
+    // An unreadable ledger cannot be rewritten without risking another account.
+    return false;
+  }
+}
+
+/** Validate the complete ledger before an account-scoped destructive rewrite. */
+function parseCompleteLedger(raw: string): StoredGeneration[] | null {
+  const parsed = JSON.parse(raw) as Partial<StoredGenerations>;
+  if (
+    parsed.version !== 1 ||
+    !Array.isArray(parsed.accounts) ||
+    parsed.accounts.length > MAX_ACCOUNTS
+  ) {
+    return null;
+  }
+  const accounts = parsed.accounts.filter(
+    (entry): entry is StoredGeneration =>
+      Boolean(entry) &&
+      UUID.test(entry.userId) &&
+      Number.isSafeInteger(entry.generation) &&
+      entry.generation >= 0 &&
+      (entry.resetRequired === undefined ||
+        typeof entry.resetRequired === "boolean"),
+  );
+  if (
+    accounts.length !== parsed.accounts.length ||
+    new Set(accounts.map((entry) => entry.userId)).size !== accounts.length
+  ) {
+    return null;
+  }
+  return accounts;
+}
+
 /** Resolve localStorage only inside a browser boundary. */
 function browserStorage(): GenerationStorage | null {
   return typeof window === "undefined" ? null : window.localStorage;

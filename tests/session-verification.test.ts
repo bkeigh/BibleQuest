@@ -32,13 +32,13 @@ describe("Supabase session verification", () => {
     });
   });
 
-  it("clears deleted, missing, and invalid local sessions", () => {
+  it("distinguishes a deleted account from invalid local credentials", () => {
     expect(
       decideSessionVerification(false, {
         status: 403,
         code: "user_not_found",
       }),
-    ).toBe("clear-local-auth");
+    ).toBe("purge-deleted-account");
     expect(
       decideSessionVerification(false, {
         name: "AuthSessionMissingError",
@@ -67,7 +67,7 @@ describe("Supabase session verification", () => {
     ).toBe("preserve-local-state");
   });
 
-  it("keeps user A isolated through user B timeout and terminal deletion", () => {
+  it("keeps user A isolated through user B timeout and scoped deletion", () => {
     const userBScope = observedSessionBoundary("user-a", "user-b");
     expect(userBScope.isolateUntilVerified).toBe(true);
     expect(userBScope.preserveVerifiedUserOnRetryableFailure).toBe(false);
@@ -80,6 +80,6 @@ describe("Supabase session verification", () => {
         status: 403,
         code: "user_not_found",
       }),
-    ).toBe("clear-local-auth");
+    ).toBe("purge-deleted-account");
   });
 });

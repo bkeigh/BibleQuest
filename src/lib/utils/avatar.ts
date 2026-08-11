@@ -81,6 +81,28 @@ function tx(
   });
 }
 
+/** Resolve true only after IndexedDB commits a full-store clear transaction. */
+function clearAvatarStore(db: IDBDatabase): Promise<boolean> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    try {
+      const transaction = db.transaction(STORE, "readwrite");
+      transaction.oncomplete = () => finish(true);
+      transaction.onerror = () => finish(false);
+      transaction.onabort = () => finish(false);
+      const request = transaction.objectStore(STORE).clear();
+      request.onerror = () => finish(false);
+    } catch {
+      finish(false);
+    }
+  });
+}
+
 /** Decode with createImageBitmap, falling back to an <img> element decode —
  * Safari can render some formats (e.g. HEIC) it won't hand to
  * createImageBitmap. Returns null when the browser can't decode it at all. */
@@ -239,4 +261,16 @@ export async function clearAvatar(marker?: string | null): Promise<void> {
   );
   db.close();
   reportAvatarChange(marker ?? null);
+}
+
+/** Clear and confirm the complete local avatar cache for terminal deletion. */
+export async function purgeAvatarCache(): Promise<boolean> {
+  const db = await openDb();
+  if (!db) return false;
+  const cleared = await clearAvatarStore(db);
+  db.close();
+  if (cleared) {
+    reportAvatarChange(null);
+  }
+  return cleared;
 }

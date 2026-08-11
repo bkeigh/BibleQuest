@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/supabase/client", () => ({
   createClient: mocks.createClient,
+  createSyncControlClient: () => mocks.createClient(),
   createSyncClient: () => mocks.createClient.mock.results.at(-1)?.value,
   isSupabaseConfigured: () => true,
 }));
@@ -44,7 +45,6 @@ vi.mock("@/lib/sync/containment", () => ({
 
 import {
   filterByTombstones,
-  INITIAL_SYNC_DEADLINE_MS,
   isMissingBibleSyncColumn,
   isMissingRecentVersesTable,
   mergeSnapshots,
@@ -53,11 +53,13 @@ import {
   startSync,
   stopSync,
 } from "@/lib/sync/engine";
+import { SYNC_REQUEST_DEADLINE_MS } from "@/lib/sync/request";
 import {
   clearLastSyncedUserId,
   getLastSyncedUserId,
   initialSyncIsPending,
   localJourneyClaimIsPending,
+  markInitialSyncPending,
   setLastSyncedUserId,
 } from "@/lib/sync/last-user";
 import { prepareLocalJourneyHandoff } from "@/lib/sync/handoff";
@@ -437,6 +439,160 @@ describe("sync ownership, lifecycle, and merge safety", () => {
     ]);
   });
 
+  it("does not import remote rows when the mutable CAS baseline cannot persist", async () => {
+    const local = currentSnapshot();
+    local.profile = { ...local.profile!, displayName: "Local guest" };
+    useQuestOS.getState().importData(local);
+    const remoteProfile = {
+      ...local.profile,
+      displayName: "Remote account",
+    };
+    mocks.createClient.mockReturnValue(
+      fakeClient(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        async (table) =>
+          table === "profiles"
+            ? {
+                data: profileToRow("account-a", remoteProfile),
+                error: null,
+              }
+            : undefined,
+      ),
+    );
+    const nativeSetItem = window.localStorage.setItem.bind(window.localStorage);
+    const storageWrite = vi
+      .spyOn(window.localStorage, "setItem")
+      .mockImplementation((key, value) => {
+        if (key === "biblequest:mutable-account-cas:v1") {
+          throw new Error("fixture storage unavailable");
+        }
+        nativeSetItem(key, value);
+      });
+
+    try {
+      await startSync("account-a");
+
+      expect(useSyncStatus.getState()).toMatchObject({
+        state: "error",
+        initialSyncComplete: false,
+      });
+      expect(useQuestOS.getState().profile?.displayName).toBe("Local guest");
+      expect(initialSyncIsPending("account-a")).toBe(true);
+    } finally {
+      storageWrite.mockRestore();
+      stopSync();
+    }
+  });
+
+  it("does not import remote rows when the daily CAS baseline cannot persist", async () => {
+    const local = currentSnapshot();
+    local.profile = { ...local.profile!, displayName: "Local guest" };
+    useQuestOS.getState().importData(local);
+    const remoteProfile = {
+      ...local.profile,
+      displayName: "Remote account",
+    };
+    mocks.createClient.mockReturnValue(
+      fakeClient(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        async (table) =>
+          table === "profiles"
+            ? {
+                data: profileToRow("account-a", remoteProfile),
+                error: null,
+              }
+            : undefined,
+      ),
+    );
+    const nativeSetItem = window.localStorage.setItem.bind(window.localStorage);
+    const storageWrite = vi
+      .spyOn(window.localStorage, "setItem")
+      .mockImplementation((key, value) => {
+        if (key === "biblequest:daily-quest-cas:v1") {
+          throw new Error("fixture storage unavailable");
+        }
+        nativeSetItem(key, value);
+      });
+
+    try {
+      await startSync("account-a");
+
+      expect(useSyncStatus.getState()).toMatchObject({
+        state: "error",
+        initialSyncComplete: false,
+      });
+      expect(useQuestOS.getState().profile?.displayName).toBe("Local guest");
+      expect(initialSyncIsPending("account-a")).toBe(true);
+    } finally {
+      storageWrite.mockRestore();
+      stopSync();
+    }
+  });
+
+  it("resumes guest adoption interrupted before its generation was stored", async () => {
+    const snapshot = currentSnapshot();
+    useQuestOS.getState().importData(snapshot);
+    // Recreate the durable state left if iOS stops after owner stamping but
+    // before the first merged generation reaches local storage.
+    markInitialSyncPending("account-a");
+    setLastSyncedUserId("account-a");
+    mocks.createClient.mockReturnValue(fakeClient());
+
+    await startSync("account-a");
+
+    expect(useSyncStatus.getState().state).toBe("idle");
+    expect(mocks.generations.get("account-a")).toBe(0);
+    expect(useQuestOS.getState().profile?.displayName).toBe(
+      snapshot.profile?.displayName,
+    );
+    expect(useQuestOS.getState().prayers).toEqual(snapshot.prayers);
+    expect(useQuestOS.getState().reflections).toEqual(snapshot.reflections);
+    expect(initialSyncIsPending("account-a")).toBe(false);
+  });
+
+  it("keeps an existing account authoritative during interrupted adoption", async () => {
+    const guest = currentSnapshot();
+    useQuestOS.getState().importData(guest);
+    markInitialSyncPending("account-a");
+    setLastSyncedUserId("account-a");
+    const existingProfile = {
+      ...guest.profile!,
+      displayName: "Existing account owner",
+    };
+    mocks.createClient.mockReturnValue(
+      fakeClient(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        async (table) =>
+          table === "profiles"
+            ? {
+                data: profileToRow("account-a", existingProfile),
+                error: null,
+              }
+            : undefined,
+      ),
+    );
+
+    await startSync("account-a");
+
+    expect(useQuestOS.getState().profile?.displayName).toBe(
+      "Existing account owner",
+    );
+    expect(useQuestOS.getState().prayers).toEqual(guest.prayers);
+    expect(initialSyncIsPending("account-a")).toBe(false);
+  });
+
   it("joins unique guest rows without replacing an existing account", async () => {
     const guest = currentSnapshot();
     useQuestOS.getState().importData(guest);
@@ -516,6 +672,44 @@ describe("sync ownership, lifecycle, and merge safety", () => {
     expect(useQuestOS.getState().profile).toBeNull();
     expect(useQuestOS.getState().prayers).toEqual([]);
     expect(localJourneyClaimIsPending("account-b")).toBe(false);
+  });
+
+  it("does not stamp the new owner when the blank journey was not persisted", () => {
+    useQuestOS.getState().importData(currentSnapshot());
+    setLastSyncedUserId("account-a");
+    const storage = useQuestOS.persist.getOptions().storage!;
+    const nativeSetItem = storage.setItem.bind(storage);
+    const setItem = vi
+      .spyOn(storage, "setItem")
+      .mockImplementation((key, value) => {
+        if (key !== "biblequest:v1") nativeSetItem(key, value);
+      });
+
+    expect(() => prepareLocalJourneyHandoff("account-b", true)).toThrow(
+      "The previous journey could not be cleared.",
+    );
+    expect(getLastSyncedUserId()).toBe("account-a");
+    setItem.mockRestore();
+  });
+
+  it("does not stamp the new owner when private draft cleanup cannot commit", () => {
+    useQuestOS.getState().importData(currentSnapshot());
+    setLastSyncedUserId("account-a");
+    const nativeSetItem = window.localStorage.setItem.bind(window.localStorage);
+    const setItem = vi
+      .spyOn(window.localStorage, "setItem")
+      .mockImplementation((key, value) => {
+        if (key === "biblequest:journal-drafts-cleared-at") {
+          throw new Error("private fixture");
+        }
+        nativeSetItem(key, value);
+      });
+
+    expect(() => prepareLocalJourneyHandoff("account-b", true)).toThrow(
+      "The previous journey could not be cleared.",
+    );
+    expect(getLastSyncedUserId()).toBe("account-a");
+    setItem.mockRestore();
   });
 
   it("downgrades only the two additive Bible columns during migration rollout", () => {
@@ -968,14 +1162,14 @@ describe("sync ownership, lifecycle, and merge safety", () => {
     expect(initialSyncIsPending("account-a")).toBe(false);
   });
 
-  it("turns a stalled initial restore into a retryable error", async () => {
+  it("turns a stalled account request into a retryable error", async () => {
     vi.useFakeTimers();
     const stalledPull = deferred();
     mocks.createClient.mockReturnValue(fakeClient(stalledPull.promise));
 
     try {
       const restore = startSync("account-a");
-      await vi.advanceTimersByTimeAsync(INITIAL_SYNC_DEADLINE_MS);
+      await vi.advanceTimersByTimeAsync(SYNC_REQUEST_DEADLINE_MS);
       await restore;
 
       expect(useSyncStatus.getState()).toMatchObject({
@@ -987,6 +1181,41 @@ describe("sync ownership, lifecycle, and merge safety", () => {
     } finally {
       stopSync();
       stalledPull.resolve();
+      vi.useRealTimers();
+    }
+  });
+
+  it("allows a large restore to exceed one request deadline in aggregate", async () => {
+    vi.useFakeTimers();
+    const startedAt = Date.now();
+    mocks.createClient.mockReturnValue(
+      fakeClient(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        async () => {
+          await new Promise((resolve) => setTimeout(resolve, 6_000));
+          return undefined;
+        },
+      ),
+    );
+
+    try {
+      const restore = startSync("account-a");
+      await vi.runAllTimersAsync();
+      await restore;
+
+      expect(Date.now() - startedAt).toBeGreaterThan(
+        SYNC_REQUEST_DEADLINE_MS,
+      );
+      expect(useSyncStatus.getState()).toMatchObject({
+        state: "idle",
+        userId: "account-a",
+        initialSyncComplete: true,
+      });
+    } finally {
+      stopSync();
       vi.useRealTimers();
     }
   });

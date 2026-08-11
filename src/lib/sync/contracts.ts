@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { assertNativeAccountBetaAvailability } from "./native-beta-contract";
+import { withSyncRequestDeadline } from "./request";
 
 export const DAILY_QUEST_SYNC_CONTRACT = "biblequest_daily_quest_sync_v1";
 export const ACCOUNT_SYNC_CONTRACT = "biblequest_account_sync_v4";
@@ -26,10 +28,20 @@ function isReadyContract(value: unknown, expected: string): boolean {
 
 /** Prove every write protocol before the engine reads or writes user data. */
 export async function assertAccountSyncContracts(supabase: SupabaseClient) {
+  await assertNativeAccountBetaAvailability(supabase);
   const [daily, account, guided] = await Promise.all([
-    supabase.rpc("daily_quest_sync_contract"),
-    supabase.rpc("account_sync_contract"),
-    supabase.rpc("guided_progress_sync_contract"),
+    withSyncRequestDeadline(
+      supabase.rpc("daily_quest_sync_contract"),
+      "Daily quest sync contract",
+    ),
+    withSyncRequestDeadline(
+      supabase.rpc("account_sync_contract"),
+      "Account sync contract",
+    ),
+    withSyncRequestDeadline(
+      supabase.rpc("guided_progress_sync_contract"),
+      "Guided progress sync contract",
+    ),
   ]);
   if (
     daily.error ||
