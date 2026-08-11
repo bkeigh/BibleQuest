@@ -246,7 +246,9 @@ export function PlusCta() {
     );
   }
 
-  if (!plus.canPurchase || plus.plans.length !== 3) {
+  if (!plus.canPurchase || plus.purchaseOptions.length !== 3) {
+    // A non-US or unknown native storefront receives no acquisition surface.
+    if (plus.purchaseChannel === "native") return null;
     return (
       <div className="mt-5 space-y-2">
         {portalReturnNotice}
@@ -279,30 +281,45 @@ export function PlusCta() {
         </p>
       )}
       {endedMembershipNotice}
+      {plus.purchaseChannel === "native" && (
+        <p className="text-[0.8125rem] leading-relaxed text-charcoal">
+          Choose a plan to leave BibleQuest and open secure Stripe Checkout in
+          your system browser. Stripe shows the price and final total before
+          you confirm. BibleQuest does not collect card details in the app.
+        </p>
+      )}
+      {endedMembershipNotice}
       <div className="grid gap-2 sm:grid-cols-3">
-        {plus.plans.map((plan) => (
-          <GentleButton
-            key={plan.interval}
-            variant="gold"
-            size="md"
-            disabled={busy !== null}
-            onClick={() => void checkout(plan.interval)}
-          >
-            {plan.interval === "monthly"
-              ? "Monthly"
-              : plan.interval === "annual"
-                ? "Annual"
-                : "Lifetime"}{" "}
-            —{" "}
-            {formatBillingAmount(plan)}
-            {plan.interval === "monthly"
-              ? "/month"
-              : plan.interval === "annual"
-                ? "/year"
-                : " once"}
-            {busy === plan.interval ? " …" : ""}
-          </GentleButton>
-        ))}
+        {plus.purchaseOptions.map((interval) => {
+          const plan = plus.plans.find(
+            (candidate) => candidate.interval === interval,
+          );
+          return (
+            <GentleButton
+              key={interval}
+              variant="gold"
+              size="md"
+              disabled={busy !== null}
+              onClick={() => void checkout(interval)}
+            >
+              {interval === "monthly"
+                ? "Monthly"
+                : interval === "annual"
+                  ? "Annual"
+                  : "Lifetime"}
+              {plan
+                ? ` — ${formatBillingAmount(plan)}${
+                    interval === "monthly"
+                      ? "/month"
+                      : interval === "annual"
+                        ? "/year"
+                        : " once"
+                  }`
+                : " in Stripe"}
+              {busy === interval ? " …" : ""}
+            </GentleButton>
+          );
+        })}
       </div>
       <p className="text-[0.75rem] leading-relaxed text-ash">
         Monthly and annual Plus renew automatically until canceled. Lifetime

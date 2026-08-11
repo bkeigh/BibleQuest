@@ -18,9 +18,18 @@ import { track } from "@/lib/analytics/events";
 import { useSession } from "@/lib/supabase/useSession";
 import type { PlanKey } from "@/lib/questos/types";
 import { apiFetch } from "@/lib/platform/api";
-import { purchaseAdapter } from "@/lib/platform/purchases";
+import {
+  NATIVE_STOREFRONT_UI_TTL_MS,
+  purchaseAdapter,
+} from "@/lib/platform/purchases";
+import { isNativeTarget } from "@/lib/platform/target";
+import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 import { NATIVE_COMMERCE_CONTAINED } from "./containment";
-import type { BillingInterval, BillingPlan } from "./validation";
+import {
+  BILLING_INTERVALS,
+  type BillingInterval,
+  type BillingPlan,
+} from "./validation";
 
 export type PlusStatus =
   | "coming-soon"
@@ -128,18 +137,48 @@ function safePlusStatus(value: BillingStatusResponse): PlusStatus {
     : "free";
 }
 
+/** Projects one authenticated status payload without inventing native prices. */
+function statusProjectionState(
+  subjectKey: string,
+  payload: BillingStatusResponse,
+): StoredPlusState {
+  return {
+    subjectKey,
+    availability: payload.availability,
+    mode: payload.mode ?? null,
+    status: safePlusStatus(payload),
+    plan: payload.plan,
+    isPlus: payload.isPlus,
+    entitlementSource: payload.entitlementSource ?? null,
+    purchasesEnabled: payload.purchasesEnabled,
+    plans: [],
+    interval: payload.interval ?? null,
+    currentPeriodEnd: payload.currentPeriodEnd ?? null,
+    cancelAtPeriodEnd: payload.cancelAtPeriodEnd ?? false,
+    hasCustomer: payload.hasCustomer ?? false,
+    synchronizedAt: payload.synchronizedAt ?? null,
+    error: null,
+    returnNotice: safeReturnNotice(),
+  };
+}
+
 async function billingFetch(
   path: string,
   init?: RequestInit,
+  expectedNativeUserId?: string,
 ): Promise<Response> {
-  return apiFetch(path, {
-    credentials: "same-origin",
-    cache: "no-store",
-    ...init,
-  });
+  return apiFetch(
+    path,
+    {
+      credentials: isNativeTarget() ? "omit" : "same-origin",
+      cache: "no-store",
+      ...init,
+    },
+    expectedNativeUserId,
+  );
 }
 
-// Native billing remains unavailable until a separately audited adapter is supplied.
+// The native adapter remains inert unless the account-beta checkout flag is exact.
 const purchases = purchaseAdapter();
 
 function safeReturnNotice(): StoredPlusState["returnNotice"] {
@@ -164,6 +203,8 @@ export interface PlusState {
   entitlementSource: "stripe" | "operator" | null;
   canPurchase: boolean;
   canManage: boolean;
+  purchaseChannel: "web-stripe" | "native";
+  purchaseOptions: readonly BillingInterval[];
   plans: BillingPlan[];
   interval: BillingInterval | "unknown" | null;
   currentPeriodEnd: string | null;
@@ -180,28 +221,43 @@ export interface PlusState {
 /** Coordinates one account-bound, server-authoritative Plus projection. */
 function usePlusCoordinator(): PlusState {
   const session = useSession();
+  const nativeTarget = isNativeTarget();
+  const nativeContained =
+    nativeTarget && (ACCOUNT_SYNC_CONTAINED || NATIVE_COMMERCE_CONTAINED);
+  const sessionUserId = session.user?.id ?? null;
   const subjectKey = session.loading
     ? "session:pending"
-    : session.user
-      ? `user:${session.user.id}`
+    : sessionUserId
+      ? `user:${sessionUserId}`
       : "guest";
   const [stored, setStored] = useState<StoredPlusState>(() =>
-    NATIVE_COMMERCE_CONTAINED
+    nativeContained
       ? containedNativeState(subjectKey)
       : initialState(subjectKey),
   );
+  const [storefrontAvailable, setStorefrontAvailable] = useState(
+    purchases.channel === "web-stripe",
+  );
   const sequence = useRef(0);
+  const storefrontSequence = useRef(0);
   const currentSubject = useRef(subjectKey);
+  const accountActions = useRef(new AbortController());
   const reconciledReturn = useRef(false);
   const portalReconciliationPending = useRef(false);
   const portalActionInFlight = useRef(false);
 
+  // Abort every billing side effect when its verified account boundary moves.
   useEffect(() => {
+    const controller = new AbortController();
+    const previousController = accountActions.current;
+    accountActions.current = controller;
+    previousController.abort();
     currentSubject.current = subjectKey;
     reconciledReturn.current = false;
     portalReconciliationPending.current = false;
     portalActionInFlight.current = false;
     return () => {
+      controller.abort();
       sequence.current += 1;
     };
   }, [subjectKey]);
@@ -209,13 +265,13 @@ function usePlusCoordinator(): PlusState {
   const visible =
     stored.subjectKey === subjectKey
       ? stored
-      : NATIVE_COMMERCE_CONTAINED
+      : nativeContained
         ? containedNativeState(subjectKey)
         : initialState(subjectKey);
 
   const load = useCallback(async () => {
     if (session.loading) return;
-    if (NATIVE_COMMERCE_CONTAINED) {
+    if (nativeContained) {
       setStored(containedNativeState(subjectKey));
       return;
     }
@@ -224,6 +280,16 @@ function usePlusCoordinator(): PlusState {
       // Guests need public plan copy but must not probe the protected account
       // projection, which would create a noisy expected 401 on every app load.
       if (subjectKey === "guest") {
+        // Native never calls the shared-cacheable plans route: it is purposely
+        // absent from the reviewed CORS allowlist.
+        if (nativeTarget) {
+          setStored({
+            ...initialState(subjectKey),
+            status: "sign-in-required",
+            returnNotice: safeReturnNotice(),
+          });
+          return;
+        }
         const plansResponse = await billingFetch("/api/billing/plans");
         if (
           request !== sequence.current ||
@@ -252,6 +318,41 @@ function usePlusCoordinator(): PlusState {
           status: "sign-in-required",
           returnNotice: safeReturnNotice(),
         });
+        return;
+      }
+
+      // Native uses only the bearer-authenticated entitlement projection. The
+      // server-selected Checkout page remains the authority for actual prices.
+      if (nativeTarget) {
+        const statusResponse = await billingFetch(
+          "/api/billing/status",
+          undefined,
+          sessionUserId ?? undefined,
+        );
+        if (
+          request !== sequence.current ||
+          currentSubject.current !== subjectKey
+        ) {
+          return;
+        }
+        if (statusResponse.status === 401) {
+          setStored({
+            ...initialState(subjectKey),
+            status: "sign-in-required",
+            returnNotice: safeReturnNotice(),
+          });
+          return;
+        }
+        if (!statusResponse.ok) throw new Error("failed");
+        const statusPayload =
+          (await statusResponse.json()) as BillingStatusResponse;
+        if (
+          request !== sequence.current ||
+          currentSubject.current !== subjectKey
+        ) {
+          return;
+        }
+        setStored(statusProjectionState(subjectKey, statusPayload));
         return;
       }
 
@@ -333,7 +434,13 @@ function usePlusCoordinator(): PlusState {
         returnNotice: safeReturnNotice(),
       });
     }
-  }, [session.loading, subjectKey]);
+  }, [
+    nativeContained,
+    nativeTarget,
+    session.loading,
+    sessionUserId,
+    subjectKey,
+  ]);
 
   // Start after the effect commits so async state never cascades in its body.
   useEffect(() => {
@@ -342,24 +449,27 @@ function usePlusCoordinator(): PlusState {
   }, [load]);
 
   const refresh = useCallback(async () => {
-    if (NATIVE_COMMERCE_CONTAINED) {
+    if (nativeContained) {
       await load();
       return;
     }
-    if (session.user) {
-      const outcome = await purchases.restore();
+    if (sessionUserId) {
+      const outcome = await purchases.restore({
+        expectedUserId: sessionUserId,
+        signal: accountActions.current.signal,
+      });
       if (outcome === "failed" || outcome === "unavailable") {
         throw new Error("refresh failed");
       }
       if (outcome === "restored") track("plus_billing_refreshed");
     }
     await load();
-  }, [load, session.user]);
+  }, [load, nativeContained, sessionUserId]);
 
   // Returning focus after an external Portal visit reconciles current Stripe
   // objects once; ordinary lifecycle events keep using the cheaper status load.
   useEffect(() => {
-    if (NATIVE_COMMERCE_CONTAINED) return;
+    if (nativeContained) return;
     if (session.loading) return;
     const refreshOnReturn = () => {
       if (!portalReconciliationPending.current) {
@@ -382,12 +492,80 @@ function usePlusCoordinator(): PlusState {
       window.removeEventListener("online", refreshOnReturn);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [load, refresh, session.loading]);
+  }, [load, nativeContained, refresh, session.loading]);
+
+  // StoreKit availability is transient policy state, not profile data. Keep it
+  // only in memory, invalidate it on every lifecycle/update signal, and expire
+  // it even if the native update stream is interrupted.
+  useEffect(() => {
+    let disposed = false;
+    let expiryTimer: number | null = null;
+    let removeNativeObserver: () => void = () => undefined;
+    const shouldCheck =
+      purchases.channel === "native" &&
+      purchases.available &&
+      !nativeContained &&
+      !session.loading &&
+      Boolean(sessionUserId) &&
+      (visible.purchasesEnabled || visible.hasCustomer);
+
+    const check = () => {
+      const request = ++storefrontSequence.current;
+      setStorefrontAvailable(false);
+      if (expiryTimer !== null) window.clearTimeout(expiryTimer);
+      void purchases.acquisitionAvailable().then((available) => {
+        if (disposed || request !== storefrontSequence.current) return;
+        setStorefrontAvailable(available);
+        expiryTimer = window.setTimeout(check, NATIVE_STOREFRONT_UI_TTL_MS);
+      });
+    };
+    const checkWhenVisible = () => {
+      if (document.visibilityState === "visible") check();
+    };
+
+    if (purchases.channel === "web-stripe") {
+      const timer = window.setTimeout(() => setStorefrontAvailable(true), 0);
+      return () => window.clearTimeout(timer);
+    }
+    if (!shouldCheck) {
+      const timer = window.setTimeout(() => setStorefrontAvailable(false), 0);
+      return () => {
+        disposed = true;
+        storefrontSequence.current += 1;
+        window.clearTimeout(timer);
+      };
+    }
+
+    const initialCheck = window.setTimeout(check, 0);
+    window.addEventListener("focus", check);
+    window.addEventListener("pageshow", check);
+    document.addEventListener("visibilitychange", checkWhenVisible);
+    void purchases.observeAcquisitionChanges(check).then((remove) => {
+      if (disposed) remove();
+      else removeNativeObserver = remove;
+    });
+    return () => {
+      disposed = true;
+      storefrontSequence.current += 1;
+      window.clearTimeout(initialCheck);
+      if (expiryTimer !== null) window.clearTimeout(expiryTimer);
+      window.removeEventListener("focus", check);
+      window.removeEventListener("pageshow", check);
+      document.removeEventListener("visibilitychange", checkWhenVisible);
+      removeNativeObserver();
+    };
+  }, [
+    nativeContained,
+    session.loading,
+    sessionUserId,
+    visible.hasCustomer,
+    visible.purchasesEnabled,
+  ]);
 
   // Checkout and Portal redirects are display hints only. Reconcile against
   // current Stripe objects once, then let the server projection decide access.
   useEffect(() => {
-    if (NATIVE_COMMERCE_CONTAINED) return;
+    if (nativeContained) return;
     if (session.loading || !session.user) return;
     if (reconciledReturn.current) return;
     const notice = safeReturnNotice();
@@ -404,28 +582,44 @@ function usePlusCoordinator(): PlusState {
       });
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [load, refresh, session.loading, session.user]);
+  }, [load, nativeContained, refresh, session.loading, session.user]);
 
   const startCheckout = useCallback(
     async (interval: BillingInterval) => {
       if (
-        !session.user ||
+        !sessionUserId ||
+        !storefrontAvailable ||
         !visible.purchasesEnabled ||
-        !visible.plans.some((plan) => plan.interval === interval)
+        (nativeTarget
+          ? !BILLING_INTERVALS.includes(interval)
+          : !visible.plans.some((plan) => plan.interval === interval))
       ) {
         return false;
       }
-      const outcome = await purchases.purchase(interval);
-      if (outcome !== "redirected") return false;
+      const outcome = await purchases.purchase(interval, {
+        expectedUserId: sessionUserId,
+        signal: accountActions.current.signal,
+      });
+      if (outcome !== "redirected") {
+        if (nativeTarget) setStorefrontAvailable(false);
+        return false;
+      }
       track("plus_checkout_opened", { interval });
       return true;
     },
-    [session.user, visible.plans, visible.purchasesEnabled],
+    [
+      nativeTarget,
+      sessionUserId,
+      storefrontAvailable,
+      visible.plans,
+      visible.purchasesEnabled,
+    ],
   );
 
   const openCustomerPortal = useCallback(async () => {
     if (
-      !session.user ||
+      !sessionUserId ||
+      !storefrontAvailable ||
       !visible.hasCustomer ||
       !purchases.available ||
       portalActionInFlight.current
@@ -435,9 +629,13 @@ function usePlusCoordinator(): PlusState {
     portalActionInFlight.current = true;
     portalReconciliationPending.current = true;
     try {
-      const outcome = await purchases.manage();
+      const outcome = await purchases.manage({
+        expectedUserId: sessionUserId,
+        signal: accountActions.current.signal,
+      });
       if (outcome !== "redirected") {
         portalReconciliationPending.current = false;
+        if (nativeTarget) setStorefrontAvailable(false);
         return false;
       }
       track("plus_billing_portal_opened");
@@ -448,7 +646,11 @@ function usePlusCoordinator(): PlusState {
     } finally {
       portalActionInFlight.current = false;
     }
-  }, [session.user, visible.hasCustomer]);
+  }, [nativeTarget, sessionUserId, storefrontAvailable, visible.hasCustomer]);
+
+  const purchaseOptions = nativeTarget
+    ? BILLING_INTERVALS
+    : visible.plans.map(({ interval }) => interval);
 
   return {
     configured: visible.availability === "configured",
@@ -461,11 +663,17 @@ function usePlusCoordinator(): PlusState {
     canPurchase:
       Boolean(session.user) &&
       purchases.available &&
+      storefrontAvailable &&
       visible.purchasesEnabled &&
-      visible.plans.length === 3 &&
+      (nativeTarget || visible.plans.length === BILLING_INTERVALS.length) &&
       !visible.isPlus,
     canManage:
-      Boolean(session.user) && purchases.available && visible.hasCustomer,
+      Boolean(session.user) &&
+      purchases.available &&
+      storefrontAvailable &&
+      visible.hasCustomer,
+    purchaseChannel: purchases.channel,
+    purchaseOptions,
     plans: visible.plans,
     interval: visible.interval,
     currentPeriodEnd: visible.currentPeriodEnd,

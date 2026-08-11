@@ -67,6 +67,7 @@ function pinReleaseEnvironment() {
     NEXT_PUBLIC_ACCOUNT_GATE_ENABLED: "false",
     NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED: "false",
     NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED: "false",
+    NEXT_PUBLIC_NATIVE_US_STRIPE_CHECKOUT_ENABLED: "false",
     NEXT_PUBLIC_ANALYTICS_ENABLED: "false",
     NEXT_PUBLIC_PLAUSIBLE_DOMAIN: "",
     NEXT_PUBLIC_PLAUSIBLE_HOST: "",
@@ -211,6 +212,7 @@ function pinAccountBetaEnvironment() {
     NEXT_PUBLIC_ACCOUNT_GATE_ENABLED: "false",
     NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED: "true",
     NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED: "false",
+    NEXT_PUBLIC_NATIVE_US_STRIPE_CHECKOUT_ENABLED: "false",
     NEXT_PUBLIC_ANALYTICS_ENABLED: "false",
     NEXT_PUBLIC_PLAUSIBLE_DOMAIN: "",
     NEXT_PUBLIC_PLAUSIBLE_HOST: "",
@@ -294,10 +296,11 @@ function requiredEnvironment() {
     (process.env.NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED !== "false" ||
       process.env.NEXT_PUBLIC_ACCOUNT_GATE_ENABLED !== "false" ||
       process.env.NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED !== "false" ||
+      process.env.NEXT_PUBLIC_NATIVE_US_STRIPE_CHECKOUT_ENABLED !== "false" ||
       process.env.NEXT_PUBLIC_ANALYTICS_ENABLED !== "false")
   ) {
     fail(
-      "release builds must keep account sync, account gates, native commerce, and analytics off.",
+      "release builds must keep account sync, account gates, native commerce, checkout, and analytics off.",
     );
   }
   if (
@@ -308,6 +311,7 @@ function requiredEnvironment() {
       process.env.NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED !== "true" ||
       process.env.NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED !== "true" ||
       process.env.NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED !== "false" ||
+      process.env.NEXT_PUBLIC_NATIVE_US_STRIPE_CHECKOUT_ENABLED !== "false" ||
       process.env.NEXT_PUBLIC_ACCOUNT_GATE_ENABLED !== "false" ||
       process.env.NEXT_PUBLIC_ANALYTICS_ENABLED !== "false" ||
       process.env.NEXT_PUBLIC_NATIVE_AUTH_CALLBACK_URL !== "" ||

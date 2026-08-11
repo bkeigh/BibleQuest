@@ -22,6 +22,10 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- The guest configurations substitute NO. A separate account-beta Xcode
+	     configuration must explicitly substitute YES before the plugin registers. -->
+	<key>BibleQuestNativeUSStripeCheckoutEnabled</key>
+	<string>$(BIBLEQUEST_NATIVE_US_STRIPE_CHECKOUT_ENABLED)</string>
 	<!-- Declared false because every cryptographic path here is exempt: HTTPS
 	     through the system TLS stack, one WebCrypto SHA-256 digest (a hash, not
 	     encryption), and Supabase PKCE/JWT handling, which is authentication.

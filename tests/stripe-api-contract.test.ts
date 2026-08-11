@@ -98,12 +98,25 @@ describe("direct Stripe API boundary", () => {
     const client = source("src/lib/billing/usePlus.ts");
     const guestBoundary = client.slice(
       client.indexOf('if (subjectKey === "guest")'),
-      client.indexOf("const [statusResponse, plansResponse]"),
+      client.indexOf("// Native uses only the bearer-authenticated"),
     );
 
     expect(guestBoundary).toContain('billingFetch("/api/billing/plans")');
     expect(guestBoundary).not.toContain('billingFetch("/api/billing/status")');
     expect(guestBoundary).toContain('status: "sign-in-required"');
+  });
+
+  it("loads native billing status without widening plans CORS", () => {
+    const client = source("src/lib/billing/usePlus.ts");
+    const nativeBoundary = client.slice(
+      client.indexOf("// Native uses only the bearer-authenticated"),
+      client.indexOf("const [statusResponse, plansResponse]"),
+    );
+
+    expect(nativeBoundary).toContain('"/api/billing/status"');
+    expect(nativeBoundary).toContain("sessionUserId ?? undefined");
+    expect(nativeBoundary).not.toContain('billingFetch("/api/billing/plans")');
+    expect(nativeBoundary).toContain("statusProjectionState(");
   });
 
   it("allows only exact hosted Stripe redirect origins", () => {

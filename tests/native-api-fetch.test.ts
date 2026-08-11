@@ -240,6 +240,54 @@ describe("apiFetch on the native target", () => {
     expect(headers.get("authorization")).toBe("Bearer session-token");
   });
 
+  it("pins a billing bearer to the expected verified account", async () => {
+    const calls = stubFetch();
+    mockAvailability();
+    mockSupabaseClient("session-token");
+    const { apiFetch, nativeSessionMatches } = await apiModule();
+
+    await expect(
+      apiFetch("/api/billing/checkout", { method: "POST" }, USER_A),
+    ).resolves.toHaveProperty("status", 204);
+    expect(calls).toHaveLength(1);
+    expect(
+      new Headers(calls[0][1]?.headers).get("authorization"),
+    ).toBe("Bearer session-token");
+    await expect(nativeSessionMatches(USER_A)).resolves.toBe(true);
+  });
+
+  it("rejects a changed account before sending a pinned billing request", async () => {
+    const calls = stubFetch();
+    mockAvailability();
+    mockSupabaseClient("different-session-token", USER_B);
+    const { apiFetch, nativeSessionMatches } = await apiModule();
+
+    await expect(
+      apiFetch("/api/billing/checkout", { method: "POST" }, USER_A),
+    ).rejects.toMatchObject({ code: "native_account_beta_unavailable" });
+    expect(calls).toHaveLength(0);
+    await expect(nativeSessionMatches(USER_A)).resolves.toBe(false);
+  });
+
+  it("replaces a caller bearer when pinning a billing account", async () => {
+    const calls = stubFetch();
+    mockAvailability();
+    mockSupabaseClient("session-token");
+    const { apiFetch } = await apiModule();
+
+    await expect(
+      apiFetch(
+        "/api/billing/checkout",
+        { headers: { Authorization: "Bearer caller-owned" } },
+        USER_A,
+      ),
+    ).resolves.toHaveProperty("status", 204);
+    expect(calls).toHaveLength(1);
+    expect(new Headers(calls[0][1]?.headers).get("authorization")).toBe(
+      "Bearer session-token",
+    );
+  });
+
   it("keeps public native APIs anonymous without inspecting Keychain", async () => {
     const calls = stubFetch();
     const createClient = mockSupabaseClient("stale-session-token");

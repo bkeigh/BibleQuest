@@ -52,8 +52,8 @@ describe("Plus management after a Stripe Portal visit", () => {
       COORDINATOR.indexOf("return {", COORDINATOR.indexOf("const openCustomerPortal")),
     );
     expect(management).toContain("!purchases.available");
-    expect(COORDINATOR).toContain(
-      "Boolean(session.user) && purchases.available && visible.hasCustomer",
+    expect(COORDINATOR).toMatch(
+      /Boolean\(session\.user\)\s*&&\s*purchases\.available\s*&&\s*storefrontAvailable\s*&&\s*visible\.hasCustomer/,
     );
   });
 

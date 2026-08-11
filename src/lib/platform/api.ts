@@ -65,12 +65,26 @@ export function buildApiUrl(
 export function apiFetch(
   path: string,
   init?: RequestInit,
+  expectedNativeUserId?: string,
 ): Promise<Response> {
   // Validate before branching so an invalid path throws synchronously on both
   // targets, exactly as before. The web branch stays one verbatim fetch with
   // the caller's own init reference.
   const url = buildApiUrl(path);
   if (!isNativeTarget()) return fetch(url, init);
+  if (expectedNativeUserId !== undefined) {
+    if (!UUID.test(expectedNativeUserId)) {
+      return Promise.reject(new NativeAccountBetaUnavailableError());
+    }
+    const headers = new Headers(init?.headers);
+    headers.set(EXPECTED_ACCOUNT_USER_HEADER, expectedNativeUserId);
+    return nativeAuthenticatedApiFetch(
+      url,
+      expectedNativeUserId,
+      init,
+      headers,
+    );
+  }
   return nativePublicApiFetch(url, init);
 }
 
@@ -151,6 +165,52 @@ function nativePublicApiFetch(
   return fetch(url, { ...init, headers });
 }
 
+/** Rechecks the live Keychain-backed account before a billing side effect. */
+export async function nativeSessionMatches(
+  expectedUserId: string,
+): Promise<boolean> {
+  if (
+    !isNativeTarget() ||
+    !UUID.test(expectedUserId) ||
+    ACCOUNT_SYNC_CONTAINED ||
+    !NATIVE_ACCOUNT_BETA_ENABLED
+  ) {
+    return false;
+  }
+  try {
+    const { requireNativeAccountBetaAvailability } = await import(
+      "@/lib/sync/availability"
+    );
+    await requireNativeAccountBetaAvailability();
+    const identity = await nativeSessionIdentity();
+    return identity?.userId === expectedUserId;
+  } catch {
+    return false;
+  }
+}
+
+/** Reads only a valid native session identity from the configured client. */
+async function nativeSessionIdentity(): Promise<{
+  accessToken: string;
+  userId: string;
+} | null> {
+  if (ACCOUNT_SYNC_CONTAINED || !NATIVE_ACCOUNT_BETA_ENABLED) return null;
+  try {
+    const { createClient, isSupabaseConfigured } = await import(
+      "@/lib/supabase/client"
+    );
+    if (!isSupabaseConfigured()) return null;
+    const { data, error } = await createClient().auth.getSession();
+    const session = data.session;
+    if (error || !session?.access_token || !UUID.test(session.user.id)) {
+      return null;
+    }
+    return { accessToken: session.access_token, userId: session.user.id };
+  } catch {
+    return null;
+  }
+}
+
 /** Attach one live, exact-user bearer after the anonymous availability probe. */
 async function nativeAuthenticatedApiFetch(
   url: string,
@@ -169,22 +229,12 @@ async function nativeAuthenticatedApiFetch(
     await requireNativeAccountBetaAvailability();
   }
 
-  const { createClient, isSupabaseConfigured } = await import(
-    "@/lib/supabase/client"
-  );
-  if (!isSupabaseConfigured()) throw new NativeAccountBetaUnavailableError();
-  const { data, error } = await createClient().auth.getSession();
-  const session = data.session;
-  if (
-    error ||
-    !session ||
-    session.user.id !== expectedUserId ||
-    !session.access_token
-  ) {
+  const identity = await nativeSessionIdentity();
+  if (!identity || identity.userId !== expectedUserId) {
     throw new NativeAccountBetaUnavailableError();
   }
   headers.set(NATIVE_ACCOUNT_BETA_HEADER, NATIVE_ACCOUNT_BETA_HEADER_VALUE);
-  headers.set("Authorization", `Bearer ${session.access_token}`);
+  headers.set("Authorization", `Bearer ${identity.accessToken}`);
   return fetch(url, { ...init, credentials: "omit", headers });
 }
 

@@ -18,7 +18,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         clearRetainedAuthAfterReinstall()
-        let bridge = CAPBridgeViewController()
+        let bridge = BibleQuestBridgeViewController()
         bridgeViewController = bridge
         window = UIWindow(windowScene: windowScene)
         window?.rootViewController = bridge

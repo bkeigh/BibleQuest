@@ -24,7 +24,9 @@ describe("iOS App Store release configuration", () => {
       'NEXT_PUBLIC_APP_PLATFORM: "native"',
       'NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED: "false"',
       'NEXT_PUBLIC_ACCOUNT_GATE_ENABLED: "false"',
+      'NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED: "false"',
       'NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED: "false"',
+      'NEXT_PUBLIC_NATIVE_US_STRIPE_CHECKOUT_ENABLED: "false"',
       'NEXT_PUBLIC_ANALYTICS_ENABLED: "false"',
       'NEXT_PUBLIC_SUPABASE_URL: ""',
     ]) {
@@ -56,19 +58,38 @@ describe("iOS App Store release configuration", () => {
   it("keeps account, billing, and marketing acquisition dormant", () => {
     const api = source("src/lib/platform/api.ts");
     const billing = source("src/lib/billing/usePlus.ts");
+    const purchases = source("src/lib/platform/purchases.ts");
     const settings = source("src/components/settings/SettingsScreen.tsx");
+    const project = source("ios/App/App.xcodeproj/project.pbxproj");
+    const plist = source("ios/App/App/Info.plist");
 
     expect(api).toContain("return nativePublicApiFetch(url, init);");
     expect(api).toContain('headers.delete(reserved);');
     expect(api).toContain('"authorization",');
     expect(
       api.indexOf(
-        "if (ACCOUNT_SYNC_CONTAINED || !NATIVE_ACCOUNT_BETA_ENABLED)",
+        "if (ACCOUNT_SYNC_CONTAINED || !NATIVE_ACCOUNT_BETA_ENABLED) return null;",
       ),
     ).toBeLessThan(
-      api.indexOf('await import(\n    "@/lib/supabase/client"'),
+      api.indexOf(
+        "const { createClient, isSupabaseConfigured } = await import(",
+      ),
     );
-    expect(billing).toContain("if (NATIVE_COMMERCE_CONTAINED) return;");
+    expect(billing).toContain(
+      "nativeTarget && (ACCOUNT_SYNC_CONTAINED || NATIVE_COMMERCE_CONTAINED)",
+    );
+    expect(purchases).toContain(
+      "NEXT_PUBLIC_NATIVE_US_STRIPE_CHECKOUT_ENABLED",
+    );
+    expect(
+      project.match(
+        /BIBLEQUEST_NATIVE_US_STRIPE_CHECKOUT_ENABLED = NO;/g,
+      ),
+    ).toHaveLength(2);
+    expect(plist).toContain(
+      "$(BIBLEQUEST_NATIVE_US_STRIPE_CHECKOUT_ENABLED)",
+    );
+    expect(billing).toContain("if (nativeContained) return;");
     expect(settings).toMatch(
       /\{!nativeTarget \? \([\s\S]*?BibleQuest website[\s\S]*?\) : null\}/,
     );

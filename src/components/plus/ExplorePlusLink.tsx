@@ -16,12 +16,11 @@ export function ExplorePlusLink({
   description = "Unlock every wallpaper, unlimited verse refreshes, and more room for daily quests.",
   memberDescription = "Every wallpaper, unlimited verse refreshes, and unlimited quest windows are ready.",
 }: ExplorePlusLinkProps) {
-  const { isPlus } = usePlus();
+  const { canManage, canPurchase, isPlus } = usePlus();
 
-  // Plus cannot be obtained on iOS until a StoreKit path exists, so an
-  // invitation here would lead somewhere the user can never act on — and App
-  // Store guideline 3.1.1 forbids steering people to an outside purchase.
-  if (isNativeTarget()) return null;
+  // Native acquisition remains absent until the verified account and fresh US
+  // storefront gate make the retained account-beta Plus route actionable.
+  if (isNativeTarget() && !isPlus && !canPurchase && !canManage) return null;
 
   return (
     <PlusInvitationLink
