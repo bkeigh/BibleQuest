@@ -80,7 +80,6 @@ describe("routes that must stay closed to the native origin", () => {
     const { readFileSync } = await import("node:fs");
     for (const path of [
       "src/app/api/support/checkout/route.ts",
-      "src/app/api/billing/checkout/route.ts",
       "src/app/api/billing/portal/route.ts",
       "src/app/api/arcade/checkout/route.ts",
     ]) {

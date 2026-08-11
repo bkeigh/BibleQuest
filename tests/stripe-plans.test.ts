@@ -30,6 +30,7 @@ function price(
 ): Stripe.Price {
   return {
     id,
+    livemode: false,
     active: true,
     type: interval ? "recurring" : "one_time",
     recurring: interval
@@ -77,5 +78,27 @@ describe("Stripe Plus catalog validation", () => {
     await expect(
       retrieveBillingPlans(stripe, CONFIGURATION),
     ).rejects.toThrow("Stripe billing plan unavailable.");
+  });
+
+  it("rejects provider Prices outside the allowlisted ID or billing mode", async () => {
+    for (const invalidMonthly of [
+      price("price_OtherMonthly123", "month"),
+      { ...price(CONFIGURATION.priceIds.monthly, "month"), livemode: true },
+    ]) {
+      const retrieve = vi.fn((id: string) =>
+        Promise.resolve(
+          id === CONFIGURATION.priceIds.monthly
+            ? invalidMonthly
+            : id === CONFIGURATION.priceIds.annual
+              ? price(id, "year")
+              : price(id, null),
+        ),
+      );
+      const stripe = { prices: { retrieve } } as unknown as Stripe;
+
+      await expect(
+        retrieveBillingPlans(stripe, CONFIGURATION),
+      ).rejects.toThrow("Stripe billing plan unavailable.");
+    }
   });
 });

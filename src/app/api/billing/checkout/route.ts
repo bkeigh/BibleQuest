@@ -10,6 +10,7 @@ import {
 import { stripeBillingContractReady } from "@/lib/billing/server";
 import {
   createStripe,
+  plusCheckoutUrl,
   retrieveBillingPlans,
 } from "@/lib/billing/stripe.server";
 import {
@@ -25,8 +26,9 @@ export const runtime = "nodejs";
 
 /** Creates one server-allowlisted hosted subscription Checkout Session. */
 export async function POST(request: Request) {
-  // Native acquisition stays closed until an audited StoreKit path exists.
-  if (isNativeAppOrigin(request)) return privateError("forbidden", 403);
+  // The native origin only widens CORS; authenticatedServerContext still
+  // requires and verifies its bearer token without a cookie fallback.
+  const nativeCheckout = isNativeAppOrigin(request);
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
   const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;
@@ -100,6 +102,7 @@ export async function POST(request: Request) {
         customer,
         client_reference_id: context.user.id,
         line_items: [{ price: plans[interval].priceId, quantity: 1 }],
+        ...(nativeCheckout ? { origin_context: "mobile_app" } : {}),
         success_url: `${configuration.appOrigin}/app/plus?checkout=returned`,
         cancel_url: `${configuration.appOrigin}/app/plus?checkout=cancelled`,
         metadata: checkoutMetadata,
@@ -120,14 +123,17 @@ export async function POST(request: Request) {
         idempotencyKey: `biblequest-checkout-${context.user.id}-${interval}-${claim.claimToken}`,
       },
     );
-    if (
-      !session.url ||
-      new URL(session.url).origin !== "https://checkout.stripe.com"
-    ) {
+    const checkoutUrl = plusCheckoutUrl(session, {
+      customerId: customer,
+      userId: context.user.id,
+      interval,
+      livemode: configuration.livemode,
+    });
+    if (!checkoutUrl) {
       return privateError("unavailable", 503);
     }
     return Response.json(
-      { url: session.url },
+      { url: checkoutUrl },
       {
         status: 201,
         headers: { "Cache-Control": "private, no-store" },

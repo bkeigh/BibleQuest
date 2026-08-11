@@ -11,6 +11,7 @@ import {
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const STRIPE_CUSTOMER_ID = /^cus_[A-Za-z0-9]+$/;
 
 interface ActionClaim {
   claimed: boolean;
@@ -59,6 +60,29 @@ export function stripeActionRateLimited(retryAfterSeconds: number): Response {
   );
 }
 
+/** Proves that one sealed mapping still belongs to the verified account. */
+function mappedCustomerId(
+  value: unknown,
+  userId: string,
+  livemode: boolean,
+  expectedCustomerId?: string,
+): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Stripe customer unavailable.");
+  }
+  const row = value as StripeCustomerRow;
+  if (
+    row.user_id !== userId ||
+    row.livemode !== livemode ||
+    !STRIPE_CUSTOMER_ID.test(row.stripe_customer_id) ||
+    (expectedCustomerId !== undefined &&
+      row.stripe_customer_id !== expectedCustomerId)
+  ) {
+    throw new Error("Stripe customer unavailable.");
+  }
+  return row.stripe_customer_id;
+}
+
 /** Finds or idempotently creates the one Stripe Customer for an account. */
 export async function customerForUser(
   admin: SupabaseClient,
@@ -73,11 +97,11 @@ export async function customerForUser(
     .maybeSingle();
   if (lookupError) throw new Error("Stripe customer unavailable.");
   if (existing) {
-    const row = existing as StripeCustomerRow;
-    if (row.livemode !== configuration.livemode) {
-      throw new Error("Stripe customer unavailable.");
-    }
-    return row.stripe_customer_id;
+    return mappedCustomerId(
+      existing,
+      user.id,
+      configuration.livemode,
+    );
   }
 
   const customer = await stripe.customers.create(
@@ -90,19 +114,40 @@ export async function customerForUser(
     },
     { idempotencyKey: `biblequest-customer-${user.id}` },
   );
-  if (customer.livemode !== configuration.livemode) {
+  if (
+    customer.livemode !== configuration.livemode ||
+    !STRIPE_CUSTOMER_ID.test(customer.id)
+  ) {
     throw new Error("Stripe customer unavailable.");
   }
-  const { error } = await admin.from("stripe_customers").upsert(
+  // Insert-only ownership prevents an unexpected conflicting Customer ID from
+  // reassigning another account through an upsert conflict update.
+  const { error } = await admin.from("stripe_customers").insert(
     {
       user_id: user.id,
       stripe_customer_id: customer.id,
       livemode: customer.livemode,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "stripe_customer_id" },
   );
-  if (error) throw new Error("Stripe customer unavailable.");
+  if (error) {
+    // An ambiguous insert or concurrent retry may already have committed the
+    // same idempotent Customer; only that exact owner/mode/ID is reusable.
+    const { data: concurrent, error: concurrentLookupError } = await admin
+      .from("stripe_customers")
+      .select("user_id,stripe_customer_id,livemode")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (concurrentLookupError) {
+      throw new Error("Stripe customer unavailable.");
+    }
+    return mappedCustomerId(
+      concurrent,
+      user.id,
+      configuration.livemode,
+      customer.id,
+    );
+  }
   return customer.id;
 }
 

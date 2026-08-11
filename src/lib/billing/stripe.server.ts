@@ -5,6 +5,7 @@ import {
   requireStripeBillingConfiguration,
   type StripeBillingConfiguration,
 } from "./config.server";
+import { stripeObjectId } from "./stripe-object.server";
 import type { BillingInterval, BillingPlan } from "./validation";
 
 /** Creates the pinned server SDK client for one already-validated key. */
@@ -21,6 +22,45 @@ export function createStripe(
       version: "0.1.0",
     },
   });
+}
+
+/** Returns only a newly created Plus Session's exact hosted Stripe URL. */
+export function plusCheckoutUrl(
+  session: Stripe.Checkout.Session,
+  expected: {
+    customerId: string;
+    userId: string;
+    interval: BillingInterval;
+    livemode: boolean;
+  },
+): string | null {
+  const mode = expected.interval === "lifetime" ? "payment" : "subscription";
+  if (
+    session.mode !== mode ||
+    session.livemode !== expected.livemode ||
+    session.status !== "open" ||
+    session.client_reference_id !== expected.userId ||
+    stripeObjectId(session.customer) !== expected.customerId ||
+    session.metadata?.purpose !== "biblequest_plus" ||
+    session.metadata?.biblequest_user_id !== expected.userId ||
+    session.metadata?.billing_interval !== expected.interval ||
+    !session.url
+  ) {
+    return null;
+  }
+  try {
+    const destination = new URL(session.url);
+    if (
+      destination.origin !== "https://checkout.stripe.com" ||
+      destination.username ||
+      destination.password
+    ) {
+      return null;
+    }
+    return destination.toString();
+  } catch {
+    return null;
+  }
 }
 
 function productId(
@@ -48,6 +88,7 @@ export async function retrieveBillingPlans(
   const parse = (
     price: Stripe.Price,
     interval: BillingInterval,
+    expectedPriceId: string,
   ): BillingPlan & { priceId: string; productId: string } => {
     const expectedInterval =
       interval === "monthly"
@@ -56,6 +97,8 @@ export async function retrieveBillingPlans(
           ? "year"
           : null;
     if (
+      price.id !== expectedPriceId ||
+      price.livemode !== configuration.livemode ||
       !price.active ||
       (expectedInterval === null
         ? price.type !== "one_time" || price.recurring !== null
@@ -78,9 +121,21 @@ export async function retrieveBillingPlans(
     };
   };
 
-  const monthly = parse(monthlyPrice, "monthly");
-  const annual = parse(annualPrice, "annual");
-  const lifetime = parse(lifetimePrice, "lifetime");
+  const monthly = parse(
+    monthlyPrice,
+    "monthly",
+    configuration.priceIds.monthly,
+  );
+  const annual = parse(
+    annualPrice,
+    "annual",
+    configuration.priceIds.annual,
+  );
+  const lifetime = parse(
+    lifetimePrice,
+    "lifetime",
+    configuration.priceIds.lifetime,
+  );
   if (
     monthly.currency !== annual.currency ||
     monthly.currency !== lifetime.currency ||
