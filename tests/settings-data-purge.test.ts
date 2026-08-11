@@ -16,11 +16,12 @@ function handler(name: string, nextMarker: string): string {
 describe("Settings device-data purge", () => {
   it("awaits the native mirror purge before resetting the primary journey", () => {
     const clear = handler("clearJourneyData", "\n\n  return (");
-    const purge = clear.indexOf("await purgeJourneyBackup()");
+    const purge = clear.indexOf("purgeJourneyBackup()");
     const reset = clear.indexOf("clearAllData(");
 
     expect(purge).toBeGreaterThan(-1);
     expect(reset).toBeGreaterThan(purge);
+    expect(clear).toContain("withDeadline(");
     expect(clear).toContain("resumeJourneyBackupAfterPurge()");
   });
 
@@ -46,6 +47,16 @@ describe("Settings device-data purge", () => {
     const clear = handler("clearJourneyData", "\n\n  return (");
 
     expect(deletion).toContain("await purgeNativeReminders()");
-    expect(clear).toContain("await purgeNativeReminders()");
+    expect(clear).toContain("purgeNativeReminders(),");
+  });
+
+  it("always releases the clear button and returns to onboarding", () => {
+    const clear = handler("clearJourneyData", "\n\n  return (");
+    const finallyBlock = clear.slice(clear.indexOf("} finally {"));
+
+    expect(finallyBlock).toContain("setConfirmClear(false)");
+    expect(finallyBlock).toContain("setClearingData(false)");
+    expect(clear).toContain('router.replace("/onboarding")');
+    expect(clear).not.toContain("window.location.replace");
   });
 });

@@ -11,6 +11,7 @@ import {
   anyPushReminderEnabled,
   parsePushReminderPreferences,
 } from "@/lib/push/validation";
+import { withDeadline } from "@/lib/async/deadline";
 import { isNativeTarget } from "@/lib/platform/target";
 
 const STORAGE_KEY = "biblequest:native-reminders:v1";
@@ -19,6 +20,7 @@ const WEEKLY_REMINDER_ID = 271_002;
 const TEST_REMINDER_ID = 271_099;
 const RECURRING_IDS = [DAILY_REMINDER_ID, WEEKLY_REMINDER_ID];
 const OWNED_IDS = [...RECURRING_IDS, TEST_REMINDER_ID];
+const NATIVE_PURGE_DEADLINE_MS = 5_000;
 
 export type NativeReminderPermission =
   | "prompt"
@@ -211,36 +213,37 @@ export async function disableNativeReminders(
 /** Removes every owned schedule, delivered alert, and local preference. */
 export async function purgeNativeReminders(): Promise<void> {
   if (!isNativeTarget()) return;
-  const notifications = await plugin();
-  let nativeCleanupFailed = false;
-  try {
-    await notifications.cancel({
-      notifications: OWNED_IDS.map((id) => ({ id })),
-    });
-  } catch {
-    nativeCleanupFailed = true;
-  }
-  try {
-    // Read delivered alerts after cancellation so none can fire between them.
-    const delivered = await notifications.getDeliveredNotifications();
-    const owned = delivered.notifications.filter((item) =>
-      OWNED_IDS.includes(item.id),
-    );
-    if (owned.length > 0) {
-      await notifications.removeDeliveredNotifications({
-        notifications: owned,
-      });
-    }
-  } catch {
-    nativeCleanupFailed = true;
-  }
 
+  // Remove the device preference first so a stalled native bridge can never
+  // leave reminders enabled in BibleQuest's own state.
   let storageFailed = false;
   try {
     window.localStorage.removeItem(STORAGE_KEY);
   } catch {
     storageFailed = true;
   }
+
+  const notifications = await plugin();
+  // Both native calls are independent and bounded. Clearing this app's whole
+  // Notification Center avoids iOS's callback-based delivered-alert lookup.
+  const outcomes = await Promise.allSettled([
+    withDeadline(
+      notifications.cancel({
+        notifications: OWNED_IDS.map((id) => ({ id })),
+      }),
+      NATIVE_PURGE_DEADLINE_MS,
+      "Native reminder cancellation",
+    ),
+    withDeadline(
+      notifications.removeAllDeliveredNotifications(),
+      NATIVE_PURGE_DEADLINE_MS,
+      "Delivered reminder cleanup",
+    ),
+  ]);
+
+  const nativeCleanupFailed = outcomes.some(
+    (outcome) => outcome.status === "rejected",
+  );
   if (storageFailed || nativeCleanupFailed) {
     throw new Error("Native reminders could not be fully purged.");
   }
