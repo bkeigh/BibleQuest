@@ -5,5 +5,10 @@
 	<!-- Personal journal files remain unavailable until the device is unlocked. -->
 	<key>com.apple.developer.default-data-protection</key>
 	<string>NSFileProtectionComplete</string>
+	<!-- Exact production universal links carry only checkout return hints. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:www.biblequest.co</string>
+	</array>
 </dict>
 </plist>

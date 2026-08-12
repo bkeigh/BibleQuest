@@ -3,6 +3,62 @@ import Foundation
 import StoreKit
 import UIKit
 
+// Carries only four exact, identifier-free return URLs across cold launches.
+final class BibleQuestCheckoutReturnRouter {
+    static let shared = BibleQuestCheckoutReturnRouter()
+    static let notification = Notification.Name(
+        "BibleQuestCheckoutReturnAccepted"
+    )
+    private let lock = NSLock()
+    private var pendingUrl: String?
+
+    private init() {}
+
+    // Rejects decorated, lookalike, and unrelated universal/custom links.
+    func accept(_ url: URL?) {
+        guard let url, let normalized = normalizedReturnUrl(url) else { return }
+        lock.lock()
+        pendingUrl = normalized
+        lock.unlock()
+        NotificationCenter.default.post(
+            name: Self.notification,
+            object: normalized
+        )
+    }
+
+    // Delivers one cold-launch hint after the WebView listener is available.
+    func consumePending() -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        let value = pendingUrl
+        pendingUrl = nil
+        return value
+    }
+
+    // Normalizes only the fixed production and app-scheme return contracts.
+    private func normalizedReturnUrl(_ url: URL) -> String? {
+        guard let components = URLComponents(
+            url: url,
+            resolvingAgainstBaseURL: false
+        ), components.user == nil, components.password == nil,
+           components.port == nil, components.query == nil,
+           components.fragment == nil else { return nil }
+        let path = components.percentEncodedPath
+        let allowedPath = path == "/checkout/plus/returned" ||
+            path == "/checkout/plus/cancelled"
+        if components.scheme == "https",
+           components.host == "www.biblequest.co", allowedPath {
+            return "https://www.biblequest.co\(path)"
+        }
+        if components.scheme == "biblequest",
+           components.host == "billing",
+           path == "/checkout/returned" || path == "/checkout/cancelled" {
+            return "biblequest://billing\(path)"
+        }
+        return nil
+    }
+}
+
 // The checked-in Xcode configurations stay closed; Task 1 must opt only its
 // separate account-beta configuration into this native bridge.
 enum BibleQuestNativeFeatures {
@@ -43,12 +99,28 @@ final class BibleQuestCommercePlugin: CAPPlugin, CAPBridgedPlugin {
     ]
 
     private var storefrontUpdatesTask: Task<Void, Never>?
+    private var checkoutReturnObserver: NSObjectProtocol?
     @MainActor private var pendingExternalOpens = Set<String>()
     @MainActor private var cancelledExternalOpens = Set<String>()
 
     // Storefront values remain ephemeral; listeners receive only an invalidation.
     override func load() {
         super.load()
+        checkoutReturnObserver = NotificationCenter.default.addObserver(
+            forName: BibleQuestCheckoutReturnRouter.notification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let url = notification.object as? String else { return }
+            self?.notifyListeners("checkoutReturn", data: ["url": url])
+        }
+        if let url = BibleQuestCheckoutReturnRouter.shared.consumePending() {
+            notifyListeners(
+                "checkoutReturn",
+                data: ["url": url],
+                retainUntilConsumed: true
+            )
+        }
         storefrontUpdatesTask = Task { @MainActor [weak self] in
             for await _ in Storefront.updates {
                 guard !Task.isCancelled else { return }
@@ -59,6 +131,9 @@ final class BibleQuestCommercePlugin: CAPPlugin, CAPBridgedPlugin {
 
     deinit {
         storefrontUpdatesTask?.cancel()
+        if let checkoutReturnObserver {
+            NotificationCenter.default.removeObserver(checkoutReturnObserver)
+        }
     }
 
     // Reads StoreKit immediately before presentation and returns no storefront ID.

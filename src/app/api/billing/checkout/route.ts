@@ -96,6 +96,13 @@ export async function POST(request: Request) {
       biblequest_user_id: context.user.id,
       billing_interval: interval,
     };
+    // Native uses fixed universal-link pages; web keeps its legacy Plus query.
+    const successUrl = nativeCheckout
+      ? `${configuration.appOrigin}/checkout/plus/returned`
+      : `${configuration.appOrigin}/app/plus?checkout=returned`;
+    const cancelUrl = nativeCheckout
+      ? `${configuration.appOrigin}/checkout/plus/cancelled`
+      : `${configuration.appOrigin}/app/plus?checkout=cancelled`;
     const session = await stripe.checkout.sessions.create(
       {
         mode: lifetime ? "payment" : "subscription",
@@ -103,8 +110,8 @@ export async function POST(request: Request) {
         client_reference_id: context.user.id,
         line_items: [{ price: plans[interval].priceId, quantity: 1 }],
         ...(nativeCheckout ? { origin_context: "mobile_app" } : {}),
-        success_url: `${configuration.appOrigin}/app/plus?checkout=returned`,
-        cancel_url: `${configuration.appOrigin}/app/plus?checkout=cancelled`,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
         metadata: checkoutMetadata,
         ...(lifetime
           ? {

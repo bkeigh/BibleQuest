@@ -205,9 +205,9 @@ describe("authenticated Plus Checkout route", () => {
         ],
         origin_context: "mobile_app",
         success_url:
-          "https://preview.biblequest.test/app/plus?checkout=returned",
+          "https://preview.biblequest.test/checkout/plus/returned",
         cancel_url:
-          "https://preview.biblequest.test/app/plus?checkout=cancelled",
+          "https://preview.biblequest.test/checkout/plus/cancelled",
         metadata: {
           purpose: "biblequest_plus",
           biblequest_user_id: USER_ID,
@@ -246,6 +246,12 @@ describe("authenticated Plus Checkout route", () => {
     expect(response.status).toBe(201);
     const [parameters] = mocks.createSession.mock.calls[0];
     expect(parameters).not.toHaveProperty("origin_context");
+    expect(parameters).toMatchObject({
+      success_url:
+        "https://preview.biblequest.test/app/plus?checkout=returned",
+      cancel_url:
+        "https://preview.biblequest.test/app/plus?checkout=cancelled",
+    });
   });
 
   it("uses the allowlisted one-time Price and payment mode for lifetime Plus", async () => {

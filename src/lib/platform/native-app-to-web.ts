@@ -31,8 +31,8 @@ interface BibleQuestCommercePlugin {
     requestId: string;
   }) => Promise<unknown>;
   addListener: (
-    eventName: "storefrontChanged",
-    listener: () => void,
+    eventName: "storefrontChanged" | "checkoutReturn",
+    listener: (event: { url?: unknown }) => void,
   ) => Promise<{ remove: () => Promise<void> }>;
 }
 
@@ -76,3 +76,21 @@ export const nativeAppToWebBridge: NativeAppToWebBridge = {
     };
   },
 };
+
+/** Delivers only native URLs that still pass the shared exact return parser. */
+export async function observeNativeCheckoutReturns(
+  listener: (url: string) => void,
+): Promise<() => void> {
+  const handle = await (await commercePlugin()).addListener(
+    "checkoutReturn",
+    (event) => {
+      if (typeof event.url === "string") listener(event.url);
+    },
+  );
+  let removed = false;
+  return () => {
+    if (removed) return;
+    removed = true;
+    void handle.remove().catch(() => undefined);
+  };
+}

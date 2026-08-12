@@ -18,6 +18,7 @@ import { track } from "@/lib/analytics/events";
 import { useSession } from "@/lib/supabase/useSession";
 import type { PlanKey } from "@/lib/questos/types";
 import { apiFetch } from "@/lib/platform/api";
+import { observeNativeCheckoutReturns } from "@/lib/platform/native-app-to-web";
 import {
   NATIVE_STOREFRONT_UI_TTL_MS,
   purchaseAdapter,
@@ -29,6 +30,7 @@ import {
   createCheckoutReturnRefreshController,
   INITIAL_CHECKOUT_RETURN_STATE,
   legacyWebCheckoutReturnHint,
+  publishCheckoutReturnUrl,
   subscribeToCheckoutReturns,
   type BillingProjectionResult,
   type BillingRefreshResult,
@@ -539,6 +541,18 @@ function usePlusCoordinator(): PlusState {
       controller.begin(hint, accountSubject);
     };
     const unsubscribe = subscribeToCheckoutReturns(acceptReturn);
+    let returnObserverDisposed = false;
+    let removeNativeReturnObserver: () => void = () => undefined;
+    if (nativeTarget) {
+      void observeNativeCheckoutReturns((url) => {
+        publishCheckoutReturnUrl(url);
+      })
+        .then((remove) => {
+          if (returnObserverDisposed) remove();
+          else removeNativeReturnObserver = remove;
+        })
+        .catch(() => undefined);
+    }
     const initialHint = legacyWebCheckoutReturnHint(window.location.href);
     const initialTimer = initialHint
       ? window.setTimeout(
@@ -566,6 +580,8 @@ function usePlusCoordinator(): PlusState {
     return () => {
       if (initialTimer !== null) window.clearTimeout(initialTimer);
       unsubscribe();
+      returnObserverDisposed = true;
+      removeNativeReturnObserver();
       controller.dispose();
       if (returnController.current === controller) {
         returnController.current = null;
@@ -579,6 +595,7 @@ function usePlusCoordinator(): PlusState {
     accountSubject,
     load,
     nativeContained,
+    nativeTarget,
     refresh,
     requestBillingRefresh,
     requestBillingStatus,

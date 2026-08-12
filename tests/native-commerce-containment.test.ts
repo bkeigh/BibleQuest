@@ -13,8 +13,10 @@ describe("native commerce containment", () => {
 
   it("keeps the native Plus coordinator free and trafficless while sealed", () => {
     const source = readFileSync("src/lib/billing/usePlus.ts", "utf8");
-    expect(source).toContain("if (NATIVE_COMMERCE_CONTAINED)");
+    expect(source).toContain(
+      "nativeTarget && (ACCOUNT_SYNC_CONTAINED || NATIVE_COMMERCE_CONTAINED)",
+    );
+    expect(source).toContain("if (nativeContained)");
     expect(source).toContain("containedNativeState(subjectKey)");
-    expect(source).not.toContain("ACCOUNT_SYNC_CONTAINED");
   });
 });

@@ -24,6 +24,14 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window?.rootViewController = bridge
         window?.makeKeyAndVisible()
 
+        // Buffer exact cold-launch return hints until the commerce plugin loads.
+        for context in connectionOptions.urlContexts {
+            BibleQuestCheckoutReturnRouter.shared.accept(context.url)
+        }
+        for activity in connectionOptions.userActivities {
+            BibleQuestCheckoutReturnRouter.shared.accept(activity.webpageURL)
+        }
+
         protectJourneyMirror()
         observeBoldText()
         SceneDelegateProxy.shared.scene(
@@ -101,10 +109,14 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        for context in URLContexts {
+            BibleQuestCheckoutReturnRouter.shared.accept(context.url)
+        }
         SceneDelegateProxy.shared.scene(scene, openURLContexts: URLContexts)
     }
 
     func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+        BibleQuestCheckoutReturnRouter.shared.accept(userActivity.webpageURL)
         SceneDelegateProxy.shared.scene(scene, continue: userActivity)
     }
 

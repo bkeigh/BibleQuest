@@ -374,6 +374,29 @@ describe("hosted Checkout return destinations", () => {
     );
   });
 
+  it("wires accepted iOS links into the bounded refresh controller", () => {
+    const entitlements = readFileSync("ios/App/App/App.entitlements", "utf8");
+    const plist = readFileSync("ios/App/App/Info.plist", "utf8");
+    const scene = readFileSync("ios/App/App/SceneDelegate.swift", "utf8");
+    const plugin = readFileSync(
+      "ios/App/App/BibleQuestCommercePlugin.swift",
+      "utf8",
+    );
+    const bridge = readFileSync(
+      "src/lib/platform/native-app-to-web.ts",
+      "utf8",
+    );
+    const coordinator = readFileSync("src/lib/billing/usePlus.ts", "utf8");
+
+    expect(entitlements).toContain("applinks:www.biblequest.co");
+    expect(plist).toContain("CFBundleURLSchemes");
+    expect(plist).toContain("<string>biblequest</string>");
+    expect(scene).toContain("BibleQuestCheckoutReturnRouter.shared.accept");
+    expect(plugin).toContain('notifyListeners("checkoutReturn"');
+    expect(bridge).toContain("observeNativeCheckoutReturns");
+    expect(coordinator).toContain("publishCheckoutReturnUrl(url)");
+  });
+
   it("polls status without copying plan acquisition into the retry loop", () => {
     const coordinator = readFileSync("src/lib/billing/usePlus.ts", "utf8");
     const statusReader = coordinator.slice(
