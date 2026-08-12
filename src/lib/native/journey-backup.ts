@@ -8,7 +8,7 @@
  * owner stamp are committed and restored as one filesystem value.
  */
 import { isNativeTarget } from "@/lib/platform/target";
-import { NATIVE_ACCOUNT_BETA_ENABLED } from "@/lib/sync/containment";
+import { NATIVE_ACCOUNT_ENABLED } from "@/lib/sync/containment";
 import {
   LAST_SYNC_USER_STORAGE_KEY,
   clearLastSyncedUserId,
@@ -68,7 +68,7 @@ function serializeFilesystemMutation<T>(operation: () => Promise<T>): Promise<T>
 
 /** Native account ownership metadata is absent from the guest release path. */
 function accountOwnerEnvelopeRequired(): boolean {
-  return isNativeTarget() && NATIVE_ACCOUNT_BETA_ENABLED;
+  return isNativeTarget() && NATIVE_ACCOUNT_ENABLED;
 }
 
 /** Load the filesystem lazily so web and failed native plugins remain inert. */

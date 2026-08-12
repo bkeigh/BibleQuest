@@ -5,13 +5,12 @@ import { withDeadline } from "@/lib/async/deadline";
 import { isNativeTarget } from "@/lib/platform/target";
 import { supabasePublishableKey } from "@/lib/supabase/config";
 import {
-  NATIVE_ACCOUNT_BETA_ENABLED,
+  NATIVE_ACCOUNT_ENABLED,
   accountSyncAvailable,
 } from "./containment";
 import {
   ACCOUNT_AVAILABILITY_DEADLINE_MS,
-  NATIVE_ACCOUNT_BETA_HEADER,
-  NATIVE_ACCOUNT_BETA_HEADER_VALUE,
+  nativeAccountBuildContract,
   NativeAccountBetaUnavailableError,
   parseNativeAccountBetaAvailability,
 } from "./native-beta-contract";
@@ -119,6 +118,8 @@ export async function fetchNativeAccountBetaAvailability(
     options.supabaseOrigin ?? process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";
   const key = options.publishableKey ?? supabasePublishableKey() ?? "";
   if (!origin || !key) throw new NativeAccountBetaUnavailableError();
+  const contract = nativeAccountBuildContract();
+  if (!contract) throw new NativeAccountBetaUnavailableError();
 
   const response = await withDeadline(
     (async () => {
@@ -131,7 +132,7 @@ export async function fetchNativeAccountBetaAvailability(
           headers: {
             apikey: key,
             "content-type": "application/json",
-            [NATIVE_ACCOUNT_BETA_HEADER]: NATIVE_ACCOUNT_BETA_HEADER_VALUE,
+            [contract.header]: contract.value,
           },
           body: "{}",
         },
@@ -166,7 +167,7 @@ export function refreshNativeAccountBetaAvailability(): Promise<boolean> {
   if (
     !accountSyncAvailable(supabaseConfigured()) ||
     !isNativeTarget() ||
-    !NATIVE_ACCOUNT_BETA_ENABLED
+    !NATIVE_ACCOUNT_ENABLED
   ) {
     updateSnapshot("unavailable");
     return Promise.resolve(false);
@@ -191,7 +192,7 @@ export function refreshNativeAccountBetaAvailability(): Promise<boolean> {
 
 /** Recheck immediately before an OTP request can touch Supabase Auth. */
 export async function requireNativeAccountBetaAvailability(): Promise<void> {
-  if (!isNativeTarget() || !NATIVE_ACCOUNT_BETA_ENABLED) return;
+  if (!isNativeTarget() || !NATIVE_ACCOUNT_ENABLED) return;
   if (!(await refreshNativeAccountBetaAvailability())) {
     throw new NativeAccountBetaUnavailableError();
   }
@@ -251,7 +252,7 @@ export function useAccountAvailability(): {
   const current = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   const buildAvailable = accountSyncAvailable(supabaseConfigured());
   const remoteRequired =
-    buildAvailable && isNativeTarget() && NATIVE_ACCOUNT_BETA_ENABLED;
+    buildAvailable && isNativeTarget() && NATIVE_ACCOUNT_ENABLED;
 
   useEffect(() => {
     if (!remoteRequired) return;

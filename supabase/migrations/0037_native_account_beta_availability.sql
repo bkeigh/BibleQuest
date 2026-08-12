@@ -10,22 +10,73 @@ on conflict (key) do update
 set description = excluded.description,
     enabled = false;
 
+-- Keep the reviewed production profile off until the signed iOS release gates pass.
+insert into public.feature_flags (key, description, enabled)
+values (
+  'native_account_us_release',
+  'Native iOS US production account availability',
+  false
+)
+on conflict (key) do update
+set description = excluded.description,
+    enabled = false;
+
 -- Return only the fixed availability contract needed before native auth starts.
 create or replace function public.native_account_beta_availability()
 returns jsonb
-language sql
+language plpgsql
 stable
 security definer
 set search_path = ''
 as $function$
-select pg_catalog.jsonb_build_object(
-  'contract', 'biblequest_native_account_beta_v1',
-  'available', exists (
+declare
+  headers jsonb := '{}'::jsonb;
+  beta_contract text;
+  release_contract text;
+  selected_flag text;
+  selected_contract text;
+begin
+  begin
+    headers := coalesce(
+      nullif(pg_catalog.current_setting('request.headers', true), ''),
+      '{}'
+    )::jsonb;
+  exception when others then
+    headers := '{}'::jsonb;
+  end;
+  beta_contract := nullif(headers->>'x-biblequest-native-account-beta', '');
+  release_contract := nullif(
+    headers->>'x-biblequest-native-account-us-release',
+    ''
+  );
+  if (beta_contract is null) = (release_contract is null) then
+    return pg_catalog.jsonb_build_object(
+      'contract', 'biblequest_native_account_beta_v1',
+      'available', false
+    );
+  end if;
+  if beta_contract = 'v1' then
+    selected_flag := 'native_account_beta';
+    selected_contract := 'biblequest_native_account_beta_v1';
+  elsif release_contract = 'v1' then
+    selected_flag := 'native_account_us_release';
+    selected_contract := 'biblequest_native_account_us_release_v1';
+  else
+    selected_flag := '';
+    selected_contract := case
+      when beta_contract is not null then 'biblequest_native_account_beta_v1'
+      else 'biblequest_native_account_us_release_v1'
+    end;
+  end if;
+  return pg_catalog.jsonb_build_object(
+    'contract', selected_contract,
+    'available', exists (
     select 1
     from public.feature_flags
-    where key = 'native_account_beta' and enabled
+    where key = selected_flag and enabled
   )
-);
+  );
+end;
 $function$;
 
 revoke execute on function public.native_account_beta_availability()
@@ -47,6 +98,8 @@ as $function$
 declare
   headers jsonb := '{}'::jsonb;
   beta_contract text;
+  release_contract text;
+  selected_flag text;
   uid uuid := auth.uid();
   deletion_user text := nullif(
     pg_catalog.current_setting(
@@ -76,17 +129,29 @@ begin
     headers->>'x-biblequest-native-account-beta',
     ''
   );
-  if beta_contract is null then
+  release_contract := nullif(
+    headers->>'x-biblequest-native-account-us-release',
+    ''
+  );
+  if beta_contract is null and release_contract is null then
     return true;
   end if;
-  if beta_contract <> 'v1' then
+  if beta_contract is not null and release_contract is not null then
+    raise exception 'native account beta is unavailable'
+      using errcode = '55000';
+  end if;
+  if beta_contract = 'v1' then
+    selected_flag := 'native_account_beta';
+  elsif release_contract = 'v1' then
+    selected_flag := 'native_account_us_release';
+  else
     raise exception 'native account beta is unavailable'
       using errcode = '55000';
   end if;
   if not exists (
     select 1
     from public.feature_flags
-    where key = 'native_account_beta' and enabled
+    where key = selected_flag and enabled
   ) then
     raise exception 'native account beta is unavailable'
       using errcode = '55000';
@@ -415,6 +480,7 @@ declare
   uid uuid := auth.uid();
   headers jsonb := '{}'::jsonb;
   beta_contract text;
+  release_contract text;
   cleanup_contract text;
   expected_user text;
 begin
@@ -437,6 +503,10 @@ begin
     headers->>'x-biblequest-native-account-beta',
     ''
   );
+  release_contract := nullif(
+    headers->>'x-biblequest-native-account-us-release',
+    ''
+  );
   cleanup_contract := nullif(
     headers->>'x-biblequest-account-deletion-cleanup',
     ''
@@ -450,6 +520,14 @@ begin
      or (
        beta_contract is not null
        and beta_contract <> 'v1'
+     )
+     or (
+       release_contract is not null
+       and release_contract <> 'v1'
+     )
+     or (
+       beta_contract is not null
+       and release_contract is not null
      ) then
     raise exception 'account deletion: invalid begin request'
       using errcode = '42501';
@@ -857,6 +935,7 @@ declare
   current_generation bigint;
   headers jsonb := '{}'::jsonb;
   beta_contract text;
+  release_contract text;
   cleanup_contract text;
   expected_user text;
   cleanup_requested boolean := false;
@@ -885,6 +964,10 @@ begin
     headers->>'x-biblequest-native-account-beta',
     ''
   );
+  release_contract := nullif(
+    headers->>'x-biblequest-native-account-us-release',
+    ''
+  );
   expected_user := nullif(
     headers->>'x-biblequest-expected-user',
     ''
@@ -895,6 +978,14 @@ begin
     or (
       beta_contract is not null
       and beta_contract <> 'v1'
+    )
+    or (
+      release_contract is not null
+      and release_contract <> 'v1'
+    )
+    or (
+      beta_contract is not null
+      and release_contract is not null
     )
   ) then
     raise exception 'profile avatar: invalid deletion cleanup'

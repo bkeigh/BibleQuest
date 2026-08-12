@@ -19,8 +19,8 @@ import {
   ACCOUNT_DELETION_CLEANUP_HEADER,
   ACCOUNT_DELETION_CLEANUP_HEADER_VALUE,
   EXPECTED_ACCOUNT_USER_HEADER,
-  NATIVE_ACCOUNT_BETA_HEADER,
-  NATIVE_ACCOUNT_BETA_HEADER_VALUE,
+  type NativeAccountRequestContract,
+  nativeAccountRequestContract,
 } from "@/lib/sync/native-beta-headers";
 
 type AuthenticatedContext = { supabase: SupabaseClient; user: User };
@@ -39,7 +39,7 @@ function expectedUserBoundary(request: Request, user: User): Response | null {
 /** Forward only reviewed account-boundary headers into PostgREST requests. */
 function databaseBoundaryHeaders(
   request: Request,
-  native: boolean,
+  nativeContract: NativeAccountRequestContract | null,
 ): Record<string, string> {
   const expected = request.headers.get(EXPECTED_ACCOUNT_USER_HEADER);
   const cleanup = request.headers.get(ACCOUNT_DELETION_CLEANUP_HEADER);
@@ -50,8 +50,8 @@ function databaseBoundaryHeaders(
     ...(cleanup === ACCOUNT_DELETION_CLEANUP_HEADER_VALUE
       ? { [ACCOUNT_DELETION_CLEANUP_HEADER]: cleanup }
       : {}),
-    ...(native
-      ? { [NATIVE_ACCOUNT_BETA_HEADER]: NATIVE_ACCOUNT_BETA_HEADER_VALUE }
+    ...(nativeContract
+      ? { [nativeContract.header]: nativeContract.value }
       : {}),
   };
 }
@@ -82,7 +82,7 @@ export async function authenticatedServerContext(
   if (isNativeAppOrigin(request)) return nativeBearerContext(request);
   try {
     const supabase = await createServerSupabase(
-      databaseBoundaryHeaders(request, false),
+      databaseBoundaryHeaders(request, null),
     );
     const {
       data: { user },
@@ -117,16 +117,12 @@ async function nativeBearerContext(
 ): Promise<AuthenticatedContext | Response> {
   const token = parsedBearerToken(request.headers.get("authorization"));
   if (!token) return privateError("unauthorized", 401);
-  if (
-    request.headers.get(NATIVE_ACCOUNT_BETA_HEADER) !==
-    NATIVE_ACCOUNT_BETA_HEADER_VALUE
-  ) {
-    return privateError("forbidden", 403);
-  }
+  const nativeContract = nativeAccountRequestContract(request.headers);
+  if (!nativeContract) return privateError("forbidden", 403);
   try {
     const supabase = createBearerSupabase(
       token,
-      databaseBoundaryHeaders(request, true),
+      databaseBoundaryHeaders(request, nativeContract),
     );
     const {
       data: { user },

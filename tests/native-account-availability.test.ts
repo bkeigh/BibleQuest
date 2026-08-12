@@ -5,6 +5,8 @@ const KEY = "fixture-publishable-key";
 
 beforeEach(() => {
   vi.resetModules();
+  vi.stubEnv("NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED", "true");
+  vi.stubEnv("NEXT_PUBLIC_NATIVE_ACCOUNT_US_RELEASE_ENABLED", "false");
 });
 
 afterEach(() => {
@@ -69,6 +71,33 @@ describe("native account-beta availability", () => {
         supabaseOrigin: ORIGIN,
       }),
     ).resolves.toBe(false);
+  });
+
+  it("uses the reviewed production contract without a beta marker", async () => {
+    vi.stubEnv("NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED", "false");
+    vi.stubEnv("NEXT_PUBLIC_NATIVE_ACCOUNT_US_RELEASE_ENABLED", "true");
+    const fetcher = vi.fn<typeof fetch>(async () =>
+      new Response(
+        JSON.stringify({
+          contract: "biblequest_native_account_us_release_v1",
+          available: true,
+        }),
+      ),
+    );
+    const { fetchNativeAccountBetaAvailability } = await import(
+      "@/lib/sync/availability"
+    );
+
+    await expect(
+      fetchNativeAccountBetaAvailability({
+        fetcher: fetcher as typeof fetch,
+        publishableKey: KEY,
+        supabaseOrigin: ORIGIN,
+      }),
+    ).resolves.toBe(true);
+    const headers = new Headers(fetcher.mock.calls[0][1]?.headers);
+    expect(headers.get("x-biblequest-native-account-us-release")).toBe("v1");
+    expect(headers.has("x-biblequest-native-account-beta")).toBe(false);
   });
 
   it.each([

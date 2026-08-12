@@ -168,7 +168,7 @@ describe("account-enabled US iOS release gate", () => {
     fixture.receipt.privacyProfile = "guest-only-v1";
     (fixture.owner.appStoreConnect as Record<string, unknown>).privacyAnswersProfile =
       "guest-only-v1";
-    cpSync("ios/App/App/PrivacyInfo.xcprivacy", fixture.privacy);
+    cpSync("ios/compliance/PrivacyInfo.guest.xcprivacy", fixture.privacy);
 
     const issues = check().issues.join("\n");
     expect(issues).toContain("still uses guest privacy answers");
@@ -215,7 +215,7 @@ describe("account-enabled US iOS release gate", () => {
   it("keeps the guest submission and manifest independently guest-only", () => {
     const guestPackage = readFileSync("docs/APP_STORE_SUBMISSION.md", "utf8");
     const guestManifest = readFileSync(
-      "ios/App/App/PrivacyInfo.xcprivacy",
+      "ios/compliance/PrivacyInfo.guest.xcprivacy",
       "utf8",
     );
     const entitlements = readFileSync("ios/App/App/App.entitlements", "utf8");
@@ -228,5 +228,33 @@ describe("account-enabled US iOS release gate", () => {
     );
     expect(entitlements).not.toContain("ExternalPurchase");
     expect(project).not.toContain("PrivacyInfo.account-us.xcprivacy");
+  });
+
+  it("pins the account build target and signed native bridge receipt", () => {
+    const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
+    const policy = JSON.parse(
+      readFileSync("config/ios-account-us-release.json", "utf8"),
+    );
+    const swift = readFileSync(
+      "ios/App/App/BibleQuestCommercePlugin.swift",
+      "utf8",
+    );
+
+    expect(packageJson.scripts["ios:account-us:prepare"]).toContain(
+      "scripts/select-ios-privacy-manifest.mjs --account-us",
+    );
+    expect(policy.buildTarget).toMatchObject({
+      reviewed: true,
+      hostedOrigin: "https://www.biblequest.co",
+      supabaseOrigin: "https://iacnjqnssovaaojswjoh.supabase.co",
+    });
+    expect(swift).toContain("ios-account-us-release-receipt");
+    expect(swift).toContain(
+      'commerce["storeKitPurchasing"] as? Bool == false',
+    );
+    const builder = readFileSync("scripts/build-native.mjs", "utf8");
+    expect(builder).toContain(
+      "account-US receipts require a clean, committed source tree.",
+    );
   });
 });

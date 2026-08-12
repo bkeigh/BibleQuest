@@ -25,8 +25,20 @@ fi
   xcrun agvtool new-version -all "$cloud_build_number"
 )
 
-# Leave release policy in the tested command and expose only safe version evidence.
+# Leave release policy in the tested commands and select exactly one profile.
 node --version
 pnpm --version
 pnpm install --frozen-lockfile
-pnpm ios:release:prepare
+case "${BIBLEQUEST_IOS_BUILD_PROFILE:-guest}" in
+  guest)
+    pnpm ios:release:prepare
+    ;;
+  account-us)
+    : "${BIBLEQUEST_IOS_ACCOUNT_US_PUBLISHABLE_KEY:?Account-US public key is required}"
+    pnpm ios:account-us:prepare
+    ;;
+  *)
+    echo "Invalid BIBLEQUEST_IOS_BUILD_PROFILE." >&2
+    exit 1
+    ;;
+esac

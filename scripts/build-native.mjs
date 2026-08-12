@@ -35,17 +35,29 @@ const ACCOUNT_BETA_CONFIG_PATH = path.join(
   repo,
   "config/ios-account-beta.json",
 );
+const ACCOUNT_US_CONFIG_PATH = path.join(
+  repo,
+  "config/ios-account-us-release.json",
+);
 const ACCOUNT_BETA_ENV_PATH = path.join(repo, ".env.account-beta.local");
 const buildArguments = process.argv.slice(2);
 const releaseBuild = buildArguments[0] === "--release";
 const accountBetaBuild = buildArguments[0] === "--account-beta";
+const accountUsBuild = buildArguments[0] === "--account-us-release";
 let accountBetaSupabaseOrigin = "";
+let accountUsSupabaseOrigin = "";
+let accountUsPolicy;
 
 if (
   buildArguments.length > 1 ||
-  (buildArguments.length === 1 && !releaseBuild && !accountBetaBuild)
+  (buildArguments.length === 1 &&
+    !releaseBuild &&
+    !accountBetaBuild &&
+    !accountUsBuild)
 ) {
-  fail("use no build mode, --release, or --account-beta exactly once.");
+  fail(
+    "use no build mode, --release, --account-beta, or --account-us-release exactly once.",
+  );
 }
 
 /**
@@ -66,6 +78,7 @@ function pinReleaseEnvironment() {
     NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED: "false",
     NEXT_PUBLIC_ACCOUNT_GATE_ENABLED: "false",
     NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED: "false",
+    NEXT_PUBLIC_NATIVE_ACCOUNT_US_RELEASE_ENABLED: "false",
     NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED: "false",
     NEXT_PUBLIC_NATIVE_US_STRIPE_CHECKOUT_ENABLED: "false",
     NEXT_PUBLIC_ANALYTICS_ENABLED: "false",
@@ -84,6 +97,74 @@ function pinReleaseEnvironment() {
   for (const [key, value] of Object.entries(values)) {
     process.env[key] = value;
   }
+}
+
+/** Reads the checked-in production target and release assertions together. */
+function accountUsConfiguration() {
+  let value;
+  try {
+    value = JSON.parse(readFileSync(ACCOUNT_US_CONFIG_PATH, "utf8"));
+  } catch {
+    fail("the checked-in iOS account-US release policy is invalid.");
+  }
+  const target = value?.buildTarget;
+  if (
+    value?.schemaVersion !== 1 ||
+    value?.profile !== "ios-account-us-stripe-v1" ||
+    target?.contract !== "biblequest_ios_account_us_target_v1" ||
+    target?.reviewed !== true ||
+    target?.hostedOrigin !== RELEASE_ORIGIN ||
+    typeof target?.supabaseOrigin !== "string" ||
+    typeof target?.supabasePublishableKeySha256 !== "string" ||
+    !/^[a-f0-9]{64}$/.test(target.supabasePublishableKeySha256)
+  ) {
+    fail("the reviewed iOS account-US production target is incomplete.");
+  }
+  try {
+    const url = new URL(target.supabaseOrigin);
+    if (
+      url.protocol !== "https:" ||
+      url.origin !== target.supabaseOrigin ||
+      url.hostname !== "iacnjqnssovaaojswjoh.supabase.co"
+    ) {
+      throw new Error("unsafe target");
+    }
+  } catch {
+    fail("the reviewed iOS account-US Supabase origin is invalid.");
+  }
+  return value;
+}
+
+/** Accepts only a fingerprinted public Supabase key for one reviewed target. */
+function fingerprintedPublishableKey(key, expectedSha256, label) {
+  const value = key?.trim();
+  if (!value || value.length > 2_048 || /\s/.test(value)) {
+    fail(`${label} requires one Supabase publishable key.`);
+  }
+  if (value.startsWith("sb_secret_")) {
+    fail(`${label} accepts only a Supabase publishable key.`);
+  }
+  let publishable = value.startsWith("sb_publishable_");
+  if (!publishable) {
+    try {
+      const parts = value.split(".");
+      if (parts.length !== 3) throw new Error("not a JWT");
+      const payload = JSON.parse(
+        Buffer.from(parts[1], "base64url").toString("utf8"),
+      );
+      publishable = payload?.role === "anon";
+    } catch {
+      publishable = false;
+    }
+  }
+  if (!publishable) {
+    fail(`${label} key is not a publishable or anon key.`);
+  }
+  const actualSha256 = createHash("sha256").update(value).digest("hex");
+  if (actualSha256 !== expectedSha256) {
+    fail(`${label} key does not match the reviewed target.`);
+  }
+  return value;
 }
 
 /** Reads only a complete, explicitly reviewed staging-target manifest. */
@@ -132,38 +213,11 @@ function accountBetaConfiguration() {
 
 /** Accepts only the fingerprinted public key from the dedicated beta file. */
 function accountBetaPublishableKey(expectedSha256) {
-  const key = process.env.BIBLEQUEST_IOS_ACCOUNT_BETA_PUBLISHABLE_KEY?.trim();
-  if (!key || key.length > 2_048 || /\s/.test(key)) {
-    fail(
-      "BIBLEQUEST_IOS_ACCOUNT_BETA_PUBLISHABLE_KEY is required in " +
-        ".env.account-beta.local.",
-    );
-  }
-  if (key.startsWith("sb_secret_")) {
-    fail("the account-beta build accepts only a Supabase publishable key.");
-  }
-  let publishable = key.startsWith("sb_publishable_");
-  if (!publishable) {
-    // Legacy anon JWTs remain supported, but every other JWT role is rejected.
-    try {
-      const parts = key.split(".");
-      if (parts.length !== 3) throw new Error("not a JWT");
-      const payload = JSON.parse(
-        Buffer.from(parts[1], "base64url").toString("utf8"),
-      );
-      publishable = payload?.role === "anon";
-    } catch {
-      publishable = false;
-    }
-  }
-  if (!publishable) {
-    fail("the account-beta Supabase key is not a publishable or anon key.");
-  }
-  const actualSha256 = createHash("sha256").update(key).digest("hex");
-  if (actualSha256 !== expectedSha256) {
-    fail("the account-beta Supabase key does not match the reviewed target.");
-  }
-  return key;
+  return fingerprintedPublishableKey(
+    process.env.BIBLEQUEST_IOS_ACCOUNT_BETA_PUBLISHABLE_KEY,
+    expectedSha256,
+    "the account-beta Supabase",
+  );
 }
 
 /** Reject every beta env-file assignment except the fingerprinted public key. */
@@ -211,6 +265,7 @@ function pinAccountBetaEnvironment() {
     NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED: "true",
     NEXT_PUBLIC_ACCOUNT_GATE_ENABLED: "false",
     NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED: "true",
+    NEXT_PUBLIC_NATIVE_ACCOUNT_US_RELEASE_ENABLED: "false",
     NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED: "false",
     NEXT_PUBLIC_NATIVE_US_STRIPE_CHECKOUT_ENABLED: "false",
     NEXT_PUBLIC_ANALYTICS_ENABLED: "false",
@@ -228,6 +283,62 @@ function pinAccountBetaEnvironment() {
   };
   for (const [key, value] of Object.entries(values)) {
     process.env[key] = value;
+  }
+}
+
+/** Pins accounts and US Stripe to the one reviewed production target. */
+function pinAccountUsEnvironment() {
+  if (!accountUsBuild) return;
+  accountUsPolicy = accountUsConfiguration();
+  const configuration = accountUsPolicy.buildTarget;
+  accountUsSupabaseOrigin = configuration.supabaseOrigin;
+  for (const key of Object.keys(process.env)) {
+    if (key.startsWith("NEXT_PUBLIC_")) delete process.env[key];
+  }
+  const values = {
+    NEXT_PUBLIC_APP_PLATFORM: "native",
+    NEXT_PUBLIC_APP_URL: RELEASE_ORIGIN,
+    NEXT_PUBLIC_NATIVE_HOSTED_ORIGIN: RELEASE_ORIGIN,
+    NEXT_PUBLIC_NATIVE_AUTH_CALLBACK_URL: "",
+    NEXT_PUBLIC_SUPABASE_URL: accountUsSupabaseOrigin,
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: fingerprintedPublishableKey(
+      process.env.BIBLEQUEST_IOS_ACCOUNT_US_PUBLISHABLE_KEY,
+      configuration.supabasePublishableKeySha256,
+      "the account-US build",
+    ),
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: "",
+    NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED: "true",
+    NEXT_PUBLIC_ACCOUNT_GATE_ENABLED: "false",
+    NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED: "false",
+    NEXT_PUBLIC_NATIVE_ACCOUNT_US_RELEASE_ENABLED: "true",
+    NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED: "true",
+    NEXT_PUBLIC_NATIVE_US_STRIPE_CHECKOUT_ENABLED: "true",
+    NEXT_PUBLIC_ANALYTICS_ENABLED: "false",
+    NEXT_PUBLIC_PLAUSIBLE_DOMAIN: "",
+    NEXT_PUBLIC_PLAUSIBLE_HOST: "",
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "",
+    NEXT_PUBLIC_GREEN_FEATURES_ENABLED: "true",
+    NEXT_PUBLIC_GUIDED_SCRIPTURE_ENABLED: "true",
+    NEXT_PUBLIC_PILGRIMAGES_ENABLED: "true",
+    NEXT_PUBLIC_SCRIPTURE_GAMES_ENABLED: "true",
+    NEXT_PUBLIC_SCRIPTURE_CONNECTIONS_ENABLED: "true",
+    NEXT_PUBLIC_BIBLE_TIMELINE_ENABLED: "true",
+    NEXT_PUBLIC_SEVEN_DAYS_MATCH_ENABLED: "true",
+    NEXT_PUBLIC_RHYTHM_BUILDER_ENABLED: "true",
+  };
+  for (const [key, value] of Object.entries(values)) process.env[key] = value;
+}
+
+/** Binds production receipts only to an exact committed source tree. */
+function verifyAccountUsSourceTree() {
+  if (!accountUsBuild) return;
+  const dirty = execFileSync(
+    "git",
+    ["status", "--porcelain", "--untracked-files=all"],
+    { cwd: repo, encoding: "utf8" },
+  ).trim();
+  if (dirty) {
+    fail("account-US receipts require a clean, committed source tree.");
   }
 }
 
@@ -297,6 +408,7 @@ function requiredEnvironment() {
       process.env.NEXT_PUBLIC_ACCOUNT_GATE_ENABLED !== "false" ||
       process.env.NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED !== "false" ||
       process.env.NEXT_PUBLIC_NATIVE_US_STRIPE_CHECKOUT_ENABLED !== "false" ||
+      process.env.NEXT_PUBLIC_NATIVE_ACCOUNT_US_RELEASE_ENABLED !== "false" ||
       process.env.NEXT_PUBLIC_ANALYTICS_ENABLED !== "false")
   ) {
     fail(
@@ -310,6 +422,7 @@ function requiredEnvironment() {
       process.env.NEXT_PUBLIC_SUPABASE_URL !== accountBetaSupabaseOrigin ||
       process.env.NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED !== "true" ||
       process.env.NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED !== "true" ||
+      process.env.NEXT_PUBLIC_NATIVE_ACCOUNT_US_RELEASE_ENABLED !== "false" ||
       process.env.NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED !== "false" ||
       process.env.NEXT_PUBLIC_NATIVE_US_STRIPE_CHECKOUT_ENABLED !== "false" ||
       process.env.NEXT_PUBLIC_ACCOUNT_GATE_ENABLED !== "false" ||
@@ -319,6 +432,24 @@ function requiredEnvironment() {
       process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY !== "")
   ) {
     fail("account-beta builds must use the pinned staging-only posture.");
+  }
+  if (
+    accountUsBuild &&
+    (origin !== RELEASE_ORIGIN ||
+      process.env.NEXT_PUBLIC_APP_URL !== RELEASE_ORIGIN ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL !== accountUsSupabaseOrigin ||
+      process.env.NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED !== "true" ||
+      process.env.NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED !== "false" ||
+      process.env.NEXT_PUBLIC_NATIVE_ACCOUNT_US_RELEASE_ENABLED !== "true" ||
+      process.env.NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED !== "true" ||
+      process.env.NEXT_PUBLIC_NATIVE_US_STRIPE_CHECKOUT_ENABLED !== "true" ||
+      process.env.NEXT_PUBLIC_ACCOUNT_GATE_ENABLED !== "false" ||
+      process.env.NEXT_PUBLIC_ANALYTICS_ENABLED !== "false" ||
+      process.env.NEXT_PUBLIC_NATIVE_AUTH_CALLBACK_URL !== "" ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== "" ||
+      process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY !== "")
+  ) {
+    fail("account-US builds must use the pinned production-only posture.");
   }
   return { target, origin };
 }
@@ -525,7 +656,10 @@ function stageTree() {
 }
 
 function pruneServerSurfaces() {
-  for (const [relative, reason] of REMOVE) {
+  const removals = accountUsBuild
+    ? REMOVE.filter(([relative]) => relative !== "src/app/app/plus")
+    : REMOVE;
+  for (const [relative, reason] of removals) {
     const target = path.join(stage, relative);
     if (!existsSync(target)) {
       fail(
@@ -553,7 +687,10 @@ function build() {
 
 /** Fails the build if a web-only acquisition route re-enters the app bundle. */
 function verifyCommerceRoutesPruned() {
-  for (const route of ["app/plus", "app/games/store"]) {
+  const forbiddenRoutes = accountUsBuild
+    ? ["app/games/store"]
+    : ["app/plus", "app/games/store"];
+  for (const route of forbiddenRoutes) {
     const exported = path.join(stage, "out", route);
     if (
       existsSync(`${exported}.html`) ||
@@ -562,6 +699,12 @@ function verifyCommerceRoutesPruned() {
     ) {
       fail(`web-only commerce route was exported into the native bundle: /${route}`);
     }
+  }
+  if (
+    accountUsBuild &&
+    !existsSync(path.join(stage, "out", "app", "plus.html"))
+  ) {
+    fail("the account-US artifact is missing its reviewed Plus route.");
   }
   log("verified web-only commerce routes are absent");
 }
@@ -579,7 +722,7 @@ function generatedFiles(directory) {
 
 /** Fails if a release artifact retains a disposable or protected host. */
 function verifyReleaseOrigin() {
-  if (!releaseBuild) return;
+  if (!releaseBuild && !accountUsBuild) return;
   const releaseMarker = Buffer.from(RELEASE_ORIGIN);
   const forbiddenMarkers = [
     "native-staging.biblequest.co",
@@ -606,6 +749,69 @@ function verifyReleaseOrigin() {
     fail(`release output does not contain the required origin ${RELEASE_ORIGIN}.`);
   }
   log(`verified production origin in ${releaseReferences} generated files`);
+}
+
+/** Requires the production account target and excludes every other Supabase host. */
+function verifyAccountUsOrigin() {
+  if (!accountUsBuild) return;
+  let references = 0;
+  for (const file of generatedFiles(path.join(stage, "out"))) {
+    const contents = readFileSync(file).toString("utf8");
+    const origins = contents.match(/https:\/\/[a-z]{20}\.supabase\.co/g) ?? [];
+    if (origins.some((origin) => origin !== accountUsSupabaseOrigin)) {
+      fail("account-US output contains a non-production Supabase origin.");
+    }
+    if (contents.includes(accountUsSupabaseOrigin)) references += 1;
+  }
+  if (references === 0) {
+    fail("account-US output is missing its reviewed production Supabase origin.");
+  }
+  log(`verified the production account target in ${references} generated files`);
+}
+
+/** Emits a non-authoritative receipt derived only from pinned build inputs. */
+function writeAccountUsReceipt() {
+  if (!accountUsBuild) return;
+  const commit = execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: repo,
+    encoding: "utf8",
+  }).trim();
+  if (!/^[a-f0-9]{40}$/.test(commit)) fail("cannot bind the account-US receipt to Git.");
+  const receipt = {
+    schemaVersion: accountUsPolicy.schemaVersion,
+    profile: accountUsPolicy.profile,
+    commit,
+    accountEnabled: true,
+    privacyProfile: accountUsPolicy.privacyAnswersProfile,
+    analyticsEnabled: false,
+    aiEnabled: false,
+    backendEnvironment: "reviewed-production",
+    backendOrigin: RELEASE_ORIGIN,
+    supabaseOrigin: accountUsSupabaseOrigin,
+    externalNavigationOrigins: [
+      "https://www.biblequest.co",
+      "https://checkout.stripe.com",
+      "https://billing.stripe.com",
+      "https://berean.bible",
+      "https://ebible.org",
+    ],
+    commerce: {
+      purchaseUIEnabled: true,
+      storefrontSource: "StoreKit.Storefront.current.countryCode",
+      eligibleCountryCodes: ["USA"],
+      failClosed: true,
+      usesIpLocaleOrUserCountry: false,
+      storeKitPurchasing: false,
+      checkoutPresentation: "system-browser",
+      embeddedPaymentForm: false,
+      entitlementAuthority: "server",
+    },
+  };
+  writeFileSync(
+    path.join(output, accountUsPolicy.receiptFile),
+    `${JSON.stringify(receipt, null, 2)}\n`,
+  );
+  log(`wrote ${accountUsPolicy.receiptFile}`);
 }
 
 /** Fails if the beta artifact drifts to production or a disposable preview. */
@@ -722,12 +928,16 @@ function publish() {
 
 pinReleaseEnvironment();
 pinAccountBetaEnvironment();
+pinAccountUsEnvironment();
+verifyAccountUsSourceTree();
 const { origin } = requiredEnvironment();
 const mode = releaseBuild
   ? "release"
   : accountBetaBuild
     ? "account-beta"
-    : "custom";
+    : accountUsBuild
+      ? "account-us-release"
+      : "custom";
 log(`mode=${mode} target=native hostedOrigin=${origin}`);
 stageTree();
 pruneServerSurfaces();
@@ -735,5 +945,7 @@ build();
 verifyCommerceRoutesPruned();
 verifyReleaseOrigin();
 verifyAccountBetaOrigin();
+verifyAccountUsOrigin();
 publish();
+writeAccountUsReceipt();
 log("done — run `pnpm exec cap sync ios` to copy it into the app");

@@ -59,14 +59,37 @@ final class BibleQuestCheckoutReturnRouter {
     }
 }
 
-// The checked-in Xcode configurations stay closed; Task 1 must opt only its
-// separate account-beta configuration into this native bridge.
+// The checked-in Xcode configurations stay closed; only the signed account-US
+// artifact receipt or an explicit reviewed Xcode override enables the bridge.
 enum BibleQuestNativeFeatures {
     static var usStripeCheckoutEnabled: Bool {
         let value = Bundle.main.object(
             forInfoDictionaryKey: "BibleQuestNativeUSStripeCheckoutEnabled"
         ) as? String
-        return value == "YES"
+        if value == "YES" { return true }
+
+        guard let receiptURL = Bundle.main.url(
+            forResource: "ios-account-us-release-receipt",
+            withExtension: "json",
+            subdirectory: "public"
+        ),
+        let receiptData = try? Data(contentsOf: receiptURL),
+        let receipt = try? JSONSerialization.jsonObject(with: receiptData)
+            as? [String: Any],
+        receipt["profile"] as? String == "ios-account-us-stripe-v1",
+        receipt["accountEnabled"] as? Bool == true,
+        receipt["backendEnvironment"] as? String == "reviewed-production",
+        receipt["backendOrigin"] as? String == "https://www.biblequest.co",
+        let commerce = receipt["commerce"] as? [String: Any],
+        commerce["purchaseUIEnabled"] as? Bool == true,
+        commerce["eligibleCountryCodes"] as? [String] == ["USA"],
+        commerce["failClosed"] as? Bool == true,
+        commerce["storeKitPurchasing"] as? Bool == false,
+        commerce["checkoutPresentation"] as? String == "system-browser",
+        commerce["entitlementAuthority"] as? String == "server" else {
+            return false
+        }
+        return true
     }
 }
 

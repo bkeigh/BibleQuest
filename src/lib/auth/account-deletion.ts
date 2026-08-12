@@ -10,7 +10,7 @@ import { DeadlineError, withDeadline } from "@/lib/async/deadline";
 import { isNativeTarget } from "@/lib/platform/target";
 import {
   ACCOUNT_SYNC_CONTAINED,
-  NATIVE_ACCOUNT_BETA_ENABLED,
+  NATIVE_ACCOUNT_ENABLED,
 } from "@/lib/sync/containment";
 
 export const ACCOUNT_DELETION_DEADLINE_MS = 15_000;
@@ -56,7 +56,7 @@ export async function verifiedNativeDeletionUserId(
   if (
     !isNativeTarget() ||
     ACCOUNT_SYNC_CONTAINED ||
-    !NATIVE_ACCOUNT_BETA_ENABLED
+    !NATIVE_ACCOUNT_ENABLED
   ) {
     throw new AccountDeletionError();
   }

@@ -295,7 +295,7 @@ produced `out-native` and selected the account manifest in the actual App
 target, run:
 
 ```bash
-pnpm check:ios:account-us-release -- \
+pnpm check:ios:account-us-release \
   --artifact out-native \
   --privacy ios/App/App/PrivacyInfo.xcprivacy \
   --attestation /restricted/evidence/ios-account-us-attestation.json

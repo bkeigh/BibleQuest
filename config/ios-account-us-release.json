@@ -1,6 +1,13 @@
 {
   "schemaVersion": 1,
   "profile": "ios-account-us-stripe-v1",
+  "buildTarget": {
+    "contract": "biblequest_ios_account_us_target_v1",
+    "reviewed": true,
+    "hostedOrigin": "https://www.biblequest.co",
+    "supabaseOrigin": "https://iacnjqnssovaaojswjoh.supabase.co",
+    "supabasePublishableKeySha256": "36ca9d846acd44042b50a15554465a5622b8c49cc50fca39db0869df851e728d"
+  },
   "receiptFile": "ios-account-us-release-receipt.json",
   "privacyAnswersProfile": "account-enabled-us-v1",
   "requiredStorefronts": ["USA"],

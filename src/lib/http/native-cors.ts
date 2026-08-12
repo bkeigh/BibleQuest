@@ -4,7 +4,7 @@ import { isNativeAppOrigin, NATIVE_APP_ORIGIN } from "./native-origin";
 import {
   ACCOUNT_DELETION_CLEANUP_HEADER,
   EXPECTED_ACCOUNT_USER_HEADER,
-  NATIVE_ACCOUNT_BETA_HEADER,
+  NATIVE_ACCOUNT_REQUEST_HEADERS,
 } from "@/lib/sync/native-beta-headers";
 
 /**
@@ -46,7 +46,7 @@ const ALLOWED_REQUEST_HEADERS = [
   "Authorization",
   "Content-Type",
   EXPECTED_ACCOUNT_USER_HEADER,
-  NATIVE_ACCOUNT_BETA_HEADER,
+  ...NATIVE_ACCOUNT_REQUEST_HEADERS,
   ACCOUNT_DELETION_CLEANUP_HEADER,
 ].join(", ");
 

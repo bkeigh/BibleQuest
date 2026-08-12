@@ -6,7 +6,7 @@ grant usage on schema extensions to public;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(64);
+select plan(68);
 
 select is(
   (
@@ -22,6 +22,51 @@ select is(
   '{"available":false,"contract":"biblequest_native_account_beta_v1"}'::jsonb,
   'the public availability response is fixed and initially unavailable'
 );
+select is(
+  (
+    select enabled
+    from public.feature_flags
+    where key = 'native_account_us_release'
+  ),
+  false,
+  'the production native account profile defaults off'
+);
+select pg_catalog.set_config(
+  'request.headers',
+  '{"x-biblequest-native-account-us-release":"v1"}',
+  true
+);
+select is(
+  public.native_account_beta_availability(),
+  '{"available":false,"contract":"biblequest_native_account_us_release_v1"}'::jsonb,
+  'the production marker selects only the production availability contract'
+);
+update public.feature_flags
+set enabled = true
+where key = 'native_account_us_release';
+select is(
+  public.native_account_beta_availability(),
+  '{"available":true,"contract":"biblequest_native_account_us_release_v1"}'::jsonb,
+  'the production contract requires its separate remote flag'
+);
+select pg_catalog.set_config(
+  'request.headers',
+  '{"x-biblequest-native-account-beta":"v1","x-biblequest-native-account-us-release":"v1"}',
+  true
+);
+set local role authenticated;
+select throws_ok(
+  $$select public.native_account_beta_request_allowed()$$,
+  '55000',
+  'native account beta is unavailable',
+  'mixed beta and production markers fail closed'
+);
+reset role;
+set role postgres;
+update public.feature_flags
+set enabled = false
+where key = 'native_account_us_release';
+select pg_catalog.set_config('request.headers', '{}', true);
 select ok(
   has_function_privilege(
     'authenticated',

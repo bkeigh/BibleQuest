@@ -7,14 +7,14 @@ import {
 import { isNativeTarget } from "./target";
 import {
   ACCOUNT_SYNC_CONTAINED,
-  NATIVE_ACCOUNT_BETA_ENABLED,
+  NATIVE_ACCOUNT_ENABLED,
 } from "@/lib/sync/containment";
 import {
   ACCOUNT_DELETION_CLEANUP_HEADER,
   ACCOUNT_DELETION_CLEANUP_HEADER_VALUE,
   EXPECTED_ACCOUNT_USER_HEADER,
-  NATIVE_ACCOUNT_BETA_HEADER,
-  NATIVE_ACCOUNT_BETA_HEADER_VALUE,
+  NATIVE_ACCOUNT_REQUEST_HEADERS,
+  nativeAccountBuildContract,
 } from "@/lib/sync/native-beta-headers";
 import { NativeAccountBetaUnavailableError } from "@/lib/sync/native-beta-contract";
 
@@ -157,7 +157,7 @@ function nativePublicApiFetch(
   for (const reserved of [
     "authorization",
     EXPECTED_ACCOUNT_USER_HEADER,
-    NATIVE_ACCOUNT_BETA_HEADER,
+    ...NATIVE_ACCOUNT_REQUEST_HEADERS,
     ACCOUNT_DELETION_CLEANUP_HEADER,
   ]) {
     headers.delete(reserved);
@@ -173,7 +173,7 @@ export async function nativeSessionMatches(
     !isNativeTarget() ||
     !UUID.test(expectedUserId) ||
     ACCOUNT_SYNC_CONTAINED ||
-    !NATIVE_ACCOUNT_BETA_ENABLED
+    !NATIVE_ACCOUNT_ENABLED
   ) {
     return false;
   }
@@ -194,7 +194,7 @@ async function nativeSessionIdentity(): Promise<{
   accessToken: string;
   userId: string;
 } | null> {
-  if (ACCOUNT_SYNC_CONTAINED || !NATIVE_ACCOUNT_BETA_ENABLED) return null;
+  if (ACCOUNT_SYNC_CONTAINED || !NATIVE_ACCOUNT_ENABLED) return null;
   try {
     const { createClient, isSupabaseConfigured } = await import(
       "@/lib/supabase/client"
@@ -219,7 +219,7 @@ async function nativeAuthenticatedApiFetch(
   headers: Headers,
   deletionOnly = false,
 ): Promise<Response> {
-  if (ACCOUNT_SYNC_CONTAINED || !NATIVE_ACCOUNT_BETA_ENABLED) {
+  if (ACCOUNT_SYNC_CONTAINED || !NATIVE_ACCOUNT_ENABLED) {
     throw new NativeAccountBetaUnavailableError();
   }
   if (!deletionOnly) {
@@ -233,7 +233,9 @@ async function nativeAuthenticatedApiFetch(
   if (!identity || identity.userId !== expectedUserId) {
     throw new NativeAccountBetaUnavailableError();
   }
-  headers.set(NATIVE_ACCOUNT_BETA_HEADER, NATIVE_ACCOUNT_BETA_HEADER_VALUE);
+  const contract = nativeAccountBuildContract();
+  if (!contract) throw new NativeAccountBetaUnavailableError();
+  headers.set(contract.header, contract.value);
   headers.set("Authorization", `Bearer ${identity.accessToken}`);
   return fetch(url, { ...init, credentials: "omit", headers });
 }

@@ -37,6 +37,12 @@ attestation. See
 Do not add production credentials or reviewer mailbox access to CI merely to
 turn that manual evidence gate green.
 
+Xcode Cloud defaults to the guest profile. The separate account-US workflow
+must set `BIBLEQUEST_IOS_BUILD_PROFILE=account-us` and provide only the
+fingerprint-matched `BIBLEQUEST_IOS_ACCOUNT_US_PUBLISHABLE_KEY` as a secret.
+Its post-clone script builds the production account payload and selects the
+account privacy manifest before Xcode compiles the signed bundle.
+
 ## Branch protection
 
 In the GitHub ruleset or branch protection rule for `main`:
@@ -83,3 +89,14 @@ The production probe intentionally stays out of pull-request CI: CI receives no
 production credentials, a transient provider incident must not block unrelated
 code review, and production state is a release gate rather than a source-code
 test. Record its sanitized pass/fail output in the restricted launch evidence.
+
+Before enabling the account-US build, dry-run its exact production packets:
+
+```bash
+pnpm check:production:ios-account-release
+```
+
+The guarded runner accepts only the reviewed production history, exact source
+hashes, a completed physical backup no older than 30 hours, and exactly the
+two expected migrations. Never repair migration history or use `--include-all`
+to bypass this lane.

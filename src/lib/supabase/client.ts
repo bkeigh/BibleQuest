@@ -18,11 +18,10 @@ import {
 import { supabasePublishableKey } from "./config";
 import { isNativeTarget } from "@/lib/platform/target";
 import { nativeSupabaseAuthOptions } from "./native-auth-storage";
-import { NATIVE_ACCOUNT_BETA_ENABLED } from "@/lib/sync/containment";
+import { NATIVE_ACCOUNT_ENABLED } from "@/lib/sync/containment";
 import {
   EXPECTED_ACCOUNT_USER_HEADER,
-  NATIVE_ACCOUNT_BETA_HEADER,
-  NATIVE_ACCOUNT_BETA_HEADER_VALUE,
+  nativeAccountBuildContract,
 } from "@/lib/sync/native-beta-headers";
 
 const UUID =
@@ -55,7 +54,7 @@ export function createClient() {
         supabasePublishableKey()!,
         {
           ...nativeSupabaseAuthOptions(),
-          global: { headers: nativeAccountBetaHeaders() },
+          global: { headers: nativeAccountHeaders() },
         },
       )
     : createBrowserClient(
@@ -85,7 +84,7 @@ function createIsolatedAuthClient(purpose: "email-otp" | "account-sign-out") {
         flowType: "pkce",
         storageKey: `biblequest-${purpose}-${isolatedAuthClientSequence}`,
       },
-      global: { headers: nativeAccountBetaHeaders() },
+      global: { headers: nativeAccountHeaders() },
     },
   );
 }
@@ -141,9 +140,10 @@ async function accountAccessToken(expectedUserId: string): Promise<string> {
 }
 
 /** Mark only native beta requests; ordinary web account clients stay headerless. */
-function nativeAccountBetaHeaders(): Record<string, string> {
-  return isNativeTarget() && NATIVE_ACCOUNT_BETA_ENABLED
-    ? { [NATIVE_ACCOUNT_BETA_HEADER]: NATIVE_ACCOUNT_BETA_HEADER_VALUE }
+function nativeAccountHeaders(): Record<string, string> {
+  const contract = nativeAccountBuildContract();
+  return isNativeTarget() && NATIVE_ACCOUNT_ENABLED && contract
+    ? { [contract.header]: contract.value }
     : {};
 }
 
@@ -170,7 +170,7 @@ export function createSyncControlClient(expectedUserId: string) {
       global: {
         headers: {
           [EXPECTED_ACCOUNT_USER_HEADER]: expectedUserId,
-          ...nativeAccountBetaHeaders(),
+          ...nativeAccountHeaders(),
         },
       },
     },
@@ -205,7 +205,7 @@ export function createSyncClient(expectedUserId: string, generation: number) {
         headers: {
           [EXPECTED_ACCOUNT_USER_HEADER]: expectedUserId,
           "x-biblequest-sync-generation": String(generation),
-          ...nativeAccountBetaHeaders(),
+          ...nativeAccountHeaders(),
         },
       },
     },

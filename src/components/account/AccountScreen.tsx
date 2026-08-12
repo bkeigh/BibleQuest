@@ -26,7 +26,7 @@ import { isStandaloneWebApp } from "@/lib/pwa/install-guidance";
 import {
   ACCOUNT_SYNC_CONTAINED,
   ACCOUNT_SYNC_CONTAINMENT_NOTICE,
-  NATIVE_ACCOUNT_BETA_ENABLED,
+  NATIVE_ACCOUNT_ENABLED,
 } from "@/lib/sync/containment";
 import { isNativeTarget } from "@/lib/platform/target";
 import {
@@ -114,7 +114,7 @@ function AccountInner() {
             this browser on this device.
           </p>
         </PaperCard>
-        {isNativeTarget() && NATIVE_ACCOUNT_BETA_ENABLED ? (
+        {isNativeTarget() && NATIVE_ACCOUNT_ENABLED ? (
           <UnavailableAccountDeletion />
         ) : null}
       </Frame>

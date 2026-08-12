@@ -9,6 +9,7 @@ import {
   ACCOUNT_DELETION_CLEANUP_HEADER,
   EXPECTED_ACCOUNT_USER_HEADER,
   NATIVE_ACCOUNT_BETA_HEADER,
+  NATIVE_ACCOUNT_US_RELEASE_HEADER,
 } from "@/lib/sync/native-beta-headers";
 
 const LATCH = "BIBLEQUEST_NATIVE_API_ORIGIN_ENABLED";
@@ -64,6 +65,7 @@ describe("the preflight short-circuit", () => {
         "Content-Type",
         EXPECTED_ACCOUNT_USER_HEADER,
         NATIVE_ACCOUNT_BETA_HEADER,
+        NATIVE_ACCOUNT_US_RELEASE_HEADER,
         ACCOUNT_DELETION_CLEANUP_HEADER,
       ].join(", "),
     );
