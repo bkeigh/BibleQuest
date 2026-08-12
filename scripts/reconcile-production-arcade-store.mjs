@@ -13,7 +13,7 @@ import { spawnSync } from "node:child_process";
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const PROJECT_REF = "iacnjqnssovaaojswjoh";
 const EXPECTED_MANIFEST_SHA256 =
-  "d3208a72206c1770a9dfd21d7eb290ac7589de5d9018e18d6e13a785453584fa";
+  "7f6f4ba507d4f314fe3965a0ed9602cce854fd370e63f1e892d34e2f08d0fa04";
 const APPLY_CONFIRMATION = `apply 20260804035000 to ${PROJECT_REF}`;
 const MAX_BACKUP_AGE_MS = 30 * 60 * 60 * 1000;
 const PACKET = {
