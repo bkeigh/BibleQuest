@@ -4,7 +4,7 @@
  * validated build assets. Prayers, reflections, and other user data continue
  * to live in the persisted Zustand store; this worker never handles that data.
  */
-const CACHE_VERSION = "biblequest-v25";
+const CACHE_VERSION = "biblequest-v26";
 const CACHE_OWNER_PREFIX = "biblequest-";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
@@ -93,14 +93,42 @@ const PRECACHE_ART_PATHS = [
 PRECACHE_ART_PATHS.push("/art/2.5d/candles/candle.gif");
 
 const PRECACHE_PATHS = [
-  "/offline",
   "/app",
   "/onboarding",
   "/manifest.webmanifest",
   ...PRECACHE_ART_PATHS,
 ];
 
-const OFFLINE_PATH = "/offline";
+// Keep the last-resort navigation fallback independent from Next.js chunks so
+// it still renders when a fresh install loses the network mid-update.
+const OFFLINE_DOCUMENT = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f6f0e2">
+    <title>Offline — BibleQuest</title>
+    <style>
+      :root { color-scheme: light; font-family: ui-sans-serif, system-ui, sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #f6f0e2; color: #29261f; }
+      main { min-height: 100dvh; display: grid; place-content: center; gap: 1rem; padding: 2rem; text-align: center; }
+      .mark { color: #9a7427; font: 3rem/1 Georgia, serif; }
+      h1 { margin: 0; font: 700 2.25rem/1.1 Georgia, serif; }
+      p { max-width: 20rem; margin: 0 auto; color: #625d52; font-size: 1rem; line-height: 1.6; }
+      a { justify-self: center; margin-top: .5rem; border: 1px solid #0d614c; border-radius: 999px; padding: .75rem 1.25rem; color: #0d614c; font-weight: 700; text-decoration: none; }
+      a:focus-visible { outline: 3px solid #c79a3b; outline-offset: 3px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark" aria-hidden="true">✦</div>
+      <h1>No connection</h1>
+      <p>You’re offline. Saved pages and drafts are still here.</p>
+      <a href="/app">Return home</a>
+    </main>
+  </body>
+</html>`;
 const PUSH_KINDS = new Set([
   "daily_verse",
   "daily_quest",
@@ -257,16 +285,18 @@ async function precacheShell() {
   );
 }
 
-async function cachedOfflineResponse() {
-  const shell = await caches.open(SHELL_CACHE);
-  const cached = await shell.match(absoluteUrl(OFFLINE_PATH));
-  return (
-    cached ||
-    new Response("BibleQuest is offline.", {
-      status: 503,
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
-    })
-  );
+function offlineDocumentResponse() {
+  return new Response(OFFLINE_DOCUMENT, {
+    status: 503,
+    headers: {
+      "Cache-Control": "no-store",
+      "Content-Security-Policy":
+        "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      "Content-Type": "text/html; charset=utf-8",
+      "Referrer-Policy": "no-referrer",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
 }
 
 async function cachedNavigation(request) {
@@ -290,7 +320,7 @@ async function handleNavigation(request) {
       const cached = await cachedNavigation(request);
       if (cached) return cached;
     }
-    return cachedOfflineResponse();
+    return offlineDocumentResponse();
   }
 
   // A resolved 4xx/5xx or redirect is returned as-is. Cache fallback is only
@@ -442,6 +472,7 @@ if (self.__BIBLEQUEST_SW_TESTING__) {
     RUNTIME_CACHE,
     CURRENT_CACHES,
     PRECACHE_PATHS,
+    OFFLINE_DOCUMENT,
     ART_ASSET_PATHS,
     PRECACHE_ART_PATHS,
     PUSH_KINDS,
