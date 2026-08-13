@@ -174,7 +174,7 @@ describe("deterministic iOS Production account release", () => {
       "node --env-file-if-exists=.env.account-release.local scripts/build-native.mjs --account-release",
     );
     expect(scripts["ios:account-release:prepare"]).toBe(
-      "pnpm build:native:account-release && pnpm exec cap sync ios",
+      "node scripts/select-ios-privacy-manifest.mjs --account-sync && pnpm build:native:account-release && pnpm exec cap sync ios",
     );
     expect(scripts["build:native:release"]).toContain("--release");
     expect(scripts["build:native:account-beta"]).toContain("--account-beta");
@@ -242,5 +242,43 @@ describe("deterministic iOS Production account release", () => {
       "only --account-release may target the Production Supabase project",
     );
     expect(existsSync(path.join(root, ".native"))).toBe(false);
+  });
+
+  it("declares account data without adding excluded release surfaces", () => {
+    const accountPrivacy = readFileSync(
+      "ios/compliance/PrivacyInfo.account-sync.xcprivacy",
+      "utf8",
+    );
+    const guestPrivacy = readFileSync(
+      "ios/compliance/PrivacyInfo.guest.xcprivacy",
+      "utf8",
+    );
+    for (const dataType of [
+      "Name",
+      "EmailAddress",
+      "SensitiveInfo",
+      "OtherUserContent",
+      "UserID",
+      "ProductInteraction",
+    ]) {
+      expect(accountPrivacy).toContain(
+        `NSPrivacyCollectedDataType${dataType}`,
+      );
+    }
+    expect(accountPrivacy).not.toContain(
+      "NSPrivacyCollectedDataTypePurchaseHistory",
+    );
+    expect(accountPrivacy).not.toContain(
+      "NSPrivacyCollectedDataTypePhotosorVideos",
+    );
+    expect(accountPrivacy).toMatch(
+      /<key>NSPrivacyTracking<\/key>\s*<false\/>/,
+    );
+    expect(guestPrivacy).toMatch(
+      /<key>NSPrivacyCollectedDataTypes<\/key>\s*<array\/>/,
+    );
+    expect(readFileSync("ios/App/App/PrivacyInfo.xcprivacy", "utf8")).toBe(
+      accountPrivacy,
+    );
   });
 });

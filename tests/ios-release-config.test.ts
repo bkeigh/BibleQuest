@@ -15,7 +15,7 @@ describe("iOS App Store release configuration", () => {
 
     expect(scripts.scripts["build:native:release"]).toContain("--release");
     expect(scripts.scripts["ios:release:prepare"]).toBe(
-      "pnpm build:native:release && pnpm exec cap sync ios",
+      "node scripts/select-ios-privacy-manifest.mjs --guest && pnpm build:native:release && pnpm exec cap sync ios",
     );
     expect(builder).toContain(
       'const RELEASE_ORIGIN = "https://www.biblequest.co"',

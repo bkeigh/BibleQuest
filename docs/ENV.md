@@ -67,6 +67,10 @@ template in [`../.env.example`](../.env.example).
   analytics/account flags off, and rejects disposable hosted origins. The
   generic `build:native` command remains available only for reviewed custom
   development builds.
+- Build the account replacement with `pnpm ios:account-release:prepare`. It
+  selects the account-sync privacy manifest before archive; the guest command
+  restores the empty collected-data profile. App Store Connect privacy answers
+  must still be updated separately to match the selected binary.
 - Guest-only containment includes native bearer lookup: it must not create a
   Supabase client, inspect or refresh an old WebView session, or attach an
   Authorization header. Clearing public Supabase configuration in the release

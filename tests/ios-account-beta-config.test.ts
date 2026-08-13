@@ -212,13 +212,13 @@ describe("deterministic iOS account-beta preparation", () => {
       "node --env-file-if-exists=.env.local scripts/build-native.mjs --release",
     );
     expect(scripts["ios:release:prepare"]).toBe(
-      "pnpm build:native:release && pnpm exec cap sync ios",
+      "node scripts/select-ios-privacy-manifest.mjs --guest && pnpm build:native:release && pnpm exec cap sync ios",
     );
     expect(scripts["build:native:account-beta"]).toBe(
       "node --env-file-if-exists=.env.account-beta.local scripts/build-native.mjs --account-beta",
     );
     expect(scripts["ios:account-beta:prepare"]).toBe(
-      "pnpm build:native:account-beta && pnpm exec cap sync ios",
+      "node scripts/select-ios-privacy-manifest.mjs --account-sync && pnpm build:native:account-beta && pnpm exec cap sync ios",
     );
 
     const { result } = runBuilder(reviewedManifest(), {
