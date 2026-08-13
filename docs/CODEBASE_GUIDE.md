@@ -182,7 +182,9 @@ free-form search terms, record IDs, or arbitrary URLs to analytics.
 `public/sw.js` precaches a small public shell and uses network-first navigation
 for an explicit allowlist of safe app routes. Immutable build assets use
 stale-while-revalidate. Auth, account, billing, API, cookie-bearing, private, and
-query-bearing responses are excluded from caching.
+query-bearing responses are excluded from caching. A self-contained, script-free
+document handles last-resort offline navigation so it cannot depend on missing
+Next.js chunks during an interrupted worker update.
 
 When the worker policy changes, increment `CACHE_VERSION` and update
 `tests/service-worker.test.ts` in the same change.

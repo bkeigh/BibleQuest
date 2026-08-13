@@ -15,6 +15,7 @@ type WorkerPolicy = {
   SHELL_CACHE: string;
   RUNTIME_CACHE: string;
   PRECACHE_PATHS: string[];
+  OFFLINE_DOCUMENT: string;
   ART_ASSET_PATHS: string[];
   PRECACHE_ART_PATHS: string[];
   PUSH_TITLE: string;
@@ -452,20 +453,20 @@ describe("service-worker fetch behavior", () => {
       throw new TypeError("offline");
     });
     const runtime = await harness.caches.open(harness.policy.RUNTIME_CACHE);
-    const shell = await harness.caches.open(harness.policy.SHELL_CACHE);
     await runtime.put(`${ORIGIN}/app/prayer`, makeResponse("cached prayer"));
-    await shell.put(`${ORIGIN}/offline`, makeResponse("offline fallback"));
 
     const result = await dispatchFetch(harness, makeRequest("/app/prayer"));
     expect(await result?.text()).toBe("cached prayer");
   });
 
-  it("uses the offline page for unvisited or forbidden navigation failures", async () => {
+  it("uses a self-contained page for unvisited or forbidden navigation failures", async () => {
     const harness = loadWorker(async () => {
       throw new TypeError("offline");
     });
+    // A stale framework-rendered fallback must not override the script-free
+    // document because its build chunks may be unreachable during an update.
     const shell = await harness.caches.open(harness.policy.SHELL_CACHE);
-    await shell.put(`${ORIGIN}/offline`, makeResponse("offline fallback"));
+    await shell.put(`${ORIGIN}/offline`, makeResponse("stale chunked fallback"));
 
     for (const pathname of [
       "/app/reflection",
@@ -473,7 +474,15 @@ describe("service-worker fetch behavior", () => {
       "/app?qa=1",
     ]) {
       const result = await dispatchFetch(harness, makeRequest(pathname));
-      expect(await result?.text(), pathname).toBe("offline fallback");
+      const body = await result?.text();
+      expect(result?.status, pathname).toBe(503);
+      expect(body, pathname).toBe(harness.policy.OFFLINE_DOCUMENT);
+      expect(body, pathname).toContain("No connection");
+      expect(body, pathname).not.toContain("<script");
+      expect(result?.headers.get("cache-control"), pathname).toBe("no-store");
+      expect(result?.headers.get("content-security-policy"), pathname).toContain(
+        "default-src 'none'",
+      );
     }
   });
 
@@ -603,6 +612,7 @@ describe("service-worker lifecycle and upgrades", () => {
     );
     expect(shell.entries.size).toBe(harness.policy.PRECACHE_PATHS.length - 1);
     expect(await shell.match(`${ORIGIN}/onboarding`)).toBeUndefined();
+    expect(await shell.match(`${ORIGIN}/offline`)).toBeUndefined();
     expect(
       await shell.match(`${ORIGIN}/art/2.5d/mascot-lamb.webp`)
     ).toBeDefined();
