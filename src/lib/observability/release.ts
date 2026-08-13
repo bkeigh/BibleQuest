@@ -5,6 +5,10 @@ import { supabasePublishableKey } from "@/lib/supabase/config";
 
 const SHA = /^[a-f0-9]{40}$/i;
 
+// Next.js replaces this static access with the public release identity captured
+// by next.config.ts, so it survives a runtime environment without CI metadata.
+const BUNDLED_BUILD_SHA = process.env.BIBLEQUEST_BUILD_SHA;
+
 export type AuthPosture = "configured" | "guest-only" | "invalid";
 export type AnalyticsPosture = "configured" | "disabled" | "invalid";
 
@@ -34,9 +38,14 @@ function safeSha(value: string | undefined): string | null {
   return candidate && SHA.test(candidate) ? candidate.toLowerCase() : null;
 }
 
-/** Chooses the first valid provider or CI SHA so a blank primary cannot mask it. */
+/** Chooses the first valid provider, CI, or bundled SHA without trusting blanks. */
 function releaseSha(env: PublicEnvironment): string | null {
-  return safeSha(env.VERCEL_GIT_COMMIT_SHA) ?? safeSha(env.GITHUB_SHA);
+  return (
+    safeSha(env.VERCEL_GIT_COMMIT_SHA) ??
+    safeSha(env.GITHUB_SHA) ??
+    safeSha(env.BIBLEQUEST_BUILD_SHA) ??
+    safeSha(BUNDLED_BUILD_SHA)
+  );
 }
 
 /** Reports configuration shape without exposing a Supabase host or key. */

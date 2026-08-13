@@ -176,9 +176,12 @@ approve that exact action; the preparation work above is not blanket approval.
    may still build `main`; it must not move production traffic. Treat the
    resulting domainless Production-environment deployment as the staged
    candidate only if its SHA and masked Production environment pass; otherwise
-   create one with `vercel --prod --skip-domain`. Promotion is a later, separate
-   approval using the exact deployment ID. See Vercel's official
-   [staged deployment workflow](https://vercel.com/docs/cli/deploying-from-cli).
+   create one with `GITHUB_SHA=<full frozen SHA> vercel --prod --skip-domain`
+   and verify `/api/health` reports that exact SHA. The build embeds this public
+   release identity; passing it only as a runtime variable is not sufficient.
+   Promotion is a later, separate approval using the exact deployment ID. See
+   Vercel's official [staged deployment
+   workflow](https://vercel.com/docs/cli/deploying-from-cli).
 4. **Freeze and rehearse:** after the first three items pass, freeze clean
    `main`, rerun every source check, create the distinct staging and staged
    Production-environment deployments from the same SHA, and execute sections
