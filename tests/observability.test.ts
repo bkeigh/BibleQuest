@@ -320,6 +320,15 @@ describe("privacy-safe observability contract", () => {
       billing_support_enabled: false,
     });
 
+    // CLI deployments expose a blank Vercel SHA, so the validated CI fallback
+    // must remain usable for an immutable release candidate.
+    expect(
+      buildReleaseHealth({
+        VERCEL_GIT_COMMIT_SHA: "",
+        GITHUB_SHA: "c".repeat(40),
+      }).release_sha,
+    ).toBe("c".repeat(40));
+
     // The public contract must report the effective guest-only latch even
     // when provider credentials remain available to the deployment.
     expect(buildReleaseHealth(configuredEnvironment).auth_posture).toBe(

@@ -34,6 +34,11 @@ function safeSha(value: string | undefined): string | null {
   return candidate && SHA.test(candidate) ? candidate.toLowerCase() : null;
 }
 
+/** Chooses the first valid provider or CI SHA so a blank primary cannot mask it. */
+function releaseSha(env: PublicEnvironment): string | null {
+  return safeSha(env.VERCEL_GIT_COMMIT_SHA) ?? safeSha(env.GITHUB_SHA);
+}
+
 /** Reports configuration shape without exposing a Supabase host or key. */
 function authPosture(
   env: PublicEnvironment,
@@ -87,7 +92,7 @@ export function buildReleaseHealth(
     status: "ok",
     app: "biblequest",
     contract: observability.contract,
-    release_sha: safeSha(env.VERCEL_GIT_COMMIT_SHA ?? env.GITHUB_SHA),
+    release_sha: releaseSha(env),
     rollback_sha: safeSha(env.BIBLEQUEST_ROLLBACK_SHA),
     canonical_origin: observability.canonicalOrigin,
     canonical_origin_matches:
