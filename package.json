@@ -22,7 +22,7 @@
     "test": "vitest run",
     "test:analytics": "vitest run tests/analytics.test.ts",
     "test:observability": "vitest run tests/observability.test.ts tests/observability-evidence.test.mjs",
-    "test:headers": "NEXT_PUBLIC_SUPABASE_URL=https://header-fixture.supabase.co NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=header-fixture-publishable-key pnpm build && pnpm test:headers:built",
+    "test:headers": "NEXT_PUBLIC_SUPABASE_URL=https://abcdefghijklmnopqrst.supabase.co NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_header_fixture_1234567890abcdef pnpm build && pnpm test:headers:built",
     "test:headers:built": "node --test tests/security-headers.integration.test.mjs",
     "test:e2e": "playwright test",
     "test:service-worker": "vitest run tests/service-worker.test.ts",

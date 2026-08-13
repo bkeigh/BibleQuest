@@ -56,7 +56,7 @@ describe("proxy wiring for the native CORS layer", () => {
     process.env[LATCH] = "true";
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://proxy-fixture.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY =
-      "proxy-fixture-publishable-key";
+      "sb_publishable_proxy_fixture_1234567890abcdef";
     process.env.NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED = "true";
     mocks.createServerClient.mockImplementation(
       (

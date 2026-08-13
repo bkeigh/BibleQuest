@@ -474,7 +474,7 @@ async function deleteActor(admin, actor) {
       password,
     });
     if (!updated.error && actor.email) {
-      actorClient = client(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+      actorClient = client(publicKey());
       const signedIn = await actorClient.auth.signInWithPassword({
         email: actor.email,
         password,

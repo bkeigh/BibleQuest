@@ -98,14 +98,14 @@ jobs:
           # Browser-safe fixtures exercise the configured-auth bundle without
           # contacting Supabase or requiring repository secrets.
           - mode: configured-auth-contained
-            supabase_url: https://header-fixture.supabase.co
-            supabase_key: header-fixture-anon-key
+            supabase_url: https://abcdefghijklmnopqrst.supabase.co
+            supabase_key: sb_publishable_header_fixture_1234567890abcdef
             account_sync_enabled: "false"
           # Compile the release posture too; fake browser-safe values never
           # contact Supabase during the build.
           - mode: configured-auth-enabled
-            supabase_url: https://header-fixture.supabase.co
-            supabase_key: header-fixture-anon-key
+            supabase_url: https://abcdefghijklmnopqrst.supabase.co
+            supabase_key: sb_publishable_header_fixture_1234567890abcdef
             account_sync_enabled: "true"
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ matrix.supabase_url }}

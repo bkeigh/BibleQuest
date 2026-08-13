@@ -301,7 +301,8 @@ describe("privacy-safe observability contract", () => {
       NEXT_PUBLIC_APP_URL: observability.canonicalOrigin,
       STRIPE_BILLING_MODE: "coming-soon",
       NEXT_PUBLIC_SUPABASE_URL: "https://project.supabase.co",
-      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "publishable-fixture",
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
+        "sb_publishable_observability_fixture_1234567890",
       NEXT_PUBLIC_ANALYTICS_ENABLED: "true",
       NEXT_PUBLIC_PLAUSIBLE_DOMAIN: "www.biblequest.co",
     };
@@ -324,6 +325,19 @@ describe("privacy-safe observability contract", () => {
     expect(buildReleaseHealth(configuredEnvironment).auth_posture).toBe(
       "guest-only",
     );
+
+    const mislabeledLegacyKey = buildReleaseHealth(
+      {
+        ...configuredEnvironment,
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: [
+          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+          "eyJyb2xlIjoiYW5vbiJ9",
+          "fixture-signature",
+        ].join("."),
+      },
+      false,
+    );
+    expect(mislabeledLegacyKey.auth_posture).toBe("invalid");
 
     const testBilling = buildReleaseHealth({
       NEXT_PUBLIC_APP_URL: observability.canonicalOrigin,

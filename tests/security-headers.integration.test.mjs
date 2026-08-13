@@ -63,7 +63,7 @@ function assertSharedSecurityContract(
     assert.deepEqual(csp.get("script-src"), ["'self'", "'unsafe-inline'"]);
     assert.deepEqual(csp.get("connect-src"), [
       "'self'",
-      "https://header-fixture.supabase.co",
+      "https://abcdefghijklmnopqrst.supabase.co",
     ]);
     assert.equal(response.headers.get("strict-transport-security"), "max-age=15552000");
     assert.deepEqual(csp.get("upgrade-insecure-requests"), []);
@@ -75,7 +75,7 @@ function assertSharedSecurityContract(
     ]);
     assert.deepEqual(csp.get("connect-src"), [
       "'self'",
-      "https://header-fixture.supabase.co",
+      "https://abcdefghijklmnopqrst.supabase.co",
       "ws://localhost:*",
     ]);
     assert.equal(response.headers.get("strict-transport-security"), null);
@@ -136,7 +136,7 @@ async function withNextServer(command, callback) {
         NODE_ENV: command === "dev" ? "development" : "production",
         BIBLEQUEST_HEADER_TEST_DIST_DIR:
           command === "dev" ? isolatedDevDistDir : "",
-        NEXT_PUBLIC_SUPABASE_URL: "https://header-fixture.supabase.co",
+        NEXT_PUBLIC_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
       },
       stdio: ["ignore", "pipe", "pipe"],
     },

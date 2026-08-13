@@ -156,7 +156,7 @@ describe("the native bearer branch", () => {
 
 describe("the bearer client construction", () => {
   const SUPABASE_URL = "https://bearer-fixture.supabase.co";
-  const SUPABASE_KEY = "bearer-fixture-publishable-key";
+  const SUPABASE_KEY = "sb_publishable_bearer_fixture_1234567890abcdef";
 
   beforeEach(() => {
     vi.resetModules();

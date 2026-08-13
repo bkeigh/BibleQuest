@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
  * These assertions fail at commit time instead, naming the file that lagged.
  */
 describe("release contract consistency", () => {
-  const NON_PRODUCTION_MIGRATIONS = new Set([
+  const RELEASE_GATED_MIGRATIONS = new Set([
     "0037_native_account_beta_availability.sql",
   ]);
   const config = JSON.parse(
@@ -31,16 +31,16 @@ describe("release contract consistency", () => {
 
   it("advertises production while the exact beta-only migration stays separate", () => {
     // The monitor compares this against production, so a config left behind a
-    // production migration reads as drift. The fail-closed native beta switch
-    // remains explicitly outside that contract until a production review.
+    // production migration reads as drift. The fail-closed native availability
+    // switch remains outside that public contract until its separate release.
     const migrations = readdirSync("supabase/migrations");
     // Keep the exception reviewable: a rename or removal must update this
     // release boundary instead of silently changing the production contract.
-    for (const migration of NON_PRODUCTION_MIGRATIONS) {
+    for (const migration of RELEASE_GATED_MIGRATIONS) {
       expect(migrations).toContain(migration);
     }
     const latest = migrations
-      .filter((name) => !NON_PRODUCTION_MIGRATIONS.has(name))
+      .filter((name) => !RELEASE_GATED_MIGRATIONS.has(name))
       .map((name) => name.match(/^(\d{4})_/)?.[1])
       .filter((value): value is string => Boolean(value))
       .sort()

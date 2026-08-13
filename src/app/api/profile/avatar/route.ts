@@ -354,6 +354,17 @@ async function removeAllOwnedObjects(
   }
 }
 
+/** Allows only the known web bridge while Production is still pre-0037. */
+function missingAccountDeletionLatch(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: unknown; message?: unknown };
+  return (
+    (candidate.code === "PGRST202" || candidate.code === "42883") &&
+    typeof candidate.message === "string" &&
+    candidate.message.includes("begin_own_account_deletion")
+  );
+}
+
 /** Deletes remote media before clearing its profile pointer. */
 export async function DELETE(request: Request) {
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
@@ -408,7 +419,13 @@ export async function DELETE(request: Request) {
       // The durable database latch waits out in-flight uploads and denies new
       // ones before the final owner-folder sweep begins.
       const { error } = await supabase.rpc("begin_own_account_deletion");
-      if (error) {
+      // The currently deployed web client predates 0037. Preserve its existing
+      // deletion behavior only for the exact missing-function bridge; native
+      // cleanup still requires the latch because it can run while disabled.
+      if (
+        error &&
+        (nativeDeletionCleanup || !missingAccountDeletionLatch(error))
+      ) {
         recordServerFailure("avatar", "delete", error);
         return privateError("delete_failed", 503);
       }

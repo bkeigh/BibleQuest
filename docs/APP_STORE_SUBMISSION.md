@@ -70,6 +70,12 @@ add an iPad set while the Xcode target remains iPhone-only.
 
 ## App Review information
 
+The notes and privacy worksheet below apply only to the current guest-only 1.0
+binary. An account-enabled replacement must use the separately verified
+metadata and disclosures in
+[`IOS_ACCOUNT_REPLACEMENT_RELEASE.md`](IOS_ACCOUNT_REPLACEMENT_RELEASE.md);
+submitting these guest statements with an account-enabled binary is a hard stop.
+
 **Suggested notes**
 
 ```text

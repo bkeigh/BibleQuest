@@ -12,8 +12,8 @@ template in [`../.env.example`](../.env.example).
 | `BIBLEQUEST_ROLLBACK_SHA` | Launch gate | **Server-only.** Exact approved 40-character rollback commit reported by health; never a branch, URL, or deployment ID. |
 | `BIBLEQUEST_DEPLOYMENT_LABEL` | Staging safety | **Server-only.** Renders a warning only when the value is exactly `SYNC-ENABLED STAGING — NEVER PROMOTE`; leave unset in Production. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Optional | Enables account sync. |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Optional | Independently rotatable publishable client key (safe in browser). The legacy anon key remains a local compatibility fallback. |
-| `SUPABASE_SECRET_KEY` | Server feature gate | **Server-only.** Used by sealed push, rate-limit, and billing projection routes. Never use a `NEXT_PUBLIC_*` name. |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Optional | Independently rotatable `sb_publishable_…` client key (safe in browser). A legacy JWT placed in this modern variable fails closed; the separately named legacy anon variable remains an explicit compatibility fallback. |
+| `SUPABASE_SECRET_KEY` | Server feature gate | **Server-only.** Must use the modern `sb_secret_…` class for sealed push, rate-limit, and billing projection routes. Never use a `NEXT_PUBLIC_*` name. |
 | `BIBLEQUEST_RATE_LIMIT_SECRET` | Server secret | **Server-only.** At least 32 random characters used only to HMAC opaque distributed rate-limit identities. |
 | `NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED` | Launch gate | Must be exactly `true` to expose account auth and sync after the full migration, RLS, provider, restore, and PWA gates pass. Missing or any other value stays guest-only. |
 | `NEXT_PUBLIC_ACCOUNT_GATE_ENABLED` | Account gate | Requires account sync to be enabled as a second precondition. The App Store 1.0 release pins both flags false. |

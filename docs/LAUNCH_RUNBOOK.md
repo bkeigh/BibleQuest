@@ -105,7 +105,10 @@ Expected filenames, in order:
 The repository manifest has one additional entry,
 `0037_native_account_beta_availability.sql`. It is staging/account-beta-only
 and is not part of the production prefix above until a separate review changes
-that release contract.
+that release contract. The separate review and guarded Production execution
+record for an account-enabled iOS replacement lives in
+[`IOS_ACCOUNT_REPLACEMENT_RELEASE.md`](IOS_ACCOUNT_REPLACEMENT_RELEASE.md);
+the existence of that packet does not add `0037` to this web launch contract.
 
 The immutable `0014_journey_event_identity.sql` SHA-256 must remain:
 

@@ -14,6 +14,12 @@ vi.mock("@supabase/supabase-js", () => ({
 }));
 
 describe("Supabase browser clients", () => {
+  const legacyAnonFixture = [
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+    "eyJyb2xlIjoiYW5vbiJ9",
+    "fixture-signature",
+  ].join(".");
+
   beforeEach(() => {
     vi.resetModules();
     mocks.createBrowserClient.mockReset();
@@ -24,7 +30,7 @@ describe("Supabase browser clients", () => {
       }
     ).__biblequestSupabaseBrowserClient;
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://fixture.supabase.co");
-    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "fixture-anon-key");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", legacyAnonFixture);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "");
     vi.stubEnv("NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED", "false");
   });
@@ -34,7 +40,7 @@ describe("Supabase browser clients", () => {
   it("prefers the independently rotatable publishable key", async () => {
     vi.stubEnv(
       "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
-      "fixture-publishable-key",
+      "sb_publishable_fixture_1234567890abcdef",
     );
     const authClient = { auth: { getSession: vi.fn() } };
     mocks.createBrowserClient.mockReturnValue(authClient);
@@ -43,9 +49,39 @@ describe("Supabase browser clients", () => {
     expect(createClient()).toBe(authClient);
     expect(mocks.createBrowserClient).toHaveBeenCalledWith(
       "https://fixture.supabase.co",
-      "fixture-publishable-key",
+      "sb_publishable_fixture_1234567890abcdef",
       { isSingleton: true },
     );
+  });
+
+  it("fails closed when the modern variable contains a legacy JWT", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", legacyAnonFixture);
+    const { createClient, isSupabaseConfigured } = await import(
+      "@/lib/supabase/client"
+    );
+
+    expect(isSupabaseConfigured()).toBe(false);
+    expect(() => createClient()).toThrow("Supabase is not configured");
+    expect(mocks.createBrowserClient).not.toHaveBeenCalled();
+  });
+
+  it("rejects a service-role JWT from the legacy public variable", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "");
+    vi.stubEnv(
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      [
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+        "eyJyb2xlIjoic2VydmljZV9yb2xlIn0",
+        "fixture-signature",
+      ].join("."),
+    );
+    const { createClient, isSupabaseConfigured } = await import(
+      "@/lib/supabase/client"
+    );
+
+    expect(isSupabaseConfigured()).toBe(false);
+    expect(() => createClient()).toThrow("Supabase is not configured");
+    expect(mocks.createBrowserClient).not.toHaveBeenCalled();
   });
 
   it("uses one Keychain-backed PKCE auth owner in the native app", async () => {
@@ -83,7 +119,7 @@ describe("Supabase browser clients", () => {
     expect(createEmailOtpVerificationClient()).toBe(verificationClient);
     expect(mocks.createSupabaseClient).toHaveBeenCalledWith(
       "https://fixture.supabase.co",
-      "fixture-anon-key",
+      legacyAnonFixture,
       expect.objectContaining({
         auth: expect.objectContaining({
           autoRefreshToken: false,
@@ -106,7 +142,7 @@ describe("Supabase browser clients", () => {
     expect(createAccountSignOutClient()).toBe(revocationClient);
     expect(mocks.createSupabaseClient).toHaveBeenCalledWith(
       "https://fixture.supabase.co",
-      "fixture-anon-key",
+      legacyAnonFixture,
       expect.objectContaining({
         auth: expect.objectContaining({
           autoRefreshToken: false,
@@ -232,7 +268,7 @@ describe("Supabase browser clients", () => {
     expect(mocks.createBrowserClient).toHaveBeenCalledOnce();
     expect(mocks.createBrowserClient).toHaveBeenCalledWith(
       "https://fixture.supabase.co",
-      "fixture-anon-key",
+      legacyAnonFixture,
       { isSingleton: true },
     );
   });

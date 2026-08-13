@@ -115,10 +115,10 @@ command or authorized by this handoff.
    its flag disabled. Prove the public RPC returns only the fixed contract and
    boolean, and prove beta-header reads, writes, and generation-bound RPCs fail
    while disabled without deleting the device's local journey.
-8. Run `pnpm check:staging-isolation` and
-   `pnpm check:native-bearer-isolation` with disposable users and sanitized
-   output. Confirm both account directions, guided movements, avatar cleanup,
-   malformed tokens, and native CORS fail closed. Delete all fixtures.
+8. Run `pnpm check:staging-isolation` plus the disabled-header and anonymous
+   denial checks with disposable users and sanitized output. The positive
+   native bearer probe remains blocked until the staffed window opens because
+   its protected reads and writes must agree with the live database flag.
 9. Have a second reviewer compare the exact project reference, migration
    history, provider configuration, Preview deployment target, public-key
    fingerprint, and evidence. Only then commit the manifest with
@@ -129,9 +129,13 @@ command or authorized by this handoff.
     of production, historical staging, deleted staging, `*.vercel.app`,
     analytics, AI, and commerce configuration.
 11. Enable the staging availability flag only for the bounded internal device
-    session after the owner approves the evidence. Rehearse disabling it while
-    a client is installed and while a request is in flight. Leave production
-    untouched.
+    session after the owner approves the evidence. Run
+    `pnpm check:native-bearer-isolation`; it first requires the fixed public
+    availability contract to report `available:true`, then proves both account
+    directions, avatar cleanup, malformed tokens, native CORS, the beta marker,
+    and expected-user binding. Rehearse disabling the flag while a client is
+    installed and while a request is in flight, then confirm the same probe
+    fails closed. Delete all fixtures and leave Production untouched.
 12. Re-run `pnpm ios:release:prepare` after the beta exercise and prove the
     synced Xcode payload returns to guest containment with no Supabase target,
     account traffic, or staging marker.

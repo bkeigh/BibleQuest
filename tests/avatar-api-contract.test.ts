@@ -57,6 +57,12 @@ describe("avatar API boundaries", () => {
     expect(route.indexOf('supabase.rpc("begin_own_account_deletion")')).toBeLessThan(
       route.indexOf("if (allOwnedObjects) {", route.indexOf("export async function DELETE")),
     );
+    expect(route).toContain("function missingAccountDeletionLatch(");
+    expect(route).toContain(
+      "nativeDeletionCleanup || !missingAccountDeletionLatch(error)",
+    );
+    expect(route).toContain('candidate.code === "PGRST202"');
+    expect(route).toContain('candidate.code === "42883"');
   });
 
   it("pins background avatar reconciliation to its captured account", () => {

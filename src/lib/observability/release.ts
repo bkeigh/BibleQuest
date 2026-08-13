@@ -1,6 +1,7 @@
 import observability from "../../../config/observability.json";
 import { stripeBillingAvailability } from "@/lib/billing/config";
 import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
+import { supabasePublishableKey } from "@/lib/supabase/config";
 
 const SHA = /^[a-f0-9]{40}$/i;
 
@@ -39,10 +40,7 @@ function authPosture(
   accountSyncContained: boolean,
 ): AuthPosture {
   const hasUrl = Boolean(env.NEXT_PUBLIC_SUPABASE_URL?.trim());
-  const hasKey = Boolean(
-    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
-      env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim(),
-  );
+  const hasKey = Boolean(supabasePublishableKey(env));
   if (hasUrl && hasKey) {
     return accountSyncContained ? "guest-only" : "configured";
   }
