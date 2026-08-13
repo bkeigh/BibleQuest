@@ -3,7 +3,7 @@
   "canonicalOrigin": "https://www.biblequest.co",
   "schemaContract": "0036",
   "contentContract": "seed-manifest-v1",
-  "serviceWorkerVersion": "biblequest-v26",
+  "serviceWorkerVersion": "biblequest-v27",
   "thresholds": {
     "minimumAttempts": 5,
     "warningFailureCount": 3,

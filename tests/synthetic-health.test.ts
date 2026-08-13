@@ -29,7 +29,7 @@ function health(overrides = {}) {
     analytics_posture: "disabled",
     schema_contract: "0036",
     content_contract: "seed-manifest-v1",
-    service_worker_version: "biblequest-v26",
+    service_worker_version: "biblequest-v27",
     billing_mode: "coming-soon",
     billing_purchases_enabled: false,
     billing_support_enabled: false,
@@ -74,7 +74,7 @@ function healthyRoutes(): Map<string, Response> {
     ],
     [
       `${CANONICAL}/sw.js`,
-      response('const CACHE_VERSION = "biblequest-v26";', 200, {
+      response('const CACHE_VERSION = "biblequest-v27";', 200, {
         "cache-control": "no-cache, no-store, must-revalidate",
       }),
     ],

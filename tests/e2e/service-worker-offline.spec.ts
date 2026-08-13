@@ -54,7 +54,7 @@ test("the installed worker keeps offline state usable and private", async ({
   await expect
     .poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller)))
     .toBe(true);
-  expect(await workerVersion(page)).toBe("biblequest-v26");
+  expect(await workerVersion(page)).toBe("biblequest-v27");
 
   await context.setOffline(true);
   const cachedApp = await page.goto("/app", { waitUntil: "domcontentloaded" });
@@ -88,7 +88,7 @@ test("the installed worker keeps offline state usable and private", async ({
 
   const cacheNames = await page.evaluate(async () => (await caches.keys()).sort());
   expect(cacheNames).toEqual([
-    "biblequest-v26-runtime",
-    "biblequest-v26-shell",
+    "biblequest-v27-runtime",
+    "biblequest-v27-shell",
   ]);
 });
