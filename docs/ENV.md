@@ -17,6 +17,7 @@ template in [`../.env.example`](../.env.example).
 | `BIBLEQUEST_RATE_LIMIT_SECRET` | Server secret | **Server-only.** At least 32 random characters used only to HMAC opaque distributed rate-limit identities. |
 | `NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED` | Launch gate | Must be exactly `true` to expose account auth and sync after the full migration, RLS, provider, restore, and PWA gates pass. Missing or any other value stays guest-only. |
 | `NEXT_PUBLIC_ACCOUNT_GATE_ENABLED` | Account gate | Requires account sync to be enabled as a second precondition. The App Store 1.0 release pins both flags false. |
+| `BIBLEQUEST_IOS_ACCOUNT_RELEASE_PUBLISHABLE_KEY` | Local Production account-release build only | The single modern public key accepted from ignored `.env.account-release.local`; it must match the checked-in Production fingerprint. Never place a secret or legacy JWT here. |
 | `BIBLEQUEST_AVATAR_SYNC_ENABLED` | Launch gate | **Server-only.** Must be exactly `true` after migration `0023`, private-bucket RLS, two-user isolation, and preview checks pass. Missing or any other value blocks avatar reads/uploads while account deletion cleanup remains available. |
 | `BIBLEQUEST_PUSH_ENABLED` | Launch gate | **Server-only.** Must be exactly `true` after migration `0024`, encryption/VAPID configuration, two-user isolation, and preview checks pass. |
 | `WEB_PUSH_VAPID_PUBLIC_KEY` | Push gate | **Server-only configuration returned only to authenticated clients.** Base64url P-256 VAPID public key. |

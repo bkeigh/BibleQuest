@@ -44,9 +44,23 @@ const REQUIRED_ENV = [
   "BIBLEQUEST_CONFIRM_NATIVE_BEARER_TEST",
   "BIBLEQUEST_NATIVE_BEARER_TARGET_ORIGIN",
   "NEXT_PUBLIC_SUPABASE_URL",
-  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-  "SUPABASE_SERVICE_ROLE_KEY",
 ];
+
+/** Prefers modern keys while retaining explicit legacy staging compatibility. */
+function publicKey() {
+  return (
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+  );
+}
+
+/** Prefers the modern server key for disposable-user administration. */
+function adminKey() {
+  return (
+    process.env.SUPABASE_SECRET_KEY?.trim() ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  );
+}
 
 // A 96x96 lossless WebP (solid green), generated with this repo's own sharp —
 // large enough for MIN_AVATAR_SOURCE_EDGE and tiny enough to inline.
@@ -58,6 +72,9 @@ function requireEnvironment() {
   const missing = REQUIRED_ENV.filter((name) => !process.env[name]);
   if (missing.length > 0) {
     throw new Error(`Missing required environment: ${missing.join(", ")}`);
+  }
+  if (!publicKey() || !adminKey()) {
+    throw new Error("Missing required Supabase public or server key class");
   }
   if (process.env.BIBLEQUEST_CONFIRM_NATIVE_BEARER_TEST !== CONFIRMATION) {
     throw new Error(
@@ -120,6 +137,23 @@ function client(key) {
       detectSessionInUrl: false,
       persistSession: false,
     },
+    ...(key.startsWith("sb_secret_")
+      ? {
+          global: {
+            // A modern secret belongs only in apikey, never the JWT channel.
+            fetch: (input, init = {}) => {
+              const headers = new Headers(
+                init.headers ??
+                  (input instanceof Request ? input.headers : undefined),
+              );
+              if (headers.get("authorization") === `Bearer ${key}`) {
+                headers.delete("authorization");
+              }
+              return fetch(input, { ...init, headers });
+            },
+          },
+        }
+      : {}),
   });
 }
 
@@ -139,7 +173,7 @@ async function createActor(admin, label) {
   );
   check(created.user?.id, `create actor ${label} returned no user`);
 
-  const actorClient = client(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const actorClient = client(publicKey());
   const signedIn = requireResult(
     await actorClient.auth.signInWithPassword({ email, password }),
     `sign in actor ${label}`,
@@ -386,7 +420,9 @@ async function cleanup(admin, actors) {
   for (const actor of actors) {
     if (actor?.id) targets.set(actor.id, actor.email);
   }
+  let targetIndex = 0;
   for (const [id] of targets) {
+    targetIndex += 1;
     // Storage objects do not cascade with the auth user; sweep the folder
     // first so an interrupted run cannot strand private media.
     try {
@@ -406,7 +442,9 @@ async function cleanup(admin, actors) {
     }
     const removed = await admin.auth.admin.deleteUser(id);
     if (removed.error) {
-      failures.push(`${id.slice(0, 8)}:${removed.error.code ?? "unknown"}`);
+      failures.push(
+        `actor-${targetIndex}:${removed.error.code ?? "unknown"}`,
+      );
     }
   }
   if (failures.length > 0) {
@@ -415,7 +453,7 @@ async function cleanup(admin, actors) {
 }
 
 const targetOrigin = requireEnvironment();
-const admin = client(process.env.SUPABASE_SERVICE_ROLE_KEY);
+const admin = client(adminKey());
 const actors = [];
 let primaryError = null;
 let resultSummary = null;

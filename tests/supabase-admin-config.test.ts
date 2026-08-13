@@ -34,13 +34,42 @@ describe("Supabase admin configuration", () => {
     expect(mocks.createClient).toHaveBeenCalledWith(
       "https://fixture.supabase.co",
       secret,
-      {
+      expect.objectContaining({
         auth: {
           autoRefreshToken: false,
           persistSession: false,
         },
-      },
+        global: { fetch: expect.any(Function) },
+      }),
     );
+
+    const options = mocks.createClient.mock.calls[0]?.[2];
+    const transport = options.global.fetch as typeof fetch;
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    await transport("https://fixture.supabase.co/rest/v1/probe", {
+      headers: {
+        apikey: secret,
+        Authorization: `Bearer ${secret}`,
+      },
+    });
+    const forwarded = new Headers(fetchMock.mock.calls[0]?.[1]?.headers);
+    expect(forwarded.get("apikey")).toBe(secret);
+    expect(forwarded.has("authorization")).toBe(false);
+    fetchMock.mockRestore();
+  });
+
+  it("rejects a legacy JWT placed in the modern Production variable", async () => {
+    vi.stubEnv("SUPABASE_SECRET_KEY", `eyJ${"a".repeat(64)}`);
+    const { createAdminSupabase } = await import(
+      "@/lib/supabase/admin.server"
+    );
+
+    expect(() => createAdminSupabase()).toThrow(
+      "Supabase admin configuration unavailable",
+    );
+    expect(mocks.createClient).not.toHaveBeenCalled();
   });
 
   it("rejects the legacy service-role fallback in production", async () => {

@@ -117,9 +117,10 @@ function environment(): NodeJS.ProcessEnv {
 
 describe("daily synthetic health", () => {
   it("passes a healthy production fixture with sanitized reports", async () => {
+    const fetchImpl = fixtureFetch(healthyRoutes());
     const report = await runSyntheticHealth({
       env: environment(),
-      fetchImpl: fixtureFetch(healthyRoutes()),
+      fetchImpl,
       retries: 0,
       now: new Date("2026-07-24T12:00:00.000Z"),
     });
@@ -147,6 +148,17 @@ describe("daily synthetic health", () => {
     expect(syntheticHealthMarkdown(report)).toContain(
       "response bodies, credentials, user records",
     );
+    const supabaseCalls = fetchImpl.mock.calls.filter(([input]) =>
+      String(input).startsWith(SUPABASE),
+    );
+    expect(supabaseCalls).toHaveLength(2);
+    for (const [, init] of supabaseCalls) {
+      const headers = new Headers(init?.headers);
+      expect(headers.get("apikey")).toBe(
+        environment().BIBLEQUEST_MONITOR_SUPABASE_ANON_KEY,
+      );
+      expect(headers.has("authorization")).toBe(false);
+    }
   });
 
   it("pins deployed contracts independently from the checkout on main", async () => {

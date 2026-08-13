@@ -317,7 +317,6 @@ async function supabaseFetch(path, init = {}) {
     ...init,
     headers: {
       apikey: publishableKey,
-      Authorization: `Bearer ${publishableKey}`,
       ...init.headers,
     },
     signal: AbortSignal.timeout(10_000),
