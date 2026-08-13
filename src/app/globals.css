@@ -494,6 +494,29 @@ textarea,
   user-select: text;
 }
 
+/* iOS permanently enlarges the visual viewport after focusing a text control
+   below 16px. Keep every keyboard-opening control at that threshold on touch
+   devices instead of disabling pinch zoom, which must remain available. */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type]),
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="email"],
+  input[type="month"],
+  input[type="number"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="text"],
+  input[type="time"],
+  input[type="url"],
+  input[type="week"],
+  textarea,
+  select {
+    font-size: max(1rem, 16px);
+  }
+}
+
 /* The artwork stays visible without competing with reading contrast. The
    lighter veil lets glass surfaces borrow more color from the selected scene. */
 .wallpaper-scrim {

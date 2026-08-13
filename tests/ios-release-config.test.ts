@@ -126,6 +126,41 @@ describe("iOS App Store release configuration", () => {
     expect(storage).toContain("storage ?? window.localStorage");
   });
 
+  it("uses the reviewed open book across native and in-app startup", () => {
+    const packageJson = JSON.parse(source("package.json")) as {
+      scripts: Record<string, string>;
+    };
+    const capacitorConfig = source("capacitor.config.ts");
+    const generator = source("scripts/build-ios-splash.mjs");
+    const assetCatalog = source(
+      "ios/App/App/Assets.xcassets/Splash.imageset/Contents.json",
+    );
+    const launchScreen = source("ios/App/App/Base.lproj/LaunchScreen.storyboard");
+    const fallback = source(
+      "src/components/app-shell/AppLoadingScreen.tsx",
+    );
+    const nativeGuard = source(
+      "src/components/app-shell/NativeJourneyGuard.tsx",
+    );
+    const onboardingGate = source(
+      "src/components/onboarding/OnboardingGate.tsx",
+    );
+
+    expect(packageJson.scripts["check:ios-splash"]).toBe(
+      "node scripts/build-ios-splash.mjs --check",
+    );
+    expect(generator).toContain('"public/art/2.5d/book-open.webp"');
+    expect(assetCatalog).toContain('"filename" : "book-open-768.png"');
+    expect(assetCatalog).not.toContain("splash-2732x2732");
+    expect(launchScreen).toContain('contentMode="scaleAspectFit"');
+    expect(launchScreen).toContain('constant="256"');
+    expect(capacitorConfig).toContain("showSpinner: false");
+    expect(fallback).toContain('<ArtMascot name="open-book"');
+    expect(fallback).toContain('className="sr-only"');
+    expect(nativeGuard).toContain("return <AppLoadingScreen />");
+    expect(onboardingGate).toContain("return <AppLoadingScreen />");
+  });
+
   it("prunes web-only workers and acquisition media from the native stage", () => {
     const builder = source("scripts/build-native.mjs");
     const registrar = source(

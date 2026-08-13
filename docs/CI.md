@@ -21,7 +21,7 @@ separate external release gates and are not implied by this aggregate.
 
 | Check | Commands | Policy |
 | --- | --- | --- |
-| `Source quality` | `pnpm lint`, `pnpm check:seed`, `git diff --check` over the event changes and working tree | Blocks lint, stale generated Console content, and whitespace errors. |
+| `Source quality` | `pnpm lint`, `pnpm check:seed`, `pnpm check:ios-splash`, `git diff --check` over the event changes and working tree | Blocks lint, stale generated Console content or native splash artwork, and whitespace errors. |
 | `Types and tests` | `pnpm exec tsc --noEmit`, `pnpm test`, `pnpm test:launch-evidence` | Blocks type/test failures and verifies the sanitized evidence command plus alert thresholds with fixtures. Tests run noninteractively. |
 | `Production build` | `pnpm build` | Blocks guest, configured-auth-contained, or configured-auth-enabled build failures; each matrix entry times out after 20 minutes. |
 | `Native release export` | `pnpm build:native:release` | Blocks a failure in the deterministic, guest-only Capacitor export. |

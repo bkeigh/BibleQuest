@@ -65,6 +65,9 @@ const config: CapacitorConfig = {
       launchAutoHide: true,
       launchShowDuration: 3000,
       backgroundColor: "#faf6ec",
+      // Keep startup focused on the reviewed artwork, with no native spinner
+      // competing with the matching in-app restore screen.
+      showSpinner: false,
     },
     /**
      * Left disabled on purpose. CapacitorHttp patches fetch/XHR onto native

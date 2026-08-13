@@ -22,6 +22,7 @@ import {
 } from "@/lib/native/journey-backup";
 import { isNativeTarget } from "@/lib/platform/target";
 import { clearLegacyNativeAuthStorage } from "@/lib/supabase/native-auth-storage";
+import { AppLoadingScreen } from "@/components/app-shell/AppLoadingScreen";
 
 export function NativeJourneyGuard({ children }: { children: React.ReactNode }) {
   const nativeTarget = isNativeTarget();
@@ -80,7 +81,8 @@ export function NativeJourneyGuard({ children }: { children: React.ReactNode }) 
     };
   }, [nativeTarget]);
 
-  if (status === "pending") return null;
+  // Match the native launch screen if its bounded auto-hide wins the race.
+  if (status === "pending") return <AppLoadingScreen />;
   if (status === "failed") {
     return (
       <main className="flex min-h-dvh items-center justify-center bg-parchment px-6 text-charcoal">

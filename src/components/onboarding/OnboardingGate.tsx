@@ -24,6 +24,7 @@ import {
   shouldRedirectAppToOnboarding,
 } from "@/lib/auth/onboarding-resume";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
+import { AppLoadingScreen } from "@/components/app-shell/AppLoadingScreen";
 import { ArtMascot } from "@/components/design-system/ArtMascot";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton } from "@/components/design-system/GentleButton";
@@ -115,19 +116,7 @@ function OnboardingRouteGate({ children }: { children: React.ReactNode }) {
 }
 
 function LoadingVeil() {
-  return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-parchment">
-      <ArtMascot name="lantern" size={176} />
-      <p
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        className="text-small text-ash"
-      >
-        Restoring your journey…
-      </p>
-    </div>
-  );
+  return <AppLoadingScreen />;
 }
 
 function RestoreError({
