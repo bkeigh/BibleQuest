@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { currentSnapshot } from "../fixtures";
 
 test("public marketing remains visible, private, and portfolio-frameable", async ({
   page,
@@ -55,4 +56,34 @@ test("onboarding exposes landmarks and denies framing", async ({ page }) => {
   const csp = response?.headers()["content-security-policy"] ?? "";
   expect(csp).toContain("frame-ancestors 'none'");
   expect(response?.headers()["x-frame-options"]).toBe("DENY");
+});
+
+// Home stays compact and cached routes resume the latest local-first profile.
+test("Home starts compactly and profile changes follow cached routes", async ({
+  page,
+}) => {
+  const snapshot = currentSnapshot();
+  await page.addInitScript((journey) => {
+    localStorage.setItem(
+      "biblequest:v1",
+      JSON.stringify({ state: journey, version: 18 }),
+    );
+  }, snapshot);
+
+  await page.goto("/app");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Fixture Person" }),
+  ).toBeVisible();
+  const profileCard = page.locator("header[data-plus-nameplate]");
+  const profileCardBox = await profileCard.boundingBox();
+  expect(profileCardBox?.y).toBeLessThanOrEqual(20);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("button", { name: "Edit" }).click();
+  await page.getByLabel("Display name").fill("Updated Person");
+  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("link", { name: "Home", exact: true }).click();
+
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Updated Person" }),
+  ).toBeVisible();
 });

@@ -55,6 +55,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     pathname === "/app/games/seven-days";
 
   useEffect(() => {
+    if (!isNativeTarget()) return;
+    // Native static routes can resume a cached screen after another route has
+    // persisted a change. Re-read the canonical local snapshot at the route
+    // boundary so profile and settings edits appear without an app restart.
+    void Promise.resolve()
+      .then(() => useQuestOS.persist.rehydrate())
+      .catch(() => undefined);
+  }, [pathname]);
+
+  useEffect(() => {
     // Analytics events queued while offline flush when the shell mounts
     // and whenever the connection returns. Both are no-ops when analytics
     // is unconfigured or the user has opted out.

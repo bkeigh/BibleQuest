@@ -102,6 +102,9 @@ describe("iOS App Store release configuration", () => {
     expect(privacy).toContain("C617.1");
     expect(privacy).not.toContain("NSPrivacyAccessedAPICategoryUserDefaults");
     expect(privacy).not.toContain("CA92.1");
+    // CSS owns the safe areas, so UIKit must not stack a second content inset.
+    expect(config).toContain('contentInset: "never"');
+    expect(config).not.toContain('contentInset: "always"');
     expect(config).toContain('preferredContentMode: "mobile"');
     expect(config).toContain("LocalNotifications:");
   });
