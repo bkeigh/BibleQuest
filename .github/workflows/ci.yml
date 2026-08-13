@@ -21,8 +21,8 @@ env:
   TZ: UTC
 
 jobs:
-  quality:
-    name: Quality
+  source-quality:
+    name: Source quality
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -274,3 +274,41 @@ jobs:
         run: pnpm audit
       - name: Block high and critical dependency risk
         run: pnpm audit --audit-level high
+
+  # Keep the protected Quality context pending until every in-repo release lane passes.
+  quality:
+    name: Quality
+    if: always()
+    needs:
+      - source-quality
+      - types-and-tests
+      - production-build
+      - native-export
+      - ios-simulator-build
+      - browser-smoke
+      - database-policies
+      - dependency-risk
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every release lane
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+        run: |
+          node <<'NODE'
+          // Fail the protected context when any release lane failed, was cancelled, or was skipped.
+          const needs = JSON.parse(process.env.NEEDS_JSON);
+          const incomplete = Object.entries(needs).filter(
+            ([, job]) => job.result !== "success",
+          );
+
+          if (incomplete.length > 0) {
+            const summary = incomplete
+              .map(([name, job]) => `${name}: ${job.result}`)
+              .join(", ");
+            console.error(`Release lanes did not all pass: ${summary}`);
+            process.exit(1);
+          }
+
+          console.log("Every in-repository release lane passed.");
+          NODE
