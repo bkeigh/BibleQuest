@@ -140,6 +140,9 @@ pnpm ios:account-release:prepare
       native commerce.
 - [ ] The selected account privacy manifest is byte-identical to
       `ios/compliance/PrivacyInfo.account-sync.xcprivacy`.
+- [ ] The account manifest and App Store privacy answers declare linked profile
+      photos for app functionality; the guest manifest remains data-free and
+      neither profile declares tracking.
 - [ ] The final Xcode archive is built from the frozen SHA, signed for the
       intended distribution path, scanned after archive/export, and recorded by
       version, build, commit, and SHA-256.

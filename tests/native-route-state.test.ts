@@ -1,7 +1,19 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { rehydrateNativeRouteState } from "@/lib/native/route-state";
 
 describe("native route state", () => {
+  it("runs the native refresh from the AppShell pathname boundary", () => {
+    const shell = readFileSync(
+      "src/components/app-shell/AppShell.tsx",
+      "utf8",
+    );
+
+    expect(shell).toMatch(
+      /useEffect\(\(\) => \{[\s\S]*?rehydrateNativeRouteState\(\);[\s\S]*?\}, \[pathname\]\);/,
+    );
+  });
+
   it("rehydrates the persisted journey at a native route boundary", async () => {
     const rehydrate = vi.fn().mockResolvedValue(undefined);
 

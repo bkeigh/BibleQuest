@@ -40,7 +40,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
   privacy: {
     eyebrow: "Privacy",
     title: "Privacy Policy",
-    effectiveDate: "July 24, 2026",
+    effectiveDate: "August 13, 2026",
     intro:
       "BibleQuest is a product of Winterhill Studio. This policy explains what we collect, why we use it, and the choices you have.",
     sections: [
@@ -52,7 +52,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
       {
         title: "Information you choose to provide",
         body:
-          "You may provide an email address and display name for an account; prayers, reflections, notes, bookmarks, quests, reading progress, settings, and Journey activity; and messages you send to support. Prayer and reflection text is sensitive personal content. BibleQuest does not require a denomination, legal name, precise location, or contact list.",
+          "You may provide an email address, display name, and profile photo for an account; prayers, reflections, notes, bookmarks, quests, reading progress, settings, and Journey activity; and messages you send to support. Prayer and reflection text is sensitive personal content. BibleQuest does not require a denomination, legal name, precise location, or contact list.",
       },
       {
         title: "Information created when you use BibleQuest",

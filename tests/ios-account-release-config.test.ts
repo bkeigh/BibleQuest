@@ -256,6 +256,7 @@ describe("deterministic iOS Production account release", () => {
     for (const dataType of [
       "Name",
       "EmailAddress",
+      "PhotosorVideos",
       "SensitiveInfo",
       "OtherUserContent",
       "UserID",
@@ -267,9 +268,6 @@ describe("deterministic iOS Production account release", () => {
     }
     expect(accountPrivacy).not.toContain(
       "NSPrivacyCollectedDataTypePurchaseHistory",
-    );
-    expect(accountPrivacy).not.toContain(
-      "NSPrivacyCollectedDataTypePhotosorVideos",
     );
     expect(accountPrivacy).toMatch(
       /<key>NSPrivacyTracking<\/key>\s*<false\/>/,
