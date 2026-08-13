@@ -13,6 +13,8 @@ const SUPABASE = "https://fixture.supabase.co";
 const RELEASE = "a".repeat(40);
 const PRIVATE_MARKER = "private-prayer-fixture-do-not-report";
 const STATIC_ASSET = "/_next/static/chunks/app-fixture.js";
+const SUPABASE_CONTENT_URL = `${SUPABASE}/rest/v1/daily_verses?select=id&limit=1`;
+const SUPABASE_SETTINGS_URL = `${SUPABASE}/auth/v1/settings`;
 
 function health(overrides = {}) {
   return {
@@ -78,11 +80,11 @@ function healthyRoutes(): Map<string, Response> {
     ],
     [`${CANONICAL}${STATIC_ASSET}`, response("fixture bundle")],
     [
-      `${SUPABASE}/rest/v1/daily_verses?select=id&limit=1`,
+      SUPABASE_CONTENT_URL,
       response([{ id: "11111111-1111-4111-8111-111111111111" }]),
     ],
     [
-      `${SUPABASE}/auth/v1/settings`,
+      SUPABASE_SETTINGS_URL,
       response({ external: { email: true, google: true, phone: false } }),
     ],
   ]);
@@ -148,8 +150,11 @@ describe("daily synthetic health", () => {
     expect(syntheticHealthMarkdown(report)).toContain(
       "response bodies, credentials, user records",
     );
+    // Exact fixture URLs prevent a lookalike hostname from entering the
+    // credential-bearing request assertions.
+    const supabaseUrls = new Set([SUPABASE_CONTENT_URL, SUPABASE_SETTINGS_URL]);
     const supabaseCalls = fetchImpl.mock.calls.filter(([input]) =>
-      String(input).startsWith(SUPABASE),
+      supabaseUrls.has(String(input)),
     );
     expect(supabaseCalls).toHaveLength(2);
     for (const [, init] of supabaseCalls) {
