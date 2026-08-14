@@ -76,6 +76,7 @@ import {
   setLastSyncedUserId,
 } from "@/lib/sync/last-user";
 import { prepareLocalJourneyHandoff } from "@/lib/sync/handoff";
+import { seedWebAuthEnvelope } from "./fixtures/web-auth";
 import {
   withActiveWebPrivateWriteReset,
   withWebAccountOperationLock,
@@ -98,30 +99,6 @@ import {
 
 const OK = { data: null, error: null };
 
-/** Mints the exact-subject access token the stored envelope must carry. */
-function webAccessToken(userId: string): string {
-  const payload = Buffer.from(
-    JSON.stringify({ sub: userId, session_id: `lineage-${userId}` }),
-  ).toString("base64url");
-  return `fixture.${payload}.signature`;
-}
-
-/** Seeds the active session that a web private reset scope requires. */
-function seedActiveWebSession(userId: string): void {
-  window.localStorage.setItem(
-    "biblequest:web-auth:v2",
-    JSON.stringify({
-      version: 2,
-      mode: "active",
-      session: {
-        access_token: webAccessToken(userId),
-        refresh_token: `refresh-${userId}`,
-        user: { id: userId },
-      },
-    }),
-  );
-}
-
 /**
  * Applies a handoff through the same shape SyncManager uses on the web: an
  * account-operation handle for every handoff, and a private write reset scope
@@ -130,7 +107,7 @@ function seedActiveWebSession(userId: string): void {
  * would assert against a failure it created itself.
  */
 async function handoff(userId: string, startFresh: boolean): Promise<void> {
-  seedActiveWebSession(userId);
+  seedWebAuthEnvelope(userId);
   await withWebAccountOperationLock(async (handle) => {
     if (!startFresh) {
       await prepareLocalJourneyHandoff(userId, false, undefined, handle);
