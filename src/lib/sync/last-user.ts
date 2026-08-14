@@ -1,5 +1,19 @@
 "use client";
 
+import {
+  LEGACY_INITIAL_SYNC_PENDING_STORAGE_KEY,
+  LEGACY_LAST_SYNC_USER_STORAGE_KEY,
+  LEGACY_LOCAL_CLAIM_PENDING_STORAGE_KEY,
+  WEB_V2_INITIAL_SYNC_PENDING_STORAGE_KEY,
+  WEB_V2_LAST_SYNC_USER_STORAGE_KEY,
+  WEB_V2_LOCAL_CLAIM_PENDING_STORAGE_KEY,
+  selectedWebPrivateStorageKey,
+} from "@/lib/storage/web-private-namespace";
+import {
+  removeWebPrivateStorageItem,
+  setWebPrivateStorageItem,
+} from "@/lib/storage/web-private-write";
+
 /**
  * Records which account the local QuestOS store last synced with.
  *
@@ -8,11 +22,11 @@
  * be treated as unowned guest data that a different account may adopt.
  */
 
-export const LAST_SYNC_USER_STORAGE_KEY = "biblequest:last-sync-user";
+export const LAST_SYNC_USER_STORAGE_KEY = LEGACY_LAST_SYNC_USER_STORAGE_KEY;
 export const LOCAL_JOURNEY_OWNER_QUARANTINE =
   "biblequest:owner-boundary-unavailable:v1";
-const INITIAL_SYNC_PENDING_KEY = "biblequest:initial-sync-pending-user";
-const LOCAL_CLAIM_PENDING_KEY = "biblequest:local-claim-pending-user";
+const INITIAL_SYNC_PENDING_KEY = LEGACY_INITIAL_SYNC_PENDING_STORAGE_KEY;
+const LOCAL_CLAIM_PENDING_KEY = LEGACY_LOCAL_CLAIM_PENDING_STORAGE_KEY;
 const MAX_USER_ID_LENGTH = 128;
 
 type OwnerStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -37,6 +51,26 @@ function ownerStorage(storage?: OwnerStorage): OwnerStorage | null {
   return window.localStorage;
 }
 
+/** Selects one owner marker only after an exact namespace decision. */
+function selectedOwnerKey(
+  storage: OwnerStorage,
+  legacyKey: string,
+  v2Key: string,
+): string | null {
+  return selectedWebPrivateStorageKey(storage, legacyKey, v2Key);
+}
+
+/** Maps each legacy owner marker to its fixed v2 counterpart. */
+function ownerMarkerV2Key(legacyKey: string): string {
+  if (legacyKey === LAST_SYNC_USER_STORAGE_KEY) {
+    return WEB_V2_LAST_SYNC_USER_STORAGE_KEY;
+  }
+  if (legacyKey === INITIAL_SYNC_PENDING_KEY) {
+    return WEB_V2_INITIAL_SYNC_PENDING_STORAGE_KEY;
+  }
+  return WEB_V2_LOCAL_CLAIM_PENDING_STORAGE_KEY;
+}
+
 /** Accept opaque Supabase IDs and test fixtures, but reject ambiguous values. */
 export function isValidLocalJourneyUserId(value: string): boolean {
   return (
@@ -53,7 +87,13 @@ export function readLocalJourneyOwner(storage?: OwnerStorage): LocalJourneyOwner
   try {
     const resolved = ownerStorage(storage);
     if (!resolved) return { status: "unowned" };
-    const value = resolved.getItem(LAST_SYNC_USER_STORAGE_KEY);
+    const key = selectedOwnerKey(
+      resolved,
+      LAST_SYNC_USER_STORAGE_KEY,
+      WEB_V2_LAST_SYNC_USER_STORAGE_KEY,
+    );
+    if (!key) return { status: "unavailable", reason: "corrupt" };
+    const value = resolved.getItem(key);
     if (value === null) return { status: "unowned" };
     if (!isValidLocalJourneyUserId(value)) {
       return { status: "unavailable", reason: "corrupt" };
@@ -74,10 +114,10 @@ export function getLastSyncedUserId(): string | null {
 }
 
 /** Persist and read back the owner so silent quota failures cannot fail open. */
-export function setLastSyncedUserId(
+export async function setLastSyncedUserId(
   userId: string,
   storage?: OwnerStorage,
-): void {
+): Promise<void> {
   if (!isValidLocalJourneyUserId(userId)) {
     throw new LocalJourneyOwnershipError();
   }
@@ -85,8 +125,20 @@ export function setLastSyncedUserId(
   try {
     const resolved = ownerStorage(storage);
     if (!resolved) throw new LocalJourneyOwnershipError();
-    resolved.setItem(LAST_SYNC_USER_STORAGE_KEY, userId);
-    if (resolved.getItem(LAST_SYNC_USER_STORAGE_KEY) !== userId) {
+    const key = selectedOwnerKey(
+      resolved,
+      LAST_SYNC_USER_STORAGE_KEY,
+      WEB_V2_LAST_SYNC_USER_STORAGE_KEY,
+    );
+    if (
+      !key ||
+      !(await setWebPrivateStorageItem(
+        resolved,
+        key,
+        userId,
+        storage !== undefined,
+      ))
+    ) {
       throw new LocalJourneyOwnershipError();
     }
   } catch (error) {
@@ -96,17 +148,32 @@ export function setLastSyncedUserId(
 }
 
 /** Clear all owner-dependent markers and verify that none survived. */
-export function clearLastSyncedUserId(storage?: OwnerStorage): void {
+export async function clearLastSyncedUserId(
+  storage?: OwnerStorage,
+): Promise<void> {
   const keys = [
     LAST_SYNC_USER_STORAGE_KEY,
     INITIAL_SYNC_PENDING_KEY,
     LOCAL_CLAIM_PENDING_KEY,
+    WEB_V2_LAST_SYNC_USER_STORAGE_KEY,
+    WEB_V2_INITIAL_SYNC_PENDING_STORAGE_KEY,
+    WEB_V2_LOCAL_CLAIM_PENDING_STORAGE_KEY,
   ];
 
   try {
     const resolved = ownerStorage(storage);
     if (!resolved) return;
-    for (const key of keys) resolved.removeItem(key);
+    for (const key of keys) {
+      if (
+        !(await removeWebPrivateStorageItem(
+          resolved,
+          key,
+          storage !== undefined,
+        ))
+      ) {
+        throw new LocalJourneyOwnershipError();
+      }
+    }
     if (keys.some((key) => resolved.getItem(key) !== null)) {
       throw new LocalJourneyOwnershipError();
     }
@@ -117,17 +184,25 @@ export function clearLastSyncedUserId(storage?: OwnerStorage): void {
 }
 
 /** Quarantine an unreadable protected mirror so it cannot become guest data. */
-export function quarantineLocalJourneyOwner(storage?: OwnerStorage): void {
+export async function quarantineLocalJourneyOwner(
+  storage?: OwnerStorage,
+): Promise<void> {
   try {
     const resolved = ownerStorage(storage);
     if (!resolved) throw new LocalJourneyOwnershipError();
-    resolved.setItem(
+    const key = selectedOwnerKey(
+      resolved,
       LAST_SYNC_USER_STORAGE_KEY,
-      LOCAL_JOURNEY_OWNER_QUARANTINE,
+      WEB_V2_LAST_SYNC_USER_STORAGE_KEY,
     );
     if (
-      resolved.getItem(LAST_SYNC_USER_STORAGE_KEY) !==
-      LOCAL_JOURNEY_OWNER_QUARANTINE
+      !key ||
+      !(await setWebPrivateStorageItem(
+        resolved,
+        key,
+        LOCAL_JOURNEY_OWNER_QUARANTINE,
+        storage !== undefined,
+      ))
     ) {
       throw new LocalJourneyOwnershipError();
     }
@@ -138,15 +213,20 @@ export function quarantineLocalJourneyOwner(storage?: OwnerStorage): void {
 }
 
 /** Store a user-bound marker and verify that it reached durable storage. */
-function setUserMarker(key: string, userId: string): void {
+async function setUserMarker(key: string, userId: string): Promise<void> {
   if (!isValidLocalJourneyUserId(userId)) {
     throw new LocalJourneyOwnershipError();
   }
   try {
     const storage = ownerStorage();
     if (!storage) throw new LocalJourneyOwnershipError();
-    storage.setItem(key, userId);
-    if (storage.getItem(key) !== userId) throw new LocalJourneyOwnershipError();
+    const selected = selectedOwnerKey(storage, key, ownerMarkerV2Key(key));
+    if (
+      !selected ||
+      !(await setWebPrivateStorageItem(storage, selected, userId))
+    ) {
+      throw new LocalJourneyOwnershipError();
+    }
   } catch (error) {
     if (error instanceof LocalJourneyOwnershipError) throw error;
     throw new LocalJourneyOwnershipError();
@@ -154,13 +234,16 @@ function setUserMarker(key: string, userId: string): void {
 }
 
 /** Clear only a marker that still belongs to the expected account. */
-function clearUserMarker(key: string, userId: string): void {
+async function clearUserMarker(key: string, userId: string): Promise<void> {
   try {
     const storage = ownerStorage();
     if (!storage) return;
-    if (storage.getItem(key) !== userId) return;
-    storage.removeItem(key);
-    if (storage.getItem(key) !== null) throw new LocalJourneyOwnershipError();
+    const selected = selectedOwnerKey(storage, key, ownerMarkerV2Key(key));
+    if (!selected) throw new LocalJourneyOwnershipError();
+    if (storage.getItem(selected) !== userId) return;
+    if (!(await removeWebPrivateStorageItem(storage, selected, false, userId))) {
+      throw new LocalJourneyOwnershipError();
+    }
   } catch (error) {
     if (error instanceof LocalJourneyOwnershipError) throw error;
     throw new LocalJourneyOwnershipError();
@@ -176,7 +259,9 @@ function userMarkerMatches(
   try {
     const storage = ownerStorage();
     if (!storage) return false;
-    const value = storage.getItem(key);
+    const selected = selectedOwnerKey(storage, key, ownerMarkerV2Key(key));
+    if (!selected) return storageFailureResult;
+    const value = storage.getItem(selected);
     if (value === null) return false;
     if (!isValidLocalJourneyUserId(value)) return storageFailureResult;
     return value === userId;
@@ -186,12 +271,12 @@ function userMarkerMatches(
 }
 
 /** Mark a first restore pending before any account-owned data can be revealed. */
-export function markInitialSyncPending(userId: string): void {
-  setUserMarker(INITIAL_SYNC_PENDING_KEY, userId);
+export function markInitialSyncPending(userId: string): Promise<void> {
+  return setUserMarker(INITIAL_SYNC_PENDING_KEY, userId);
 }
 
-export function clearInitialSyncPending(userId: string): void {
-  clearUserMarker(INITIAL_SYNC_PENDING_KEY, userId);
+export function clearInitialSyncPending(userId: string): Promise<void> {
+  return clearUserMarker(INITIAL_SYNC_PENDING_KEY, userId);
 }
 
 /** An unreadable pending marker must keep the restore boundary closed. */
@@ -200,8 +285,8 @@ export function initialSyncIsPending(userId: string): boolean {
 }
 
 /** Remember an explicit keep-my-journey choice until its first sync succeeds. */
-export function markLocalJourneyClaimPending(userId: string): void {
-  setUserMarker(LOCAL_CLAIM_PENDING_KEY, userId);
+export function markLocalJourneyClaimPending(userId: string): Promise<void> {
+  return setUserMarker(LOCAL_CLAIM_PENDING_KEY, userId);
 }
 
 /** A storage failure never grants local data authority to an account. */
@@ -209,8 +294,8 @@ export function localJourneyClaimIsPending(userId: string): boolean {
   return userMarkerMatches(LOCAL_CLAIM_PENDING_KEY, userId, false);
 }
 
-export function clearLocalJourneyClaimPending(userId: string): void {
-  clearUserMarker(LOCAL_CLAIM_PENDING_KEY, userId);
+export function clearLocalJourneyClaimPending(userId: string): Promise<void> {
+  return clearUserMarker(LOCAL_CLAIM_PENDING_KEY, userId);
 }
 
 /** Unknown ownership is a conflict, never an adoptable guest journey. */

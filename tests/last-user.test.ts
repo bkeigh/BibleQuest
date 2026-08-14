@@ -33,11 +33,11 @@ class OwnerStorage {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("local journey ownership boundary", () => {
-  it("distinguishes a genuinely unowned journey from an exact owner", () => {
+  it("distinguishes a genuinely unowned journey from an exact owner", async () => {
     const storage = new OwnerStorage();
     expect(readLocalJourneyOwner(storage)).toEqual({ status: "unowned" });
 
-    setLastSyncedUserId("account-a", storage);
+    await setLastSyncedUserId("account-a", storage);
 
     expect(readLocalJourneyOwner(storage)).toEqual({
       status: "owned",
@@ -52,7 +52,7 @@ describe("local journey ownership boundary", () => {
 
     expect(readLocalJourneyOwner()).toEqual({
       status: "unavailable",
-      reason: "storage",
+      reason: "corrupt",
     });
     expect(getLastSyncedUserId()).toBe(LOCAL_JOURNEY_OWNER_QUARANTINE);
     expect(localDataBelongsToOtherUser("account-b")).toBe(true);
@@ -70,18 +70,18 @@ describe("local journey ownership boundary", () => {
     expect(localDataBelongsToOtherUser("account-b")).toBe(true);
   });
 
-  it("rejects thrown and silently ignored owner writes", () => {
+  it("rejects thrown and silently ignored owner writes", async () => {
     const throwing = new OwnerStorage();
     throwing.throwOnSet = true;
-    expect(() => setLastSyncedUserId("account-a", throwing)).toThrow(
-      LocalJourneyOwnershipError,
-    );
+    await expect(
+      setLastSyncedUserId("account-a", throwing),
+    ).rejects.toBeInstanceOf(LocalJourneyOwnershipError);
 
     const ignored = new OwnerStorage();
     ignored.ignoreWrites = true;
-    expect(() => setLastSyncedUserId("account-a", ignored)).toThrow(
-      LocalJourneyOwnershipError,
-    );
+    await expect(
+      setLastSyncedUserId("account-a", ignored),
+    ).rejects.toBeInstanceOf(LocalJourneyOwnershipError);
     expect(readLocalJourneyOwner(ignored)).toEqual({ status: "unowned" });
   });
 });
