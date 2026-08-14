@@ -3,6 +3,7 @@ import { SyncManager } from "@/components/app-shell/SyncManager";
 import { OnboardingAccountRestoreGate } from "@/components/onboarding/OnboardingGate";
 import { parseAuthFailureReason } from "@/lib/auth/errors";
 import { privateRouteMetadata } from "@/lib/metadata";
+import { JournalDraftJanitor } from "@/components/journal/JournalDraftJanitor";
 
 export const metadata = privateRouteMetadata("Welcome", "/onboarding");
 
@@ -13,11 +14,15 @@ export default async function OnboardingPage({
 }) {
   const { error } = await searchParams;
   return (
-    <>
-      <SyncManager />
-      <OnboardingAccountRestoreGate>
+    <OnboardingAccountRestoreGate
+      services={
+        <>
+          <SyncManager />
+          <JournalDraftJanitor />
+        </>
+      }
+    >
         <OnboardingFlow authFailure={parseAuthFailureReason(error)} />
-      </OnboardingAccountRestoreGate>
-    </>
+    </OnboardingAccountRestoreGate>
   );
 }

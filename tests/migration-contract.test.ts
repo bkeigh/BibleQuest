@@ -43,6 +43,8 @@ const EXPECTED_MIGRATIONS = [
   "0034_distributed_provider_rate_limits.sql",
   "0035_fix_provider_rate_limit_claim_timestamp.sql",
   "0036_arcade_store_purchases.sql",
+  "0037_native_account_beta_availability.sql",
+  "0038_web_account_deletion_hardening.sql",
 ];
 
 /** Hash a migration exactly as the release manifest does. */
@@ -115,13 +117,25 @@ describe("release migration contracts", () => {
       join(ROOT, "supabase", "evidence", "rls_policy_report.sql"),
       "utf8",
     );
+    const betaReport = readFileSync(
+      join(
+        ROOT,
+        "supabase",
+        "evidence",
+        "native_account_beta_report.sql",
+      ),
+      "utf8",
+    );
     const observability = JSON.parse(
       readFileSync(join(ROOT, "config", "observability.json"), "utf8"),
     ) as { serviceWorkerVersion: string };
     const expectedTables = report.match(/    \('[a-z_]+', '[^']+'\)/g) ?? [];
     const worker = readFileSync(join(ROOT, "public", "sw.js"), "utf8");
 
-    expect(expectedTables).toHaveLength(44);
+    expect(expectedTables).toHaveLength(45);
+    expect(report).toContain(
+      "('account_deletion_latches', 'server-owned account deletion state')",
+    );
     expect(report).toContain("('user_guided_movements', 'user-owned')");
     expect(report).toContain("('user_daily_quest_days', 'user-owned')");
     expect(report).toContain(
@@ -130,10 +144,17 @@ describe("release migration contracts", () => {
     expect(report).toContain("'mutable_account_sync_contract'");
     expect(report).toContain("'account_sync_generation'");
     expect(report).toContain("'account_sync_contract'");
+    expect(report).toContain("'native_account_beta_availability'");
+    expect(report).toContain("'native_account_beta_request_allowed'");
+    expect(report).toContain("'enforce_native_account_beta_availability'");
     expect(report).toContain("'guided_progress_sync_contract'");
+    expect(report).toContain("'avatar_upload_allowed'");
+    expect(report).toContain("'begin_own_account_deletion'");
     expect(report).toContain("'advance_account_sync_revision'");
     expect(report).toContain("'delete_own_account'");
+    expect(report).toContain("'own_account_deletion_status'");
     expect(report).toContain("'account_deletion_contract'");
+    expect(report).toContain("'account_deletion_storage_contract'");
     expect(report).toContain("'profile_avatar_contract'");
     expect(report).toContain("'set_profile_avatar'");
     expect(report).toContain("'clear_profile_avatar'");
@@ -173,6 +194,9 @@ describe("release migration contracts", () => {
       "select public.account_deletion_contract() as account_deletion_contract;",
     );
     expect(report).toContain(
+      "select public.account_deletion_storage_contract()",
+    );
+    expect(report).toContain(
       "select public.profile_avatar_contract() as profile_avatar_contract;",
     );
     expect(report).toContain(
@@ -198,6 +222,23 @@ describe("release migration contracts", () => {
     expect(report).toContain(
       "select public.guided_progress_sync_contract() as guided_progress_sync_contract;",
     );
+    const triggerInventory = report.slice(
+      report.indexOf("-- 6."),
+      report.indexOf("-- 7."),
+    );
+    expect(triggerInventory).toContain("'user_sync_state'");
+    expect(betaReport).toContain(
+      "select public.native_account_beta_availability()",
+    );
+    expect(betaReport).toContain("'native account beta availability'");
+    expect(betaReport).toContain(
+      "'enforce_native_account_beta_availability'",
+    );
+    expect(betaReport).toContain("'account_deletion_latches'");
+    expect(betaReport).toContain("'avatar_upload_allowed'");
+    expect(betaReport).toContain("'begin_own_account_deletion'");
+    const guardedRelations = betaReport.match(/    \('[a-z_]+'\)/g) ?? [];
+    expect(guardedRelations).toHaveLength(21);
     expect(worker).toContain(
       `const CACHE_VERSION = "${observability.serviceWorkerVersion}";`,
     );

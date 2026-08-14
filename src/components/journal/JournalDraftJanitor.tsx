@@ -6,7 +6,7 @@ import { purgeExpiredDeviceLocalJournalDrafts } from "@/lib/questos/journal-draf
 /** Enforce bounded local-draft retention whenever BibleQuest is opened. */
 export function JournalDraftJanitor() {
   useEffect(() => {
-    purgeExpiredDeviceLocalJournalDrafts();
+    void purgeExpiredDeviceLocalJournalDrafts();
   }, []);
 
   return null;

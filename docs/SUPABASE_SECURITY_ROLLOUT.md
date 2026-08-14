@@ -12,7 +12,8 @@ and billing/support/console boundaries `0023` through `0027`, and lifetime
 Plus billing `0028`, user-row/trigger hardening `0029`, and sealed operator Plus
 grants `0030`; Stripe corrections `0031`–`0032`; guided progress `0033`;
 distributed provider limits `0034`–`0035`; and the sealed Arcade store `0036`.
-It is
+The native account beta remains isolated in `0037`, while the standalone web
+account-deletion Storage boundary is the forward-only `0038` migration. It is
 deliberately local/staging-first. Do not run any linked or remote command until
 the project reference and exact command have been reviewed and explicitly
 approved.
@@ -46,6 +47,7 @@ The repository timeline is:
 | 2026-07-27 | Lifetime Plus | Adds `0028`: sealed one-time/lifetime Stripe projection fields and the v2 billing contract. |
 | 2026-07-28 | Sync resource hardening | Adds `0029`: a one-MiB cap on every generation-bound row and removes direct Data API access to trigger helpers. |
 | 2026-07-28 | Operator Plus grants | Adds `0030`: sealed manual entitlement history, atomic grant/revoke RPCs, and append-only operator auditing. |
+| 2026-08-14 | Web account-deletion Storage hardening | Adds `0038`: a durable owner deletion latch, serialized avatar uploads, final owner-folder proof, and a fixed readiness contract. `0037` remains a separate native-beta migration. |
 
 If a database recorded an old `0002`, `0003`, or `0004` before the renames,
 the later filenames do not change those recorded versions. Conversely, a
@@ -247,6 +249,43 @@ production readiness, and the Arcade store database tests. Never use normal
 linked `db push`, `--include-all`, or migration repair for this production
 history.
 
+### Production 0038 web account-deletion packet
+
+Migration `0038` is a self-contained web safety packet that applies directly
+after the reviewed Production `0036` state without applying native migration
+`0037`. It adds only the durable Storage deletion latch, serialized avatar
+upload/pointer checks, exact pending-status RPC, and final empty-owner-folder
+proof before Auth deletion. PostgreSQL Auth/FK locking makes final deletion wait
+for accepted in-flight private writes and then cascade them; the latch prevents
+late avatar objects, whose Storage ownership has no Auth foreign key.
+
+`0038` deliberately adds no provider-protocol column, adoption RPC, or private
+protocol policies. An additive `x-biblequest-web-auth: v2` request therefore
+retains the same owner-scoped provider access as the headerless known-good
+artifact. This compatibility is required so rebinding to exact `ed28b0b`
+remains the approved application rollback. Any irreversible provider-v2
+adoption belongs to a separate later release with its own rollback artifact.
+
+Run the exact history, checksum, backup, and one-packet preflight with:
+
+```bash
+pnpm check:production-web-account-deletion
+```
+
+Apply only the reviewed long-version packet with the pinned confirmation:
+
+```bash
+BIBLEQUEST_PRODUCTION_MIGRATION_CONFIRM='apply 20260812005000 to iacnjqnssovaaojswjoh' \
+  node scripts/reconcile-production-web-account-deletion.mjs --apply
+```
+
+The apply must report `"applied":true`. Then rerun the read-only check,
+Production readiness, and the RLS report. Run the `0038` deletion and `0037`
+coexistence pgTAP files only against local or isolated staging databases—never
+execute test SQL against Production. Production history and flags must still
+prove that native migration `0037` is absent. Never use normal linked
+`db push`, `--include-all`, or migration repair for this Production history.
+
 ## Complete public-table inventory
 
 | Classification | Tables | Intended access |
@@ -254,10 +293,10 @@ history.
 | Public content | `faith_providers`, `bible_translations`, `bible_books`, `bible_chapters`, `bible_verses`, `daily_verses`, `quest_templates`, `prayer_prompts`, `reflection_prompts`, `milestones`, `feature_flags` | Anonymous and authenticated `SELECT` only. Reads are limited to active/approved content; disabled feature flags are hidden. No client writes. Prompt tables contain generic seed prompts, not a user's prayer or reflection text. |
 | User-owned | `profiles`, `user_sync_state`, `user_settings`, `user_daily_quests`, `user_daily_quest_days`, `user_quests`, `quest_completions`, `prayers`, `reflections`, `verse_bookmarks`, `user_recent_verses`, `user_guided_movements`, `reading_progress`, `chapters_read`, `journey_events`, `growth_events`, `user_milestones`, `notification_preferences` | Authenticated owner only. Most tables allow bounded owner operations; sync revisions and destructive account actions stay behind reviewed RPCs. |
 | Server-managed user state | `push_reminder_preferences`, `push_subscriptions`, `push_deliveries` | Normal users can reach only the reviewed owner-scoped functions or projections; delivery mutation is service-role only. |
-| Server-owned | `subscriptions`, `push_test_claims`, `stripe_customers`, `stripe_webhook_events`, `stripe_action_claims`, `stripe_billing_signals`, `stripe_support_payments`, `console_audit_logs`, `operator_plus_grants`, `provider_rate_limit_windows`, `arcade_orders`, `arcade_question_skip_redemptions` | Only documented owner projections are client-readable. Provider identifiers, money, webhook state, test claims, operational rate buckets, operator audit, purchase projections, redemptions, and manual entitlement history remain sealed behind server boundaries. |
+| Server-owned | `subscriptions`, `push_test_claims`, `stripe_customers`, `stripe_webhook_events`, `stripe_action_claims`, `stripe_billing_signals`, `stripe_support_payments`, `console_audit_logs`, `operator_plus_grants`, `provider_rate_limit_windows`, `arcade_orders`, `arcade_question_skip_redemptions`, `account_deletion_latches` | Only documented owner projections are client-readable. Provider identifiers, money, webhook state, test claims, operational rate buckets, operator audit, purchase projections, redemptions, manual entitlement history, and deletion-latch state remain sealed behind server boundaries. |
 | Internal | Supabase-managed schemas remain outside the public-table inventory. Private avatar objects use the sealed `storage.objects` policies and non-public bucket. |
 
-RLS is enabled on all 44 tables. Private prayers, reflections, recent Scripture
+RLS is enabled on all 45 tables. Private prayers, reflections, recent Scripture
 history, notes, and
 journey data have no anonymous policy and every authenticated policy includes
 an `auth.uid()` owner condition.
@@ -272,6 +311,7 @@ supabase start
 supabase db reset
 supabase migration list --local
 supabase test db --local
+pnpm test:account-deletion-concurrency
 docker exec -i supabase_db_BibleQuest \
   psql -U postgres -d postgres -v ON_ERROR_STOP=1 -P pager=off \
   < supabase/evidence/rls_policy_report.sql
@@ -316,9 +356,11 @@ Expected migration order:
 0034_distributed_provider_rate_limits.sql
 0035_fix_provider_rate_limit_claim_timestamp.sql
 0036_arcade_store_purchases.sql
+0037_native_account_beta_availability.sql
+0038_web_account_deletion_hardening.sql
 ```
 
-Evidence must show all 44 expected tables with `rowsecurity = true`, only the
+Evidence must show all 45 expected tables with `rowsecurity = true`, only the
 documented policy names, no `anon` role on user/server-owned policies, and
 `purge_user_data` as `security_definer = true`, `search_path=""`, anonymous
 execute false, authenticated execute true. Table grants must also match the
@@ -420,6 +462,7 @@ content parity.
 ```bash
 pnpm check:production-lifetime-migration
 pnpm check:production-user-row-hardening
+pnpm check:production-web-account-deletion
 # Stop here for review and explicit approval of the exact pending packet.
 BIBLEQUEST_PRODUCTION_MIGRATION_CONFIRM='apply 20260728191500 to iacnjqnssovaaojswjoh' \
   node scripts/reconcile-production-user-row-hardening.mjs --apply

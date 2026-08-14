@@ -1,12 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   acknowledgeMutableWrites,
+  assertMutableRevisionContextBoundary,
   prepareMutableWrites,
   type MutableAccountResource,
   type MutableRevisionAcknowledgement,
   type MutableRevisionContext,
   type MutableResourceKey,
 } from "./mutable-revisions";
+import { withSyncRequestDeadline } from "./request";
 
 export type MutableAccountTable = MutableAccountResource;
 
@@ -102,12 +104,14 @@ export async function writeMutableAccountRows<Row extends object>(
   table: MutableAccountTable,
   rows: readonly Readonly<Row>[],
   context: MutableRevisionContext,
+  responseIsCurrent: () => boolean = () => true,
 ): Promise<MutableAccountWriteResult> {
   if (rows.length > 200) {
     throw new MutableAccountSyncContractError(
       "Mutable account sync accepts at most 200 rows",
     );
   }
+  const epoch = context.epoch;
   const prepared = await prepareMutableWrites(
     context,
     table,
@@ -117,14 +121,29 @@ export async function writeMutableAccountRows<Row extends object>(
   if (prepared.length === 0) {
     return { applied: 0, stale: 0, generation: expectedGeneration };
   }
+  if (!responseIsCurrent()) {
+    throw new Error("Mutable account sync request became stale.");
+  }
 
-  const result = await supabase.rpc("upsert_mutable_account_rows", {
-    p_expected_user_id: expectedUserId,
-    p_expected_generation: expectedGeneration,
-    p_resource: table,
-    p_rows: prepared.map((row) => row.envelope),
-  });
+  const result = await withSyncRequestDeadline(
+    supabase.rpc("upsert_mutable_account_rows", {
+      p_expected_user_id: expectedUserId,
+      p_expected_generation: expectedGeneration,
+      p_resource: table,
+      p_rows: prepared.map((row) => row.envelope),
+    }),
+    `Account sync ${table} write`,
+  );
   if (result.error) throw result.error;
+  if (!responseIsCurrent()) {
+    throw new Error("Mutable account sync response became stale.");
+  }
+  assertMutableRevisionContextBoundary(
+    context,
+    expectedUserId,
+    expectedGeneration,
+    epoch,
+  );
   const acknowledgement = parseWriteResult(
     result.data,
     prepared.length,

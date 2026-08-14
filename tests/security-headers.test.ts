@@ -58,7 +58,7 @@ async function headerRules(
   vi.stubEnv("NODE_ENV", nodeEnv);
   vi.stubEnv(
     "NEXT_PUBLIC_SUPABASE_URL",
-    "https://header-fixture.supabase.co",
+    "https://abcdefghijklmnopqrst.supabase.co",
   );
   vi.resetModules();
 
@@ -125,7 +125,7 @@ describe("transport and payment header scope", () => {
     expect(csp.get("script-src")).not.toContain("https://tally.so");
     expect(csp.get("script-src")).not.toContain("'unsafe-eval'");
     expect(csp.get("connect-src")).toContain(
-      "https://header-fixture.supabase.co",
+      "https://abcdefghijklmnopqrst.supabase.co",
     );
     expect(csp.get("frame-src")).toEqual(["'self'", "https://tally.so"]);
     expect(csp.get("img-src")).toEqual(["'self'", "data:", "blob:"]);

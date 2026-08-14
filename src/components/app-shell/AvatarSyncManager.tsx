@@ -44,15 +44,23 @@ export function AvatarSyncManager() {
         if (!configured) return;
         if (localDataBelongsToOtherUser(userId)) return;
 
-        const remote = await downloadRemoteAvatar(controller.signal);
+        const expectedUserId = userId;
+
+        const remote = await downloadRemoteAvatar(
+          expectedUserId,
+          controller.signal,
+        );
+        if (controller.signal.aborted) return;
         if (remote) {
           const cached = await loadAvatar(remote.version);
+          if (controller.signal.aborted) return;
           if (
             !cached &&
             !(await storeRemoteAvatar(remote.blob, remote.version))
           ) {
             return;
           }
+          if (controller.signal.aborted) return;
           if (
             profile.avatarVersion !== remote.version ||
             profile.avatarUpdatedAt !== remote.updatedAt
@@ -75,6 +83,7 @@ export function AvatarSyncManager() {
               (await loadLegacyAvatar())
             : null;
         if (local) {
+          if (controller.signal.aborted) return;
           const extension =
             local.type === "image/png"
               ? "png"
@@ -82,12 +91,15 @@ export function AvatarSyncManager() {
                 ? "jpg"
                 : "webp";
           const uploaded = await uploadRemoteAvatar(
+            expectedUserId,
             new File([local], `avatar.${extension}`, { type: local.type }),
             controller.signal,
           );
+          if (controller.signal.aborted) return;
           if (!(await storeRemoteAvatar(uploaded.blob, uploaded.version))) {
             return;
           }
+          if (controller.signal.aborted) return;
           state.updateProfile({
             avatarVersion: uploaded.version,
             avatarUpdatedAt: uploaded.updatedAt,
@@ -98,6 +110,7 @@ export function AvatarSyncManager() {
 
         if (localMarker) {
           await clearAvatar(localMarker);
+          if (controller.signal.aborted) return;
           state.updateProfile({
             avatarVersion: null,
             avatarUpdatedAt: null,

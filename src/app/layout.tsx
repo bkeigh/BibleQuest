@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegistrar } from "@/components/app-shell/ServiceWorkerRegistrar";
-import { JournalDraftJanitor } from "@/components/journal/JournalDraftJanitor";
 import { NativeJourneyGuard } from "@/components/app-shell/NativeJourneyGuard";
 import { APPEARANCE_BOOTSTRAP_SCRIPT } from "@/lib/appearance/bootstrap";
 import { deploymentLabel } from "@/lib/deployment-label";
@@ -132,9 +131,9 @@ export default function RootLayout({
             {stagingLabel}
           </div>
         ) : null}
-        {children}
-        <JournalDraftJanitor />
-        <NativeJourneyGuard />
+        <NativeJourneyGuard>
+          {children}
+        </NativeJourneyGuard>
         <ServiceWorkerRegistrar />
       </body>
     </html>

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DailyQuestAssignment } from "@/lib/questos/types";
 import {
+  DailyQuestPersistenceError,
   clearStoredDailyQuestSyncContext,
   configureDailyQuestSyncContext,
   createDailyQuestSyncContext,
@@ -9,6 +10,7 @@ import {
   isMissingDailyQuestRpc,
   mergeDailyQuestDay,
   reconcileDailyQuestPull,
+  removeStoredDailyQuestSyncContext,
   restoreDailyQuestSyncContext,
   writeDailyQuestAssignments,
 } from "@/lib/sync/daily-quests";
@@ -210,6 +212,25 @@ describe("transactional daily-quest sync", () => {
 
     clearStoredDailyQuestSyncContext(storage);
 
+    expect(storage.getItem("biblequest:daily-quest-cas:v1")).toBeNull();
+  });
+
+  it("preserves another account's daily metadata during scoped deletion", () => {
+    const storage = new FakeStorage();
+    const accountB = createDailyQuestSyncContext(() => "account-b-request");
+    restoreDailyQuestSyncContext(accountB, "owner-b", false, storage);
+    configureDailyQuestSyncContext(
+      accountB,
+      [{ assigned_date: DAY, revision: 7 }],
+      true,
+      { [DAY]: [assignment("quest-b")] },
+    );
+    const before = storage.getItem("biblequest:daily-quest-cas:v1");
+
+    removeStoredDailyQuestSyncContext("owner-a", storage);
+
+    expect(storage.getItem("biblequest:daily-quest-cas:v1")).toBe(before);
+    removeStoredDailyQuestSyncContext("owner-b", storage);
     expect(storage.getItem("biblequest:daily-quest-cas:v1")).toBeNull();
   });
 
@@ -480,6 +501,39 @@ describe("transactional daily-quest sync", () => {
     expect(reopened.revisions.get(DAY)).toBe(2);
   });
 
+  it("does not resurrect a deleted day after its bounded base ages out", () => {
+    const storage = new FakeStorage();
+    const observed = createDailyQuestSyncContext(() => "observed-request");
+    restoreDailyQuestSyncContext(observed, "owner-a", false, storage);
+    const local: Record<string, DailyQuestAssignment[]> = {};
+    const remote: Record<string, DailyQuestAssignment[]> = {};
+    const revisions = Array.from({ length: 121 }, (_, index) => {
+      const date = new Date(Date.UTC(2025, 0, index + 1))
+        .toISOString()
+        .slice(0, 10);
+      const row = { ...assignment(`quest-${index}`), dateKey: date };
+      local[date] = [row];
+      remote[date] = [row];
+      return { assigned_date: date, revision: 1 };
+    });
+    reconcileDailyQuestPull(observed, local, remote, revisions, true);
+
+    const oldest = revisions[0].assigned_date;
+    const stale = local[oldest];
+    const reopened = createDailyQuestSyncContext(() => "reopened-request");
+    restoreDailyQuestSyncContext(reopened, "owner-a", true, storage);
+    expect(reopened.bases.has(oldest)).toBe(false);
+
+    const merged = reconcileDailyQuestPull(
+      reopened,
+      { [oldest]: stale },
+      { [oldest]: [] },
+      [{ assigned_date: oldest, revision: 2 }],
+      true,
+    );
+    expect(merged[oldest]).toEqual([]);
+  });
+
   it("invalidates an older daily base when a canonical rewrite cannot persist", () => {
     const storage = new FailAfterOneDailyWriteStorage();
     const original = assignment("original");
@@ -492,19 +546,39 @@ describe("transactional daily-quest sync", () => {
       [{ assigned_date: DAY, revision: 1 }],
       true,
     );
-    reconcileDailyQuestPull(
-      active,
-      { [DAY]: [original] },
-      { [DAY]: [] },
-      [{ assigned_date: DAY, revision: 2 }],
-      true,
-    );
+    expect(() =>
+      reconcileDailyQuestPull(
+        active,
+        { [DAY]: [original] },
+        { [DAY]: [] },
+        [{ assigned_date: DAY, revision: 2 }],
+        true,
+      ),
+    ).toThrow(DailyQuestPersistenceError);
+    expect(storage.getItem("biblequest:daily-quest-cas:v1")).toBeNull();
 
     const reopened = createDailyQuestSyncContext(() => "reopened-request");
     restoreDailyQuestSyncContext(reopened, "owner-a", true, storage);
 
     expect(reopened.revisions.size).toBe(0);
     expect(reopened.bases.size).toBe(0);
+  });
+
+  it("rejects a storage backend that acknowledges without retaining the base", () => {
+    const storage = new FakeStorage();
+    storage.setItem = () => undefined;
+    const active = createDailyQuestSyncContext(() => "active-request");
+    restoreDailyQuestSyncContext(active, "owner-a", false, storage);
+
+    expect(() =>
+      reconcileDailyQuestPull(
+        active,
+        { [DAY]: [] },
+        { [DAY]: [] },
+        [{ assigned_date: DAY, revision: 1 }],
+        true,
+      ),
+    ).toThrow(DailyQuestPersistenceError);
   });
 
   it("does not repeat a committed request after an offline reload", async () => {

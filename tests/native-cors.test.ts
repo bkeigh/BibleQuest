@@ -5,6 +5,11 @@ import {
   nativeCorsPreflightResponse,
 } from "@/lib/http/native-cors";
 import { NATIVE_APP_ORIGIN } from "@/lib/http/native-origin";
+import {
+  ACCOUNT_DELETION_CLEANUP_HEADER,
+  EXPECTED_ACCOUNT_USER_HEADER,
+  NATIVE_ACCOUNT_BETA_HEADER,
+} from "@/lib/sync/native-beta-headers";
 
 const LATCH = "BIBLEQUEST_NATIVE_API_ORIGIN_ENABLED";
 
@@ -54,7 +59,13 @@ describe("the preflight short-circuit", () => {
       "GET, POST, PATCH, DELETE",
     );
     expect(response?.headers.get("access-control-allow-headers")).toBe(
-      "Authorization, Content-Type",
+      [
+        "Authorization",
+        "Content-Type",
+        EXPECTED_ACCOUNT_USER_HEADER,
+        NATIVE_ACCOUNT_BETA_HEADER,
+        ACCOUNT_DELETION_CLEANUP_HEADER,
+      ].join(", "),
     );
     expect(response?.headers.get("access-control-max-age")).toBe("600");
     expect(response?.headers.get("vary")).toBe("Origin");

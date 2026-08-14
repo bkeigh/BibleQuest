@@ -405,6 +405,11 @@ export function fixtureReadiness() {
     migration: "0022",
     ok: true,
   });
+  schemaChecks.push({
+    contract: "biblequest_account_deletion_storage_v1",
+    migration: "0038",
+    ok: true,
+  });
   for (const [contract, migration] of [
     ["biblequest_profile_avatar_v1", "0023"],
     ["biblequest_private_push_v1", "0024"],
@@ -452,7 +457,7 @@ export function fixtureReadiness() {
       google_enabled: true,
       phone_disabled: true,
     },
-    check_count: 26,
+    check_count: 27,
     failed_check_count: 0,
   };
 }

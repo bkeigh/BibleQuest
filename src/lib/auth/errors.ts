@@ -108,6 +108,14 @@ export function emailRequestFailure(
   const message = errorMessage(error);
   const status = errorShape(error).status;
 
+  if (code === "native_account_beta_unavailable") {
+    return {
+      message:
+        "Account sign-in is temporarily unavailable. Your journey remains safe on this device.",
+      reference: "AUTH-BETA-UNAVAILABLE",
+      unavailable: true,
+    };
+  }
   if (!online || message.includes("failed to fetch") || code === "request_timeout") {
     return {
       message:
@@ -172,6 +180,14 @@ export function emailOtpFailure(
   const message = errorMessage(error);
   const status = errorShape(error).status;
 
+  if (code === "native_account_beta_unavailable") {
+    return {
+      message:
+        "Account sign-in is temporarily unavailable. Keep this screen open and try again later.",
+      reference: "AUTH-BETA-UNAVAILABLE",
+      unavailable: true,
+    };
+  }
   if (!online || message.includes("failed to fetch") || code === "request_timeout") {
     return {
       message:

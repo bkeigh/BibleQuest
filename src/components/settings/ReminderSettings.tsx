@@ -46,9 +46,29 @@ export function ReminderSettings() {
   );
 }
 
-/** Full web-push UI; permission is requested only in enable(). */
+/** Remounts account-bound reminder state whenever the session subject changes. */
 function WebReminderSettings() {
   const { user, configured, loading } = useSession();
+  return (
+    <SubjectBoundWebReminderSettings
+      key={loading ? "loading" : user?.id ?? "guest"}
+      userId={user?.id ?? null}
+      configured={configured}
+      loading={loading}
+    />
+  );
+}
+
+/** Full web-push UI; permission is requested only in enable(). */
+function SubjectBoundWebReminderSettings({
+  userId,
+  configured,
+  loading,
+}: {
+  userId: string | null;
+  configured: boolean;
+  loading: boolean;
+}) {
   const updateSettings = useQuestOS((state) => state.updateSettings);
   const { toast } = useToast();
   const [config, setConfig] = useState<PushConfig | null>(null);
@@ -66,10 +86,10 @@ function WebReminderSettings() {
 
   useEffect(() => {
     if (loading) return;
-    if (!configured || !user) return;
+    if (!configured || !userId) return;
     const controller = new AbortController();
     void Promise.all([
-      fetchPushConfig(controller.signal),
+      fetchPushConfig(userId, controller.signal),
       currentPushSubscription(),
     ])
       .then(([nextConfig, current]) => {
@@ -90,9 +110,9 @@ function WebReminderSettings() {
       })
       .finally(() => {
         if (!controller.signal.aborted) setChecking(false);
-      });
+    });
     return () => controller.abort();
-  }, [configured, loading, user]);
+  }, [configured, loading, userId]);
 
   const mirrorLegacySettings = (value: PushReminderPreferences) => {
     updateSettings({
@@ -115,9 +135,10 @@ function WebReminderSettings() {
     ) {
       return;
     }
+    if (!userId) return;
     setBusy(true);
     try {
-      const next = await enablePushReminders(config, preferences);
+      const next = await enablePushReminders(userId, config, preferences);
       setSubscription(next);
       mirrorLegacySettings(preferences);
       toast("Gentle reminders are on.", { variant: "success" });
@@ -133,10 +154,10 @@ function WebReminderSettings() {
   };
 
   const save = async () => {
-    if (busy || !validPreferences) return;
+    if (busy || !validPreferences || !userId) return;
     setBusy(true);
     try {
-      await savePushPreferences(preferences);
+      await savePushPreferences(userId, preferences);
       mirrorLegacySettings(preferences);
       toast("Reminder choices saved.", { variant: "success" });
     } catch {
@@ -147,7 +168,7 @@ function WebReminderSettings() {
   };
 
   const disable = async () => {
-    if (busy) return;
+    if (busy || !userId) return;
     const disabled = {
       ...preferences,
       dailyVerse: false,
@@ -157,7 +178,7 @@ function WebReminderSettings() {
     };
     setBusy(true);
     try {
-      await disablePushReminders(subscription, disabled);
+      await disablePushReminders(userId, subscription, disabled);
       setSubscription(null);
       setPreferences(disabled);
       mirrorLegacySettings(disabled);
@@ -170,10 +191,10 @@ function WebReminderSettings() {
   };
 
   const test = async () => {
-    if (!subscription || busy) return;
+    if (!subscription || busy || !userId) return;
     setBusy(true);
     try {
-      await sendTestPush(subscription);
+      await sendTestPush(userId, subscription);
       toast("Test reminder sent.", { variant: "success" });
     } catch {
       toast("The test reminder couldn’t be sent. Wait a few minutes and retry.");
@@ -195,7 +216,7 @@ function WebReminderSettings() {
   if (loading) {
     return <p className="text-small text-ash">Checking reminder support…</p>;
   }
-  if (!configured || !user) {
+  if (!configured || !userId) {
     return (
       <p className="text-small leading-relaxed text-ash">
         Reminders follow your account across devices.{" "}

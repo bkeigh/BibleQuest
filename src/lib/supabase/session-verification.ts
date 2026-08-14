@@ -2,6 +2,7 @@
 export type SessionVerificationDecision =
   | "accept"
   | "clear-local-auth"
+  | "purge-deleted-account"
   | "preserve-local-state";
 
 /** Boundary applied as soon as a cached auth session is observed. */
@@ -20,7 +21,6 @@ const TERMINAL_AUTH_CODES = new Set([
   "bad_jwt",
   "refresh_token_not_found",
   "session_not_found",
-  "user_not_found",
 ]);
 
 /** Cached auth events never prove that the account still exists remotely. */
@@ -58,6 +58,10 @@ export function decideSessionVerification(
   const code =
     typeof shape.code === "string" ? shape.code.toLowerCase() : "";
   const status = typeof shape.status === "number" ? shape.status : 0;
+
+  // Only the provider's exact deleted-user result authorizes account-scoped
+  // device cleanup; expired or malformed credentials preserve the journey.
+  if (code === "user_not_found") return "purge-deleted-account";
 
   if (
     name === "authsessionmissingerror" ||

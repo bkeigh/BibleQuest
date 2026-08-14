@@ -75,10 +75,10 @@ describe("sanitizeInventory", () => {
 });
 
 describe("readInventory and writeInventory", () => {
-  it("round-trips a sanitized inventory", () => {
+  it("round-trips a sanitized inventory", async () => {
     const storage = new MemoryStorage();
     const inventory = grantBoost(EMPTY_INVENTORY, "gather", 3);
-    expect(writeInventory(inventory, storage)).toBe(true);
+    await expect(writeInventory(inventory, storage)).resolves.toBe(true);
     expect(readInventory(storage)).toEqual(inventory);
   });
 
@@ -86,51 +86,55 @@ describe("readInventory and writeInventory", () => {
     expect(readInventory(new MemoryStorage())).toEqual(EMPTY_INVENTORY);
   });
 
-  it("drops and forgets a tampered or unreadable record", () => {
+  it("drops and forgets a tampered or unreadable record", async () => {
     const storage = new MemoryStorage();
     storage.setItem(BOOST_STORAGE_KEY, JSON.stringify({ "level-skip": 5 }));
     expect(readInventory(storage)).toEqual(EMPTY_INVENTORY);
-    expect(storage.getItem(BOOST_STORAGE_KEY)).toBeNull();
+    await vi.waitFor(() =>
+      expect(storage.getItem(BOOST_STORAGE_KEY)).toBeNull(),
+    );
 
     storage.setItem(BOOST_STORAGE_KEY, "{not json");
     expect(readInventory(storage)).toEqual(EMPTY_INVENTORY);
   });
 
-  it("refuses to persist an inventory it would not accept back", () => {
+  it("refuses to persist an inventory it would not accept back", async () => {
     const storage = new MemoryStorage();
-    expect(
+    await expect(
       writeInventory({ hint: -1 } as unknown as BoostInventory, storage),
-    ).toBe(false);
+    ).resolves.toBe(false);
     expect(storage.getItem(BOOST_STORAGE_KEY)).toBeNull();
   });
 
-  it("degrades to no boosts when storage throws or is unavailable", () => {
+  it("degrades to no boosts when storage throws or is unavailable", async () => {
     const storage = failingStorage();
     expect(readInventory(storage)).toEqual(EMPTY_INVENTORY);
-    expect(writeInventory(EMPTY_INVENTORY, storage)).toBe(false);
+    await expect(writeInventory(EMPTY_INVENTORY, storage)).resolves.toBe(false);
 
     vi.stubGlobal("window", undefined);
     expect(readInventory()).toEqual(EMPTY_INVENTORY);
-    expect(writeInventory(EMPTY_INVENTORY)).toBe(false);
+    await expect(writeInventory(EMPTY_INVENTORY)).resolves.toBe(false);
     vi.unstubAllGlobals();
   });
 
-  it("uses window.localStorage when no storage is passed", () => {
+  it("uses window.localStorage when no storage is passed", async () => {
     const storage = new MemoryStorage();
     vi.stubGlobal("window", { localStorage: storage });
-    expect(writeInventory(grantBoost(EMPTY_INVENTORY, "hint"))).toBe(true);
+    await expect(
+      writeInventory(grantBoost(EMPTY_INVENTORY, "hint")),
+    ).resolves.toBe(true);
     expect(readInventory().hint).toBe(1);
     vi.unstubAllGlobals();
   });
 
-  it("survives a browser that throws on localStorage access", () => {
+  it("survives a browser that throws on localStorage access", async () => {
     vi.stubGlobal("window", {
       get localStorage(): Storage {
         throw new Error("blocked in private mode");
       },
     });
     expect(readInventory()).toEqual(EMPTY_INVENTORY);
-    expect(writeInventory(EMPTY_INVENTORY)).toBe(false);
+    await expect(writeInventory(EMPTY_INVENTORY)).resolves.toBe(false);
     vi.unstubAllGlobals();
   });
 });

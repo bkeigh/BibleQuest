@@ -71,6 +71,28 @@ describe("wrapped-webview readiness", () => {
     expect(rulesFor("body {")).toContain("text-size-adjust: 100%");
   });
 
+  it("prevents persistent iOS focus zoom without disabling pinch zoom", () => {
+    const touchRule = css.slice(
+      css.indexOf("@media (hover: none) and (pointer: coarse)"),
+      css.indexOf("/* The artwork stays visible", css.indexOf("@media (hover: none) and (pointer: coarse)")),
+    );
+
+    for (const control of [
+      'input[type="email"]',
+      'input[type="search"]',
+      'input[type="text"]',
+      "textarea",
+      "select",
+    ]) {
+      expect(touchRule, `${control} can still trigger iOS focus zoom`).toContain(
+        control,
+      );
+    }
+    expect(touchRule).toContain("font-size: max(1rem, 16px)");
+    expect(layout).not.toContain("maximumScale");
+    expect(layout).not.toContain("userScalable");
+  });
+
   it("reaches under the notch and the home indicator", () => {
     expect(layout).toContain('viewportFit: "cover"');
     expect(css).toContain("env(safe-area-inset-bottom)");

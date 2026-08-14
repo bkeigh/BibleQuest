@@ -40,6 +40,11 @@ test("the installed worker keeps offline state usable and private", async ({
   }, snapshot);
 
   await page.goto("/app");
+  // Walk the one-time legacy keep decision so the v2 namespace adopts the
+  // seeded journey before offline behaviour is measured.
+  await page
+    .getByRole("button", { name: "Keep this local journey" })
+    .click();
   await expect(
     page.getByRole("heading", { level: 1, name: "Fixture Person" }),
   ).toBeVisible();
@@ -54,7 +59,7 @@ test("the installed worker keeps offline state usable and private", async ({
   await expect
     .poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller)))
     .toBe(true);
-  expect(await workerVersion(page)).toBe("biblequest-v26");
+  expect(await workerVersion(page)).toBe("biblequest-v28");
 
   await context.setOffline(true);
   const cachedApp = await page.goto("/app", { waitUntil: "domcontentloaded" });
@@ -88,7 +93,7 @@ test("the installed worker keeps offline state usable and private", async ({
 
   const cacheNames = await page.evaluate(async () => (await caches.keys()).sort());
   expect(cacheNames).toEqual([
-    "biblequest-v26-runtime",
-    "biblequest-v26-shell",
+    "biblequest-v28-runtime",
+    "biblequest-v28-shell",
   ]);
 });

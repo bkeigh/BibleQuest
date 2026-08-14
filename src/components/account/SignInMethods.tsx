@@ -6,7 +6,7 @@
  * the message reaches the inbox, so the requested state explains recovery and
  * offers a rate-limit-aware resend.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { track } from "@/lib/analytics/events";
@@ -27,6 +27,22 @@ import {
 } from "@/lib/sync/containment";
 import { withDeadline } from "@/lib/async/deadline";
 import { isNativeTarget } from "@/lib/platform/target";
+import { requireNativeAccountBetaAvailability } from "@/lib/sync/availability";
+import { requireAccountLifecycleIdle } from "@/lib/auth/account-lifecycle";
+import {
+  beginEmailOtpAttempt,
+  cancelEmailOtpAttempt,
+  emailOtpAttemptIsCurrent,
+  emailOtpInstallationNeedsReload,
+  requestIsolatedEmailOtp,
+  verifyAndInstallEmailOtp,
+  type EmailOtpAttempt,
+} from "@/lib/auth/email-otp-verification";
+import {
+  readWebAuthState,
+  requireCurrentWebAccountRealm,
+  withWebAccountOperationLock,
+} from "@/lib/supabase/web-auth-storage";
 
 type EmailStatus = "idle" | "sending" | "requested";
 type OAuthProvider = "apple" | "google";
@@ -82,6 +98,8 @@ export function SignInMethods({
   const [resending, setResending] = useState(false);
   const [oauthPending, setOauthPending] = useState<OAuthProvider | null>(null);
   const [error, setError] = useState<AuthRequestFailure | null>(null);
+  const activeOtpAttempt = useRef<EmailOtpAttempt | null>(null);
+  const requestedEmailRef = useRef("");
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -91,6 +109,15 @@ export function SignInMethods({
     );
     return () => window.clearTimeout(timer);
   }, [resendCooldown]);
+
+  useEffect(
+    () => () => {
+      cancelEmailOtpAttempt(activeOtpAttempt.current);
+      activeOtpAttempt.current = null;
+      requestedEmailRef.current = "";
+    },
+    [],
+  );
 
   const emailValid = EMAIL.test(email.trim());
   const online = () =>
@@ -117,16 +144,15 @@ export function SignInMethods({
     }
 
     try {
+      const lifecycle = requireAccountLifecycleIdle();
+      await requireNativeAccountBetaAvailability();
+      requireAccountLifecycleIdle(lifecycle);
       const { error: requestError } = await withDeadline(
-        createClient().auth.signInWithOtp({
-          email: address,
-          options: {
-            shouldCreateUser: shouldCreateAccount(intent),
-          },
-        }),
+        requestIsolatedEmailOtp(address, shouldCreateAccount(intent)),
         AUTH_REQUEST_DEADLINE_MS,
         "Email sign-in request",
       );
+      requireAccountLifecycleIdle(lifecycle);
       if (requestError) {
         reportClientSignal({
           surface: "auth",
@@ -139,6 +165,9 @@ export function SignInMethods({
         return;
       }
 
+      cancelEmailOtpAttempt(activeOtpAttempt.current);
+      activeOtpAttempt.current = null;
+      requestedEmailRef.current = address;
       setRequestedEmail(address);
       setEmailOtp("");
       setEmailStatus("requested");
@@ -164,30 +193,43 @@ export function SignInMethods({
     }
   }
 
-  /** Completes auth in the current storage context, including an installed PWA. */
+  /** Verifies off-storage, then installs only the still-current email session. */
   async function verifyEmailCode() {
-    if (!isEmailOtpReady(emailOtp) || verifyingOtp) return;
+    if (
+      !isEmailOtpReady(emailOtp) ||
+      verifyingOtp ||
+      activeOtpAttempt.current
+    ) {
+      return;
+    }
 
     setError(null);
     setVerifyingOtp(true);
+    let attempt: EmailOtpAttempt | null = null;
     try {
-      const { error: verificationError } = await withDeadline(
-        createClient().auth.verifyOtp({
-          email: requestedEmail,
-          token: emailOtp,
-          type: "email",
-        }),
-        AUTH_REQUEST_DEADLINE_MS,
-        "Email-code verification",
+      const lifecycle = requireAccountLifecycleIdle();
+      await requireNativeAccountBetaAvailability();
+      requireAccountLifecycleIdle(lifecycle);
+      attempt = beginEmailOtpAttempt(requestedEmailRef.current);
+      activeOtpAttempt.current = attempt;
+      const result = await verifyAndInstallEmailOtp(
+        attempt,
+        emailOtp,
+        () => requestedEmailRef.current,
       );
-      if (verificationError) {
+      if (result.status === "stale") return;
+      if (result.status === "error") {
+        if (emailOtpInstallationNeedsReload(result.error)) {
+          window.location.reload();
+          return;
+        }
         reportClientSignal({
           surface: "auth",
           stage: "verify_email",
           outcome: "failure",
-          category: classifyOperationalError(verificationError, online()),
+          category: classifyOperationalError(result.error, online()),
         });
-        showFailure(emailOtpFailure(verificationError, online()));
+        showFailure(emailOtpFailure(result.error, online()));
         return;
       }
 
@@ -201,6 +243,16 @@ export function SignInMethods({
       // Supabase emits SIGNED_IN in this same PWA context. The shared session
       // hook verifies the user and advances the existing account flow.
     } catch (verificationError) {
+      if (emailOtpInstallationNeedsReload(verificationError)) {
+        window.location.reload();
+        return;
+      }
+      if (
+        attempt &&
+        !emailOtpAttemptIsCurrent(attempt, requestedEmailRef.current)
+      ) {
+        return;
+      }
       reportClientSignal({
         surface: "auth",
         stage: "verify_email",
@@ -209,7 +261,11 @@ export function SignInMethods({
       });
       showFailure(emailOtpFailure(verificationError, online()));
     } finally {
-      setVerifyingOtp(false);
+      if (!attempt || activeOtpAttempt.current === attempt) {
+        cancelEmailOtpAttempt(attempt);
+        activeOtpAttempt.current = null;
+        setVerifyingOtp(false);
+      }
     }
   }
 
@@ -219,14 +275,28 @@ export function SignInMethods({
     setOauthPending(provider);
     track("sign_in_started", { method: provider, source });
     try {
-      const { error: requestError } = await withDeadline(
+      const lifecycle = requireAccountLifecycleIdle();
+      const request = () =>
         createClient().auth.signInWithOAuth({
           provider,
           options: { redirectTo: callbackUrl() },
-        }),
+        });
+      const guardedRequest = nativeTarget
+        ? request()
+        : withWebAccountOperationLock(async (handle) => {
+            await requireCurrentWebAccountRealm(handle);
+            const state = await readWebAuthState(handle);
+            if (state.status !== "missing") {
+              throw new Error("Account sign-in is unavailable.");
+            }
+            return request();
+          });
+      const { error: requestError } = await withDeadline(
+        guardedRequest,
         AUTH_REQUEST_DEADLINE_MS,
         `${providerName} sign-in request`,
       );
+      requireAccountLifecycleIdle(lifecycle);
       if (requestError) {
         reportClientSignal({
           surface: "auth",
@@ -351,6 +421,9 @@ export function SignInMethods({
             size="sm"
             disabled={verifyingOtp}
             onClick={() => {
+              cancelEmailOtpAttempt(activeOtpAttempt.current);
+              activeOtpAttempt.current = null;
+              requestedEmailRef.current = "";
               setEmailStatus("idle");
               setEmailOtp("");
               setError(null);

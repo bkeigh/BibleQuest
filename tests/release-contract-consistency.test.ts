@@ -12,6 +12,9 @@ import { describe, expect, it } from "vitest";
  * These assertions fail at commit time instead, naming the file that lagged.
  */
 describe("release contract consistency", () => {
+  const RELEASE_GATED_MIGRATIONS = new Set([
+    "0037_native_account_beta_availability.sql",
+  ]);
   const config = JSON.parse(
     readFileSync("config/observability.json", "utf8"),
   ) as { serviceWorkerVersion: string; schemaContract: string };
@@ -26,10 +29,18 @@ describe("release contract consistency", () => {
     expect(config.serviceWorkerVersion).toBe(declared);
   });
 
-  it("advertises the newest applied schema migration", () => {
+  it("advertises production while the exact beta-only migration stays separate", () => {
     // The monitor compares this against production, so a config left behind a
-    // migration reads as drift rather than as a stale contract file.
-    const latest = readdirSync("supabase/migrations")
+    // production migration reads as drift. The fail-closed native availability
+    // switch remains outside that public contract until its separate release.
+    const migrations = readdirSync("supabase/migrations");
+    // Keep the exception reviewable: a rename or removal must update this
+    // release boundary instead of silently changing the production contract.
+    for (const migration of RELEASE_GATED_MIGRATIONS) {
+      expect(migrations).toContain(migration);
+    }
+    const latest = migrations
+      .filter((name) => !RELEASE_GATED_MIGRATIONS.has(name))
       .map((name) => name.match(/^(\d{4})_/)?.[1])
       .filter((value): value is string => Boolean(value))
       .sort()

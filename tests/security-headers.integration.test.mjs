@@ -18,6 +18,7 @@ const approvedFrameAncestors = [
 ];
 const isolatedDevDistDir = ".next-header-test";
 const incrementalTypeCache = "tsconfig.tsbuildinfo";
+const fullSha = /^[a-f0-9]{40}$/i;
 
 function parseCsp(value) {
   const directives = new Map();
@@ -63,7 +64,7 @@ function assertSharedSecurityContract(
     assert.deepEqual(csp.get("script-src"), ["'self'", "'unsafe-inline'"]);
     assert.deepEqual(csp.get("connect-src"), [
       "'self'",
-      "https://header-fixture.supabase.co",
+      "https://abcdefghijklmnopqrst.supabase.co",
     ]);
     assert.equal(response.headers.get("strict-transport-security"), "max-age=15552000");
     assert.deepEqual(csp.get("upgrade-insecure-requests"), []);
@@ -75,7 +76,7 @@ function assertSharedSecurityContract(
     ]);
     assert.deepEqual(csp.get("connect-src"), [
       "'self'",
-      "https://header-fixture.supabase.co",
+      "https://abcdefghijklmnopqrst.supabase.co",
       "ws://localhost:*",
     ]);
     assert.equal(response.headers.get("strict-transport-security"), null);
@@ -123,7 +124,7 @@ async function stop(child) {
   clearTimeout(force);
 }
 
-async function withNextServer(command, callback) {
+async function withNextServer(command, callback, environment = {}) {
   const port = await availablePort();
   const logs = [];
   const child = spawn(
@@ -136,7 +137,8 @@ async function withNextServer(command, callback) {
         NODE_ENV: command === "dev" ? "development" : "production",
         BIBLEQUEST_HEADER_TEST_DIST_DIR:
           command === "dev" ? isolatedDevDistDir : "",
-        NEXT_PUBLIC_SUPABASE_URL: "https://header-fixture.supabase.co",
+        NEXT_PUBLIC_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
+        ...environment,
       },
       stdio: ["ignore", "pipe", "pipe"],
     },
@@ -180,6 +182,22 @@ test(
         redirect: "manual",
       });
       assertSharedSecurityContract(privateResponse, true, ["'none'"], "DENY");
+
+      // Conflicting runtime CI/build variables cannot impersonate the commit
+      // captured by next.config.ts when this exact artifact was compiled.
+      const health = await fetch(`${origin}/api/health`).then((value) =>
+        value.json(),
+      );
+      const expectedBuildSha =
+        process.env.BIBLEQUEST_EXPECTED_BUILD_SHA ?? process.env.GITHUB_SHA;
+      assert.match(health.release_sha, fullSha);
+      if (expectedBuildSha) {
+        assert.equal(health.release_sha, expectedBuildSha.toLowerCase());
+      }
+    }, {
+      VERCEL_GIT_COMMIT_SHA: "",
+      GITHUB_SHA: "f".repeat(40),
+      BIBLEQUEST_BUILD_SHA: "e".repeat(40),
     });
   },
 );

@@ -301,7 +301,8 @@ describe("privacy-safe observability contract", () => {
       NEXT_PUBLIC_APP_URL: observability.canonicalOrigin,
       STRIPE_BILLING_MODE: "coming-soon",
       NEXT_PUBLIC_SUPABASE_URL: "https://project.supabase.co",
-      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "publishable-fixture",
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
+        "sb_publishable_observability_fixture_1234567890",
       NEXT_PUBLIC_ANALYTICS_ENABLED: "true",
       NEXT_PUBLIC_PLAUSIBLE_DOMAIN: "www.biblequest.co",
     };
@@ -312,18 +313,50 @@ describe("privacy-safe observability contract", () => {
       canonical_origin_matches: true,
       auth_posture: "configured",
       analytics_posture: "configured",
-      schema_contract: "0036",
-      service_worker_version: "biblequest-v26",
+      schema_contract: "0038",
+      service_worker_version: "biblequest-v28",
       billing_mode: "coming-soon",
       billing_purchases_enabled: false,
       billing_support_enabled: false,
     });
+
+    // A runtime CI value is operator-controlled and must not impersonate the
+    // identity captured in an already-built release artifact.
+    expect(
+      buildReleaseHealth({
+        VERCEL_GIT_COMMIT_SHA: "",
+        GITHUB_SHA: "c".repeat(40),
+      }).release_sha,
+    ).toBeNull();
+
+    // Likewise, a runtime value under the bundled variable name cannot replace
+    // the constant that Next.js captured while compiling the server bundle.
+    expect(
+      buildReleaseHealth({
+        VERCEL_GIT_COMMIT_SHA: "",
+        GITHUB_SHA: "",
+        BIBLEQUEST_BUILD_SHA: "d".repeat(40),
+      }).release_sha,
+    ).toBeNull();
 
     // The public contract must report the effective guest-only latch even
     // when provider credentials remain available to the deployment.
     expect(buildReleaseHealth(configuredEnvironment).auth_posture).toBe(
       "guest-only",
     );
+
+    const mislabeledLegacyKey = buildReleaseHealth(
+      {
+        ...configuredEnvironment,
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: [
+          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+          "eyJyb2xlIjoiYW5vbiJ9",
+          "fixture-signature",
+        ].join("."),
+      },
+      false,
+    );
+    expect(mislabeledLegacyKey.auth_posture).toBe("invalid");
 
     const testBilling = buildReleaseHealth({
       NEXT_PUBLIC_APP_URL: observability.canonicalOrigin,

@@ -293,7 +293,6 @@ async function supabaseChecks(env, fetchOptions) {
 
   const headers = {
     apikey: key,
-    authorization: `Bearer ${key}`,
     accept: "application/json",
   };
   const publicContent = await inspectResponse(

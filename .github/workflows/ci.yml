@@ -21,8 +21,8 @@ env:
   TZ: UTC
 
 jobs:
-  quality:
-    name: Quality
+  source-quality:
+    name: Source quality
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -47,6 +47,8 @@ jobs:
         run: pnpm lint
       - name: Verify generated Console seed
         run: pnpm check:seed
+      - name: Verify native launch artwork
+        run: pnpm check:ios-splash
       - name: Check changed lines for whitespace errors
         run: |
           if [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
@@ -98,14 +100,14 @@ jobs:
           # Browser-safe fixtures exercise the configured-auth bundle without
           # contacting Supabase or requiring repository secrets.
           - mode: configured-auth-contained
-            supabase_url: https://header-fixture.supabase.co
-            supabase_key: header-fixture-anon-key
+            supabase_url: https://abcdefghijklmnopqrst.supabase.co
+            supabase_key: sb_publishable_header_fixture_1234567890abcdef
             account_sync_enabled: "false"
           # Compile the release posture too; fake browser-safe values never
           # contact Supabase during the build.
           - mode: configured-auth-enabled
-            supabase_url: https://header-fixture.supabase.co
-            supabase_key: header-fixture-anon-key
+            supabase_url: https://abcdefghijklmnopqrst.supabase.co
+            supabase_key: sb_publishable_header_fixture_1234567890abcdef
             account_sync_enabled: "true"
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ matrix.supabase_url }}
@@ -274,3 +276,41 @@ jobs:
         run: pnpm audit
       - name: Block high and critical dependency risk
         run: pnpm audit --audit-level high
+
+  # Keep the protected Quality context pending until every in-repo release lane passes.
+  quality:
+    name: Quality
+    if: always()
+    needs:
+      - source-quality
+      - types-and-tests
+      - production-build
+      - native-export
+      - ios-simulator-build
+      - browser-smoke
+      - database-policies
+      - dependency-risk
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every release lane
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+        run: |
+          node <<'NODE'
+          // Fail the protected context when any release lane failed, was cancelled, or was skipped.
+          const needs = JSON.parse(process.env.NEEDS_JSON);
+          const incomplete = Object.entries(needs).filter(
+            ([, job]) => job.result !== "success",
+          );
+
+          if (incomplete.length > 0) {
+            const summary = incomplete
+              .map(([name, job]) => `${name}: ${job.result}`)
+              .join(", ");
+            console.error(`Release lanes did not all pass: ${summary}`);
+            process.exit(1);
+          }
+
+          console.log("Every in-repository release lane passed.");
+          NODE

@@ -12,7 +12,11 @@
  * leaves this store for analytics, logs, or AI.
  */
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
+import {
+  persist,
+  createJSONStorage,
+  type StateStorage,
+} from "zustand/middleware";
 import { questBySlug } from "@/data/seed/quests";
 import { seedMilestones } from "@/data/seed/milestones";
 import {
@@ -25,6 +29,21 @@ import { computeMetrics, checkMilestones } from "./milestone-engine";
 import { toDateKey } from "@/lib/utils/dates";
 import { track, setAnalyticsConsent } from "@/lib/analytics/events";
 import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
+import { isNativeTarget } from "@/lib/platform/target";
+import {
+  beginWebPrivateWrite,
+  registerWebPrivateMemoryReset,
+  webPrivateInstallingReadAllowed,
+  webPrivateReadAllowed,
+  webPrivateWriteGuardIsCurrent,
+  withWebAuthStorageLock,
+  type WebAccountOperationHandle,
+} from "@/lib/supabase/web-auth-storage";
+import {
+  LEGACY_QUEST_JOURNEY_STORAGE_KEY,
+  WEB_V2_QUEST_JOURNEY_STORAGE_KEY,
+  selectedWebPrivateStorageKey,
+} from "@/lib/storage/web-private-namespace";
 import {
   DEFAULT_SETTINGS,
   MEANINGFUL_JOURNEY_EVENT_TYPES,
@@ -465,6 +484,226 @@ function journeyTitle(type: JourneyEventType, detail?: string): string {
     case "milestone_reached":
       return detail ?? "Milestone reached";
   }
+}
+
+let webJourneyStorageQueue: Promise<void> = Promise.resolve();
+let webJourneyReadEpoch = 0;
+let webJourneyPersistenceSuppressed = false;
+
+interface WebJourneyReadContext {
+  authorizationIsCurrent: () => boolean;
+  epoch: number;
+  storage: Storage;
+  storageKey: string;
+}
+
+let webJourneyReadContext: WebJourneyReadContext | null = null;
+
+/** Keeps this tab's persisted journey writes ordered before taking the web lock. */
+function enqueueWebJourneyStorage(operation: () => Promise<void>): Promise<void> {
+  const result = webJourneyStorageQueue.then(operation, operation);
+  webJourneyStorageQueue = result.catch(() => undefined);
+  // A refused durable write keeps the in-memory guest journey usable without
+  // surfacing an unhandled promise from Zustand's synchronous action API.
+  return result.catch(() => undefined);
+}
+
+/** Waits until every persistence mutation already queued by this realm settles. */
+export async function flushQuestJourneyStorage(): Promise<void> {
+  await webJourneyStorageQueue;
+}
+
+/** Builds the exact native, guest, or account-fenced journey storage adapter. */
+export function createQuestJourneyStorage(
+  storage: Storage,
+  nativeTarget = isNativeTarget(),
+): StateStorage<void | Promise<void>> {
+  if (nativeTarget) return storage;
+  return {
+    getItem: (name) => {
+      if (name !== LEGACY_QUEST_JOURNEY_STORAGE_KEY) return null;
+      const context = webJourneyReadContext;
+      if (
+        !context ||
+        context.storage !== storage ||
+        context.epoch !== webJourneyReadEpoch ||
+        !context.authorizationIsCurrent() ||
+        selectedWebPrivateStorageKey(
+          storage,
+          LEGACY_QUEST_JOURNEY_STORAGE_KEY,
+          WEB_V2_QUEST_JOURNEY_STORAGE_KEY,
+        ) !== context.storageKey
+      ) {
+        return null;
+      }
+      return storage.getItem(context.storageKey);
+    },
+    setItem: (name, value) => {
+      if (
+        name !== LEGACY_QUEST_JOURNEY_STORAGE_KEY ||
+        webJourneyPersistenceSuppressed
+      ) {
+        return;
+      }
+      // Capture both the owner generation and namespace before this write can
+      // wait behind another account transition.
+      const guard = beginWebPrivateWrite();
+      const storageKey = selectedWebPrivateStorageKey(
+        storage,
+        LEGACY_QUEST_JOURNEY_STORAGE_KEY,
+        WEB_V2_QUEST_JOURNEY_STORAGE_KEY,
+      );
+      if (!guard || !storageKey) return;
+      return enqueueWebJourneyStorage(() =>
+        withWebAuthStorageLock(async () => {
+          if (!webPrivateWriteGuardIsCurrent(guard)) return;
+          const previous = storage.getItem(storageKey);
+          storage.setItem(storageKey, value);
+          if (
+            !webPrivateWriteGuardIsCurrent(guard) &&
+            storage.getItem(storageKey) === value
+          ) {
+            if (previous === null) storage.removeItem(storageKey);
+            else storage.setItem(storageKey, previous);
+          }
+        }),
+      );
+    },
+    removeItem: (name) => {
+      if (
+        name !== LEGACY_QUEST_JOURNEY_STORAGE_KEY ||
+        webJourneyPersistenceSuppressed
+      ) {
+        return;
+      }
+      // A delayed removal must never acquire authority from a later account.
+      const guard = beginWebPrivateWrite();
+      const storageKey = selectedWebPrivateStorageKey(
+        storage,
+        LEGACY_QUEST_JOURNEY_STORAGE_KEY,
+        WEB_V2_QUEST_JOURNEY_STORAGE_KEY,
+      );
+      if (!guard || !storageKey) return;
+      return enqueueWebJourneyStorage(() =>
+        withWebAuthStorageLock(async () => {
+          if (!webPrivateWriteGuardIsCurrent(guard)) return;
+          const previous = storage.getItem(storageKey);
+          storage.removeItem(storageKey);
+          if (
+            !webPrivateWriteGuardIsCurrent(guard) &&
+            previous !== null &&
+            storage.getItem(storageKey) === null
+          ) {
+            storage.setItem(storageKey, previous);
+          }
+        }),
+      );
+    },
+  };
+}
+
+export type QuestJourneyWebHydrationAuthorization =
+  | { kind: "current" }
+  | {
+      kind: "installing";
+      handle: WebAccountOperationHandle;
+      userId: string;
+    };
+
+/** Removes every in-memory journey field without authorizing a durable write. */
+export function resetQuestOSWebPrivateMemory(): void {
+  webJourneyReadEpoch += 1;
+  webJourneyReadContext = null;
+  setAnalyticsConsent(false);
+  webJourneyPersistenceSuppressed = true;
+  try {
+    useQuestOS.setState(useQuestOS.getInitialState(), true);
+  } finally {
+    webJourneyPersistenceSuppressed = false;
+  }
+}
+
+/** Rehydrates once inside an exact, short-lived web-private read capability. */
+export async function coordinateQuestOSWebPrivateHydration(
+  authorization: QuestJourneyWebHydrationAuthorization = { kind: "current" },
+): Promise<boolean> {
+  if (isNativeTarget() || typeof window === "undefined") return false;
+  await flushQuestJourneyStorage();
+  try {
+    return await withWebAuthStorageLock(async () => {
+      const storage = window.localStorage;
+      const authorizationIsCurrent = () =>
+        authorization.kind === "installing"
+          ? webPrivateInstallingReadAllowed(
+              authorization.handle,
+              authorization.userId,
+              storage,
+            )
+          : webPrivateReadAllowed(storage);
+      if (!authorizationIsCurrent()) return false;
+      const storageKey = selectedWebPrivateStorageKey(
+        storage,
+        LEGACY_QUEST_JOURNEY_STORAGE_KEY,
+        WEB_V2_QUEST_JOURNEY_STORAGE_KEY,
+      );
+      if (!storageKey) return false;
+
+      resetQuestOSWebPrivateMemory();
+      const epoch = webJourneyReadEpoch;
+      webJourneyReadContext = {
+        authorizationIsCurrent,
+        epoch,
+        storage,
+        storageKey,
+      };
+      try {
+        await useQuestOS.persist.rehydrate();
+        if (
+          webJourneyReadEpoch !== epoch ||
+          !authorizationIsCurrent() ||
+          selectedWebPrivateStorageKey(
+            storage,
+            LEGACY_QUEST_JOURNEY_STORAGE_KEY,
+            WEB_V2_QUEST_JOURNEY_STORAGE_KEY,
+          ) !== storageKey
+        ) {
+          resetQuestOSWebPrivateMemory();
+          return false;
+        }
+        return true;
+      } catch {
+        resetQuestOSWebPrivateMemory();
+        return false;
+      } finally {
+        if (webJourneyReadContext?.epoch === epoch) {
+          webJourneyReadContext = null;
+        }
+      }
+    });
+  } catch {
+    resetQuestOSWebPrivateMemory();
+    return false;
+  }
+}
+
+/** Resolves the browser storage surface only when Zustand initializes on-device. */
+function questJourneyStorage(): StateStorage<void | Promise<void>> {
+  const nativeTarget = isNativeTarget();
+  // Resolve localStorage per operation so a browser storage replacement or
+  // test realm cannot leave the persisted adapter bound to a stale surface.
+  return {
+    getItem: (name) =>
+      createQuestJourneyStorage(window.localStorage, nativeTarget).getItem(name),
+    setItem: (name, value) =>
+      createQuestJourneyStorage(window.localStorage, nativeTarget).setItem(
+        name,
+        value,
+      ),
+    removeItem: (name) =>
+      createQuestJourneyStorage(window.localStorage, nativeTarget).removeItem(
+        name,
+      ),
+  };
 }
 
 export const useQuestOS = create<QuestOSState>()(
@@ -1633,8 +1872,11 @@ export const useQuestOS = create<QuestOSState>()(
       };
     },
     {
-      name: "biblequest:v1",
-      storage: createJSONStorage(() => localStorage),
+      name: LEGACY_QUEST_JOURNEY_STORAGE_KEY,
+      storage: createJSONStorage(questJourneyStorage),
+      // Auth/native startup grants a reviewed read boundary before hydration.
+      // This prevents module import from loading account data into live memory.
+      skipHydration: true,
       version: 18,
       migrate: (persisted, version) => {
         const state = persisted as Record<string, unknown>;
@@ -1902,6 +2144,10 @@ export const useQuestOS = create<QuestOSState>()(
     }
   )
 );
+
+// Generation rotation invokes this synchronously before publishing any auth
+// transition, so a loaded account cannot survive in module memory as another.
+registerWebPrivateMemoryReset(resetQuestOSWebPrivateMemory);
 
 // ---------------------------------------------------------------------------
 // Derived selectors

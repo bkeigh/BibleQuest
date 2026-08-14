@@ -1,46 +1,59 @@
 "use client";
 
 /**
- * A durable copy of the journey, outside the WebView.
+ * A durable copy of the journey outside reclaimable WebView storage.
  *
- * iOS treats script-writable WebView storage as reclaimable: under storage
- * pressure the system can purge localStorage and IndexedDB without warning and
- * without uninstalling the app. BibleQuest keeps the entire journey — prayers,
- * reflections, quests, streaks — in the single `biblequest:v1` localStorage
- * blob, and account sync is off by default, so there is no server copy to
- * restore from. Losing that is unrecoverable and invisible until a reader opens
- * the app to an empty history.
- *
- * The fix is deliberately conservative. localStorage stays the synchronous
- * primary, so store rehydration timing is untouched; this module only adds a
- * write-through copy in the app's Documents directory (which iOS does not
- * reclaim) and restores it when the primary comes up empty.
- *
- * It is not a sync engine. It never merges, and it never overwrites a
- * non-empty primary — a restore happens only when localStorage has nothing at
- * all, which is precisely the eviction case.
+ * Guest releases retain the original raw-file format. The native account beta
+ * writes one versioned envelope instead, so the protected journey and its exact
+ * owner stamp are committed and restored as one filesystem value.
  */
 import { isNativeTarget } from "@/lib/platform/target";
+import { NATIVE_ACCOUNT_BETA_ENABLED } from "@/lib/sync/containment";
+import {
+  LAST_SYNC_USER_STORAGE_KEY,
+  clearLastSyncedUserId,
+  isValidLocalJourneyUserId,
+  quarantineLocalJourneyOwner,
+  readLocalJourneyOwner,
+  setLastSyncedUserId,
+} from "@/lib/sync/last-user";
 
 /** Must match the Zustand persist `name` in lib/questos/store.ts. */
 export const JOURNEY_STORAGE_KEY = "biblequest:v1";
 
 const BACKUP_FILE = "journey-backup.json";
-
-/** Coalesces bursts of store writes into one file write. */
+const BACKUP_ENVELOPE_KIND = "biblequest-native-journey-backup";
+const BACKUP_ENVELOPE_VERSION = 1;
 const WRITE_DEBOUNCE_MS = 1500;
 
 type FilesystemModule = typeof import("@capacitor/filesystem");
 
+interface BackupEnvelope {
+  kind: typeof BACKUP_ENVELOPE_KIND;
+  version: typeof BACKUP_ENVELOPE_VERSION;
+  ownerUserId: string | null;
+  journey: Record<string, unknown>;
+}
+
+type BackupRecord =
+  | { status: "missing" }
+  | { status: "unavailable" }
+  | { status: "corrupt"; protectedEnvelope: boolean }
+  | {
+      status: "ready";
+      journey: string;
+      ownerUserId: string | null;
+      legacyGuest: boolean;
+    };
+
+type PrimaryRecord =
+  | { status: "missing" }
+  | { status: "unavailable" }
+  | { status: "ready"; journey: string };
+
 let filesystem: FilesystemModule | null = null;
-
-/** Serializes mirror writes with irreversible purge requests. */
 let filesystemMutation: Promise<void> = Promise.resolve();
-
-/** Prevents an old scheduled write from recreating a purged journey. */
 let backupWritesSuspended = false;
-
-/** Invalidates writes that were requested before a purge began. */
 let backupGeneration = 0;
 
 /** Runs one filesystem mutation after every earlier mutation has settled. */
@@ -53,11 +66,12 @@ function serializeFilesystemMutation<T>(operation: () => Promise<T>): Promise<T>
   return result;
 }
 
-/**
- * Loaded lazily so the plugin never enters the web bundle. Returns null on web
- * and on any load failure — a backup is a safety net, and a failing net must
- * not take the app down with it.
- */
+/** Native account ownership metadata is absent from the guest release path. */
+function accountOwnerEnvelopeRequired(): boolean {
+  return isNativeTarget() && NATIVE_ACCOUNT_BETA_ENABLED;
+}
+
+/** Load the filesystem lazily so web and failed native plugins remain inert. */
 async function loadFilesystem(): Promise<FilesystemModule | null> {
   if (!isNativeTarget()) return null;
   if (filesystem) return filesystem;
@@ -69,24 +83,135 @@ async function loadFilesystem(): Promise<FilesystemModule | null> {
   }
 }
 
-function readPrimary(): string | null {
+/** Read the primary without making a denied storage access look empty. */
+function readPrimary(): PrimaryRecord {
   try {
-    return window.localStorage.getItem(JOURNEY_STORAGE_KEY);
+    const raw = window.localStorage.getItem(JOURNEY_STORAGE_KEY);
+    return isSubstantive(raw)
+      ? { status: "ready", journey: raw }
+      : { status: "missing" };
+  } catch {
+    return { status: "unavailable" };
+  }
+}
+
+/** A journey worth preserving is neither absent nor an empty JSON tombstone. */
+function isSubstantive(raw: string | null): raw is string {
+  return typeof raw === "string" && raw.length > 2;
+}
+
+/** Parse one journey object without accepting arrays or scalar JSON. */
+function parseJourneyObject(raw: string): Record<string, unknown> | null {
+  try {
+    const value: unknown = JSON.parse(raw);
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : null;
   } catch {
     return null;
   }
 }
 
-/** A journey worth preserving — not absent, and not an empty JSON husk. */
-function isSubstantive(raw: string | null): raw is string {
-  return typeof raw === "string" && raw.length > 2;
+/** Decode either the account-safe envelope or a pre-beta guest backup. */
+function parseBackupFile(raw: string | null): BackupRecord {
+  if (!isSubstantive(raw)) return { status: "missing" };
+  const advertisesEnvelope = raw.includes(BACKUP_ENVELOPE_KIND);
+  const parsed = parseJourneyObject(raw);
+  if (!parsed) {
+    return { status: "corrupt", protectedEnvelope: advertisesEnvelope };
+  }
+
+  if (parsed.kind !== BACKUP_ENVELOPE_KIND) {
+    return {
+      status: "ready",
+      journey: raw,
+      ownerUserId: null,
+      legacyGuest: true,
+    };
+  }
+
+  const keys = Object.keys(parsed).sort().join(",");
+  const owner = parsed.ownerUserId;
+  const journey = parsed.journey;
+  if (
+    keys !== "journey,kind,ownerUserId,version" ||
+    parsed.version !== BACKUP_ENVELOPE_VERSION ||
+    (owner !== null &&
+      (typeof owner !== "string" || !isValidLocalJourneyUserId(owner))) ||
+    !journey ||
+    typeof journey !== "object" ||
+    Array.isArray(journey)
+  ) {
+    return { status: "corrupt", protectedEnvelope: true };
+  }
+
+  const encodedJourney = JSON.stringify(journey);
+  if (!isSubstantive(encodedJourney)) {
+    return { status: "corrupt", protectedEnvelope: true };
+  }
+  return {
+    status: "ready",
+    journey: encodedJourney,
+    ownerUserId: owner as string | null,
+    legacyGuest: false,
+  };
 }
 
-/** Writes the current journey to the app's Documents directory. */
+/** Encode an account-beta journey and its strict owner in one protected value. */
+function encodeBackup(raw: string): string | null {
+  if (!accountOwnerEnvelopeRequired()) return raw;
+  const journey = parseJourneyObject(raw);
+  const owner = readLocalJourneyOwner();
+  if (!journey || owner.status === "unavailable") return null;
+
+  const envelope: BackupEnvelope = {
+    kind: BACKUP_ENVELOPE_KIND,
+    version: BACKUP_ENVELOPE_VERSION,
+    ownerUserId: owner.status === "owned" ? owner.userId : null,
+    journey,
+  };
+  return JSON.stringify(envelope);
+}
+
+/** Read and classify the protected file without collapsing corruption to none. */
+async function readBackupRecord(): Promise<BackupRecord> {
+  if (!isNativeTarget()) return { status: "missing" };
+  const fs = await loadFilesystem();
+  if (!fs) return { status: "unavailable" };
+  try {
+    const file = await fs.Filesystem.readFile({
+      path: BACKUP_FILE,
+      directory: fs.Directory.Data,
+      encoding: fs.Encoding.UTF8,
+    });
+    return parseBackupFile(typeof file.data === "string" ? file.data : null);
+  } catch (error) {
+    return error !== null &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "OS-PLUG-FILE-0008"
+      ? { status: "missing" }
+      : { status: "unavailable" };
+  }
+}
+
+/** Quarantine a malformed account mirror and prevent an automatic overwrite. */
+async function quarantineProtectedMirror(): Promise<void> {
+  backupWritesSuspended = true;
+  try {
+    await quarantineLocalJourneyOwner();
+  } catch {
+    // Storage is already unavailable; suspension still preserves the mirror.
+  }
+}
+
+/** Writes the current journey to the app's protected Data directory. */
 export async function writeJourneyBackup(): Promise<boolean> {
-  const raw = readPrimary();
+  const primary = readPrimary();
   const generation = backupGeneration;
-  if (backupWritesSuspended || !isSubstantive(raw)) return false;
+  if (backupWritesSuspended || primary.status !== "ready") return false;
+  const encoded = encodeBackup(primary.journey);
+  if (!encoded) return false;
 
   return serializeFilesystemMutation(async () => {
     if (backupWritesSuspended || generation !== backupGeneration) return false;
@@ -94,11 +219,10 @@ export async function writeJourneyBackup(): Promise<boolean> {
     if (!fs || backupWritesSuspended || generation !== backupGeneration) {
       return false;
     }
-
     try {
       await fs.Filesystem.writeFile({
         path: BACKUP_FILE,
-        data: raw,
+        data: encoded,
         directory: fs.Directory.Data,
         encoding: fs.Encoding.UTF8,
       });
@@ -110,22 +234,48 @@ export async function writeJourneyBackup(): Promise<boolean> {
 }
 
 /**
- * Irreversibly removes the native mirror before Settings clears localStorage.
- *
- * The empty-object write is a durable tombstone: even if the following delete
- * is unavailable, restore rejects the two-byte file as non-substantive. Writes
- * remain suspended after success until the caller has reset the primary store.
+ * Durably bind the current native beta mirror to one expected account.
+ * The sync engine should await this after stamping ownership and before it can
+ * treat account-owned local data as safely recoverable.
+ */
+export async function sealJourneyBackupOwner(
+  expectedUserId: string,
+): Promise<boolean> {
+  if (!accountOwnerEnvelopeRequired()) return true;
+  const owner = readLocalJourneyOwner();
+  const primary = readPrimary();
+  if (
+    owner.status !== "owned" ||
+    owner.userId !== expectedUserId ||
+    primary.status !== "ready" ||
+    !(await writeJourneyBackup())
+  ) {
+    return false;
+  }
+
+  const record = await readBackupRecord();
+  return (
+    record.status === "ready" &&
+    !record.legacyGuest &&
+    record.ownerUserId === expectedUserId &&
+    record.journey === primary.journey
+  );
+}
+
+/**
+ * Tombstone the mirror before any irreversible local clear or account handoff.
+ * A failed delete remains safe because the two-byte file is non-restorable.
  */
 export async function purgeJourneyBackup(): Promise<boolean> {
   if (!isNativeTarget()) return true;
 
+  const wasSuspended = backupWritesSuspended;
   backupWritesSuspended = true;
   backupGeneration += 1;
 
   const purged = await serializeFilesystemMutation(async () => {
     const fs = await loadFilesystem();
     if (!fs) return false;
-
     try {
       await fs.Filesystem.writeFile({
         path: BACKUP_FILE,
@@ -143,37 +293,24 @@ export async function purgeJourneyBackup(): Promise<boolean> {
         directory: fs.Directory.Data,
       });
     } catch {
-      // The tombstone already makes the mirror non-restorable.
+      // The durable tombstone already makes this mirror non-restorable.
     }
     return true;
   });
 
-  if (!purged) backupWritesSuspended = false;
+  if (!purged) backupWritesSuspended = wasSuspended;
   return purged;
 }
 
-/** Lets mirroring resume only after the caller has reset the primary store. */
+/** Resume writes only after the caller has reset the primary and owner marker. */
 export function resumeJourneyBackupAfterPurge(): void {
   backupWritesSuspended = false;
 }
 
-/** Reads the mirrored journey, or null when there is none. */
+/** Reads the mirrored journey body while hiding its account metadata. */
 export async function readJourneyBackup(): Promise<string | null> {
-  const fs = await loadFilesystem();
-  if (!fs) return null;
-
-  try {
-    const file = await fs.Filesystem.readFile({
-      path: BACKUP_FILE,
-      directory: fs.Directory.Data,
-      encoding: fs.Encoding.UTF8,
-    });
-    const data = typeof file.data === "string" ? file.data : null;
-    return isSubstantive(data) ? data : null;
-  } catch {
-    // A missing file is the normal first-launch case, not an error.
-    return null;
-  }
+  const record = await readBackupRecord();
+  return record.status === "ready" ? record.journey : null;
 }
 
 export type RestoreOutcome =
@@ -183,41 +320,114 @@ export type RestoreOutcome =
   | "restored"
   | "failed";
 
-/**
- * Repairs an evicted primary from the mirror. Call once, before the store
- * hydrates — afterwards the app has already rendered an empty journey.
- *
- * Never overwrites existing data: if localStorage still holds a journey, the
- * mirror is refreshed from it instead.
- */
+/** Restore one owner-stamped account journey or one compatible legacy guest. */
 export async function restoreJourneyIfEvicted(): Promise<RestoreOutcome> {
   if (!isNativeTarget()) return "not-native";
+  const primary = readPrimary();
+  if (primary.status === "unavailable") {
+    backupWritesSuspended = true;
+    return "failed";
+  }
 
-  if (isSubstantive(readPrimary())) {
-    // Healthy launch. Take the opportunity to refresh the mirror.
+  if (primary.status === "ready") {
+    if (accountOwnerEnvelopeRequired()) {
+      const owner = readLocalJourneyOwner();
+      if (owner.status === "unavailable") {
+        backupWritesSuspended = true;
+        return "failed";
+      }
+
+      // Recover a selectively evicted owner key only when the protected body is
+      // byte-for-byte the same journey. A mismatch is ambiguous and quarantined.
+      if (owner.status === "unowned") {
+        const backup = await readBackupRecord();
+        if (
+          backup.status === "ready" &&
+          !backup.legacyGuest &&
+          backup.ownerUserId !== null
+        ) {
+          if (backup.journey !== primary.journey) {
+            await quarantineProtectedMirror();
+            return "failed";
+          }
+          try {
+            await setLastSyncedUserId(backup.ownerUserId);
+          } catch {
+            backupWritesSuspended = true;
+            return "failed";
+          }
+        } else if (backup.status === "corrupt" && backup.protectedEnvelope) {
+          await quarantineProtectedMirror();
+          return "failed";
+        } else if (backup.status === "unavailable") {
+          backupWritesSuspended = true;
+          return "failed";
+        }
+      }
+    }
+
+    // The primary is authoritative; refresh its mirror without delaying launch.
     void writeJourneyBackup();
     return "primary-intact";
   }
 
-  const backup = await readJourneyBackup();
-  if (!backup) return "no-backup";
+  const backup = await readBackupRecord();
+  if (backup.status === "missing") return "no-backup";
+  if (backup.status === "unavailable") {
+    backupWritesSuspended = true;
+    return "failed";
+  }
+  if (backup.status === "corrupt") {
+    if (accountOwnerEnvelopeRequired()) await quarantineProtectedMirror();
+    return "failed";
+  }
 
   try {
-    // Parsed first so a truncated or corrupt mirror can never replace a valid
-    // empty state with something the store cannot rehydrate.
-    JSON.parse(backup);
-    window.localStorage.setItem(JOURNEY_STORAGE_KEY, backup);
+    // The filesystem read is asynchronous. Never overwrite a primary or owner
+    // that became authoritative while it was in flight.
+    const currentPrimary = readPrimary();
+    if (currentPrimary.status === "unavailable") {
+      backupWritesSuspended = true;
+      return "failed";
+    }
+    if (currentPrimary.status === "ready") {
+      return restoreJourneyIfEvicted();
+    }
+    if (accountOwnerEnvelopeRequired()) {
+      const currentOwner = readLocalJourneyOwner();
+      if (
+        currentOwner.status === "unavailable" ||
+        (currentOwner.status === "owned" &&
+          (backup.legacyGuest ||
+            backup.ownerUserId === null ||
+            currentOwner.userId !== backup.ownerUserId))
+      ) {
+        backupWritesSuspended = true;
+        return "failed";
+      }
+      // Owner first: a crash between the two localStorage writes leaves no
+      // account journey exposed as unowned guest data.
+      if (
+        currentOwner.status === "unowned" &&
+        !backup.legacyGuest &&
+        backup.ownerUserId !== null
+      ) {
+        await setLastSyncedUserId(backup.ownerUserId);
+      } else if (currentOwner.status === "unowned") {
+        await clearLastSyncedUserId();
+      }
+    }
+    window.localStorage.setItem(JOURNEY_STORAGE_KEY, backup.journey);
+    if (window.localStorage.getItem(JOURNEY_STORAGE_KEY) !== backup.journey) {
+      return "failed";
+    }
     return "restored";
   } catch {
     return "failed";
   }
 }
 
-/**
- * Mirrors the journey whenever it changes, debounced, plus once more when the
- * app is backgrounded — the last moment before iOS may suspend or reclaim.
- * Returns a cleanup function.
- */
+/** Mirror store and owner writes, plus flush before iOS backgrounds the app. */
 export function startJourneyBackup(): () => void {
   if (!isNativeTarget() || typeof window === "undefined") return () => {};
 
@@ -241,18 +451,16 @@ export function startJourneyBackup(): () => void {
     void writeJourneyBackup();
   };
 
-  // `storage` fires for other documents, not this one, so the store's own
-  // writes are observed by patching setItem for our single key.
+  // The owner key flushes immediately so an account claim is sealed as soon as
+  // possible. The engine still awaits sealJourneyBackupOwner for strict proof.
   const nativeSetItem = window.localStorage.setItem.bind(window.localStorage);
   const patched = (key: string, value: string) => {
     nativeSetItem(key, value);
-    if (key === JOURNEY_STORAGE_KEY) schedule();
+    if (key === LAST_SYNC_USER_STORAGE_KEY) flush();
+    else if (key === JOURNEY_STORAGE_KEY) schedule();
   };
   window.localStorage.setItem = patched as typeof window.localStorage.setItem;
 
-  // Backgrounding is the last moment before iOS may suspend or reclaim, so
-  // flush there too. Both listeners are optional — the debounced write above
-  // is the primary path, and a missing document must not break mirroring.
   const onHide = () => {
     if (document.visibilityState === "hidden") flush();
   };
@@ -260,7 +468,7 @@ export function startJourneyBackup(): () => void {
   if (hasDocument) document.addEventListener("visibilitychange", onHide);
   window.addEventListener?.("pagehide", flush);
 
-  // One write at startup so a first session is protected before any edit.
+  // Protect the first hydrated session even if it makes no later store edit.
   schedule();
 
   return () => {

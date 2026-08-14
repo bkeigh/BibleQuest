@@ -16,6 +16,24 @@ import {
   consoleAuthEnabled,
 } from "@/lib/console/auth-config";
 
+const MAX_AUTHORIZATION_CODE_LENGTH = 4_096;
+
+/** Accepts one bounded opaque provider code without retaining it server-side. */
+function safeAuthorizationCode(value: string | null): value is string {
+  return Boolean(
+    value &&
+      value.length <= MAX_AUTHORIZATION_CODE_LENGTH &&
+      /^[\x21-\x7e]+$/.test(value),
+  );
+}
+
+/** Moves a customer code into a fragment that is never sent with the next request. */
+function customerCompletionRedirect(url: URL, code: string, next: string) {
+  const destination = new URL("/auth/customer-callback", url.origin);
+  destination.hash = new URLSearchParams({ code, next }).toString();
+  return privateRedirect(destination);
+}
+
 /** Allows the independent operator console to complete auth while product sync stays contained. */
 function isConfiguredConsoleCallback(
   request: Request,
@@ -59,7 +77,12 @@ export async function GET(request: Request) {
     failure = "configuration";
   } else if (providerError) {
     failure = authFailureReason(null, providerError);
-  } else if (code) {
+  } else if (safeAuthorizationCode(code)) {
+    if (!consoleCallback) {
+      // Customer PKCE completion is browser-only. The server may route the
+      // opaque code, but it never exchanges it or writes customer credentials.
+      return customerCompletionRedirect(url, code, next);
+    }
     try {
       const supabase = await createServerSupabase();
       const { data, error } = await supabase.auth.exchangeCodeForSession(code);

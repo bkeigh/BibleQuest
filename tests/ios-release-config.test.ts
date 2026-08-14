@@ -15,7 +15,7 @@ describe("iOS App Store release configuration", () => {
 
     expect(scripts.scripts["build:native:release"]).toContain("--release");
     expect(scripts.scripts["ios:release:prepare"]).toBe(
-      "pnpm build:native:release && pnpm exec cap sync ios",
+      "node scripts/select-ios-privacy-manifest.mjs --guest && pnpm build:native:release && pnpm exec cap sync ios",
     );
     expect(builder).toContain(
       'const RELEASE_ORIGIN = "https://www.biblequest.co"',
@@ -24,6 +24,7 @@ describe("iOS App Store release configuration", () => {
       'NEXT_PUBLIC_APP_PLATFORM: "native"',
       'NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED: "false"',
       'NEXT_PUBLIC_ACCOUNT_GATE_ENABLED: "false"',
+      'NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED: "false"',
       'NEXT_PUBLIC_ANALYTICS_ENABLED: "false"',
       'NEXT_PUBLIC_SUPABASE_URL: ""',
     ]) {
@@ -57,13 +58,30 @@ describe("iOS App Store release configuration", () => {
     const billing = source("src/lib/billing/usePlus.ts");
     const settings = source("src/components/settings/SettingsScreen.tsx");
 
-    expect(api).toContain("if (ACCOUNT_SYNC_CONTAINED) return null;");
-    expect(api.indexOf("if (ACCOUNT_SYNC_CONTAINED) return null;")).toBeLessThan(
-      api.indexOf('await import(\n      "@/lib/supabase/client"'),
+    // The public request path carries no account authority. It was renamed
+    // from nativePublicApiFetch when the browser transport landed and now also
+    // drops cookies outright, so the guest build cannot send ambient identity.
+    expect(api).toContain("return publicApiFetch(url, init);");
+    // Pin the public body itself: "credentials" also appears on the account
+    // paths, so a bare substring would still match if this one lost it.
+    expect(api).toMatch(
+      /function publicApiFetch\([\s\S]{0,160}?return fetch\(url, \{\s*\.\.\.init,\s*credentials: "omit",\s*headers: publicHeaders\(init\?\.headers\),\s*\}\);/,
     );
-    expect(billing).toContain(
-      "const nativeGuestOnly = isNativeTarget() && ACCOUNT_SYNC_CONTAINED",
+    expect(api).toContain('headers.delete(reserved);');
+    expect(api).toContain('"authorization",');
+    expect(
+      api.indexOf(
+        "if (ACCOUNT_SYNC_CONTAINED || !NATIVE_ACCOUNT_BETA_ENABLED)",
+      ),
+    ).toBeLessThan(
+      api.indexOf('await import(\n    "@/lib/supabase/client"'),
     );
+    // The browser-owned auth transport is reachable only through the exact
+    // non-native branch; a native build always takes the contained path.
+    expect(api).toMatch(
+      /if \(!isNativeTarget\(\)\) \{\s*headers\.set\(WEB_AUTH_PROTOCOL_HEADER, WEB_AUTH_PROTOCOL_VERSION\);\s*return webAuthenticatedApiFetch\(url, expectedUserId, init, headers\);\s*\}\s*return nativeAuthenticatedApiFetch\(url, expectedUserId, init, headers\);/,
+    );
+    expect(billing).toContain("if (NATIVE_COMMERCE_CONTAINED) return;");
     expect(settings).toMatch(
       /\{!nativeTarget \? \([\s\S]*?BibleQuest website[\s\S]*?\) : null\}/,
     );
@@ -97,6 +115,9 @@ describe("iOS App Store release configuration", () => {
     expect(privacy).toContain("C617.1");
     expect(privacy).not.toContain("NSPrivacyAccessedAPICategoryUserDefaults");
     expect(privacy).not.toContain("CA92.1");
+    // CSS owns the safe areas, so UIKit must not stack a second content inset.
+    expect(config).toContain('contentInset: "never"');
+    expect(config).not.toContain('contentInset: "always"');
     expect(config).toContain('preferredContentMode: "mobile"');
     expect(config).toContain("LocalNotifications:");
   });
@@ -105,11 +126,55 @@ describe("iOS App Store release configuration", () => {
     const startup = source(
       "src/components/app-shell/NativeJourneyGuard.tsx",
     );
+    const layout = source("src/app/layout.tsx");
     const storage = source("src/lib/supabase/native-auth-storage.ts");
 
     expect(startup).toContain("clearLegacyNativeAuthStorage()");
+    expect(startup).toContain("await restoreJourneyIfEvicted()");
+    expect(startup).toContain("await useQuestOS.persist.rehydrate()");
+    expect(startup.indexOf("await restoreJourneyIfEvicted()")).toBeLessThan(
+      startup.indexOf("startJourneyBackup()"),
+    );
+    expect(layout).toMatch(
+      /<NativeJourneyGuard>\s*\{children\}[\s\S]*?<\/NativeJourneyGuard>/,
+    );
     expect(storage).toContain('"biblequest:native-auth-cookies"');
     expect(storage).toContain("storage ?? window.localStorage");
+  });
+
+  it("uses the reviewed open book across native and in-app startup", () => {
+    const packageJson = JSON.parse(source("package.json")) as {
+      scripts: Record<string, string>;
+    };
+    const capacitorConfig = source("capacitor.config.ts");
+    const generator = source("scripts/build-ios-splash.mjs");
+    const assetCatalog = source(
+      "ios/App/App/Assets.xcassets/Splash.imageset/Contents.json",
+    );
+    const launchScreen = source("ios/App/App/Base.lproj/LaunchScreen.storyboard");
+    const fallback = source(
+      "src/components/app-shell/AppLoadingScreen.tsx",
+    );
+    const nativeGuard = source(
+      "src/components/app-shell/NativeJourneyGuard.tsx",
+    );
+    const onboardingGate = source(
+      "src/components/onboarding/OnboardingGate.tsx",
+    );
+
+    expect(packageJson.scripts["check:ios-splash"]).toBe(
+      "node scripts/build-ios-splash.mjs --check",
+    );
+    expect(generator).toContain('"public/art/2.5d/book-open.webp"');
+    expect(assetCatalog).toContain('"filename" : "book-open-768.png"');
+    expect(assetCatalog).not.toContain("splash-2732x2732");
+    expect(launchScreen).toContain('contentMode="scaleAspectFit"');
+    expect(launchScreen).toContain('constant="256"');
+    expect(capacitorConfig).toContain("showSpinner: false");
+    expect(fallback).toContain('<ArtMascot name="open-book"');
+    expect(fallback).toContain('className="sr-only"');
+    expect(nativeGuard).toContain("return <AppLoadingScreen />");
+    expect(onboardingGate).toContain("return <AppLoadingScreen />");
   });
 
   it("prunes web-only workers and acquisition media from the native stage", () => {

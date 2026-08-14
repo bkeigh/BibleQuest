@@ -97,7 +97,7 @@ export function SevenDaysQuestionRound({
               for (const grant of earned) {
                 inventory = grantBoost(inventory, grant.id, grant.count);
               }
-              writeInventory(inventory);
+              void writeInventory(inventory);
             }
             onComplete(firstTry);
           }}

@@ -27,6 +27,9 @@ import { createClient } from "@supabase/supabase-js";
 
 const CONFIRMATION = "staging-only-native-bearer-isolation";
 const NATIVE_ORIGIN = "capacitor://localhost";
+const NATIVE_ACCOUNT_HEADER = "x-biblequest-native-account-beta";
+const NATIVE_ACCOUNT_HEADER_VALUE = "v1";
+const EXPECTED_USER_HEADER = "x-biblequest-expected-user";
 
 /**
  * The one biblequest.co host this probe may target.
@@ -44,9 +47,23 @@ const REQUIRED_ENV = [
   "BIBLEQUEST_CONFIRM_NATIVE_BEARER_TEST",
   "BIBLEQUEST_NATIVE_BEARER_TARGET_ORIGIN",
   "NEXT_PUBLIC_SUPABASE_URL",
-  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-  "SUPABASE_SERVICE_ROLE_KEY",
 ];
+
+/** Prefers modern keys while retaining explicit legacy staging compatibility. */
+function publicKey() {
+  return (
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+  );
+}
+
+/** Prefers the modern server key for disposable-user administration. */
+function adminKey() {
+  return (
+    process.env.SUPABASE_SECRET_KEY?.trim() ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  );
+}
 
 // A 96x96 lossless WebP (solid green), generated with this repo's own sharp —
 // large enough for MIN_AVATAR_SOURCE_EDGE and tiny enough to inline.
@@ -58,6 +75,9 @@ function requireEnvironment() {
   const missing = REQUIRED_ENV.filter((name) => !process.env[name]);
   if (missing.length > 0) {
     throw new Error(`Missing required environment: ${missing.join(", ")}`);
+  }
+  if (!publicKey() || !adminKey()) {
+    throw new Error("Missing required Supabase public or server key class");
   }
   if (process.env.BIBLEQUEST_CONFIRM_NATIVE_BEARER_TEST !== CONFIRMATION) {
     throw new Error(
@@ -120,7 +140,59 @@ function client(key) {
       detectSessionInUrl: false,
       persistSession: false,
     },
+    ...(key.startsWith("sb_secret_")
+      ? {
+          global: {
+            // A modern secret belongs only in apikey, never the JWT channel.
+            fetch: (input, init = {}) => {
+              const headers = new Headers(
+                init.headers ??
+                  (input instanceof Request ? input.headers : undefined),
+              );
+              if (headers.get("authorization") === `Bearer ${key}`) {
+                headers.delete("authorization");
+              }
+              return fetch(input, { ...init, headers });
+            },
+          },
+        }
+      : {}),
   });
+}
+
+/** Proves the staffed window is open before creating disposable actors. */
+async function verifyNativeAvailabilityEnabled() {
+  const key = publicKey();
+  const headers = {
+    apikey: key,
+    "content-type": "application/json",
+    [NATIVE_ACCOUNT_HEADER]: NATIVE_ACCOUNT_HEADER_VALUE,
+  };
+  // A legacy staging JWT may use its JWT channel; a modern public key may not.
+  if (!key.startsWith("sb_publishable_")) {
+    headers.Authorization = `Bearer ${key}`;
+  }
+  const response = await fetch(
+    new URL(
+      "/rest/v1/rpc/native_account_beta_availability",
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+    ),
+    {
+      method: "POST",
+      cache: "no-store",
+      credentials: "omit",
+      headers,
+      body: "{}",
+    },
+  );
+  check(response.status === 200, "native availability check failed closed");
+  const payload = await response.json();
+  check(
+    payload?.contract === "biblequest_native_account_beta_v1" &&
+      payload.available === true &&
+      Object.keys(payload).sort().join(",") === "available,contract",
+    "native availability is not enabled for this staffed window",
+  );
 }
 
 /** Creates one confirmed disposable user and captures a real bearer token. */
@@ -139,7 +211,7 @@ async function createActor(admin, label) {
   );
   check(created.user?.id, `create actor ${label} returned no user`);
 
-  const actorClient = client(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const actorClient = client(publicKey());
   const signedIn = requireResult(
     await actorClient.auth.signInWithPassword({ email, password }),
     `sign in actor ${label}`,
@@ -162,7 +234,14 @@ async function createActor(admin, label) {
 async function nativeFetch(
   targetOrigin,
   pathname,
-  { token, method = "GET", headers = {}, body } = {},
+  {
+    token,
+    expectedUser,
+    betaMarker = NATIVE_ACCOUNT_HEADER_VALUE,
+    method = "GET",
+    headers = {},
+    body,
+  } = {},
 ) {
   return fetch(new URL(pathname, targetOrigin), {
     method,
@@ -170,6 +249,8 @@ async function nativeFetch(
     headers: {
       Origin: NATIVE_ORIGIN,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(betaMarker ? { [NATIVE_ACCOUNT_HEADER]: betaMarker } : {}),
+      ...(expectedUser ? { [EXPECTED_USER_HEADER]: expectedUser } : {}),
       ...headers,
     },
   });
@@ -184,7 +265,8 @@ async function verifyCorsLayer(targetOrigin) {
       headers: {
         Origin: NATIVE_ORIGIN,
         "Access-Control-Request-Method": "GET",
-        "Access-Control-Request-Headers": "authorization,content-type",
+        "Access-Control-Request-Headers":
+          "authorization,content-type,x-biblequest-expected-user,x-biblequest-native-account-beta",
       },
     },
   );
@@ -202,6 +284,15 @@ async function verifyCorsLayer(targetOrigin) {
       preflight.headers.get("access-control-allow-headers") ?? "",
     ),
     "preflight does not allow the Authorization header",
+  );
+  check(
+    /x-biblequest-expected-user/i.test(
+      preflight.headers.get("access-control-allow-headers") ?? "",
+    ) &&
+      /x-biblequest-native-account-beta/i.test(
+        preflight.headers.get("access-control-allow-headers") ?? "",
+      ),
+    "preflight does not allow the native account boundary headers",
   );
 
   const excluded = await fetch(new URL("/api/billing/plans", targetOrigin), {
@@ -221,6 +312,7 @@ async function verifyCorsLayer(targetOrigin) {
 async function verifyBillingIsolation(targetOrigin, plusActor, freeActor) {
   const plusStatus = await nativeFetch(targetOrigin, "/api/billing/status", {
     token: plusActor.token,
+    expectedUser: plusActor.id,
   });
   check(
     plusStatus.status === 200,
@@ -234,6 +326,7 @@ async function verifyBillingIsolation(targetOrigin, plusActor, freeActor) {
 
   const freeStatus = await nativeFetch(targetOrigin, "/api/billing/status", {
     token: freeActor.token,
+    expectedUser: freeActor.id,
   });
   check(
     freeStatus.status === 200,
@@ -247,7 +340,7 @@ async function verifyBillingIsolation(targetOrigin, plusActor, freeActor) {
 }
 
 /** Proves missing, malformed, and forged tokens all fail closed with 401. */
-async function verifyFailClosed(targetOrigin, actor) {
+async function verifyFailClosed(targetOrigin, actor, other) {
   const tampered = `${actor.token.slice(0, -4)}AAAA`;
   const cases = [
     ["missing token", undefined],
@@ -257,11 +350,25 @@ async function verifyFailClosed(targetOrigin, actor) {
   for (const [name, token] of cases) {
     const response = await nativeFetch(targetOrigin, "/api/billing/status", {
       token,
+      expectedUser: actor.id,
     });
     check(response.status === 401, `${name} answered ${response.status}`);
     const payload = await response.json();
     check(payload.error === "unauthorized", `${name} body was not sanitized`);
   }
+
+  const missingMarker = await nativeFetch(
+    targetOrigin,
+    "/api/billing/status",
+    { token: actor.token, expectedUser: actor.id, betaMarker: null },
+  );
+  check(missingMarker.status === 403, "missing beta marker did not fail closed");
+
+  const wrongOwner = await nativeFetch(targetOrigin, "/api/billing/status", {
+    token: actor.token,
+    expectedUser: other.id,
+  });
+  check(wrongOwner.status === 403, "mismatched expected owner did not fail closed");
 }
 
 /** Builds the multipart body the avatar POST expects. */
@@ -284,6 +391,7 @@ function avatarForm() {
 async function verifyAvatarIsolation(targetOrigin, owner, other) {
   const initial = await nativeFetch(targetOrigin, "/api/profile/avatar", {
     token: owner.token,
+    expectedUser: owner.id,
   });
   check(
     initial.status !== 503,
@@ -293,6 +401,7 @@ async function verifyAvatarIsolation(targetOrigin, owner, other) {
 
   const uploaded = await nativeFetch(targetOrigin, "/api/profile/avatar", {
     token: owner.token,
+    expectedUser: owner.id,
     method: "POST",
     body: avatarForm(),
   });
@@ -304,11 +413,13 @@ async function verifyAvatarIsolation(targetOrigin, owner, other) {
 
   const ownRead = await nativeFetch(targetOrigin, "/api/profile/avatar", {
     token: owner.token,
+    expectedUser: owner.id,
   });
   check(ownRead.status === 200, `owner avatar read answered ${ownRead.status}`);
 
   const crossRead = await nativeFetch(targetOrigin, "/api/profile/avatar", {
     token: other.token,
+    expectedUser: other.id,
   });
   check(
     crossRead.status === 404,
@@ -317,6 +428,7 @@ async function verifyAvatarIsolation(targetOrigin, owner, other) {
 
   const otherDelete = await nativeFetch(targetOrigin, "/api/profile/avatar", {
     token: other.token,
+    expectedUser: other.id,
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ allOwnedObjects: false }),
@@ -327,6 +439,7 @@ async function verifyAvatarIsolation(targetOrigin, owner, other) {
   );
   const survivingRead = await nativeFetch(targetOrigin, "/api/profile/avatar", {
     token: owner.token,
+    expectedUser: owner.id,
   });
   check(
     survivingRead.status === 200,
@@ -335,6 +448,7 @@ async function verifyAvatarIsolation(targetOrigin, owner, other) {
 
   const ownDelete = await nativeFetch(targetOrigin, "/api/profile/avatar", {
     token: owner.token,
+    expectedUser: owner.id,
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ allOwnedObjects: true }),
@@ -342,6 +456,7 @@ async function verifyAvatarIsolation(targetOrigin, owner, other) {
   check(ownDelete.status === 204, `owner delete answered ${ownDelete.status}`);
   const afterDelete = await nativeFetch(targetOrigin, "/api/profile/avatar", {
     token: owner.token,
+    expectedUser: owner.id,
   });
   check(
     afterDelete.status === 404,
@@ -386,7 +501,9 @@ async function cleanup(admin, actors) {
   for (const actor of actors) {
     if (actor?.id) targets.set(actor.id, actor.email);
   }
+  let targetIndex = 0;
   for (const [id] of targets) {
+    targetIndex += 1;
     // Storage objects do not cascade with the auth user; sweep the folder
     // first so an interrupted run cannot strand private media.
     try {
@@ -406,7 +523,9 @@ async function cleanup(admin, actors) {
     }
     const removed = await admin.auth.admin.deleteUser(id);
     if (removed.error) {
-      failures.push(`${id.slice(0, 8)}:${removed.error.code ?? "unknown"}`);
+      failures.push(
+        `actor-${targetIndex}:${removed.error.code ?? "unknown"}`,
+      );
     }
   }
   if (failures.length > 0) {
@@ -415,12 +534,13 @@ async function cleanup(admin, actors) {
 }
 
 const targetOrigin = requireEnvironment();
-const admin = client(process.env.SUPABASE_SERVICE_ROLE_KEY);
+const admin = client(adminKey());
 const actors = [];
 let primaryError = null;
 let resultSummary = null;
 
 try {
+  await verifyNativeAvailabilityEnabled();
   const actorA = await createActor(admin, "a");
   actors.push(actorA);
   const actorB = await createActor(admin, "b");
@@ -429,7 +549,7 @@ try {
 
   await verifyCorsLayer(targetOrigin);
   await verifyBillingIsolation(targetOrigin, actorB, actorA);
-  await verifyFailClosed(targetOrigin, actorA);
+  await verifyFailClosed(targetOrigin, actorA, actorB);
   await verifyAvatarIsolation(targetOrigin, actorA, actorB);
   await verifyAvatarIsolation(targetOrigin, actorB, actorA);
 
@@ -437,7 +557,7 @@ try {
     authenticatedUsers: 2,
     corsPreflights: 2,
     billingDirections: 2,
-    failClosedCases: 3,
+    failClosedCases: 5,
     avatarDirections: 2,
     status: "pass",
   };
