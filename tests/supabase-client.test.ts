@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  WEB_PRIVATE_NAMESPACE_V2_COMPLETE,
-  WEB_PRIVATE_NAMESPACE_V2_MARKER,
-  WEB_V2_LAST_SYNC_USER_STORAGE_KEY,
-} from "@/lib/storage/web-private-namespace";
+  attestAndAdopt,
+  seedActiveWebAccount,
+  WEB_AUTH_ENVELOPE_KEY,
+} from "./fixtures/web-auth";
 
 const mocks = vi.hoisted(() => ({
   createBrowserClient: vi.fn(),
@@ -12,59 +12,6 @@ const mocks = vi.hoisted(() => ({
   coordinateHydration: vi.fn(),
   removeLegacyResidue: vi.fn(),
 }));
-
-const WEB_AUTH_KEY = "biblequest:web-auth:v2";
-
-/** Encodes a v2 access token with exact subject and session lineage claims. */
-function webAccessToken(userId: string, sessionId: string): string {
-  const payload = Buffer.from(
-    JSON.stringify({ sub: userId, session_id: sessionId }),
-  ).toString("base64url");
-  return `fixture.${payload}.signature`;
-}
-
-/** Seeds the browser-owned active envelope used by deferred sync token reads. */
-function seedWebSession(userId: string, sessionId = "fixture-lineage") {
-  const token = webAccessToken(userId, sessionId);
-  localStorage.setItem(
-    WEB_AUTH_KEY,
-    JSON.stringify({
-      version: 2,
-      mode: "active",
-      session: {
-        access_token: token,
-        refresh_token: `refresh-${sessionId}`,
-        user: { id: userId },
-      },
-    }),
-  );
-  localStorage.setItem(
-    WEB_PRIVATE_NAMESPACE_V2_MARKER,
-    WEB_PRIVATE_NAMESPACE_V2_COMPLETE,
-  );
-  localStorage.setItem(WEB_V2_LAST_SYNC_USER_STORAGE_KEY, userId);
-  return token;
-}
-
-/**
- * Attests this realm and adopts the private write generation for the seeded
- * owner. Reads of the active envelope are refused until both hold, so a test
- * that only takes the account lock never reaches the assertion it intends.
- */
-async function attestAndAdopt(userId: string): Promise<void> {
-  const {
-    adoptCurrentWebPrivateWriteGeneration,
-    requireCurrentWebAccountRealm,
-    withWebAccountOperationLock,
-  } = await import("@/lib/supabase/web-auth-storage");
-  await withWebAccountOperationLock(async (handle) => {
-    await requireCurrentWebAccountRealm(handle);
-    const adopted = await adoptCurrentWebPrivateWriteGeneration(handle, userId);
-    if (!adopted) {
-      throw new Error("fixture could not adopt the private write generation");
-    }
-  });
-}
 
 vi.mock("@supabase/ssr", () => ({
   createBrowserClient: mocks.createBrowserClient,
@@ -144,7 +91,7 @@ describe("Supabase browser clients", () => {
         auth: expect.objectContaining({
           persistSession: true,
           autoRefreshToken: true,
-          storageKey: WEB_AUTH_KEY,
+          storageKey: WEB_AUTH_ENVELOPE_KEY,
           storage: expect.objectContaining({
             getItem: expect.any(Function),
             setItem: expect.any(Function),
@@ -292,7 +239,7 @@ describe("Supabase browser clients", () => {
 
   it("uses the auth singleton only as the generation-bound data token source", async () => {
     const userId = "10000000-0000-4000-8000-000000000001";
-    const token = seedWebSession(userId);
+    const token = seedActiveWebAccount(userId);
     const syncClient = { rpc: vi.fn() };
     mocks.createSupabaseClient.mockReturnValue(syncClient);
     const { createSyncClient } = await import("@/lib/supabase/client");
@@ -323,7 +270,7 @@ describe("Supabase browser clients", () => {
 
   it("refuses to reuse a token after the authenticated account changes", async () => {
     const seededUserId = "20000000-0000-4000-8000-000000000002";
-    seedWebSession(seededUserId, "lineage-b");
+    seedActiveWebAccount(seededUserId, { sessionId: "lineage-b" });
     mocks.createSupabaseClient.mockReturnValue({ rpc: vi.fn() });
     const { createSyncClient } = await import("@/lib/supabase/client");
     await attestAndAdopt(seededUserId);

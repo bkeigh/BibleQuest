@@ -13,36 +13,29 @@ import {
   beginAccountLifecycle,
 } from "@/lib/auth/account-lifecycle";
 import { withWebAccountOperationLock } from "@/lib/supabase/web-auth-storage";
+import {
+  seedActiveWebAccount,
+  webAccessToken,
+} from "./fixtures/web-auth";
 
 const USER_A = "10000000-0000-4000-8000-000000000001";
 const USER_B = "20000000-0000-4000-8000-000000000002";
-const ACCESS_A = `fixture.${Buffer.from(
-  JSON.stringify({ sub: USER_A, session_id: "lineage-a" }),
-).toString("base64url")}.signature`;
+const ACCESS_A = webAccessToken(USER_A, "lineage-a");
 
 /** Seeds the exact active v2 credential captured by web sign-out. */
 function seedWebAccountA() {
+  // This suite pre-seeds a fixed private write generation instead of adopting
+  // one through attestAndAdopt, because sign-out asserts against the exact
+  // generation value it expects to rotate away from.
   localStorage.setItem(
     "biblequest:web-private-write-generation:v1",
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   );
-  localStorage.setItem("biblequest:web-private:namespace:v2", "complete");
-  localStorage.setItem(
-    "biblequest:web-private:v2:last-sync-user",
-    USER_A,
-  );
-  localStorage.setItem(
-    "biblequest:web-auth:v2",
-    JSON.stringify({
-      version: 2,
-      mode: "active",
-      session: {
-        access_token: ACCESS_A,
-        refresh_token: "refresh-a",
-        user: { id: USER_A },
-      },
-    }),
-  );
+  seedActiveWebAccount(USER_A, {
+    sessionId: "lineage-a",
+    accessToken: ACCESS_A,
+    refreshToken: "refresh-a",
+  });
 }
 
 function authClient(userId = USER_A) {

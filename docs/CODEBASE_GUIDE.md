@@ -3,7 +3,10 @@
 This guide is the quickest way to understand where behavior lives and which
 files should change together. It complements the product specification in
 [`BIBLEQUEST_CODEX.md`](BIBLEQUEST_CODEX.md); that document defines the product,
-while this one explains the implementation.
+while this one explains the implementation. The structural map — layers, the
+private-storage ownership model, and the authority concepts — lives in
+[`ARCHITECTURE.md`](ARCHITECTURE.md); read that first for auth, storage, or
+sync work.
 
 ## Mental model
 
