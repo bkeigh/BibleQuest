@@ -40,6 +40,11 @@ test("the installed worker keeps offline state usable and private", async ({
   }, snapshot);
 
   await page.goto("/app");
+  // Walk the one-time legacy keep decision so the v2 namespace adopts the
+  // seeded journey before offline behaviour is measured.
+  await page
+    .getByRole("button", { name: "Keep this local journey" })
+    .click();
   await expect(
     page.getByRole("heading", { level: 1, name: "Fixture Person" }),
   ).toBeVisible();

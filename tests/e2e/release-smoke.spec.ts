@@ -71,6 +71,12 @@ test("Home starts compactly and profile changes follow cached routes", async ({
   }, snapshot);
 
   await page.goto("/app");
+  // A device carrying legacy private bytes gets exactly one explicit
+  // keep-or-clear decision before the v2 namespace adopts them; this is the
+  // upgrade path every existing guest walks once.
+  await page
+    .getByRole("button", { name: "Keep this local journey" })
+    .click();
   await expect(
     page.getByRole("heading", { level: 1, name: "Fixture Person" }),
   ).toBeVisible();
