@@ -22,9 +22,11 @@ import {
   clearAvatar,
   clearLegacyAvatar,
   profileAvatarMarker,
+  purgeAvatarCache,
   saveAvatar,
   storeRemoteAvatar,
 } from "@/lib/utils/avatar";
+import { purgePersistedJourney } from "@/lib/questos/purge";
 import {
   deleteRemoteAvatar,
   uploadRemoteAvatar,
@@ -36,14 +38,24 @@ import {
   parseSnapshot,
 } from "@/lib/questos/import-schema";
 import { createExportSnapshot } from "@/lib/questos/snapshot";
-import { clearAllDeviceLocalJournalDrafts } from "@/lib/questos/journal-drafts";
+import {
+  clearAllDeviceLocalJournalDrafts,
+  purgeAllDeviceLocalJournalDrafts,
+} from "@/lib/questos/journal-drafts";
 import { clearLastSyncedUserId } from "@/lib/sync/last-user";
 import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 import { useSession } from "@/lib/supabase/useSession";
 import { createClient } from "@/lib/supabase/client";
 import {
+  readActiveWebAuthSession,
+  withActiveWebPrivateWriteReset,
+  withWebAccountOperationLock,
+  type WebAccountOperationHandle,
+} from "@/lib/supabase/web-auth-storage";
+import { commitWebPrivateHandoffOwner } from "@/lib/storage/web-private-cutover";
+import {
   AccountDeletionPendingError,
-  deleteOwnAccountWithAvatar,
+  deleteAccountAndDeviceData,
 } from "@/lib/auth/account-deletion";
 import { track } from "@/lib/analytics/events";
 import { withDeadline } from "@/lib/async/deadline";
@@ -76,6 +88,7 @@ import { ReminderSettings } from "@/components/settings/ReminderSettings";
 import { GREEN_FEATURES } from "@/lib/features/green";
 import {
   clearRhythmState,
+  purgeRhythmState,
   readRhythmState,
   replaceRhythmState,
 } from "@/lib/rhythm/client";
@@ -85,10 +98,7 @@ import {
   parseDeviceBackupExtras,
   type DeviceBackupExtras,
 } from "@/lib/backup/device-extras";
-import {
-  clearStandaloneGameData,
-  purgeDeletedAccountDeviceData,
-} from "@/lib/auth/device-account-cleanup";
+import { clearStandaloneGameData } from "@/lib/auth/device-account-cleanup";
 import {
   accountLifecycleHandleIsCurrent,
   beginAccountLifecycle,
@@ -959,8 +969,7 @@ function SettingsInner() {
       toast("Couldn’t log out just now. Check your connection and retry.");
       if (
         error instanceof AccountSignOutError &&
-        error.reloadRequired &&
-        nativeTarget
+        error.reloadRequired
       ) {
         window.location.reload();
       }
@@ -1107,15 +1116,15 @@ function SettingsInner() {
     setPendingImport({ journey: result.data, device: device.data });
   }
 
-  function confirmImport() {
+  async function confirmImport() {
     if (!pendingImport) return;
     importData(
       pendingImport.journey,
       user ? { purgeAccount: user.id } : undefined
     );
-    const rhythmRestored = pendingImport.device
+    const rhythmRestored = await (pendingImport.device
       ? replaceRhythmState(pendingImport.device.rhythm)
-      : clearRhythmState();
+      : clearRhythmState());
     // A restore whose profile carries no photo marker must not resurrect a
     // stale on-device photo blob for the incoming profile.
     if (
@@ -1156,8 +1165,12 @@ function SettingsInner() {
 
     let retainLifecycle = false;
     try {
+      let deviceCleared = false;
       try {
-        await deleteOwnAccountWithAvatar(deletedUserId);
+        deviceCleared = await deleteAccountAndDeviceData(
+          deletedUserId,
+          lifecycle,
+        );
       } catch (error) {
         setDeletingAccount(false);
         if (error instanceof AccountDeletionPendingError) {
@@ -1178,7 +1191,7 @@ function SettingsInner() {
       // protected mirror first, and preserves any newer account credential.
       if (
         !accountLifecycleHandleIsCurrent(lifecycle) ||
-        !(await purgeDeletedAccountDeviceData(deletedUserId, lifecycle))
+        !deviceCleared
       ) {
         setDeletingAccount(false);
         setDeleteAccountError("device");
@@ -1211,62 +1224,144 @@ function SettingsInner() {
     let deviceCleanupFailed = false;
     let journeyCleared = false;
     try {
-      if (expectedUserId) {
-        await withDeadline(
-          deleteRemoteAvatar(expectedUserId, { allOwnedObjects: true }),
+      /** Holds account-bound remote and local clears behind one web lock. */
+      const clearExpectedJourney = async (
+        webOperation?: WebAccountOperationHandle,
+      ) => {
+        if (expectedUserId) {
+          await withDeadline(
+            deleteRemoteAvatar(expectedUserId, { allOwnedObjects: true }),
+            CLEAR_DATA_DEADLINE_MS,
+            "Remote avatar cleanup",
+          );
+        }
+        // This await is the privacy boundary: local data remains intact unless
+        // the native filesystem mirror is first made non-restorable.
+        const mirrorPurged = await withDeadline(
+          purgeJourneyBackup(),
           CLEAR_DATA_DEADLINE_MS,
-          "Remote avatar cleanup",
+          "Native journey backup purge",
         );
-      }
-      // This await is the privacy boundary: local data remains intact unless
-      // the native filesystem mirror is first made non-restorable.
-      const mirrorPurged = await withDeadline(
-        purgeJourneyBackup(),
-        CLEAR_DATA_DEADLINE_MS,
-        "Native journey backup purge",
-      );
-      if (!mirrorPurged) {
-        throw new Error("native journey backup could not be purged");
-      }
-      try {
-        await withDeadline(
-          purgeNativeReminders(),
-          CLEAR_DATA_DEADLINE_MS,
-          "Native reminder cleanup",
+        if (!mirrorPurged) {
+          throw new Error("native journey backup could not be purged");
+        }
+        try {
+          await withDeadline(
+            purgeNativeReminders(),
+            CLEAR_DATA_DEADLINE_MS,
+            "Native reminder cleanup",
+          );
+        } catch {
+          // Reminders are best effort after their local preference is removed.
+          deviceCleanupFailed = true;
+        }
+        if (expectedUserId) {
+          let exactUserId: string | null;
+          if (isNativeTarget()) {
+            const observed = await createClient().auth.getSession();
+            exactUserId = observed.error
+              ? null
+              : observed.data.session?.user.id ?? null;
+          } else {
+            exactUserId =
+              (await readActiveWebAuthSession(webOperation))?.userId ?? null;
+          }
+          if (
+            exactUserId !== expectedUserId ||
+            !lifecycle ||
+            !accountLifecycleHandleIsCurrent(lifecycle)
+          ) {
+            throw new Error("account changed during journey clear");
+          }
+        }
+        const guardedWebReset = Boolean(
+          expectedUserId && !isNativeTarget() && webOperation,
         );
-      } catch {
-        // Reminders are best effort after their local preference is removed.
-        deviceCleanupFailed = true;
-      }
-      if (expectedUserId) {
-        const session = await createClient().auth.getSession();
-        if (
-          session.error ||
-          session.data.session?.user.id !== expectedUserId ||
-          !lifecycle ||
-          !accountLifecycleHandleIsCurrent(lifecycle)
-        ) {
-          throw new Error("account changed during journey clear");
+        if (guardedWebReset) {
+          if (
+            !expectedUserId ||
+            !webOperation ||
+            !purgePersistedJourney({
+              purgeAccount: expectedUserId,
+              webOperation,
+            })
+          ) {
+            throw new Error("account journey reset could not be persisted");
+          }
+        } else {
+          clearAllData(
+            expectedUserId ? { purgeAccount: expectedUserId } : undefined,
+          );
+        }
+        journeyCleared = true;
+        const draftsCleared = expectedUserId
+          ? await purgeAllDeviceLocalJournalDrafts()
+          : (await clearAllDeviceLocalJournalDrafts()) >= 0;
+        const rhythmCleared = guardedWebReset
+          ? await purgeRhythmState()
+          : await clearRhythmState();
+        const gamesCleared = await clearStandaloneGameData();
+        if (!draftsCleared || !rhythmCleared || !gamesCleared) {
+          if (guardedWebReset) {
+            throw new Error("account device stores could not be cleared");
+          }
+          deviceCleanupFailed = true;
+        }
+        try {
+          if (guardedWebReset) {
+            const avatarCleared = await withDeadline(
+              purgeAvatarCache(),
+              CLEAR_DATA_DEADLINE_MS,
+              "Local avatar cleanup",
+            );
+            if (avatarCleared === false) {
+              throw new Error("avatar cache could not be cleared");
+            }
+          } else {
+            await withDeadline(
+              clearAvatar(),
+              CLEAR_DATA_DEADLINE_MS,
+              "Local avatar cleanup",
+            );
+          }
+        } catch {
+          // The primary journey is already empty; report cache cleanup honestly.
+          if (guardedWebReset) throw new Error("avatar cache could not be cleared");
+          deviceCleanupFailed = true;
+        }
+        if (guardedWebReset) {
+          if (
+            !expectedUserId ||
+            !webOperation ||
+            !(await commitWebPrivateHandoffOwner(
+              webOperation,
+              expectedUserId,
+              false,
+            ))
+          ) {
+            throw new Error("account owner reset could not be committed");
+          }
+        } else {
+          await clearLastSyncedUserId();
+        }
+      };
+      if (!expectedUserId || isNativeTarget()) {
+        await clearExpectedJourney();
+      } else {
+        const resetComplete = await withWebAccountOperationLock((webOperation) =>
+          withActiveWebPrivateWriteReset(
+            webOperation,
+            expectedUserId,
+            async () => {
+              await clearExpectedJourney(webOperation);
+              return true;
+            },
+          ),
+        );
+        if (!resetComplete) {
+          throw new Error("account journey reset did not reopen safely");
         }
       }
-      clearAllData(
-        expectedUserId ? { purgeAccount: expectedUserId } : undefined,
-      );
-      journeyCleared = true;
-      clearAllDeviceLocalJournalDrafts();
-      clearRhythmState();
-      clearStandaloneGameData();
-      try {
-        await withDeadline(
-          clearAvatar(),
-          CLEAR_DATA_DEADLINE_MS,
-          "Local avatar cleanup",
-        );
-      } catch {
-        // The primary journey is already empty; report cache cleanup honestly.
-        deviceCleanupFailed = true;
-      }
-      clearLastSyncedUserId();
       toast(
         deviceCleanupFailed
           ? "Your journey was cleared, but some device-only cleanup could not finish. Restart BibleQuest before continuing."

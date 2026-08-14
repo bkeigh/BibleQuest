@@ -21,7 +21,7 @@ describe("Settings device-data purge", () => {
   it("awaits the native mirror purge before resetting the primary journey", () => {
     const clear = handler("clearJourneyData", "\n\n  return (");
     const purge = clear.indexOf("purgeJourneyBackup()");
-    const reset = clear.indexOf("clearAllData(");
+    const reset = clear.indexOf("purgePersistedJourney({");
 
     expect(purge).toBeGreaterThan(-1);
     expect(reset).toBeGreaterThan(purge);
@@ -35,23 +35,27 @@ describe("Settings device-data purge", () => {
       DEVICE_CLEANUP.indexOf("export function purgeDeletedAccountDeviceData"),
     );
 
-    expect(standalone).toContain("clearGameProgress()");
-    expect(standalone).toContain("clearSevenDaysProgress()");
-    expect(standalone).toContain("SEVEN_DAYS_TUTORIAL_STORAGE_KEY");
-    expect(standalone).toContain("BOOST_STORAGE_KEY");
+    expect(standalone).toContain("purgeGameProgress()");
+    expect(standalone).toContain("purgeSevenDaysProgress()");
+    expect(standalone).toContain("LEGACY_SEVEN_DAYS_TUTORIAL_STORAGE_KEY");
+    expect(standalone).toContain("WEB_V2_SEVEN_DAYS_TUTORIAL_STORAGE_KEY");
+    expect(standalone).toContain("LEGACY_ARCADE_BOOST_STORAGE_KEY");
+    expect(standalone).toContain("WEB_V2_ARCADE_BOOST_STORAGE_KEY");
 
     const deletion = handler("deleteAccount", "\n\n  /** Removes account");
     const clear = handler("clearJourneyData", "\n\n  return (");
-    expect(deletion).toContain("purgeDeletedAccountDeviceData(");
+    expect(deletion).toContain("deleteAccountAndDeviceData(");
     expect(DEVICE_CLEANUP).toContain("clearStandaloneGameData,");
-    expect(clear).toContain("clearStandaloneGameData()");
+    expect(clear).toContain("await clearStandaloneGameData()");
+    expect(clear).toContain("commitWebPrivateHandoffOwner(");
+    expect(clear).toContain("if (!resetComplete)");
   });
 
   it("cancels native reminders during both destructive Settings paths", () => {
     const deletion = handler("deleteAccount", "\n\n  /** Removes account");
     const clear = handler("clearJourneyData", "\n\n  return (");
 
-    expect(deletion).toContain("purgeDeletedAccountDeviceData(");
+    expect(deletion).toContain("deleteAccountAndDeviceData(");
     expect(DEVICE_CLEANUP).toContain("purgeNativeReminders");
     expect(clear).toContain("purgeNativeReminders(),");
   });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createConsoleClient } from "@/lib/supabase/client";
 import { isConsoleHost } from "@/lib/console/paths";
 import { recordConsoleSignIn } from "@/app/console/(protected)/actions";
 
@@ -35,7 +35,7 @@ export function ConsoleSignIn() {
     setState("sending");
     const address = email.trim().toLowerCase();
     try {
-      const { error } = await createClient().auth.signInWithOtp({
+      const { error } = await createConsoleClient().auth.signInWithOtp({
         email: address,
         options: { shouldCreateUser: false },
       });
@@ -56,7 +56,7 @@ export function ConsoleSignIn() {
     setMessage(null);
     setState("verifying");
     try {
-      const supabase = createClient();
+      const supabase = createConsoleClient();
       const { error } = await supabase.auth.verifyOtp({
         email: requestedEmail,
         token: code,

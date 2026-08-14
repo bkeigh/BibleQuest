@@ -19,10 +19,30 @@ vi.mock("@/lib/supabase/client", () => ({
   isSupabaseConfigured: () => true,
 }));
 
+vi.mock("@/lib/supabase/configuration", () => ({
+  isSupabaseConfigured: () => true,
+}));
+
 vi.mock("@/lib/analytics/events", () => ({
   track: vi.fn(),
   setAnalyticsConsent: vi.fn(),
 }));
+
+// This suite starts after the guest bootstrap has granted its durable write
+// generation; read-capability behavior is covered by the dedicated gate tests.
+vi.mock("@/lib/supabase/web-auth-storage", async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import("@/lib/supabase/web-auth-storage")
+  >();
+  return {
+    ...actual,
+    beginWebPrivateWrite: () => ({ generation: "guest-generation" }),
+    registerWebPrivateMemoryReset: () => () => undefined,
+    webPrivateWriteGuardIsCurrent: () => true,
+    withWebAuthStorageLock: async <T>(operation: () => Promise<T>) =>
+      operation(),
+  };
+});
 
 // Make both server auth factories observable; containment must reach neither.
 vi.mock("@supabase/ssr", () => ({
@@ -36,7 +56,7 @@ vi.mock("@/lib/supabase/server", () => ({
 
 import { SignInMethods } from "@/components/account/SignInMethods";
 import { GET as authCallback } from "@/app/auth/callback/route";
-import { useQuestOS } from "@/lib/questos/store";
+import { flushQuestJourneyStorage, useQuestOS } from "@/lib/questos/store";
 import {
   ACCOUNT_SYNC_CONTAINED,
   accountSyncContained,
@@ -125,10 +145,10 @@ describe("guest-only account-sync containment", () => {
     expect(useQuestOS.getState().journeyEvents).toEqual([
       snapshot.journeyEvents[0],
     ]);
-    const persisted = await useQuestOS.persist
-      .getOptions()
-      .storage?.getItem("biblequest:v1");
-    expect(JSON.stringify(persisted)).toContain(snapshot.journeyEvents[0].id);
+    await flushQuestJourneyStorage();
+    expect(window.localStorage.getItem("biblequest:v1")).toContain(
+      snapshot.journeyEvents[0].id,
+    );
     expect(mocks.createClient).not.toHaveBeenCalled();
   });
 

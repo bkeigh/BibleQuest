@@ -58,11 +58,9 @@ export function NativeJourneyGuard({ children }: { children: React.ReactNode }) 
           setStatus("failed");
           return;
         }
-        if (outcome === "restored") {
-          // Child auth and sync effects may mount only after the restored owner
-          // and journey have both reached the live Zustand store.
-          await useQuestOS.persist.rehydrate();
-        }
+        // Hydration is globally deferred, so both a healthy primary and a
+        // repaired primary must reach the live store before children mount.
+        await useQuestOS.persist.rehydrate();
         if (cancelled) return;
         // Started only after the restore decision, so the mirror can never be
         // overwritten with the empty state we were about to repair.

@@ -31,10 +31,9 @@ import {
 import { isNativeTarget } from "@/lib/platform/target";
 import {
   AccountDeletionPendingError,
-  deleteOwnAccountWithAvatar,
+  deleteAccountAndDeviceData,
   verifiedNativeDeletionUserId,
 } from "@/lib/auth/account-deletion";
-import { purgeDeletedAccountDeviceData } from "@/lib/auth/device-account-cleanup";
 import {
   accountLifecycleHandleIsCurrent,
   beginAccountLifecycle,
@@ -153,8 +152,7 @@ function AccountInner() {
       toast("Couldn’t sign out just now. Check your connection and retry.");
       if (
         error instanceof AccountSignOutError &&
-        error.reloadRequired &&
-        isNativeTarget()
+        error.reloadRequired
       ) {
         window.location.reload();
       }
@@ -319,10 +317,13 @@ function UnavailableAccountDeletion() {
         setError("device");
         return;
       }
-      await deleteOwnAccountWithAvatar(expectedUserId);
+      const deviceCleared = await deleteAccountAndDeviceData(
+        expectedUserId,
+        lifecycle,
+      );
       if (
         !accountLifecycleHandleIsCurrent(lifecycle) ||
-        !(await purgeDeletedAccountDeviceData(expectedUserId, lifecycle))
+        !deviceCleared
       ) {
         setError("device");
         return;

@@ -22,7 +22,8 @@ import {
   MY_SHEPHERD_MAX_QUESTION_LENGTH,
   type MyShepherdAnswer,
 } from "@/lib/ai/contracts";
-import { apiFetch } from "@/lib/platform/api";
+import { authenticatedApiFetch } from "@/lib/platform/api";
+import { useSession } from "@/lib/supabase/useSession";
 import { useVisualViewport } from "@/lib/platform/keyboard-inset";
 import {
   useCompactViewport,
@@ -141,7 +142,23 @@ function ShepherdMark({ pulsing = false }: { pulsing?: boolean }) {
 }
 
 /** Provides a session-only, non-modal MyShepherd conversation above the app shell. */
+/** Remounts private in-memory questions and answers at account boundaries. */
 export function FloatingMyShepherd() {
+  const { user } = useSession();
+  return (
+    <SubjectBoundFloatingMyShepherd
+      key={user?.id ?? "guest"}
+      expectedUserId={user?.id ?? null}
+    />
+  );
+}
+
+/** Owns one account's non-persisted floating study conversation. */
+function SubjectBoundFloatingMyShepherd({
+  expectedUserId,
+}: {
+  expectedUserId: string | null;
+}) {
   const pathname = usePathname();
   const viewport = useVisualViewport();
   const compact = useCompactViewport();
@@ -394,7 +411,7 @@ export function FloatingMyShepherd() {
 
   async function ask(nextQuestion = question) {
     const trimmed = nextQuestion.trim();
-    if (trimmed.length < 3 || working) return;
+    if (trimmed.length < 3 || working || !expectedUserId) return;
     // Show the question and empty the field straight away: waiting beside your
     // own words reads as progress, waiting beside an unchanged field reads as
     // a dropped tap.
@@ -402,12 +419,16 @@ export function FloatingMyShepherd() {
     setQuestion("");
     setError(null);
     try {
-      const response = await apiFetch("/api/ai/shepherd", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: trimmed, currentPath: pathname }),
-      });
+      const response = await authenticatedApiFetch(
+        expectedUserId,
+        "/api/ai/shepherd",
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: trimmed, currentPath: pathname }),
+        },
+      );
       if (!response.ok) {
         setError(floatingErrorMessage(response.status));
         setQuestion(trimmed);
@@ -571,7 +592,8 @@ export function FloatingMyShepherd() {
 
   const horizontalOffset = "max(1rem, calc((100vw - 48rem) / 2))";
   const remaining = MY_SHEPHERD_MAX_QUESTION_LENGTH - question.length;
-  const canSend = !working && question.trim().length >= 3;
+  const canSend =
+    Boolean(expectedUserId) && !working && question.trim().length >= 3;
   const sheetTransition =
     reduceMotion || dragging
       ? { duration: 0 }

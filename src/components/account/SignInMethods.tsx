@@ -33,9 +33,16 @@ import {
   beginEmailOtpAttempt,
   cancelEmailOtpAttempt,
   emailOtpAttemptIsCurrent,
+  emailOtpInstallationNeedsReload,
+  requestIsolatedEmailOtp,
   verifyAndInstallEmailOtp,
   type EmailOtpAttempt,
 } from "@/lib/auth/email-otp-verification";
+import {
+  readWebAuthState,
+  requireCurrentWebAccountRealm,
+  withWebAccountOperationLock,
+} from "@/lib/supabase/web-auth-storage";
 
 type EmailStatus = "idle" | "sending" | "requested";
 type OAuthProvider = "apple" | "google";
@@ -141,12 +148,7 @@ export function SignInMethods({
       await requireNativeAccountBetaAvailability();
       requireAccountLifecycleIdle(lifecycle);
       const { error: requestError } = await withDeadline(
-        createClient().auth.signInWithOtp({
-          email: address,
-          options: {
-            shouldCreateUser: shouldCreateAccount(intent),
-          },
-        }),
+        requestIsolatedEmailOtp(address, shouldCreateAccount(intent)),
         AUTH_REQUEST_DEADLINE_MS,
         "Email sign-in request",
       );
@@ -217,6 +219,10 @@ export function SignInMethods({
       );
       if (result.status === "stale") return;
       if (result.status === "error") {
+        if (emailOtpInstallationNeedsReload(result.error)) {
+          window.location.reload();
+          return;
+        }
         reportClientSignal({
           surface: "auth",
           stage: "verify_email",
@@ -237,6 +243,10 @@ export function SignInMethods({
       // Supabase emits SIGNED_IN in this same PWA context. The shared session
       // hook verifies the user and advances the existing account flow.
     } catch (verificationError) {
+      if (emailOtpInstallationNeedsReload(verificationError)) {
+        window.location.reload();
+        return;
+      }
       if (
         attempt &&
         !emailOtpAttemptIsCurrent(attempt, requestedEmailRef.current)
@@ -266,11 +276,23 @@ export function SignInMethods({
     track("sign_in_started", { method: provider, source });
     try {
       const lifecycle = requireAccountLifecycleIdle();
-      const { error: requestError } = await withDeadline(
+      const request = () =>
         createClient().auth.signInWithOAuth({
           provider,
           options: { redirectTo: callbackUrl() },
-        }),
+        });
+      const guardedRequest = nativeTarget
+        ? request()
+        : withWebAccountOperationLock(async (handle) => {
+            await requireCurrentWebAccountRealm(handle);
+            const state = await readWebAuthState(handle);
+            if (state.status !== "missing") {
+              throw new Error("Account sign-in is unavailable.");
+            }
+            return request();
+          });
+      const { error: requestError } = await withDeadline(
+        guardedRequest,
         AUTH_REQUEST_DEADLINE_MS,
         `${providerName} sign-in request`,
       );

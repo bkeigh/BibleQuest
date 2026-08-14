@@ -5,8 +5,9 @@ import {
   MY_SHEPHERD_MAX_QUESTION_LENGTH,
   type MyShepherdAnswer,
 } from "@/lib/ai/contracts";
-import { apiFetch } from "@/lib/platform/api";
+import { authenticatedApiFetch } from "@/lib/platform/api";
 import { usePlus } from "@/lib/billing/usePlus";
+import { useSession } from "@/lib/supabase/useSession";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { InfoHint } from "@/components/design-system/InfoHint";
 import { PaperCard } from "@/components/design-system/PaperCard";
@@ -30,8 +31,23 @@ function errorMessage(status: number): string {
   return "MyShepherd couldn’t answer just now. Please try again in a moment.";
 }
 
-/** One-question study companion with no transcript or journal persistence. */
+/** Remounts private in-memory study state at every account boundary. */
 export function MyShepherd() {
+  const { user } = useSession();
+  return (
+    <SubjectBoundMyShepherd
+      key={user?.id ?? "guest"}
+      expectedUserId={user?.id ?? null}
+    />
+  );
+}
+
+/** One-question study companion with no transcript or journal persistence. */
+function SubjectBoundMyShepherd({
+  expectedUserId,
+}: {
+  expectedUserId: string | null;
+}) {
   const plus = usePlus();
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<MyShepherdAnswer | null>(null);
@@ -41,19 +57,23 @@ export function MyShepherd() {
 
   async function ask() {
     const trimmed = question.trim();
-    if (trimmed.length < 3 || working) return;
+    if (trimmed.length < 3 || working || !expectedUserId) return;
     setWorking(true);
     setError(null);
     try {
-      const response = await apiFetch("/api/ai/shepherd", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: trimmed,
-          currentPath: window.location.pathname,
-        }),
-      });
+      const response = await authenticatedApiFetch(
+        expectedUserId,
+        "/api/ai/shepherd",
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            question: trimmed,
+            currentPath: window.location.pathname,
+          }),
+        },
+      );
       if (!response.ok) {
         setError(errorMessage(response.status));
         return;
@@ -167,7 +187,9 @@ export function MyShepherd() {
           variant="primary"
           fullWidth
           className="mt-4"
-          disabled={working || question.trim().length < 3}
+          disabled={
+            working || !expectedUserId || question.trim().length < 3
+          }
           onClick={ask}
           aria-busy={working}
         >

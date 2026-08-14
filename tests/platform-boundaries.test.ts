@@ -32,6 +32,7 @@ const NATIVE_RUNTIME = {
   target: "native",
   hostedOrigin: "https://www.biblequest.co",
 } as const;
+const USER_ID = "10000000-0000-4000-8000-000000000001";
 
 describe("platform runtime and API routing", () => {
   it("keeps web relative and targets one configured native HTTPS origin", () => {
@@ -254,9 +255,11 @@ describe("purchase and notification delegation", () => {
     const closed = purchaseAdapter({ runtime: NATIVE_RUNTIME });
     expect(closed.channel).toBe("native");
     expect(closed.available).toBe(false);
-    await expect(closed.purchase("annual")).resolves.toBe("unavailable");
-    await expect(closed.restore()).resolves.toBe("unavailable");
-    await expect(closed.manage()).resolves.toBe("unavailable");
+    await expect(closed.purchase(USER_ID, "annual")).resolves.toBe(
+      "unavailable",
+    );
+    await expect(closed.restore(USER_ID)).resolves.toBe("unavailable");
+    await expect(closed.manage(USER_ID)).resolves.toBe("unavailable");
   });
 
   it("uses exact server-created Stripe destinations for web actions", async () => {
@@ -276,14 +279,17 @@ describe("purchase and notification delegation", () => {
       navigate,
     });
 
-    await expect(web.purchase("annual")).resolves.toBe("redirected");
-    await expect(web.restore()).resolves.toBe("restored");
-    await expect(web.manage()).resolves.toBe("redirected");
-    expect(fetcher.mock.calls.map(([path]) => path)).toEqual([
+    await expect(web.purchase(USER_ID, "annual")).resolves.toBe("redirected");
+    await expect(web.restore(USER_ID)).resolves.toBe("restored");
+    await expect(web.manage(USER_ID)).resolves.toBe("redirected");
+    expect(fetcher.mock.calls.map(([, path]) => path)).toEqual([
       "/api/billing/checkout",
       "/api/billing/refresh",
       "/api/billing/portal",
     ]);
+    expect(fetcher.mock.calls.every(([userId]) => userId === USER_ID)).toBe(
+      true,
+    );
     expect(navigate).toHaveBeenNthCalledWith(
       1,
       "https://checkout.stripe.com/c/pay",
@@ -305,7 +311,9 @@ describe("purchase and notification delegation", () => {
         ),
       navigate,
     });
-    await expect(lookalike.purchase("monthly")).resolves.toBe("failed");
+    await expect(lookalike.purchase(USER_ID, "monthly")).resolves.toBe(
+      "failed",
+    );
     expect(navigate).not.toHaveBeenCalled();
 
     const throttled = purchaseAdapter({
@@ -315,7 +323,7 @@ describe("purchase and notification delegation", () => {
         .mockResolvedValue(new Response(null, { status: 429 })),
       navigate,
     });
-    await expect(throttled.restore()).resolves.toBe("deferred");
+    await expect(throttled.restore(USER_ID)).resolves.toBe("deferred");
   });
 
   it("selects native notifications only when an explicit adapter exists", async () => {

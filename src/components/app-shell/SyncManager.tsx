@@ -3,6 +3,13 @@
 import { useEffect, useReducer, useState } from "react";
 import { useSession } from "@/lib/supabase/useSession";
 import { createClient } from "@/lib/supabase/client";
+import { isNativeTarget } from "@/lib/platform/target";
+import {
+  readActiveWebAuthSession,
+  withActiveWebPrivateWriteReset,
+  withWebAccountOperationLock,
+  type WebAccountOperationHandle,
+} from "@/lib/supabase/web-auth-storage";
 import { startSync, stopSync } from "@/lib/sync/engine";
 import {
   localDataBelongsToOtherUser,
@@ -25,7 +32,6 @@ import {
   AccountSignOutError,
   signOutExpectedAccount,
 } from "@/lib/auth/account-sign-out";
-import { isNativeTarget } from "@/lib/platform/target";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton } from "@/components/design-system/GentleButton";
 
@@ -91,46 +97,82 @@ export function SyncManager() {
     let mirrorPurged = false;
     let lifecycleFinished = false;
     try {
-      // Tombstone the protected A mirror before clearing the primary, so an
-      // interruption can never restore it underneath B's new owner marker.
-      if (startFresh) {
-        mirrorPurged = await purgeJourneyBackup();
-        if (
-          !mirrorPurged ||
-          !accountLifecycleHandleIsCurrent(lifecycle)
-        ) {
-          setHandoffError(true);
-          return;
-        }
-        await purgeNativeReminders();
-        if (!accountLifecycleHandleIsCurrent(lifecycle)) {
-          setHandoffError(true);
-          return;
+      /** Keeps the entire local handoff behind the cross-tab account boundary. */
+      const resolveExpectedAccount = async (
+        webOperation?: WebAccountOperationHandle,
+      ): Promise<boolean> => {
+        let exactUserId: string | null;
+        if (isNativeTarget()) {
+          const observed = await createClient().auth.getSession();
+          exactUserId = observed.error
+            ? null
+            : observed.data.session?.user.id ?? null;
+        } else {
+          exactUserId =
+            (await readActiveWebAuthSession(webOperation))?.userId ?? null;
         }
         if (
-          !(await purgeAvatarCache()) ||
+          exactUserId !== userId ||
           !accountLifecycleHandleIsCurrent(lifecycle)
         ) {
-          setHandoffError(true);
-          return;
+          return false;
         }
-        if (!clearRhythmState() || !clearStandaloneGameData()) {
-          setHandoffError(true);
-          return;
+
+        /** Purges the old owner while all stale web generations stay closed. */
+        const completeHandoff = async () => {
+          // Tombstone the protected A mirror before clearing the primary, so an
+          // interruption can never restore it underneath B's new owner marker.
+          if (startFresh) {
+            mirrorPurged = await purgeJourneyBackup();
+            if (
+              !mirrorPurged ||
+              !accountLifecycleHandleIsCurrent(lifecycle)
+            ) {
+              return false;
+            }
+            await purgeNativeReminders();
+            if (!accountLifecycleHandleIsCurrent(lifecycle)) return false;
+            if (
+              !(await purgeAvatarCache()) ||
+              !accountLifecycleHandleIsCurrent(lifecycle)
+            ) {
+              return false;
+            }
+            const rhythmCleared = await clearRhythmState();
+            if (
+              !rhythmCleared ||
+              !(await clearStandaloneGameData())
+            ) {
+              return false;
+            }
+          }
+          await prepareLocalJourneyHandoff(
+            userId,
+            startFresh,
+            lifecycle,
+            webOperation,
+          );
+          if (mirrorPurged) resumeJourneyBackupAfterPurge();
+          mirrorPurged = false;
+          return true;
+        };
+
+        if (startFresh && webOperation) {
+          return withActiveWebPrivateWriteReset(
+            webOperation,
+            userId,
+            completeHandoff,
+          );
         }
-      }
-      const session = await createClient().auth.getSession();
-      if (
-        session.error ||
-        session.data.session?.user.id !== userId ||
-        !accountLifecycleHandleIsCurrent(lifecycle)
-      ) {
+        return completeHandoff();
+      };
+      const resolved = isNativeTarget()
+        ? await resolveExpectedAccount()
+        : await withWebAccountOperationLock(resolveExpectedAccount);
+      if (!resolved) {
         setHandoffError(true);
         return;
       }
-      prepareLocalJourneyHandoff(userId, startFresh, lifecycle);
-      if (mirrorPurged) resumeJourneyBackupAfterPurge();
-      mirrorPurged = false;
       finishAccountLifecycle(lifecycle);
       lifecycleFinished = true;
       void startSync(userId);
@@ -161,8 +203,7 @@ export function SyncManager() {
       setHandoffError(true);
       if (
         error instanceof AccountSignOutError &&
-        error.reloadRequired &&
-        isNativeTarget()
+        error.reloadRequired
       ) {
         window.location.reload();
       }

@@ -19,11 +19,11 @@ describe("native account sync manager boundaries", () => {
 
   it("requires every private device store to clear before stamping a new owner", () => {
     expect(MANAGER).toContain("!(await purgeAvatarCache())");
-    expect(MANAGER).toContain(
-      "!clearRhythmState() || !clearStandaloneGameData()",
-    );
+    expect(MANAGER).toContain("const rhythmCleared = await clearRhythmState()");
+    expect(MANAGER).toContain("!(await clearStandaloneGameData())");
+    expect(MANAGER).toContain("withActiveWebPrivateWriteReset(");
     expect(HANDOFF).toContain("!purgePersistedJourney()");
-    expect(HANDOFF).toContain("!purgeAllDeviceLocalJournalDrafts()");
+    expect(HANDOFF).toContain("!(await purgeAllDeviceLocalJournalDrafts())");
     expect(HANDOFF.indexOf("purgePersistedJourney()")).toBeLessThan(
       HANDOFF.lastIndexOf("setLastSyncedUserId(userId)"),
     );

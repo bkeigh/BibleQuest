@@ -7,6 +7,7 @@ import { SyncManager } from "@/components/app-shell/SyncManager";
 import { AvatarSyncManager } from "@/components/app-shell/AvatarSyncManager";
 import { PlusProvider } from "@/lib/billing/usePlus";
 import { PRIVATE_APP_METADATA } from "@/lib/metadata";
+import { JournalDraftJanitor } from "@/components/journal/JournalDraftJanitor";
 
 export const metadata = PRIVATE_APP_METADATA;
 
@@ -16,10 +17,15 @@ export default function PrivateAppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <>
-      <SyncManager />
-      <AvatarSyncManager />
-      <OnboardingGate>
+    <OnboardingGate
+      services={
+        <>
+          <SyncManager />
+          <AvatarSyncManager />
+          <JournalDraftJanitor />
+        </>
+      }
+    >
         <PlusProvider>
           <ThemeApplier />
           <MotionProvider>
@@ -27,7 +33,6 @@ export default function PrivateAppLayout({
             <MilestoneReveal />
           </MotionProvider>
         </PlusProvider>
-      </OnboardingGate>
-    </>
+    </OnboardingGate>
   );
 }
