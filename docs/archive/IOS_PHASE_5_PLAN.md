@@ -1,5 +1,8 @@
 # iOS Phase 5 — release proof and controlled account beta
 
+> **STATUS (2026-08-14):** Superseded by [IOS_TESTFLIGHT_RUNBOOK.md](../IOS_TESTFLIGHT_RUNBOOK.md) (guest 1.0) and [IOS_ACCOUNT_REPLACEMENT_RELEASE.md](../IOS_ACCOUNT_REPLACEMENT_RELEASE.md) (account release).
+
+
 **Status:** Milestone 1 passed except for Clear My Data; ship its bounded native
 cleanup fix in a new TestFlight build, then begin the isolated account beta
 

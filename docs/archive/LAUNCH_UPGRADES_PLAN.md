@@ -1,5 +1,8 @@
 # BibleQuest launch upgrades
 
+> **STATUS (2026-08-14):** Completed implementation plan for the July 31 launch; kept as a record.
+
+
 Status: implementation plan
 Baseline: `173b1a95a6db8c6abb42d43ac62d0449cbcab50d`
 Prepared: July 24, 2026

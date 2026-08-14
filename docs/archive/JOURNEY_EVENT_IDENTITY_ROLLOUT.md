@@ -1,5 +1,8 @@
 # Journey event identity rollout
 
+> **STATUS (2026-08-14):** Completed rollout record. Migration 0014 has been applied in production since July 2026.
+
+
 Migration `0014_journey_event_identity.sql` must be applied before deploying
 the app commit that writes `journey_events.date_key` and `source_id`.
 Its accepted SHA-256 identity is

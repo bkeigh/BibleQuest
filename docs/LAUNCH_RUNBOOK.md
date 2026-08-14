@@ -10,7 +10,7 @@ health, browser signals, thresholds, and synthetic routing use
 custom SMTP, auth templates, and content reconciliation are executed through
 [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md).
 Provider-console and physical-device work can be coordinated with the
-guardrailed [`Claude Cowork launch-operator prompt`](CLAUDE_COWORK_LAUNCH_PROMPT.md);
+guardrailed [`Claude Cowork launch-operator prompt`](archive/CLAUDE_COWORK_LAUNCH_PROMPT.md);
 that prompt does not replace any gate in this runbook.
 
 No unchecked item is a pass. `OPEN`, `TBD`, and blank evidence fields are

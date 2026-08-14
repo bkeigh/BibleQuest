@@ -138,7 +138,7 @@ docs/                   # Codex + setup/deployment/security/content/QA guides
 - [`docs/STRIPE_TEST_BILLING.md`](docs/STRIPE_TEST_BILLING.md) — direct Stripe test billing, webhook evidence, and production gates
 - [`docs/STRIPE_ONE_TIME_SUPPORT.md`](docs/STRIPE_ONE_TIME_SUPPORT.md) — one-time support Checkout, refund, and rollout gates
 - [`SECURITY.md`](SECURITY.md) — RLS, sensitive data, disclosure
-- [`docs/SECURITY_AUDIT_2026-08-02.md`](docs/SECURITY_AUDIT_2026-08-02.md) — release audit, remediations, evidence, and residual risk
+- [`docs/archive/SECURITY_AUDIT_2026-08-02.md`](docs/archive/SECURITY_AUDIT_2026-08-02.md) — release audit, remediations, evidence, and residual risk
 - [`docs/CONTENT_GUIDE.md`](docs/CONTENT_GUIDE.md) — quest/prayer/theology rules
 - [`docs/ART_SYSTEM.md`](docs/ART_SYSTEM.md) — 2.5D art, candle motion, and asset-promotion rules
 - [`docs/QA.md`](docs/QA.md) — manual QA checklist

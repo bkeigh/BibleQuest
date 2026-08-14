@@ -1,5 +1,8 @@
 # Claude Fable 5 Cowork launch-operator prompt
 
+> **STATUS (2026-08-14):** Historical. Agent-session prompt for the July 31 launch window; not a current operating document.
+
+
 Use this prompt in a dedicated Claude Fable 5 Cowork session on the same Mac as
 the BibleQuest repository. Give Cowork access only to the browser profiles,
 provider accounts, and evidence destination needed for the launch.

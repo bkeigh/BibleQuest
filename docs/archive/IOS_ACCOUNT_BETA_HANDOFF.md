@@ -1,5 +1,8 @@
 # iOS account beta preparation and handoff
 
+> **STATUS (2026-08-14):** Superseded by [IOS_ACCOUNT_REPLACEMENT_RELEASE.md](../IOS_ACCOUNT_REPLACEMENT_RELEASE.md). The production-backed account release replaced this staging-beta ceremony; the fail-closed beta builder remains in the repo but is not the release path.
+
+
 **Status:** fail closed; no reviewed durable staging backend is pinned
 
 **Last policy check:** August 11, 2026

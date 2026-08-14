@@ -1,5 +1,8 @@
 # BibleQuest application and security audit — 2026-08-02
 
+> **STATUS (2026-08-14):** Historical audit record. Findings were remediated; see the follow-up audit of 2026-08-03.
+
+
 ## Executive result
 
 BibleQuest is ready to enter the protected release pipeline. No unresolved

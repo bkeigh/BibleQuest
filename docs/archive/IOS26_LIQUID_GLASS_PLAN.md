@@ -1,5 +1,8 @@
 # iOS 26 Liquid Glass — bottom tab bar adoption plan
 
+> **STATUS (2026-08-14):** Parked research plan. No code depends on it; revisit only if the tab-bar adoption is rescheduled.
+
+
 **Status:** research and planning only. No app code changed by this document.
 **Written:** 2026-08-07, against `feat/capacitor-ios-scaffold`.
 **Intended home:** a separate branch, after the 10-day polish deadline lands.
