@@ -666,9 +666,15 @@ export function useSession(): SessionState {
 
     let reconcileWebAuthStorage: () => void = () => undefined;
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      authStorageRead += 1;
       latestSession = session;
+      // Auth events that arrive before the web bootstrap finishes are recorded
+      // but must not invalidate it. Bumping the read counter here cancelled the
+      // in-flight reconcile through its `read !== authStorageRead` guard, while
+      // this handler returned below without completing the bootstrap itself —
+      // so nothing ever cleared the loading veil. The bootstrap re-reads durable
+      // state before it commits, so deferring the bump loses no information.
       if (!webBootstrapComplete) return;
+      authStorageRead += 1;
       if (event === "SIGNED_OUT" || !session) {
         if (!isNativeTarget()) {
           reconcileWebAuthStorage();
