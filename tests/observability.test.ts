@@ -320,24 +320,24 @@ describe("privacy-safe observability contract", () => {
       billing_support_enabled: false,
     });
 
-    // CLI deployments expose a blank Vercel SHA, so the validated CI fallback
-    // must remain usable for an immutable release candidate.
+    // A runtime CI value is operator-controlled and must not impersonate the
+    // identity captured in an already-built release artifact.
     expect(
       buildReleaseHealth({
         VERCEL_GIT_COMMIT_SHA: "",
         GITHUB_SHA: "c".repeat(40),
       }).release_sha,
-    ).toBe("c".repeat(40));
+    ).toBeNull();
 
-    // The bundled build identity keeps a CLI artifact observable even when
-    // both runtime provider variables are absent.
+    // Likewise, a runtime value under the bundled variable name cannot replace
+    // the constant that Next.js captured while compiling the server bundle.
     expect(
       buildReleaseHealth({
         VERCEL_GIT_COMMIT_SHA: "",
         GITHUB_SHA: "",
         BIBLEQUEST_BUILD_SHA: "d".repeat(40),
       }).release_sha,
-    ).toBe("d".repeat(40));
+    ).toBeNull();
 
     // The public contract must report the effective guest-only latch even
     // when provider credentials remain available to the deployment.

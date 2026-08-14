@@ -38,14 +38,9 @@ function safeSha(value: string | undefined): string | null {
   return candidate && SHA.test(candidate) ? candidate.toLowerCase() : null;
 }
 
-/** Chooses the first valid provider, CI, or bundled SHA without trusting blanks. */
+/** Trusts the runtime provider identity, then the immutable bundled identity. */
 function releaseSha(env: PublicEnvironment): string | null {
-  return (
-    safeSha(env.VERCEL_GIT_COMMIT_SHA) ??
-    safeSha(env.GITHUB_SHA) ??
-    safeSha(env.BIBLEQUEST_BUILD_SHA) ??
-    safeSha(BUNDLED_BUILD_SHA)
-  );
+  return safeSha(env.VERCEL_GIT_COMMIT_SHA) ?? safeSha(BUNDLED_BUILD_SHA);
 }
 
 /** Reports configuration shape without exposing a Supabase host or key. */

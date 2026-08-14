@@ -18,6 +18,7 @@ const approvedFrameAncestors = [
 ];
 const isolatedDevDistDir = ".next-header-test";
 const incrementalTypeCache = "tsconfig.tsbuildinfo";
+const fullSha = /^[a-f0-9]{40}$/i;
 
 function parseCsp(value) {
   const directives = new Map();
@@ -123,7 +124,7 @@ async function stop(child) {
   clearTimeout(force);
 }
 
-async function withNextServer(command, callback) {
+async function withNextServer(command, callback, environment = {}) {
   const port = await availablePort();
   const logs = [];
   const child = spawn(
@@ -137,6 +138,7 @@ async function withNextServer(command, callback) {
         BIBLEQUEST_HEADER_TEST_DIST_DIR:
           command === "dev" ? isolatedDevDistDir : "",
         NEXT_PUBLIC_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
+        ...environment,
       },
       stdio: ["ignore", "pipe", "pipe"],
     },
@@ -180,6 +182,22 @@ test(
         redirect: "manual",
       });
       assertSharedSecurityContract(privateResponse, true, ["'none'"], "DENY");
+
+      // Conflicting runtime CI/build variables cannot impersonate the commit
+      // captured by next.config.ts when this exact artifact was compiled.
+      const health = await fetch(`${origin}/api/health`).then((value) =>
+        value.json(),
+      );
+      const expectedBuildSha =
+        process.env.BIBLEQUEST_EXPECTED_BUILD_SHA ?? process.env.GITHUB_SHA;
+      assert.match(health.release_sha, fullSha);
+      if (expectedBuildSha) {
+        assert.equal(health.release_sha, expectedBuildSha.toLowerCase());
+      }
+    }, {
+      VERCEL_GIT_COMMIT_SHA: "",
+      GITHUB_SHA: "f".repeat(40),
+      BIBLEQUEST_BUILD_SHA: "e".repeat(40),
     });
   },
 );

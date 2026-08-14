@@ -19,10 +19,20 @@ import type { NextConfig } from "next";
  */
 const isProduction = process.env.NODE_ENV === "production";
 
-// Preserve the validated source identity inside the server bundle so a CLI
-// deployment cannot lose it when provider variables are absent at runtime.
+// Accept only a full commit identity before embedding public release metadata.
+function releaseSha(value: string | undefined) {
+  const candidate = value?.trim();
+  return candidate && /^[a-f0-9]{40}$/i.test(candidate)
+    ? candidate.toLowerCase()
+    : null;
+}
+
+// Preserve the first validated build-provider identity inside the server
+// bundle so an invalid Vercel value cannot mask a valid GitHub commit.
 const buildReleaseSha =
-  process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || "";
+  releaseSha(process.env.VERCEL_GIT_COMMIT_SHA) ??
+  releaseSha(process.env.GITHUB_SHA) ??
+  "";
 
 // Next.js App Router streams the RSC payload through inline <script> tags and
 // injects inline <style> (next/font, Tailwind, framer-motion) — both need
