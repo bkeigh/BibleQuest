@@ -1,6 +1,6 @@
 "use client";
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { DeadlineError, withDeadline } from "@/lib/async/deadline";
 import {
   AccountLifecycleBusyError,
@@ -10,13 +10,24 @@ import {
 } from "./account-lifecycle";
 import {
   createClient,
+  createEmailAuthRequestClient,
   createEmailOtpVerificationClient,
 } from "@/lib/supabase/client";
 import {
-  clearExactNativeAuthSession,
+  clearExactAuthSession,
   type ExactCredentialClearResult,
   type ExactNativeAuthSession,
-} from "@/lib/supabase/native-auth-storage";
+} from "./exact-session";
+import { isNativeTarget } from "@/lib/platform/target";
+import {
+  WebAuthUnavailableError,
+  installVerifiedWebSession,
+  readWebAuthState,
+  requireCurrentWebAccountRealm,
+  withWebAccountOperationLock,
+  type WebAccountOperationHandle,
+  type WebSessionInstallResult,
+} from "@/lib/supabase/web-auth-storage";
 
 const EMAIL_OTP_VERIFICATION_DEADLINE_MS = 12_000;
 const EMAIL_OTP_INSTALLATION_DEADLINE_MS = 12_000;
@@ -26,8 +37,13 @@ type OtpVerificationClient = {
   auth: Pick<SupabaseClient["auth"], "verifyOtp">;
 };
 
+type OtpRequestClient = {
+  auth: Pick<SupabaseClient["auth"], "signInWithOtp">;
+};
+
 type SessionInstallationClient = {
-  auth: Pick<SupabaseClient["auth"], "setSession">;
+  auth: Pick<SupabaseClient["auth"], "setSession"> &
+    Partial<Pick<SupabaseClient["auth"], "getSession">>;
 };
 
 export interface EmailOtpAttempt {
@@ -47,6 +63,10 @@ interface EmailOtpAttemptOptions {
   ) => Promise<ExactCredentialClearResult>;
   installationTimeoutMs?: number;
   installationClient?: SessionInstallationClient;
+  installWebSession?: (
+    handle: WebAccountOperationHandle,
+    session: Session,
+  ) => Promise<WebSessionInstallResult>;
   timeoutMs?: number;
   verificationClient?: OtpVerificationClient;
 }
@@ -55,7 +75,54 @@ type SessionInstallationResult = Awaited<
   ReturnType<SupabaseClient["auth"]["setSession"]>
 >;
 
+interface InstallationResolution {
+  result: EmailOtpAttemptResult;
+  safeToRelease: boolean;
+}
+
 let authAttemptGeneration = 0;
+
+/** Requests one code off-storage after the web realm and empty slot are proved. */
+export function requestIsolatedEmailOtp(
+  email: string,
+  shouldCreateUser: boolean,
+  requestClient?: OtpRequestClient,
+): ReturnType<SupabaseClient["auth"]["signInWithOtp"]> {
+  const request = () =>
+    (requestClient ?? createEmailAuthRequestClient()).auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser },
+    });
+  if (isNativeTarget()) return request();
+  return withWebAccountOperationLock(async (handle) => {
+    await requireCurrentWebAccountRealm(handle);
+    const state = await readWebAuthState(handle);
+    if (state.status !== "missing") throw new WebAuthUnavailableError();
+    return request();
+  });
+}
+
+/** Requires a fresh document when an ambiguous install cannot be reconciled. */
+export class EmailOtpInstallationRecoveryError extends Error {
+  readonly code = "email_otp_installation_recovery_required";
+  readonly reloadRequired = true;
+
+  constructor() {
+    super("Email-code session installation needs a safe reload.");
+    this.name = "EmailOtpInstallationRecoveryError";
+  }
+}
+
+/** Recognizes the content-free recovery signal across lazy-loaded bundles. */
+export function emailOtpInstallationNeedsReload(error: unknown): boolean {
+  return (
+    error instanceof EmailOtpInstallationRecoveryError ||
+    (Boolean(error) &&
+      typeof error === "object" &&
+      (error as { code?: unknown }).code ===
+        "email_otp_installation_recovery_required")
+  );
+}
 
 /** Compare addresses without making provider casing differences a new identity. */
 function canonicalEmail(value: string): string {
@@ -138,8 +205,14 @@ function installedCredential(
 }
 
 /** Treat only a proved absence or different credential as safe reconciliation. */
-function exactClearIsSafe(result: ExactCredentialClearResult): boolean {
-  return result !== "unavailable";
+export function credentialClearProvesReconciliation(
+  result: ExactCredentialClearResult,
+): boolean {
+  return (
+    result === "cleared" ||
+    result === "different-session" ||
+    result === "missing"
+  );
 }
 
 /** Compare-and-remove a stale install without touching a newer native session. */
@@ -148,26 +221,9 @@ async function clearInstalledCredential(
   clear: (value: ExactNativeAuthSession) => Promise<ExactCredentialClearResult>,
 ): Promise<boolean> {
   try {
-    return exactClearIsSafe(await clear(expected));
+    return credentialClearProvesReconciliation(await clear(expected));
   } catch {
     return false;
-  }
-}
-
-/** Reconcile a setSession promise that outlived its caller-visible deadline. */
-async function reconcileLateInstallation(
-  installation: Promise<SessionInstallationResult>,
-  fallback: ExactNativeAuthSession,
-  clear: (value: ExactNativeAuthSession) => Promise<ExactCredentialClearResult>,
-): Promise<boolean> {
-  try {
-    const installed = await installation;
-    return clearInstalledCredential(
-      installedCredential(installed, fallback),
-      clear,
-    );
-  } catch {
-    return clearInstalledCredential(fallback, clear);
   }
 }
 
@@ -188,7 +244,7 @@ function installationMatchesAttempt(
 
 /**
  * Verify off-storage, then install exactly one still-current result while the
- * device-wide lifecycle prevents another account mutation from overtaking it.
+ * lifecycle and web cross-tab lock prevent another account mutation overtaking it.
  */
 export async function verifyAndInstallEmailOtp(
   attempt: EmailOtpAttempt,
@@ -196,6 +252,12 @@ export async function verifyAndInstallEmailOtp(
   currentEmail: () => string,
   options: EmailOtpAttemptOptions = {},
 ): Promise<EmailOtpAttemptResult> {
+  // Consume a web code only after this v28 realm and every live peer attest.
+  if (!isNativeTarget()) {
+    await withWebAccountOperationLock((handle) =>
+      requireCurrentWebAccountRealm(handle),
+    );
+  }
   const verificationClient =
     options.verificationClient ?? createEmailOtpVerificationClient();
   const verification = await withDeadline(
@@ -224,24 +286,168 @@ export async function verifyAndInstallEmailOtp(
     if (!emailOtpAttemptIsCurrent(attempt, currentEmail())) {
       return { status: "stale" };
     }
-    const installationClient = options.installationClient ?? createClient();
     const fallbackCredential: ExactNativeAuthSession = {
       userId: session.user.id,
       accessToken: session.access_token,
       refreshToken: session.refresh_token,
     };
-    const clearInstalledSession =
-      options.clearInstalledSession ?? clearExactNativeAuthSession;
-    const installation = Promise.resolve().then(() =>
-      installationClient.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-      }),
-    );
+    let callerTimedOut = false;
 
-    let installed: SessionInstallationResult;
+    /** Owns account ordering until a late write is accepted or removed. */
+    const installAndReconcile = async (
+      webOperation?: WebAccountOperationHandle,
+    ): Promise<InstallationResolution> => {
+      const clearInstalledSession =
+        options.clearInstalledSession ??
+        ((value: ExactNativeAuthSession) =>
+          clearExactAuthSession(value, webOperation));
+      if (
+        callerTimedOut ||
+        !emailOtpAttemptIsCurrent(attempt, currentEmail())
+      ) {
+        return { result: { status: "stale" }, safeToRelease: true };
+      }
+
+      if (!isNativeTarget()) {
+        if (!webOperation) {
+          return {
+            result: { status: "error", error: new Error("Account unavailable.") },
+            safeToRelease: true,
+          };
+        }
+        const installWebSession =
+          options.installWebSession ??
+          ((handle: WebAccountOperationHandle) =>
+            installVerifiedWebSession(handle, session, "email-otp"));
+        const installed = await installWebSession(webOperation, session);
+        const attemptStillCurrent = emailOtpAttemptIsCurrent(
+          attempt,
+          currentEmail(),
+        );
+        if (
+          installed === "installed" &&
+          attemptStillCurrent &&
+          !callerTimedOut
+        ) {
+          return { result: { status: "installed" }, safeToRelease: true };
+        }
+        // A durable provisional install owns crash recovery and must never be
+        // compare-cleared after the one-time OTP has already been consumed.
+        if (installed === "recovery-required") {
+          return {
+            result: {
+              status: "error",
+              error: new EmailOtpInstallationRecoveryError(),
+            },
+            safeToRelease: true,
+          };
+        }
+        if (installed === "occupied") {
+          return { result: { status: "stale" }, safeToRelease: true };
+        }
+        if (installed === "installed" || installed === "unavailable") {
+          const safeToRelease = await clearInstalledCredential(
+            fallbackCredential,
+            clearInstalledSession,
+          );
+          return {
+            result:
+              !attemptStillCurrent || callerTimedOut
+                ? { status: "stale" }
+                : {
+                    status: "error",
+                    error: new Error("Email-code installation unavailable."),
+                  },
+            safeToRelease,
+          };
+        }
+        return {
+          result: {
+            status: "error",
+            error: new Error("Email-code session was rejected."),
+          },
+          safeToRelease: true,
+        };
+      }
+
+      const installationClient = options.installationClient ?? createClient();
+      // Native may still hold another account that this OTP must never replace.
+      if (installationClient.auth.getSession) {
+        const current = await installationClient.auth.getSession();
+        if (current.error) {
+          return {
+            result: { status: "error", error: current.error },
+            safeToRelease: true,
+          };
+        }
+        if (
+          current.data.session &&
+          current.data.session.user.id !== session.user.id
+        ) {
+          return { result: { status: "stale" }, safeToRelease: true };
+        }
+      }
+      let installed: SessionInstallationResult;
+      try {
+        installed = await installationClient.auth.setSession({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        });
+      } catch (error) {
+        return {
+          result: { status: "error", error },
+          safeToRelease: await clearInstalledCredential(
+            fallbackCredential,
+            clearInstalledSession,
+          ),
+        };
+      }
+
+      if (installed.error) {
+        return {
+          result: { status: "error", error: installed.error },
+          safeToRelease: await clearInstalledCredential(
+            installedCredential(installed, fallbackCredential),
+            clearInstalledSession,
+          ),
+        };
+      }
+      const responseMatches = installationMatchesAttempt(
+        attempt,
+        session.user.id,
+        installed,
+      );
+      const attemptStillCurrent = emailOtpAttemptIsCurrent(
+        attempt,
+        currentEmail(),
+      );
+      if (responseMatches && attemptStillCurrent && !callerTimedOut) {
+        return { result: { status: "installed" }, safeToRelease: true };
+      }
+
+      const safeToRelease = await clearInstalledCredential(
+        installedCredential(installed, fallbackCredential),
+        clearInstalledSession,
+      );
+      if (!attemptStillCurrent || callerTimedOut) {
+        return { result: { status: "stale" }, safeToRelease };
+      }
+      return {
+        result: {
+          status: "error",
+          error: new Error("Email-code session installation changed identity."),
+        },
+        safeToRelease,
+      };
+    };
+
+    const installation = isNativeTarget()
+      ? installAndReconcile()
+      : withWebAccountOperationLock(installAndReconcile);
+
+    let resolution: InstallationResolution;
     try {
-      installed = await withDeadline(
+      resolution = await withDeadline(
         installation,
         options.installationTimeoutMs ??
           EMAIL_OTP_INSTALLATION_DEADLINE_MS,
@@ -249,56 +455,25 @@ export async function verifyAndInstallEmailOtp(
       );
     } catch (error) {
       if (error instanceof DeadlineError) {
-        // The UI may recover now, but the lifecycle remains closed until the
-        // late write is either removed exactly or proved to be a newer session.
+        // Keep the lock and lifecycle until the late write is removed exactly.
+        callerTimedOut = true;
         releaseLifecycle = false;
-        void reconcileLateInstallation(
-          installation,
-          fallbackCredential,
-          clearInstalledSession,
-        ).then((safe) => {
-          if (safe) finishAccountLifecycle(lifecycle);
-        });
-        throw error;
+        void installation.then(
+          (late) => {
+            if (late.safeToRelease) finishAccountLifecycle(lifecycle);
+          },
+          () => undefined,
+        );
+        throw new EmailOtpInstallationRecoveryError();
       }
-      const safe = await clearInstalledCredential(
-        fallbackCredential,
-        clearInstalledSession,
-      );
-      if (!safe) releaseLifecycle = false;
       throw error;
     }
 
-    if (installed.error) {
-      const safe = await clearInstalledCredential(
-        installedCredential(installed, fallbackCredential),
-        clearInstalledSession,
-      );
-      if (!safe) releaseLifecycle = false;
-      return { status: "error", error: installed.error };
+    if (!resolution.safeToRelease) {
+      releaseLifecycle = false;
+      throw new EmailOtpInstallationRecoveryError();
     }
-    const responseMatches = installationMatchesAttempt(
-      attempt,
-      session.user.id,
-      installed,
-    );
-    const attemptStillCurrent = emailOtpAttemptIsCurrent(
-      attempt,
-      currentEmail(),
-    );
-    if (!responseMatches || !attemptStillCurrent) {
-      const safe = await clearInstalledCredential(
-        installedCredential(installed, fallbackCredential),
-        clearInstalledSession,
-      );
-      if (!safe) releaseLifecycle = false;
-      if (!attemptStillCurrent) return { status: "stale" };
-      return {
-        status: "error",
-        error: new Error("Email-code session installation changed identity."),
-      };
-    }
-    return { status: "installed" };
+    return resolution.result;
   } finally {
     if (releaseLifecycle) finishAccountLifecycle(lifecycle);
   }

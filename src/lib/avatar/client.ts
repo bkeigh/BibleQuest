@@ -8,6 +8,7 @@ import {
   accountDeletionAvatarFetch,
   authenticatedApiFetch,
 } from "@/lib/platform/api";
+import type { WebAccountOperationHandle } from "@/lib/supabase/web-auth-storage";
 
 export interface RemoteAvatar {
   blob: Blob;
@@ -26,6 +27,8 @@ export interface DeleteRemoteAvatarOptions {
   allOwnedObjects?: boolean;
   accountDeletionCleanup?: boolean;
   signal?: AbortSignal;
+  /** Carries the already-held web account lock through the deleting read. */
+  webOperation?: WebAccountOperationHandle;
 }
 
 function remoteAvatarFromResponse(response: Response): Promise<RemoteAvatar> {
@@ -100,11 +103,16 @@ export async function deleteRemoteAvatar(
     allOwnedObjects = false,
     accountDeletionCleanup = false,
     signal,
+    webOperation,
   }: DeleteRemoteAvatarOptions = {},
 ): Promise<void> {
   const response =
     allOwnedObjects && accountDeletionCleanup
-      ? await accountDeletionAvatarFetch(expectedUserId, signal)
+      ? await accountDeletionAvatarFetch(
+          expectedUserId,
+          signal,
+          webOperation,
+        )
       : await authenticatedApiFetch(
           expectedUserId,
           "/api/profile/avatar",

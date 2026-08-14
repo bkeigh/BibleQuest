@@ -3,7 +3,36 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   createBrowserClient: vi.fn(),
   createSupabaseClient: vi.fn(),
+  requireAttestation: vi.fn(),
 }));
+
+const WEB_AUTH_KEY = "biblequest:web-auth:v2";
+
+/** Encodes a v2 access token with exact subject and session lineage claims. */
+function webAccessToken(userId: string, sessionId: string): string {
+  const payload = Buffer.from(
+    JSON.stringify({ sub: userId, session_id: sessionId }),
+  ).toString("base64url");
+  return `fixture.${payload}.signature`;
+}
+
+/** Seeds the browser-owned active envelope used by deferred sync token reads. */
+function seedWebSession(userId: string, sessionId = "fixture-lineage") {
+  const token = webAccessToken(userId, sessionId);
+  localStorage.setItem(
+    WEB_AUTH_KEY,
+    JSON.stringify({
+      version: 2,
+      mode: "active",
+      session: {
+        access_token: token,
+        refresh_token: `refresh-${sessionId}`,
+        user: { id: userId },
+      },
+    }),
+  );
+  return token;
+}
 
 vi.mock("@supabase/ssr", () => ({
   createBrowserClient: mocks.createBrowserClient,
@@ -11,6 +40,10 @@ vi.mock("@supabase/ssr", () => ({
 
 vi.mock("@supabase/supabase-js", () => ({
   createClient: mocks.createSupabaseClient,
+}));
+
+vi.mock("@/lib/platform/web-auth-service-worker", () => ({
+  requireWebAuthServiceWorkerAttestation: mocks.requireAttestation,
 }));
 
 describe("Supabase browser clients", () => {
@@ -24,11 +57,19 @@ describe("Supabase browser clients", () => {
     vi.resetModules();
     mocks.createBrowserClient.mockReset();
     mocks.createSupabaseClient.mockReset();
+    mocks.requireAttestation.mockReset();
+    mocks.requireAttestation.mockResolvedValue(undefined);
     delete (
       globalThis as typeof globalThis & {
         __biblequestSupabaseBrowserClient?: unknown;
       }
     ).__biblequestSupabaseBrowserClient;
+    delete (
+      globalThis as typeof globalThis & {
+        __biblequestSupabaseConsoleClient?: unknown;
+      }
+    ).__biblequestSupabaseConsoleClient;
+    localStorage.clear();
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://fixture.supabase.co");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", legacyAnonFixture);
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "");
@@ -43,15 +84,29 @@ describe("Supabase browser clients", () => {
       "sb_publishable_fixture_1234567890abcdef",
     );
     const authClient = { auth: { getSession: vi.fn() } };
-    mocks.createBrowserClient.mockReturnValue(authClient);
+    mocks.createSupabaseClient.mockReturnValue(authClient);
     const { createClient } = await import("@/lib/supabase/client");
 
     expect(createClient()).toBe(authClient);
-    expect(mocks.createBrowserClient).toHaveBeenCalledWith(
+    expect(mocks.createSupabaseClient).toHaveBeenCalledWith(
       "https://fixture.supabase.co",
       "sb_publishable_fixture_1234567890abcdef",
-      { isSingleton: true },
+      expect.objectContaining({
+        auth: expect.objectContaining({
+          persistSession: true,
+          autoRefreshToken: true,
+          storageKey: WEB_AUTH_KEY,
+          storage: expect.objectContaining({
+            getItem: expect.any(Function),
+            setItem: expect.any(Function),
+            removeItem: expect.any(Function),
+          }),
+          lock: expect.any(Function),
+        }),
+        global: { headers: { "x-biblequest-web-auth": "v2" } },
+      }),
     );
+    expect(mocks.createBrowserClient).not.toHaveBeenCalled();
   });
 
   it("fails closed when the modern variable contains a legacy JWT", async () => {
@@ -63,6 +118,7 @@ describe("Supabase browser clients", () => {
     expect(isSupabaseConfigured()).toBe(false);
     expect(() => createClient()).toThrow("Supabase is not configured");
     expect(mocks.createBrowserClient).not.toHaveBeenCalled();
+    expect(mocks.createSupabaseClient).not.toHaveBeenCalled();
   });
 
   it("rejects a service-role JWT from the legacy public variable", async () => {
@@ -82,6 +138,7 @@ describe("Supabase browser clients", () => {
     expect(isSupabaseConfigured()).toBe(false);
     expect(() => createClient()).toThrow("Supabase is not configured");
     expect(mocks.createBrowserClient).not.toHaveBeenCalled();
+    expect(mocks.createSupabaseClient).not.toHaveBeenCalled();
   });
 
   it("uses one Keychain-backed PKCE auth owner in the native app", async () => {
@@ -128,8 +185,35 @@ describe("Supabase browser clients", () => {
           persistSession: false,
           storageKey: expect.stringMatching(/^biblequest-email-otp-\d+$/),
         }),
+        global: { headers: { "x-biblequest-web-auth": "v2" } },
       }),
     );
+  });
+
+  it("creates email-code request clients without primary or cookie storage", async () => {
+    const requestClient = { auth: { signInWithOtp: vi.fn() } };
+    mocks.createSupabaseClient.mockReturnValue(requestClient);
+    const { createEmailAuthRequestClient } = await import(
+      "@/lib/supabase/client"
+    );
+
+    expect(createEmailAuthRequestClient()).toBe(requestClient);
+    expect(mocks.createSupabaseClient).toHaveBeenCalledWith(
+      "https://fixture.supabase.co",
+      legacyAnonFixture,
+      expect.objectContaining({
+        auth: expect.objectContaining({
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+          storageKey: expect.stringMatching(
+            /^biblequest-email-otp-request-\d+$/,
+          ),
+        }),
+        global: { headers: { "x-biblequest-web-auth": "v2" } },
+      }),
+    );
+    expect(mocks.createBrowserClient).not.toHaveBeenCalled();
   });
 
   it("creates sign-out revocation clients without durable auth storage", async () => {
@@ -152,26 +236,22 @@ describe("Supabase browser clients", () => {
             /^biblequest-account-sign-out-\d+$/,
           ),
         }),
+        global: { headers: { "x-biblequest-web-auth": "v2" } },
       }),
     );
   });
 
   it("uses the auth singleton only as the generation-bound data token source", async () => {
     const userId = "10000000-0000-4000-8000-000000000001";
-    const getSession = vi.fn().mockResolvedValue({
-      data: {
-        session: {
-          access_token: "fixture-access-token",
-          user: { id: userId },
-        },
-      },
-      error: null,
-    });
-    const authClient = { auth: { getSession } };
+    const token = seedWebSession(userId);
     const syncClient = { rpc: vi.fn() };
-    mocks.createBrowserClient.mockReturnValue(authClient);
     mocks.createSupabaseClient.mockReturnValue(syncClient);
     const { createSyncClient } = await import("@/lib/supabase/client");
+    const {
+      requireCurrentWebAccountRealm,
+      withWebAccountOperationLock,
+    } = await import("@/lib/supabase/web-auth-storage");
+    await withWebAccountOperationLock(requireCurrentWebAccountRealm);
 
     expect(
       createSyncClient(userId, 4),
@@ -189,26 +269,22 @@ describe("Supabase browser clients", () => {
           "x-biblequest-expected-user":
             userId,
           "x-biblequest-sync-generation": "4",
+          "x-biblequest-web-auth": "v2",
         },
       },
     });
-    expect(await options.accessToken()).toBe("fixture-access-token");
-    expect(getSession).toHaveBeenCalledOnce();
+    expect(await options.accessToken()).toBe(token);
   });
 
   it("refuses to reuse a token after the authenticated account changes", async () => {
-    const getSession = vi.fn().mockResolvedValue({
-      data: {
-        session: {
-          access_token: "account-b-token",
-          user: { id: "20000000-0000-4000-8000-000000000002" },
-        },
-      },
-      error: null,
-    });
-    mocks.createBrowserClient.mockReturnValue({ auth: { getSession } });
+    seedWebSession("20000000-0000-4000-8000-000000000002", "lineage-b");
     mocks.createSupabaseClient.mockReturnValue({ rpc: vi.fn() });
     const { createSyncClient } = await import("@/lib/supabase/client");
+    const {
+      requireCurrentWebAccountRealm,
+      withWebAccountOperationLock,
+    } = await import("@/lib/supabase/web-auth-storage");
+    await withWebAccountOperationLock(requireCurrentWebAccountRealm);
     createSyncClient("10000000-0000-4000-8000-000000000001", 4);
     const options = mocks.createSupabaseClient.mock.calls[0]?.[2];
 
@@ -255,21 +331,71 @@ describe("Supabase browser clients", () => {
           },
         },
       });
+      expect(call[2]?.global?.headers).not.toHaveProperty(
+        "x-biblequest-web-auth",
+      );
     }
   });
 
   it("keeps one auth client across every app consumer", async () => {
     const authClient = { auth: { getSession: vi.fn() } };
-    mocks.createBrowserClient.mockReturnValue(authClient);
+    mocks.createSupabaseClient.mockReturnValue(authClient);
     const { createClient } = await import("@/lib/supabase/client");
 
     expect(createClient()).toBe(authClient);
     expect(createClient()).toBe(authClient);
+    expect(mocks.createSupabaseClient).toHaveBeenCalledOnce();
+    expect(mocks.createBrowserClient).not.toHaveBeenCalled();
+  });
+
+  it("prevents auth-js construction from creating a token-bearing channel", async () => {
+    const posted: unknown[] = [];
+    class FixtureBroadcastChannel {
+      constructor(name: string) {
+        expect(name).not.toBe("");
+      }
+      postMessage(value: unknown) {
+        posted.push(value);
+      }
+      close() {}
+    }
+    vi.stubGlobal("BroadcastChannel", FixtureBroadcastChannel);
+    const before = Object.getOwnPropertyDescriptor(
+      globalThis,
+      "BroadcastChannel",
+    );
+    const authClient = { auth: { getSession: vi.fn() } };
+    mocks.createSupabaseClient.mockImplementation(() => {
+      if (typeof BroadcastChannel !== "undefined") {
+        new BroadcastChannel("supabase-auth").postMessage({
+          event: "SIGNED_IN",
+          session: { access_token: "must-not-broadcast" },
+        });
+      }
+      return authClient;
+    });
+    const { createClient } = await import("@/lib/supabase/client");
+
+    expect(createClient()).toBe(authClient);
+    expect(posted).toEqual([]);
+    expect(Object.getOwnPropertyDescriptor(globalThis, "BroadcastChannel")).toEqual(
+      before,
+    );
+  });
+
+  it("keeps the operator console on its separate legacy cookie seam", async () => {
+    const consoleClient = { auth: { getSession: vi.fn() } };
+    mocks.createBrowserClient.mockReturnValue(consoleClient);
+    const { createConsoleClient } = await import("@/lib/supabase/client");
+
+    expect(createConsoleClient()).toBe(consoleClient);
+    expect(createConsoleClient()).toBe(consoleClient);
     expect(mocks.createBrowserClient).toHaveBeenCalledOnce();
     expect(mocks.createBrowserClient).toHaveBeenCalledWith(
       "https://fixture.supabase.co",
       legacyAnonFixture,
       { isSingleton: true },
     );
+    expect(mocks.createSupabaseClient).not.toHaveBeenCalled();
   });
 });

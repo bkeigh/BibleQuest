@@ -17,7 +17,10 @@ import {
 import { track } from "@/lib/analytics/events";
 import { useSession } from "@/lib/supabase/useSession";
 import type { PlanKey } from "@/lib/questos/types";
-import { apiFetch } from "@/lib/platform/api";
+import {
+  apiFetch,
+  authenticatedApiFetch,
+} from "@/lib/platform/api";
 import { purchaseAdapter } from "@/lib/platform/purchases";
 import { NATIVE_COMMERCE_CONTAINED } from "./containment";
 import type { BillingInterval, BillingPlan } from "./validation";
@@ -135,6 +138,19 @@ async function billingFetch(
   });
 }
 
+/** Reads or mutates billing only for the still-current captured account. */
+async function authenticatedBillingFetch(
+  expectedUserId: string,
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
+  return authenticatedApiFetch(expectedUserId, path, {
+    credentials: "same-origin",
+    cache: "no-store",
+    ...init,
+  });
+}
+
 // Native billing remains unavailable until a separately audited adapter is supplied.
 const purchases = purchaseAdapter();
 
@@ -243,8 +259,10 @@ function usePlusCoordinator(): PlusState {
         return;
       }
 
+      const expectedUserId = session.user?.id;
+      if (!expectedUserId) throw new Error("account changed");
       const [statusResponse, plansResponse] = await Promise.all([
-        billingFetch("/api/billing/status"),
+        authenticatedBillingFetch(expectedUserId, "/api/billing/status"),
         billingFetch("/api/billing/plans"),
       ]);
       if (
@@ -321,7 +339,7 @@ function usePlusCoordinator(): PlusState {
         returnNotice: safeReturnNotice(),
       });
     }
-  }, [session.loading, subjectKey]);
+  }, [session.loading, session.user, subjectKey]);
 
   // Start after the effect commits so async state never cascades in its body.
   useEffect(() => {
@@ -354,7 +372,7 @@ function usePlusCoordinator(): PlusState {
       return;
     }
     if (session.user) {
-      const outcome = await purchases.restore();
+      const outcome = await purchases.restore(session.user.id);
       if (outcome === "failed" || outcome === "unavailable") {
         throw new Error("refresh failed");
       }
@@ -394,7 +412,7 @@ function usePlusCoordinator(): PlusState {
       ) {
         return false;
       }
-      const outcome = await purchases.purchase(interval);
+      const outcome = await purchases.purchase(session.user.id, interval);
       if (outcome !== "redirected") return false;
       track("plus_checkout_opened", { interval });
       return true;
@@ -404,7 +422,7 @@ function usePlusCoordinator(): PlusState {
 
   const openCustomerPortal = useCallback(async () => {
     if (!session.user || !visible.hasCustomer) return false;
-    const outcome = await purchases.manage();
+    const outcome = await purchases.manage(session.user.id);
     if (outcome !== "redirected") return false;
     track("plus_billing_portal_opened");
     return true;

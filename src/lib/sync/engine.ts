@@ -326,7 +326,7 @@ export async function startSync(userId: string, retryingFailure = false) {
   }
   if (lastSyncedUserId !== userId) {
     try {
-      markInitialSyncPending(userId);
+      await markInitialSyncPending(userId);
     } catch {
       stopSync();
       return;
@@ -383,8 +383,8 @@ export async function startSync(userId: string, retryingFailure = false) {
       isCurrent,
     );
     if (!isCurrent()) return; // stopped/restarted mid-sync
-    clearInitialSyncPending(userId);
-    clearLocalJourneyClaimPending(userId);
+    await clearInitialSyncPending(userId);
+    await clearLocalJourneyClaimPending(userId);
     writeThroughReady = true;
     setStatus("idle", { syncedNow: true, initialSyncComplete: true });
     track("sync_completed", { status: "initial" });
@@ -405,8 +405,8 @@ export async function startSync(userId: string, retryingFailure = false) {
       // The merge may already be persisted when another device advances the
       // destructive generation. Quarantine it across reloads until the next
       // pull replaces stale account fields with the server baseline.
-      markInitialSyncPending(userId);
-      markAccountSyncResetRequired(
+      await markInitialSyncPending(userId);
+      await markAccountSyncResetRequired(
         userId,
         getAccountSyncGeneration(userId) ?? 0,
       );
@@ -622,7 +622,7 @@ async function runPush() {
     // Re-stamp ownership on every successful push: "Clear my data" in
     // settings drops the marker, but anything written afterwards while still
     // signed in lands in this account's rows and belongs to it.
-    setLastSyncedUserId(userId);
+    await setLastSyncedUserId(userId);
     if (!(await sealJourneyBackupOwner(userId))) {
       throw new Error("The protected journey owner could not be sealed.");
     }
@@ -845,15 +845,19 @@ async function initialSync(
 
   // Stamp the owner before applying account data. A failed durable write must
   // never leave an account journey looking like adoptable guest data.
-  setLastSyncedUserId(userId);
+  await setLastSyncedUserId(userId);
   applyingRemote = true;
   try {
     useQuestOS.getState().importData(merged);
   } finally {
     applyingRemote = false;
   }
-  setAccountSyncGeneration(userId, propagated.generation);
-  clearAccountSyncResetRequired(userId);
+  if (
+    !(await setAccountSyncGeneration(userId, propagated.generation)) ||
+    !(await clearAccountSyncResetRequired(userId))
+  ) {
+    throw new Error("Account sync generation could not be persisted.");
+  }
   if (!(await sealJourneyBackupOwner(userId))) {
     throw new Error("The protected journey owner could not be sealed.");
   }
@@ -2079,9 +2083,13 @@ async function propagateTombstones(
     generation = currentGeneration;
     preferred = currentGeneration;
     if (requiresServerReset) {
-      markAccountSyncResetRequired(userId, generation);
+      if (!(await markAccountSyncResetRequired(userId, generation))) {
+        throw new Error("Account sync reset could not be persisted.");
+      }
     } else {
-      setAccountSyncGeneration(userId, generation);
+      if (!(await setAccountSyncGeneration(userId, generation))) {
+        throw new Error("Account sync generation could not be persisted.");
+      }
     }
     return { operationIsCurrent };
   };

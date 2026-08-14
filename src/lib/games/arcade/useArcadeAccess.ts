@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiFetch } from "@/lib/platform/api";
+import { authenticatedApiFetch } from "@/lib/platform/api";
 import { webCommerceAvailable } from "@/lib/platform/purchases";
 import { useSession } from "@/lib/supabase/useSession";
 import type { ArcadeProductId } from "./store";
@@ -52,10 +52,14 @@ export function useArcadeAccess() {
   const refresh = useCallback(async () => {
     if (session.loading || !session.user) return;
     try {
-      const response = await apiFetch("/api/arcade/status", {
-        credentials: "same-origin",
-        cache: "no-store",
-      });
+      const response = await authenticatedApiFetch(
+        session.user.id,
+        "/api/arcade/status",
+        {
+          credentials: "same-origin",
+          cache: "no-store",
+        },
+      );
       if (!response.ok) throw new Error("status");
       const payload = (await response.json()) as ArcadeStatusPayload;
       if (
@@ -81,55 +85,70 @@ export function useArcadeAccess() {
     return () => window.clearTimeout(timer);
   }, [refresh, session.loading, session.user]);
 
-  const startCheckout = useCallback(async (product: ArcadeProductId) => {
-    if (!webCommerceAvailable()) return false;
-    try {
-      const response = await apiFetch("/api/arcade/checkout", {
-        method: "POST",
-        credentials: "same-origin",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product }),
-      });
-      const destination = response.ok ? await checkoutUrl(response) : null;
-      if (!destination) return false;
-      window.location.assign(destination);
-      return true;
-    } catch {
-      return false;
-    }
-  }, []);
-
-  const consumeQuestionSkip = useCallback(async (chapterId: string) => {
-    try {
-      const response = await apiFetch("/api/arcade/consume", {
-        method: "POST",
-        credentials: "same-origin",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chapterId }),
-      });
-      if (!response.ok) return false;
-      const payload = (await response.json()) as {
-        consumed?: unknown;
-        remaining?: unknown;
-      };
-      if (
-        payload.consumed !== true ||
-        !Number.isInteger(payload.remaining) ||
-        Number(payload.remaining) < 0
-      ) {
+  const startCheckout = useCallback(
+    async (product: ArcadeProductId) => {
+      if (!webCommerceAvailable() || !session.user) return false;
+      try {
+        const response = await authenticatedApiFetch(
+          session.user.id,
+          "/api/arcade/checkout",
+          {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ product }),
+          },
+        );
+        const destination = response.ok ? await checkoutUrl(response) : null;
+        if (!destination) return false;
+        window.location.assign(destination);
+        return true;
+      } catch {
         return false;
       }
-      setStatus((current) => ({
-        ...current,
-        questionSkips: Number(payload.remaining),
-      }));
-      return true;
-    } catch {
-      return false;
-    }
-  }, []);
+    },
+    [session.user],
+  );
+
+  const consumeQuestionSkip = useCallback(
+    async (chapterId: string) => {
+      if (!session.user) return false;
+      try {
+        const response = await authenticatedApiFetch(
+          session.user.id,
+          "/api/arcade/consume",
+          {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chapterId }),
+          },
+        );
+        if (!response.ok) return false;
+        const payload = (await response.json()) as {
+          consumed?: unknown;
+          remaining?: unknown;
+        };
+        if (
+          payload.consumed !== true ||
+          !Number.isInteger(payload.remaining) ||
+          Number(payload.remaining) < 0
+        ) {
+          return false;
+        }
+        setStatus((current) => ({
+          ...current,
+          questionSkips: Number(payload.remaining),
+        }));
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [session.user],
+  );
 
   const visible =
     status.subjectKey === session.user?.id ? status : EMPTY_STATUS;

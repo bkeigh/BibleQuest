@@ -196,10 +196,10 @@ async function readBackupRecord(): Promise<BackupRecord> {
 }
 
 /** Quarantine a malformed account mirror and prevent an automatic overwrite. */
-function quarantineProtectedMirror(): void {
+async function quarantineProtectedMirror(): Promise<void> {
   backupWritesSuspended = true;
   try {
-    quarantineLocalJourneyOwner();
+    await quarantineLocalJourneyOwner();
   } catch {
     // Storage is already unavailable; suspension still preserves the mirror.
   }
@@ -347,17 +347,17 @@ export async function restoreJourneyIfEvicted(): Promise<RestoreOutcome> {
           backup.ownerUserId !== null
         ) {
           if (backup.journey !== primary.journey) {
-            quarantineProtectedMirror();
+            await quarantineProtectedMirror();
             return "failed";
           }
           try {
-            setLastSyncedUserId(backup.ownerUserId);
+            await setLastSyncedUserId(backup.ownerUserId);
           } catch {
             backupWritesSuspended = true;
             return "failed";
           }
         } else if (backup.status === "corrupt" && backup.protectedEnvelope) {
-          quarantineProtectedMirror();
+          await quarantineProtectedMirror();
           return "failed";
         } else if (backup.status === "unavailable") {
           backupWritesSuspended = true;
@@ -378,7 +378,7 @@ export async function restoreJourneyIfEvicted(): Promise<RestoreOutcome> {
     return "failed";
   }
   if (backup.status === "corrupt") {
-    if (accountOwnerEnvelopeRequired()) quarantineProtectedMirror();
+    if (accountOwnerEnvelopeRequired()) await quarantineProtectedMirror();
     return "failed";
   }
 
@@ -412,9 +412,9 @@ export async function restoreJourneyIfEvicted(): Promise<RestoreOutcome> {
         !backup.legacyGuest &&
         backup.ownerUserId !== null
       ) {
-        setLastSyncedUserId(backup.ownerUserId);
+        await setLastSyncedUserId(backup.ownerUserId);
       } else if (currentOwner.status === "unowned") {
-        clearLastSyncedUserId();
+        await clearLastSyncedUserId();
       }
     }
     window.localStorage.setItem(JOURNEY_STORAGE_KEY, backup.journey);

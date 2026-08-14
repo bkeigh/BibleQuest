@@ -1,11 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+
+vi.mock("@/lib/platform/web-auth-service-worker", () => ({
+  requireWebAuthServiceWorkerAttestation: vi.fn().mockResolvedValue(undefined),
+}));
 import {
   AccountDeletionError,
   AccountDeletionPendingError,
+  ACCOUNT_DELETION_STATUS_CONTRACT,
+  deleteAccountAndDeviceData,
   deleteOwnAccount,
   deleteOwnAccountWithAvatar,
+  ownAccountDeletionIsPending,
 } from "@/lib/auth/account-deletion";
+import {
+  beginAccountLifecycle,
+  finishAccountLifecycle,
+} from "@/lib/auth/account-lifecycle";
+import { withWebAccountOperationLock } from "@/lib/supabase/web-auth-storage";
 
 const USER_A = "10000000-0000-4000-8000-000000000001";
 const USER_B = "20000000-0000-4000-8000-000000000002";
@@ -13,8 +25,37 @@ const PLATFORM = "NEXT_PUBLIC_APP_PLATFORM";
 const ACCOUNT_SYNC = "NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED";
 const ACCOUNT_BETA = "NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED";
 
+/** Seeds one strict active v2 envelope for complete web-deletion tests. */
+function seedWebAccountA() {
+  const accessToken = `fixture.${Buffer.from(
+    JSON.stringify({ sub: USER_A, session_id: "lineage-a" }),
+  ).toString("base64url")}.signature`;
+  localStorage.setItem(
+    "biblequest:web-private-write-generation:v1",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  );
+  localStorage.setItem("biblequest:web-private:namespace:v2", "complete");
+  localStorage.setItem(
+    "biblequest:web-private:v2:last-sync-user",
+    USER_A,
+  );
+  localStorage.setItem(
+    "biblequest:web-auth:v2",
+    JSON.stringify({
+      version: 2,
+      mode: "active",
+      session: {
+        access_token: accessToken,
+        refresh_token: "refresh-a",
+        user: { id: USER_A },
+      },
+    }),
+  );
+}
+
 beforeEach(() => {
   process.env[PLATFORM] = "web";
+  localStorage.clear();
 });
 
 afterEach(() => {
@@ -47,43 +88,57 @@ function client(
 }
 
 describe("self-service account deletion", () => {
-  it("calls the zero-argument owner RPC then clears the local session", async () => {
+  it("calls only the zero-argument owner RPC before device cleanup", async () => {
     const fixture = client();
 
-    await deleteOwnAccount(USER_A, fixture.client, fixture.client);
+    await deleteOwnAccount(USER_A, fixture.client);
 
     expect(fixture.rpc).toHaveBeenCalledWith("delete_own_account");
-    expect(fixture.getSession).toHaveBeenCalledOnce();
-    expect(fixture.signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(fixture.getSession).not.toHaveBeenCalled();
+    expect(fixture.signOut).not.toHaveBeenCalled();
   });
 
   it("keeps the session and device journey untouched when deletion fails", async () => {
     const fixture = client({ code: "42501", message: "private fixture" });
 
     await expect(
-      deleteOwnAccount(USER_A, fixture.client, fixture.client),
+      deleteOwnAccount(USER_A, fixture.client),
     ).rejects.toBeInstanceOf(AccountDeletionError);
     expect(fixture.signOut).not.toHaveBeenCalled();
   });
 
-  it("treats a timed-out irreversible deletion as pending even if it settles later", async () => {
+  it("keeps the full Web Lock after the caller-visible deletion deadline", async () => {
     vi.useFakeTimers();
-    let settle!: (value: { data: null; error: null }) => void;
-    const deferred = new Promise<{ data: null; error: null }>((resolve) => {
+    seedWebAccountA();
+    let settle!: () => void;
+    const deferred = new Promise<void>((resolve) => {
       settle = resolve;
     });
-    const fixture = client();
-    fixture.rpc.mockReturnValue(deferred);
-
-    const deletion = expect(
-      deleteOwnAccount(USER_A, fixture.client, fixture.client),
-    ).rejects.toBeInstanceOf(AccountDeletionPendingError);
+    const lifecycle = beginAccountLifecycle(USER_A)!;
+    const purgeDevice = vi.fn(async () => true);
+    const deletion = deleteAccountAndDeviceData(USER_A, lifecycle, {
+      removeOwnedAvatars: vi.fn(() => deferred),
+      purgeDevice,
+    });
+    const rejected = expect(deletion).rejects.toBeInstanceOf(
+      AccountDeletionPendingError,
+    );
     await vi.advanceTimersByTimeAsync(15_000);
-    await deletion;
+    await rejected;
+    expect(purgeDevice).not.toHaveBeenCalled();
 
-    settle({ data: null, error: null });
+    let laterAccountStarted = false;
+    const laterAccount = withWebAccountOperationLock(async () => {
+      laterAccountStarted = true;
+    });
     await Promise.resolve();
-    expect(fixture.signOut).not.toHaveBeenCalled();
+    expect(laterAccountStarted).toBe(false);
+
+    settle();
+    await laterAccount;
+    expect(purgeDevice).toHaveBeenCalledWith(USER_A, lifecycle, expect.anything());
+    expect(laterAccountStarted).toBe(true);
+    finishAccountLifecycle(lifecycle);
   });
 
   it.each([0, 503])(
@@ -96,7 +151,7 @@ describe("self-service account deletion", () => {
       );
 
       await expect(
-        deleteOwnAccount(USER_A, fixture.client, fixture.client),
+        deleteOwnAccount(USER_A, fixture.client),
       ).rejects.toBeInstanceOf(AccountDeletionPendingError);
       expect(fixture.signOut).not.toHaveBeenCalled();
     },
@@ -107,7 +162,7 @@ describe("self-service account deletion", () => {
     fixture.rpc.mockRejectedValue(new TypeError("private transport failure"));
 
     await expect(
-      deleteOwnAccount(USER_A, fixture.client, fixture.client),
+      deleteOwnAccount(USER_A, fixture.client),
     ).rejects.toBeInstanceOf(AccountDeletionPendingError);
     expect(fixture.signOut).not.toHaveBeenCalled();
   });
@@ -115,9 +170,10 @@ describe("self-service account deletion", () => {
   it("does not sign out a newer account after the server deletes the expected one", async () => {
     const fixture = client(null, USER_B);
 
-    await deleteOwnAccount(USER_A, fixture.client, fixture.client);
+    await deleteOwnAccount(USER_A, fixture.client);
 
     expect(fixture.rpc).toHaveBeenCalledOnce();
+    expect(fixture.getSession).not.toHaveBeenCalled();
     expect(fixture.signOut).not.toHaveBeenCalled();
   });
 
@@ -125,7 +181,7 @@ describe("self-service account deletion", () => {
     process.env[PLATFORM] = "native";
     const fixture = client();
 
-    await deleteOwnAccount(USER_A, fixture.client, fixture.client);
+    await deleteOwnAccount(USER_A, fixture.client);
 
     expect(fixture.rpc).toHaveBeenCalledOnce();
     expect(fixture.getSession).not.toHaveBeenCalled();
@@ -160,8 +216,55 @@ describe("self-service account deletion", () => {
 
     await expect(
       deleteOwnAccountWithAvatar(USER_A, removeOwnedAvatars, deleteAccount),
-    ).rejects.toThrow("private fixture");
+    ).rejects.toBeInstanceOf(AccountDeletionPendingError);
     expect(deleteAccount).not.toHaveBeenCalled();
+  });
+
+  it("requires the exact sealed deletion-status response", async () => {
+    const rpc = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: {
+          contract: ACCOUNT_DELETION_STATUS_CONTRACT,
+          pending: false,
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          contract: ACCOUNT_DELETION_STATUS_CONTRACT,
+          pending: true,
+        },
+        error: null,
+      });
+    const statusClient = { rpc } as unknown as SupabaseClient;
+
+    await expect(
+      ownAccountDeletionIsPending(USER_A, statusClient),
+    ).resolves.toBe(false);
+    await expect(
+      ownAccountDeletionIsPending(USER_A, statusClient),
+    ).resolves.toBe(true);
+    expect(rpc).toHaveBeenCalledWith("own_account_deletion_status");
+  });
+
+  it.each([
+    null,
+    { contract: ACCOUNT_DELETION_STATUS_CONTRACT, pending: "false" },
+    {
+      contract: ACCOUNT_DELETION_STATUS_CONTRACT,
+      pending: false,
+      extra: true,
+    },
+    { contract: "wrong", pending: false },
+  ])("fails closed for malformed deletion status %#", async (data) => {
+    const statusClient = {
+      rpc: vi.fn().mockResolvedValue({ data, error: null }),
+    } as unknown as SupabaseClient;
+
+    await expect(
+      ownAccountDeletionIsPending(USER_A, statusClient),
+    ).rejects.toBeInstanceOf(AccountDeletionError);
   });
 
   it("recovers only one stable server-verified native subject for disabled-beta deletion", async () => {

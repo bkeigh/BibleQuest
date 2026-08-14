@@ -4,7 +4,7 @@ import type {
   PushReminderPreferences,
   SerializedPushSubscription,
 } from "./validation";
-import { apiFetch } from "@/lib/platform/api";
+import { authenticatedApiFetch } from "@/lib/platform/api";
 import {
   notificationCapability,
   type NotificationPosture,
@@ -56,10 +56,11 @@ async function responseReady(response: Response): Promise<Response> {
 
 /** Reads browser-safe configuration without requesting notification permission. */
 export async function fetchPushConfig(
+  expectedUserId: string,
   signal?: AbortSignal,
 ): Promise<PushConfig> {
   const response = await responseReady(
-    await apiFetch("/api/push/config", {
+    await authenticatedApiFetch(expectedUserId, "/api/push/config", {
       cache: "no-store",
       credentials: "same-origin",
       signal,
@@ -112,9 +113,12 @@ export async function currentPushSubscription(): Promise<PushSubscription | null
   return registration?.pushManager.getSubscription() ?? null;
 }
 
-async function deleteEndpoint(endpoint: string): Promise<void> {
+async function deleteEndpoint(
+  expectedUserId: string,
+  endpoint: string,
+): Promise<void> {
   await responseReady(
-    await apiFetch("/api/push/subscriptions", {
+    await authenticatedApiFetch(expectedUserId, "/api/push/subscriptions", {
       method: "DELETE",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
@@ -125,6 +129,7 @@ async function deleteEndpoint(endpoint: string): Promise<void> {
 
 /** Prompts only from the caller's click, then persists one encrypted endpoint. */
 export async function enablePushReminders(
+  expectedUserId: string,
   config: PushConfig,
   preferences: PushReminderPreferences,
 ): Promise<PushSubscription> {
@@ -142,20 +147,26 @@ export async function enablePushReminders(
   const serialized = serializedSubscription(subscription);
   try {
     await responseReady(
-      await apiFetch("/api/push/subscriptions", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subscription: serialized,
-          preferences,
-        }),
-      }),
+      await authenticatedApiFetch(
+        expectedUserId,
+        "/api/push/subscriptions",
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subscription: serialized,
+            preferences,
+          }),
+        },
+      ),
     );
     return subscription;
   } catch (error) {
     if (created) {
-      await deleteEndpoint(serialized.endpoint).catch(() => undefined);
+      await deleteEndpoint(expectedUserId, serialized.endpoint).catch(
+        () => undefined,
+      );
       await subscription.unsubscribe().catch(() => undefined);
     }
     throw error;
@@ -164,10 +175,11 @@ export async function enablePushReminders(
 
 /** Saves account-wide choices without changing browser permission. */
 export async function savePushPreferences(
+  expectedUserId: string,
   preferences: PushReminderPreferences,
 ): Promise<void> {
   await responseReady(
-    await apiFetch("/api/push/preferences", {
+    await authenticatedApiFetch(expectedUserId, "/api/push/preferences", {
       method: "PATCH",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
@@ -178,21 +190,23 @@ export async function savePushPreferences(
 
 /** Disables account delivery first, then removes this browser endpoint. */
 export async function disablePushReminders(
+  expectedUserId: string,
   subscription: PushSubscription | null,
   preferences: PushReminderPreferences,
 ): Promise<void> {
-  await savePushPreferences(preferences);
+  await savePushPreferences(expectedUserId, preferences);
   if (!subscription) return;
-  await deleteEndpoint(subscription.endpoint);
+  await deleteEndpoint(expectedUserId, subscription.endpoint);
   await subscription.unsubscribe();
 }
 
 /** Requests one server-throttled neutral test notification. */
 export async function sendTestPush(
+  expectedUserId: string,
   subscription: PushSubscription,
 ): Promise<void> {
   await responseReady(
-    await apiFetch("/api/push/test", {
+    await authenticatedApiFetch(expectedUserId, "/api/push/test", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },

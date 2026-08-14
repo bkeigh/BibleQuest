@@ -36,7 +36,7 @@ describe("Plus reconciliation after a Checkout return", () => {
 
   it("keeps the reconcile server-driven rather than trusting the redirect", () => {
     // The return parameter only triggers a request; it never sets isPlus.
-    expect(SOURCE).toContain("purchases.restore()");
+    expect(SOURCE).toContain("purchases.restore(session.user.id)");
     expect(PURCHASE_SOURCE).toContain('"/api/billing/refresh"');
     expect(SOURCE).not.toContain('isPlus: true');
   });

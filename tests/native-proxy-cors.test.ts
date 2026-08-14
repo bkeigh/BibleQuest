@@ -48,55 +48,26 @@ describe("proxy wiring for the native CORS layer", () => {
     expect(mocks.createServerClient).not.toHaveBeenCalled();
   });
 
-  it("keeps decoration on the response updateSession reassigns", async () => {
-    // A sync-enabled build is where updateSession actually constructs a
-    // client and its cookie-refresh callback REASSIGNS the response — the
-    // exact hazard the decoration must survive. Env must be set before the
-    // module graph loads, because containment captures it at import time.
+  it("decorates native customer requests without creating a cookie session", async () => {
+    // Customer account transport is bearer-only even in a sync-enabled build.
+    // Native CORS remains available without reopening middleware cookie writes.
     process.env[LATCH] = "true";
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://proxy-fixture.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY =
       "sb_publishable_proxy_fixture_1234567890abcdef";
     process.env.NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED = "true";
-    mocks.createServerClient.mockImplementation(
-      (
-        _url: string,
-        _key: string,
-        options: {
-          cookies: {
-            setAll: (
-              cookies: { name: string; value: string; options: object }[],
-            ) => void;
-          };
-        },
-      ) => ({
-        auth: {
-          getUser: async () => {
-            options.cookies.setAll([
-              { name: "sb-fixture", value: "refreshed", options: {} },
-            ]);
-            return { data: { user: null }, error: null };
-          },
-        },
-      }),
-    );
-
     const proxy = await loadProxy();
     const response = await proxy(
       nativeRequest("GET", "https://www.biblequest.co/api/arcade/status"),
     );
-    expect(mocks.createServerClient).toHaveBeenCalledTimes(1);
-    // The cookie refresh replaced the response object; the decoration must
-    // sit on the replacement.
+    expect(mocks.createServerClient).not.toHaveBeenCalled();
     expect(response.headers.get("access-control-allow-origin")).toBe(
       NATIVE_ORIGIN,
     );
     expect(response.headers.get("access-control-expose-headers")).toContain(
       "X-BibleQuest-Avatar-Version",
     );
-    expect(response.headers.get("set-cookie")).toContain(
-      "sb-fixture=refreshed",
-    );
+    expect(response.headers.get("set-cookie")).toBeNull();
   });
 
   it("passes web requests through untouched with the latch on", async () => {

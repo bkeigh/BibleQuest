@@ -21,14 +21,17 @@ vi.mock("@/lib/sync/generation", () => ({
   getAccountSyncGeneration: (userId: string) => mocks.generations.get(userId) ?? null,
   setAccountSyncGeneration: (userId: string, generation: number) => {
     mocks.generations.set(userId, generation);
+    return true;
   },
   accountSyncResetRequired: (userId: string) => mocks.resetRequired.has(userId),
   markAccountSyncResetRequired: (userId: string, generation: number) => {
     mocks.generations.set(userId, generation);
     mocks.resetRequired.add(userId);
+    return true;
   },
   clearAccountSyncResetRequired: (userId: string) => {
     mocks.resetRequired.delete(userId);
+    return true;
   },
 }));
 

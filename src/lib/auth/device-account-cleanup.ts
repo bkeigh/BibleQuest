@@ -7,11 +7,16 @@ import { removeStoredAccountSyncGeneration } from "@/lib/sync/generation";
 import { removeStoredDailyQuestSyncContext } from "@/lib/sync/daily-quests";
 import { removeStoredMutableRevisionContext } from "@/lib/sync/mutable-revisions";
 import { clearNativeAuthStorageForUser } from "@/lib/supabase/native-auth-storage";
-import { clearRhythmState } from "@/lib/rhythm/client";
-import { clearGameProgress } from "@/lib/games/storage";
-import { clearSevenDaysProgress } from "@/lib/games/seven-days/progress";
-import { SEVEN_DAYS_TUTORIAL_STORAGE_KEY } from "@/lib/games/seven-days/tutorial";
-import { BOOST_STORAGE_KEY } from "@/lib/games/arcade/boosts";
+import {
+  clearExpectedWebAuthSubject,
+  confirmTerminalWebPrivateDataPurge,
+  withWebAccountOperationLock,
+  type WebAccountOperationHandle,
+} from "@/lib/supabase/web-auth-storage";
+import { isNativeTarget } from "@/lib/platform/target";
+import { purgeRhythmState } from "@/lib/rhythm/client";
+import { purgeGameProgress } from "@/lib/games/storage";
+import { purgeSevenDaysProgress } from "@/lib/games/seven-days/progress";
 import { purgeAvatarCache } from "@/lib/utils/avatar";
 import {
   purgeJourneyBackup,
@@ -24,21 +29,50 @@ import {
   finishAccountLifecycle,
   type AccountLifecycleHandle,
 } from "./account-lifecycle";
+import { clearSignInTrackingStamp } from "./sign-in-tracking";
+import { removeWebPrivateStorageItem } from "@/lib/storage/web-private-write";
+import {
+  LEGACY_ARCADE_BOOST_STORAGE_KEY,
+  LEGACY_SEVEN_DAYS_TUTORIAL_STORAGE_KEY,
+  WEB_V2_ARCADE_BOOST_STORAGE_KEY,
+  WEB_V2_SEVEN_DAYS_TUTORIAL_STORAGE_KEY,
+} from "@/lib/storage/web-private-namespace";
+import {
+  proveAllWebPrivateDataNamespacesEmpty,
+  purgeAllWebPrivateDataNamespaces,
+} from "@/lib/storage/web-private-cutover";
 
 let cleanupRun: { promise: Promise<boolean>; userId: string } | null = null;
 
+/** Clears only the proved-deleted subject through this platform's auth store. */
+async function clearDeletedAccountCredential(userId: string) {
+  return isNativeTarget()
+    ? clearNativeAuthStorageForUser(userId)
+    : clearExpectedWebAuthSubject(userId);
+}
+
 /** Clear game records that live outside the persisted journey store. */
-export function clearStandaloneGameData(): boolean {
-  const gameProgressCleared = clearGameProgress();
-  const sevenDaysCleared = clearSevenDaysProgress();
+export async function clearStandaloneGameData(): Promise<boolean> {
+  const [gameProgressCleared, sevenDaysCleared] = await Promise.all([
+    purgeGameProgress(),
+    purgeSevenDaysProgress(),
+  ]);
   let complete = gameProgressCleared && sevenDaysCleared;
   try {
-    window.localStorage.removeItem(SEVEN_DAYS_TUTORIAL_STORAGE_KEY);
-    window.localStorage.removeItem(BOOST_STORAGE_KEY);
+    const standaloneKeys = [
+      LEGACY_SEVEN_DAYS_TUTORIAL_STORAGE_KEY,
+      WEB_V2_SEVEN_DAYS_TUTORIAL_STORAGE_KEY,
+      LEGACY_ARCADE_BOOST_STORAGE_KEY,
+      WEB_V2_ARCADE_BOOST_STORAGE_KEY,
+    ];
+    const removed = await Promise.all(
+      standaloneKeys.map((key) =>
+        removeWebPrivateStorageItem(window.localStorage, key),
+      ),
+    );
     complete =
       complete &&
-      window.localStorage.getItem(SEVEN_DAYS_TUTORIAL_STORAGE_KEY) === null &&
-      window.localStorage.getItem(BOOST_STORAGE_KEY) === null;
+      removed.every(Boolean);
   } catch {
     complete = false;
   }
@@ -52,6 +86,7 @@ export function clearStandaloneGameData(): boolean {
 export function purgeDeletedAccountDeviceData(
   userId: string,
   lifecycle?: AccountLifecycleHandle,
+  webOperation?: WebAccountOperationHandle,
 ): Promise<boolean> {
   if (cleanupRun) {
     return cleanupRun.userId === userId
@@ -69,7 +104,13 @@ export function purgeDeletedAccountDeviceData(
     return Promise.resolve(false);
   }
 
-  const promise = runDeletedAccountCleanup(handle).finally(() => {
+  // A newly acquired web operation must be threaded into every reviewed purge.
+  const cleanup = (activeWebOperation?: WebAccountOperationHandle) =>
+    runDeletedAccountCleanup(handle, activeWebOperation);
+  const operation = isNativeTarget()
+    ? cleanup()
+    : withWebAccountOperationLock(cleanup, webOperation).catch(() => false);
+  const promise = operation.finally(() => {
     if (cleanupRun?.promise === promise) cleanupRun = null;
     if (ownedLifecycle) finishAccountLifecycle(ownedLifecycle);
   });
@@ -80,6 +121,7 @@ export function purgeDeletedAccountDeviceData(
 /** Stop sync, tombstone the mirror, then clear each isolated device store. */
 async function runDeletedAccountCleanup(
   lifecycle: AccountLifecycleHandle,
+  webOperation?: WebAccountOperationHandle,
 ): Promise<boolean> {
   const userId = lifecycle.userId;
   const boundaryIsCurrent = () => {
@@ -97,12 +139,21 @@ async function runDeletedAccountCleanup(
     entryOwner.status !== "owned" ||
     entryOwner.userId !== userId
   ) {
-    // A terminal credential is still removable when no local journey is
-    // attributed to it, but unknown ownership never authorizes a local clear.
-    const credential = await clearNativeAuthStorageForUser(userId);
+    // A different or unreadable owner cannot authorize any terminal mutation.
+    if (entryOwner.status !== "unowned") return false;
+    // Unknown native residue cannot authorize clearing a terminal credential.
+    if (isNativeTarget() || !webOperation) return false;
+    const privateDataAbsent = await confirmTerminalWebPrivateDataPurge(
+      webOperation,
+      userId,
+      async () =>
+        (await proveAllWebPrivateDataNamespacesEmpty()) &&
+        readLocalJourneyOwner().status === "unowned",
+    );
+    if (!privateDataAbsent) return false;
+    const credential = await clearDeletedAccountCredential(userId);
     return (
       accountLifecycleHandleIsCurrent(lifecycle) &&
-      entryOwner.status !== "unavailable" &&
       credential !== "unavailable"
     );
   }
@@ -125,34 +176,41 @@ async function runDeletedAccountCleanup(
       return false;
     }
     primaryReset = true;
+    const nativeOnlyMetadataClearers = isNativeTarget()
+      ? [
+          async () => {
+            if (!(await removeStoredAccountSyncGeneration(userId))) {
+              throw new Error("account generation cleanup unavailable");
+            }
+            return true;
+          },
+          () => {
+            if (!removeStoredDailyQuestSyncContext(userId)) {
+              throw new Error("daily quest cleanup unavailable");
+            }
+            return true;
+          },
+          () => {
+            if (!removeStoredMutableRevisionContext(userId)) {
+              throw new Error("mutable revision cleanup unavailable");
+            }
+            return true;
+          },
+          clearSignInTrackingStamp,
+        ]
+      : [];
     for (const clear of [
       purgeAllDeviceLocalJournalDrafts,
-      () => {
-        if (!removeStoredAccountSyncGeneration(userId)) {
-          throw new Error("account generation cleanup unavailable");
-        }
-        return true;
-      },
-      () => {
-        if (!removeStoredDailyQuestSyncContext(userId)) {
-          throw new Error("daily quest cleanup unavailable");
-        }
-        return true;
-      },
-      () => {
-        if (!removeStoredMutableRevisionContext(userId)) {
-          throw new Error("mutable revision cleanup unavailable");
-        }
-        return true;
-      },
-      clearRhythmState,
+      purgeRhythmState,
       clearStandaloneGameData,
+      ...nativeOnlyMetadataClearers,
     ]) {
       try {
-        if (!clear()) complete = false;
+        if (!(await clear())) complete = false;
       } catch {
         complete = false;
       }
+      if (!boundaryIsCurrent()) return false;
     }
     for (const clear of [purgeNativeReminders, purgeAvatarCache]) {
       if (!boundaryIsCurrent()) return false;
@@ -165,17 +223,31 @@ async function runDeletedAccountCleanup(
       if (!boundaryIsCurrent()) return false;
     }
 
+    if (!isNativeTarget()) {
+      if (!boundaryIsCurrent() || !webOperation) return false;
+      if (
+        !(await confirmTerminalWebPrivateDataPurge(
+          webOperation,
+          userId,
+          purgeAllWebPrivateDataNamespaces,
+        ))
+      ) {
+        return false;
+      }
+      if (!accountLifecycleHandleIsCurrent(lifecycle)) return false;
+    }
+
     // Retain both the owner and credential on a partial purge. A fresh server
     // verification can then recognize the deleted subject and retry every
     // device-only store instead of silently turning remnants into guest data.
     if (!complete) return false;
     try {
-      clearLastSyncedUserId();
+      await clearLastSyncedUserId();
       ownerCleared = true;
     } catch {
       return false;
     }
-    const credential = await clearNativeAuthStorageForUser(userId);
+    const credential = await clearDeletedAccountCredential(userId);
     if (!accountLifecycleHandleIsCurrent(lifecycle)) return false;
     if (credential === "unavailable") complete = false;
   } finally {

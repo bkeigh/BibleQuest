@@ -63,6 +63,44 @@ function mockSupabaseClient(
   return createClient;
 }
 
+/** Supplies one exact v2 web credential without exposing browser cookies. */
+function mockWebAuthSession(
+  accessToken: string | null,
+  userId = USER_A,
+) {
+  const readActiveWebAuthSession = vi.fn(async () =>
+    accessToken
+      ? {
+          userId,
+          accessToken,
+          refreshToken: "fixture-refresh-token",
+        }
+      : null,
+  );
+  const readExpectedWebAuthSession = vi.fn(
+    async (expectedUserId: string, allowedModes: readonly string[]) => {
+      if (
+        !accessToken ||
+        expectedUserId !== userId ||
+        allowedModes.length !== 1 ||
+        allowedModes[0] !== "deleting"
+      ) {
+        throw new Error("web auth unavailable");
+      }
+      return {
+        userId,
+        accessToken,
+        refreshToken: "fixture-refresh-token",
+      };
+    },
+  );
+  vi.doMock("@/lib/supabase/web-auth-storage", () => ({
+    readActiveWebAuthSession,
+    readExpectedWebAuthSession,
+  }));
+  return { readActiveWebAuthSession, readExpectedWebAuthSession };
+}
+
 /** Makes the anonymous remote gate explicit in authenticated API tests. */
 function mockAvailability(available = true) {
   const requireNativeAccountBetaAvailability = vi.fn(async () => {
@@ -89,19 +127,171 @@ afterEach(() => {
   delete process.env[ACCOUNT_BETA];
   vi.doUnmock("@/lib/supabase/client");
   vi.doUnmock("@/lib/sync/availability");
+  vi.doUnmock("@/lib/supabase/web-auth-storage");
   vi.unstubAllGlobals();
 });
 
 describe("apiFetch on the web target", () => {
-  it("passes the caller's init through by reference with no token", async () => {
+  it("forces public requests anonymous and removes reserved authority", async () => {
     const calls = stubFetch();
     const { apiFetch } = await apiModule();
-    const init = { method: "POST", credentials: "same-origin" as const };
+    const init = {
+      method: "POST",
+      credentials: "same-origin" as const,
+      headers: {
+        Authorization: "Bearer caller-owned",
+        "x-biblequest-account-deletion-cleanup": "v1",
+        "x-biblequest-expected-user": USER_A,
+        "x-biblequest-native-account-beta": "v1",
+        "x-biblequest-web-auth": "v2",
+        "x-public": "kept",
+      },
+    };
     await apiFetch("/api/arcade/status", init);
     expect(calls).toHaveLength(1);
     expect(calls[0][0]).toBe("/api/arcade/status");
-    // Identity, not equality: web behavior is byte-identical to before.
-    expect(calls[0][1]).toBe(init);
+    expect(calls[0][1]?.credentials).toBe("omit");
+    const headers = new Headers(calls[0][1]?.headers);
+    expect(headers.get("x-public")).toBe("kept");
+    expect(headers.has("authorization")).toBe(false);
+    expect(headers.has("x-biblequest-account-deletion-cleanup")).toBe(false);
+    expect(headers.has("x-biblequest-expected-user")).toBe(false);
+    expect(headers.has("x-biblequest-native-account-beta")).toBe(false);
+    expect(headers.has("x-biblequest-web-auth")).toBe(false);
+  });
+
+  it("sends only the exact active v2 bearer for a captured web subject", async () => {
+    const calls = stubFetch();
+    const reads = mockWebAuthSession("web-session-token");
+    const { authenticatedApiFetch } = await apiModule();
+
+    await authenticatedApiFetch(USER_A, "/api/arcade/status", {
+      credentials: "include",
+      headers: {
+        Authorization: "Bearer caller-owned",
+        "x-biblequest-account-deletion-cleanup": "v1",
+        "x-biblequest-native-account-beta": "v1",
+        "x-biblequest-web-auth": "caller-owned",
+      },
+    });
+
+    expect(reads.readActiveWebAuthSession).toHaveBeenCalledOnce();
+    expect(reads.readExpectedWebAuthSession).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(1);
+    expect(calls[0][1]?.credentials).toBe("omit");
+    const headers = new Headers(calls[0][1]?.headers);
+    expect(headers.get("authorization")).toBe("Bearer web-session-token");
+    expect(headers.get("x-biblequest-expected-user")).toBe(USER_A);
+    expect(headers.has("x-biblequest-account-deletion-cleanup")).toBe(false);
+    expect(headers.has("x-biblequest-native-account-beta")).toBe(false);
+    expect(headers.get("x-biblequest-web-auth")).toBe("v2");
+  });
+
+  it("refuses absent or replacement web credentials before fetch", async () => {
+    const calls = stubFetch();
+    mockWebAuthSession("account-b-token", USER_B);
+    const { authenticatedApiFetch } = await apiModule();
+
+    await expect(
+      authenticatedApiFetch(USER_A, "/api/arcade/status"),
+    ).rejects.toMatchObject({ code: "native_account_beta_unavailable" });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("adds the cleanup marker only through the fixed deletion helper", async () => {
+    const calls = stubFetch();
+    const reads = mockWebAuthSession("web-session-token");
+    const { accountDeletionAvatarFetch } = await apiModule();
+    const webOperation = {} as NonNullable<
+      Parameters<typeof accountDeletionAvatarFetch>[2]
+    >;
+
+    await accountDeletionAvatarFetch(USER_A, undefined, webOperation);
+
+    expect(reads.readActiveWebAuthSession).not.toHaveBeenCalled();
+    expect(reads.readExpectedWebAuthSession).toHaveBeenCalledWith(
+      USER_A,
+      ["deleting"],
+      webOperation,
+    );
+    const headers = new Headers(calls[0][1]?.headers);
+    expect(calls[0][1]?.credentials).toBe("omit");
+    expect(headers.get("authorization")).toBe("Bearer web-session-token");
+    expect(headers.get("x-biblequest-expected-user")).toBe(USER_A);
+    expect(headers.get("x-biblequest-account-deletion-cleanup")).toBe("v1");
+    expect(headers.get("x-biblequest-web-auth")).toBe("v2");
+  });
+
+  it("requires the retained account-operation handle for web deletion", async () => {
+    const calls = stubFetch();
+    const reads = mockWebAuthSession("web-session-token");
+    const { accountDeletionAvatarFetch } = await apiModule();
+
+    await expect(accountDeletionAvatarFetch(USER_A)).rejects.toMatchObject({
+      code: "native_account_beta_unavailable",
+    });
+
+    expect(calls).toHaveLength(0);
+    expect(reads.readActiveWebAuthSession).not.toHaveBeenCalled();
+    expect(reads.readExpectedWebAuthSession).not.toHaveBeenCalled();
+  });
+
+  it("keeps deleting credentials exclusive to the exact deletion transport", async () => {
+    const calls = stubFetch();
+    const readActiveWebAuthSession = vi.fn(async () => {
+      throw new Error("terminal web session");
+    });
+    const readExpectedWebAuthSession = vi.fn(
+      async (
+        expectedUserId: string,
+        allowedModes: readonly string[],
+        webOperation: unknown,
+      ) => {
+        if (
+          expectedUserId !== USER_A ||
+          allowedModes.length !== 1 ||
+          allowedModes[0] !== "deleting" ||
+          !webOperation
+        ) {
+          throw new Error("web auth unavailable");
+        }
+        return {
+          userId: USER_A,
+          accessToken: "deleting-session-token",
+          refreshToken: "fixture-refresh-token",
+        };
+      },
+    );
+    vi.doMock("@/lib/supabase/web-auth-storage", () => ({
+      readActiveWebAuthSession,
+      readExpectedWebAuthSession,
+    }));
+    const { accountDeletionAvatarFetch, authenticatedApiFetch } =
+      await apiModule();
+    const webOperation = {} as NonNullable<
+      Parameters<typeof accountDeletionAvatarFetch>[2]
+    >;
+
+    await expect(
+      authenticatedApiFetch(USER_A, "/api/profile/avatar"),
+    ).rejects.toThrow("terminal web session");
+    expect(calls).toHaveLength(0);
+
+    await accountDeletionAvatarFetch(USER_A, undefined, webOperation);
+    expect(calls).toHaveLength(1);
+    expect(
+      new Headers(calls[0][1]?.headers).get("authorization"),
+    ).toBe("Bearer deleting-session-token");
+
+    await expect(
+      accountDeletionAvatarFetch(USER_B, undefined, webOperation),
+    ).rejects.toThrow("web auth unavailable");
+    expect(calls).toHaveLength(1);
+    expect(readExpectedWebAuthSession).toHaveBeenCalledWith(
+      USER_A,
+      ["deleting"],
+      webOperation,
+    );
   });
 
   it("still throws synchronously on an invalid path", async () => {
@@ -139,6 +329,7 @@ describe("apiFetch on the native target", () => {
     const headers = new Headers(init.headers);
     expect(headers.get("authorization")).toBe("Bearer session-token");
     expect(headers.get("x-biblequest-expected-user")).toBe(USER_A);
+    expect(headers.has("x-biblequest-web-auth")).toBe(false);
   });
 
   it("marks only the deterministic native account-beta API posture", async () => {
@@ -234,10 +425,14 @@ describe("apiFetch on the native target", () => {
     mockSupabaseClient("session-token");
     const { authenticatedApiFetch } = await apiModule();
     await authenticatedApiFetch(USER_A, "/api/profile/avatar", {
-      headers: { Authorization: "Bearer caller-owned" },
+      headers: {
+        Authorization: "Bearer caller-owned",
+        "x-biblequest-web-auth": "v2",
+      },
     });
     const headers = new Headers(calls[0][1]!.headers);
     expect(headers.get("authorization")).toBe("Bearer session-token");
+    expect(headers.has("x-biblequest-web-auth")).toBe(false);
   });
 
   it("keeps public native APIs anonymous without inspecting Keychain", async () => {
@@ -249,6 +444,7 @@ describe("apiFetch on the native target", () => {
         Authorization: "Bearer caller-owned",
         "x-biblequest-expected-user": USER_A,
         "x-biblequest-native-account-beta": "v1",
+        "x-biblequest-web-auth": "v2",
       },
     });
     expect(createClient).not.toHaveBeenCalled();
@@ -256,6 +452,7 @@ describe("apiFetch on the native target", () => {
     expect(headers.has("authorization")).toBe(false);
     expect(headers.has("x-biblequest-expected-user")).toBe(false);
     expect(headers.has("x-biblequest-native-account-beta")).toBe(false);
+    expect(headers.has("x-biblequest-web-auth")).toBe(false);
   });
 
   it("degrades to no token when Supabase is unconfigured", async () => {

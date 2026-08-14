@@ -16,6 +16,7 @@ function req(
   betaMarker: string | null = authorization ? "v1" : null,
   deletionCleanup: string | null = null,
   expectedUser: string | null = null,
+  webProtocol: string | null = null,
 ) {
   const headers = new Headers({ host: "www.biblequest.co" });
   if (origin !== null) headers.set("origin", origin);
@@ -28,6 +29,9 @@ function req(
   }
   if (expectedUser !== null) {
     headers.set("x-biblequest-expected-user", expectedUser);
+  }
+  if (webProtocol !== null) {
+    headers.set("x-biblequest-web-auth", webProtocol);
   }
   return new Request("https://www.biblequest.co/api/arcade/status", {
     headers,
@@ -131,6 +135,21 @@ describe("the native bearer branch", () => {
     }
   });
 
+  it("rejects the customer-web protocol marker on the native transport", async () => {
+    process.env[LATCH] = "true";
+    const result = await context(
+      req(
+        NATIVE_APP_ORIGIN,
+        `Bearer ${TOKEN}`,
+        "v1",
+        null,
+        null,
+        "v2",
+      ),
+    );
+    expect((result as Response).status).toBe(403);
+  });
+
   it("rejects a malformed deletion-cleanup marker", async () => {
     process.env[LATCH] = "true";
     const result = await context(
@@ -139,15 +158,13 @@ describe("the native bearer branch", () => {
     expect((result as Response).status).toBe(403);
   });
 
-  it("ignores the Authorization header entirely while the latch is off", async () => {
-    // Latch off is production today: a bearer header must change nothing.
-    // Both requests take the cookie path, which fails identically in this
-    // unconfigured environment.
+  it("rejects the raw native origin before the web bearer path while its latch is off", async () => {
+    // The raw native origin remains recognizable while disabled, so it cannot
+    // acquire the customer-web bearer posture by presenting the same token.
     const withHeader = await context(req(NATIVE_APP_ORIGIN, `Bearer ${TOKEN}`));
     const withoutHeader = await context(req(NATIVE_APP_ORIGIN));
-    expect((withHeader as Response).status).toBe(
-      (withoutHeader as Response).status,
-    );
+    expect((withHeader as Response).status).toBe(403);
+    expect((withoutHeader as Response).status).toBe(403);
     await expect((withHeader as Response).json()).resolves.toEqual(
       await (withoutHeader as Response).json(),
     );

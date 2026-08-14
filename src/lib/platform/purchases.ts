@@ -1,4 +1,4 @@
-import { apiFetch } from "./api";
+import { authenticatedApiFetch } from "./api";
 import {
   platformRuntime,
   type PlatformRuntime,
@@ -15,9 +15,12 @@ export type PurchaseAction =
 export interface PurchaseAdapter {
   channel: "web-stripe" | "native";
   available: boolean;
-  purchase: (product: PurchaseProduct) => Promise<PurchaseAction>;
-  restore: () => Promise<PurchaseAction>;
-  manage: () => Promise<PurchaseAction>;
+  purchase: (
+    expectedUserId: string,
+    product: PurchaseProduct,
+  ) => Promise<PurchaseAction>;
+  restore: (expectedUserId: string) => Promise<PurchaseAction>;
+  manage: (expectedUserId: string) => Promise<PurchaseAction>;
 }
 
 export interface NativePurchaseAdapter extends PurchaseAdapter {
@@ -27,7 +30,7 @@ export interface NativePurchaseAdapter extends PurchaseAdapter {
 interface PurchaseDependencies {
   runtime?: PlatformRuntime;
   native?: NativePurchaseAdapter;
-  fetcher?: typeof apiFetch;
+  fetcher?: typeof authenticatedApiFetch;
   navigate?: (url: string) => void;
 }
 
@@ -53,7 +56,7 @@ export function purchaseAdapter(
 function webStripePurchaseAdapter(
   dependencies: PurchaseDependencies,
 ): PurchaseAdapter {
-  const fetcher = dependencies.fetcher ?? apiFetch;
+  const fetcher = dependencies.fetcher ?? authenticatedApiFetch;
   const navigate =
     dependencies.navigate ??
     ((url: string) => {
@@ -63,15 +66,19 @@ function webStripePurchaseAdapter(
   return {
     channel: "web-stripe",
     available: true,
-    purchase: async (product) => {
+    purchase: async (expectedUserId, product) => {
       try {
-        const response = await fetcher("/api/billing/checkout", {
-          method: "POST",
-          credentials: "same-origin",
-          cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ interval: product }),
-        });
+        const response = await fetcher(
+          expectedUserId,
+          "/api/billing/checkout",
+          {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ interval: product }),
+          },
+        );
         const destination = response.ok
           ? await exactRedirect(response, "https://checkout.stripe.com")
           : null;
@@ -82,26 +89,34 @@ function webStripePurchaseAdapter(
         return "failed";
       }
     },
-    restore: async () => {
+    restore: async (expectedUserId) => {
       try {
-        const response = await fetcher("/api/billing/refresh", {
-          method: "POST",
-          credentials: "same-origin",
-          cache: "no-store",
-        });
+        const response = await fetcher(
+          expectedUserId,
+          "/api/billing/refresh",
+          {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+          },
+        );
         if (response.ok) return "restored";
         return response.status === 429 ? "deferred" : "failed";
       } catch {
         return "failed";
       }
     },
-    manage: async () => {
+    manage: async (expectedUserId) => {
       try {
-        const response = await fetcher("/api/billing/portal", {
-          method: "POST",
-          credentials: "same-origin",
-          cache: "no-store",
-        });
+        const response = await fetcher(
+          expectedUserId,
+          "/api/billing/portal",
+          {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+          },
+        );
         const destination = response.ok
           ? await exactRedirect(response, "https://billing.stripe.com")
           : null;
