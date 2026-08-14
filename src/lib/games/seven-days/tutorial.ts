@@ -1,6 +1,17 @@
+import {
+  removeWebPrivateStorageItem,
+  setWebPrivateStorageItem,
+  webPrivateStorageReadAllowed,
+} from "@/lib/storage/web-private-write";
+import {
+  LEGACY_SEVEN_DAYS_TUTORIAL_STORAGE_KEY,
+  WEB_V2_SEVEN_DAYS_TUTORIAL_STORAGE_KEY,
+  selectedWebPrivateStorageKey,
+} from "@/lib/storage/web-private-namespace";
+
 /** The tutorial record is separate from game progress so it can evolve safely. */
 export const SEVEN_DAYS_TUTORIAL_STORAGE_KEY =
-  "biblequest:seven-days-match:tutorial:v1";
+  LEGACY_SEVEN_DAYS_TUTORIAL_STORAGE_KEY;
 
 /** A schema version makes stale tutorial state fail closed after copy changes. */
 export const SEVEN_DAYS_TUTORIAL_STORAGE_VERSION = 1;
@@ -21,6 +32,15 @@ function browserStorage(): Storage | null {
   } catch {
     return null;
   }
+}
+
+/** Resolves the atomically selected guest or installed-account namespace. */
+export function sevenDaysTutorialStorageKey(storage: Storage): string | null {
+  return selectedWebPrivateStorageKey(
+    storage,
+    LEGACY_SEVEN_DAYS_TUTORIAL_STORAGE_KEY,
+    WEB_V2_SEVEN_DAYS_TUTORIAL_STORAGE_KEY,
+  );
 }
 
 /** Accepts only the small record written by this tutorial version. */
@@ -45,14 +65,32 @@ export function readSevenDaysTutorialSeen(storage?: Storage): boolean {
   const target = storage ?? browserStorage();
   if (!target) return false;
   try {
-    const raw = target.getItem(SEVEN_DAYS_TUTORIAL_STORAGE_KEY);
-    if (!raw) return false;
+    if (!webPrivateStorageReadAllowed(target, storage !== undefined)) {
+      return false;
+    }
+    const key = sevenDaysTutorialStorageKey(target);
+    if (!key) return false;
+    const raw = target.getItem(key);
+    if (
+      !webPrivateStorageReadAllowed(target, storage !== undefined) ||
+      !raw
+    ) {
+      return false;
+    }
     const state =
       raw.length <= MAX_TUTORIAL_RECORD_LENGTH
         ? sanitizeTutorialState(JSON.parse(raw))
         : null;
-    if (state) return state.seen;
-    target.removeItem(SEVEN_DAYS_TUTORIAL_STORAGE_KEY);
+    if (
+      state &&
+      webPrivateStorageReadAllowed(target, storage !== undefined)
+    ) {
+      return state.seen;
+    }
+    if (!webPrivateStorageReadAllowed(target, storage !== undefined)) {
+      return false;
+    }
+    void removeWebPrivateStorageItem(target, key, storage !== undefined, raw);
   } catch {
     // Restricted storage leaves the tutorial available instead of blocking play.
   }
@@ -60,17 +98,21 @@ export function readSevenDaysTutorialSeen(storage?: Storage): boolean {
 }
 
 /** Persists only a versioned boolean marker after the tips are completed. */
-export function writeSevenDaysTutorialSeen(storage?: Storage): boolean {
+export function writeSevenDaysTutorialSeen(
+  storage?: Storage,
+): Promise<boolean> {
   const target = storage ?? browserStorage();
-  if (!target) return false;
+  if (!target) return Promise.resolve(false);
+  const key = sevenDaysTutorialStorageKey(target);
+  if (!key) return Promise.resolve(false);
   const state: SevenDaysTutorialState = {
     version: SEVEN_DAYS_TUTORIAL_STORAGE_VERSION,
     seen: true,
   };
-  try {
-    target.setItem(SEVEN_DAYS_TUTORIAL_STORAGE_KEY, JSON.stringify(state));
-    return true;
-  } catch {
-    return false;
-  }
+  return setWebPrivateStorageItem(
+    target,
+    key,
+    JSON.stringify(state),
+    storage !== undefined,
+  );
 }

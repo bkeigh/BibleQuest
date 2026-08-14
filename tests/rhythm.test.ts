@@ -116,7 +116,7 @@ describe("Rhythm validation", () => {
     expect(rhythmBlockForCurrentTime([], "12:00")).toBeNull();
   });
 
-  it("preserves lapsed Plus rhythms without allowing Free mutation", () => {
+  it("preserves lapsed Plus rhythms without allowing Free mutation", async () => {
     const second: RhythmBlock = {
       ...MORNING,
       id: "rhythm_second01",
@@ -124,10 +124,10 @@ describe("Rhythm validation", () => {
       createdAt: "2026-07-29T12:01:00.000Z",
       updatedAt: "2026-07-29T12:01:00.000Z",
     };
-    expect(saveRhythmBlock(MORNING, true)).toBe(true);
-    expect(saveRhythmBlock(second, true)).toBe(true);
+    await expect(saveRhythmBlock(MORNING, true)).resolves.toBe(true);
+    await expect(saveRhythmBlock(second, true)).resolves.toBe(true);
 
-    expect(
+    await expect(
       saveRhythmBlock(
         {
           ...second,
@@ -136,7 +136,7 @@ describe("Rhythm validation", () => {
         },
         false,
       ),
-    ).toBe(false);
+    ).resolves.toBe(false);
     expect(readRhythmState().blocks[1]?.label).toBe("Evening");
   });
 });

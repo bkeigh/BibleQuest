@@ -4,24 +4,47 @@ import type {
   GamePuzzle,
   TimelineProgress,
 } from "./types";
+import {
+  captureWebPrivateStorageReadLease,
+  removeWebPrivateStorageItem,
+  webPrivateStorageReadAllowed,
+  webPrivateStorageReadLeaseIsCurrent,
+  withWebPrivateWriteGuard,
+} from "@/lib/storage/web-private-write";
+import {
+  LEGACY_GAME_STORAGE_KEY,
+  WEB_V2_GAME_STORAGE_KEY,
+  selectedWebPrivateStorageKey,
+} from "@/lib/storage/web-private-namespace";
+import {
+  registerWebPrivateMemoryReset,
+  type WebPrivateReadLease,
+} from "@/lib/supabase/web-auth-storage";
 
-export const GAME_STORAGE_KEY = "biblequest:scripture-games:v1";
+export const GAME_STORAGE_KEY = LEGACY_GAME_STORAGE_KEY;
 export const GAME_STORAGE_VERSION = 2;
 export const MAX_STORED_GAME_SESSIONS = 14;
 const MAX_GAME_CLOCK_SKEW_MS = 5 * 60 * 1000;
+const MAX_GAME_READ_LEASES = 32;
+const gameReadLeases = new Map<string, WebPrivateReadLease | null>();
+
+/** Retains only bounded opaque read leases for currently rendered sessions. */
+function rememberGameReadLease(
+  sessionKey: string,
+  lease: WebPrivateReadLease | null,
+): void {
+  gameReadLeases.delete(sessionKey);
+  gameReadLeases.set(sessionKey, lease);
+  while (gameReadLeases.size > MAX_GAME_READ_LEASES) {
+    const oldest = gameReadLeases.keys().next().value;
+    if (typeof oldest !== "string") break;
+    gameReadLeases.delete(oldest);
+  }
+}
 
 interface GameStorageEnvelope {
   version: typeof GAME_STORAGE_VERSION;
   entries: GameProgress[];
-}
-
-/** Best-effort cleanup never turns unavailable storage into a page crash. */
-function removeGameEnvelope(storage: Storage): void {
-  try {
-    storage.removeItem(GAME_STORAGE_KEY);
-  } catch {
-    // Restricted storage is equivalent to no local resume capability.
-  }
 }
 
 function isStringArray(value: unknown, maxLength: number): value is string[] {
@@ -146,16 +169,38 @@ function sanitizeProgress(
   return entry as TimelineProgress;
 }
 
-function readEnvelope(storage: Storage): GameStorageEnvelope {
+function readEnvelope(
+  storage: Storage,
+  testFixtureStorage = false,
+  purgeInvalid = true,
+): GameStorageEnvelope {
+  let raw: string | null = null;
   try {
-    const raw = storage.getItem(GAME_STORAGE_KEY);
-    if (!raw) return { version: GAME_STORAGE_VERSION, entries: [] };
+    if (!webPrivateStorageReadAllowed(storage, testFixtureStorage)) {
+      return { version: GAME_STORAGE_VERSION, entries: [] };
+    }
+    const key = gameStorageKey(storage);
+    if (!key) return { version: GAME_STORAGE_VERSION, entries: [] };
+    raw = storage.getItem(key);
+    if (
+      !webPrivateStorageReadAllowed(storage, testFixtureStorage) ||
+      !raw
+    ) {
+      return { version: GAME_STORAGE_VERSION, entries: [] };
+    }
     const parsed = JSON.parse(raw) as Partial<GameStorageEnvelope>;
     if (
       parsed.version !== GAME_STORAGE_VERSION ||
       !Array.isArray(parsed.entries)
     ) {
-      removeGameEnvelope(storage);
+      if (purgeInvalid) {
+        void removeWebPrivateStorageItem(
+          storage,
+          key,
+          testFixtureStorage,
+          raw,
+        );
+      }
       return { version: GAME_STORAGE_VERSION, entries: [] };
     }
     const entries = parsed.entries
@@ -163,11 +208,35 @@ function readEnvelope(storage: Storage): GameStorageEnvelope {
       .filter((entry): entry is GameProgress => Boolean(entry))
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, MAX_STORED_GAME_SESSIONS);
-    return { version: GAME_STORAGE_VERSION, entries };
+    return webPrivateStorageReadAllowed(storage, testFixtureStorage)
+      ? { version: GAME_STORAGE_VERSION, entries }
+      : { version: GAME_STORAGE_VERSION, entries: [] };
   } catch {
-    removeGameEnvelope(storage);
+    const key = gameStorageKey(storage);
+    if (
+      purgeInvalid &&
+      key &&
+      raw !== null &&
+      webPrivateStorageReadAllowed(storage, testFixtureStorage)
+    ) {
+      void removeWebPrivateStorageItem(
+        storage,
+        key,
+        testFixtureStorage,
+        raw,
+      );
+    }
     return { version: GAME_STORAGE_VERSION, entries: [] };
   }
+}
+
+/** Resolves the atomically selected guest or installed-account namespace. */
+function gameStorageKey(storage: Storage): string | null {
+  return selectedWebPrivateStorageKey(
+    storage,
+    LEGACY_GAME_STORAGE_KEY,
+    WEB_V2_GAME_STORAGE_KEY,
+  );
 }
 
 /** Resolves browser storage without crashing in restricted privacy contexts. */
@@ -188,33 +257,88 @@ export function readGameProgress(
 ): GameProgress | null {
   const target = storage ?? browserGameStorage();
   if (!target) return null;
-  const envelope = readEnvelope(target);
+  const testFixtureStorage = storage !== undefined;
+  const lease = captureWebPrivateStorageReadLease(
+    target,
+    testFixtureStorage,
+  );
+  if (
+    !webPrivateStorageReadLeaseIsCurrent(
+      lease,
+      target,
+      testFixtureStorage,
+    )
+  ) {
+    return null;
+  }
+  const envelope = readEnvelope(target, storage !== undefined);
+  if (
+    !webPrivateStorageReadLeaseIsCurrent(
+      lease,
+      target,
+      testFixtureStorage,
+    )
+  ) {
+    return null;
+  }
+  rememberGameReadLease(sessionKey, lease);
   const candidate = envelope.entries.find(
     (entry) => entry.sessionKey === sessionKey,
   );
   const progress = sanitizeProgress(candidate, puzzle);
   if (candidate && !progress) {
-    writeEntries(
-      envelope.entries.filter((entry) => entry.sessionKey !== sessionKey),
+    void removeInvalidGameProgress(
       target,
+      puzzle,
+      sessionKey,
+      testFixtureStorage,
+      lease,
     );
   }
   return progress;
 }
 
-function writeEntries(entries: GameProgress[], storage: Storage): boolean {
-  try {
-    const bounded = [...entries]
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .slice(0, MAX_STORED_GAME_SESSIONS);
-    storage.setItem(
-      GAME_STORAGE_KEY,
-      JSON.stringify({ version: GAME_STORAGE_VERSION, entries: bounded }),
+/** Re-reads before removing one still-invalid session under the shared lock. */
+async function removeInvalidGameProgress(
+  storage: Storage,
+  puzzle: GamePuzzle,
+  sessionKey: string,
+  testFixtureStorage = false,
+  expectedReadLease: WebPrivateReadLease | null = null,
+): Promise<void> {
+  await withWebPrivateWriteGuard(() => {
+    const key = gameStorageKey(storage);
+    if (!key) return { value: undefined };
+    const previous = storage.getItem(key);
+    const envelope = readEnvelope(storage, testFixtureStorage, false);
+    const candidate = envelope.entries.find(
+      (entry) => entry.sessionKey === sessionKey,
     );
-    return true;
-  } catch {
-    return false;
-  }
+    if (!candidate || sanitizeProgress(candidate, puzzle)) {
+      return { value: undefined };
+    }
+    const encoded = JSON.stringify({
+      version: GAME_STORAGE_VERSION,
+      entries: envelope.entries.filter(
+        (entry) => entry.sessionKey !== sessionKey,
+      ),
+    });
+    storage.setItem(key, encoded);
+    if (storage.getItem(key) !== encoded) {
+      throw new Error("game progress cleanup failed");
+    }
+    return {
+      value: undefined,
+      rollback: () => {
+        if (storage.getItem(key) === encoded && previous !== null) {
+          storage.setItem(key, previous);
+        }
+      },
+    };
+  }, testFixtureStorage, {
+    expectedReadLease,
+    readStorage: storage,
+  });
 }
 
 /** Persists bounded game mechanics locally; no answer or result telemetry exists. */
@@ -222,30 +346,87 @@ export function writeGameProgress(
   progress: GameProgress,
   puzzle: GamePuzzle,
   storage?: Storage,
-): boolean {
+): Promise<boolean> {
   const safe = sanitizeProgress(progress, puzzle);
   const target = storage ?? browserGameStorage();
-  if (!safe || !target) return false;
-  const envelope = readEnvelope(target);
-  return writeEntries(
-    [
+  if (!safe || !target) return Promise.resolve(false);
+  const testFixtureStorage = storage !== undefined;
+  const hasLease = gameReadLeases.has(safe.sessionKey);
+  const lease = hasLease ? gameReadLeases.get(safe.sessionKey) ?? null : null;
+  if (
+    !hasLease &&
+    !webPrivateStorageReadLeaseIsCurrent(
+      lease,
+      target,
+      testFixtureStorage,
+    )
+  ) {
+    return Promise.resolve(false);
+  }
+  return withWebPrivateWriteGuard(() => {
+    const key = gameStorageKey(target);
+    if (!key) return { value: false };
+    const previous = target.getItem(key);
+    const envelope = readEnvelope(target, testFixtureStorage, false);
+    const entries = [
       safe,
       ...envelope.entries.filter(
         (entry) => entry.sessionKey !== safe.sessionKey,
       ),
-    ],
-    target,
+    ]
+      .sort((left, right) => right.updatedAt - left.updatedAt)
+      .slice(0, MAX_STORED_GAME_SESSIONS);
+    const encoded = JSON.stringify({
+      version: GAME_STORAGE_VERSION,
+      entries,
+    });
+    target.setItem(key, encoded);
+    if (target.getItem(key) !== encoded) {
+      throw new Error("game progress storage failed");
+    }
+    return {
+      value: true,
+      rollback: () => {
+        if (target.getItem(key) !== encoded) return;
+        if (previous === null) target.removeItem(key);
+        else target.setItem(key, previous);
+      },
+    };
+  }, testFixtureStorage, {
+    expectedReadLease: lease,
+    readStorage: target,
+  }).then(
+    (result) => result.committed && result.value,
   );
 }
 
+// Auth rotation discards every lease held by stale rendered game components.
+registerWebPrivateMemoryReset(() => gameReadLeases.clear());
+
 /** Clears every device-local game session for Settings clear/delete flows. */
-export function clearGameProgress(storage?: Storage): boolean {
+export function clearGameProgress(storage?: Storage): Promise<boolean> {
+  const target = storage ?? browserGameStorage();
+  if (!target) return Promise.resolve(false);
+  const key = gameStorageKey(target);
+  if (!key) return Promise.resolve(false);
+  return removeWebPrivateStorageItem(target, key, storage !== undefined);
+}
+
+/** Removes both web namespaces after terminal account deletion. */
+export async function purgeGameProgress(storage?: Storage): Promise<boolean> {
   const target = storage ?? browserGameStorage();
   if (!target) return false;
-  try {
-    target.removeItem(GAME_STORAGE_KEY);
-    return true;
-  } catch {
-    return false;
-  }
+  const results = await Promise.all([
+    removeWebPrivateStorageItem(
+      target,
+      LEGACY_GAME_STORAGE_KEY,
+      storage !== undefined,
+    ),
+    removeWebPrivateStorageItem(
+      target,
+      WEB_V2_GAME_STORAGE_KEY,
+      storage !== undefined,
+    ),
+  ]);
+  return results.every(Boolean);
 }

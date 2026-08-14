@@ -5,8 +5,18 @@ import {
   levelsForChapter,
 } from "./levels";
 import type { SevenDaysChapter, SevenDaysLevel } from "./types";
+import {
+  removeWebPrivateStorageItem,
+  setWebPrivateStorageItem,
+  webPrivateStorageReadAllowed,
+} from "@/lib/storage/web-private-write";
+import {
+  LEGACY_SEVEN_DAYS_STORAGE_KEY,
+  WEB_V2_SEVEN_DAYS_STORAGE_KEY,
+  selectedWebPrivateStorageKey,
+} from "@/lib/storage/web-private-namespace";
 
-export const SEVEN_DAYS_STORAGE_KEY = "biblequest:seven-days-match:v1";
+export const SEVEN_DAYS_STORAGE_KEY = LEGACY_SEVEN_DAYS_STORAGE_KEY;
 export const SEVEN_DAYS_STORAGE_VERSION = 3;
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 
@@ -118,15 +128,42 @@ function browserStorage(): Storage | null {
   }
 }
 
+/** Resolves the atomically selected guest or installed-account namespace. */
+function sevenDaysStorageKey(storage: Storage): string | null {
+  return selectedWebPrivateStorageKey(
+    storage,
+    LEGACY_SEVEN_DAYS_STORAGE_KEY,
+    WEB_V2_SEVEN_DAYS_STORAGE_KEY,
+  );
+}
+
 export function readSevenDaysProgress(storage?: Storage): SevenDaysProgress {
   const target = storage ?? browserStorage();
   if (!target) return emptySevenDaysProgress();
   try {
-    const raw = target.getItem(SEVEN_DAYS_STORAGE_KEY);
-    if (!raw) return emptySevenDaysProgress();
+    if (!webPrivateStorageReadAllowed(target, storage !== undefined)) {
+      return emptySevenDaysProgress();
+    }
+    const key = sevenDaysStorageKey(target);
+    if (!key) return emptySevenDaysProgress();
+    const raw = target.getItem(key);
+    if (
+      !webPrivateStorageReadAllowed(target, storage !== undefined) ||
+      !raw
+    ) {
+      return emptySevenDaysProgress();
+    }
     const progress = sanitizeSevenDaysProgress(JSON.parse(raw));
-    if (progress) return progress;
-    target.removeItem(SEVEN_DAYS_STORAGE_KEY);
+    if (
+      progress &&
+      webPrivateStorageReadAllowed(target, storage !== undefined)
+    ) {
+      return progress;
+    }
+    if (!webPrivateStorageReadAllowed(target, storage !== undefined)) {
+      return emptySevenDaysProgress();
+    }
+    void removeWebPrivateStorageItem(target, key, storage !== undefined, raw);
   } catch {
     // Restricted storage simply means this device does not keep a map.
   }
@@ -136,45 +173,59 @@ export function readSevenDaysProgress(storage?: Storage): SevenDaysProgress {
 export function writeSevenDaysProgress(
   progress: SevenDaysProgress,
   storage?: Storage,
-): boolean {
+): Promise<boolean> {
   const safe = sanitizeSevenDaysProgress(progress);
   const target = storage ?? browserStorage();
-  if (!safe || !target) return false;
-  try {
-    target.setItem(SEVEN_DAYS_STORAGE_KEY, JSON.stringify(safe));
-    return true;
-  } catch {
-    return false;
-  }
+  if (!safe || !target) return Promise.resolve(false);
+  const key = sevenDaysStorageKey(target);
+  if (!key) return Promise.resolve(false);
+  return setWebPrivateStorageItem(
+    target,
+    key,
+    JSON.stringify(safe),
+    storage !== undefined,
+  );
 }
 
 /**
- * Answers "will this device remember?" without writing a record for someone
- * who has not played yet. Private-mode browsers get an honest note instead of
- * a map that silently forgets.
+ * Reports storage eligibility without an unguarded probe mutation.
  */
 export function sevenDaysStorageAvailable(storage?: Storage): boolean {
   const target = storage ?? browserStorage();
   if (!target) return false;
-  const probe = `${SEVEN_DAYS_STORAGE_KEY}:probe`;
-  try {
-    target.setItem(probe, "1");
-    target.removeItem(probe);
-    return true;
-  } catch {
-    return false;
-  }
+  return (
+    webPrivateStorageReadAllowed(target, storage !== undefined) &&
+    sevenDaysStorageKey(target) !== null
+  );
 }
 
-export function clearSevenDaysProgress(storage?: Storage): boolean {
+export function clearSevenDaysProgress(storage?: Storage): Promise<boolean> {
+  const target = storage ?? browserStorage();
+  if (!target) return Promise.resolve(false);
+  const key = sevenDaysStorageKey(target);
+  if (!key) return Promise.resolve(false);
+  return removeWebPrivateStorageItem(target, key, storage !== undefined);
+}
+
+/** Removes both web namespaces after terminal account deletion. */
+export async function purgeSevenDaysProgress(
+  storage?: Storage,
+): Promise<boolean> {
   const target = storage ?? browserStorage();
   if (!target) return false;
-  try {
-    target.removeItem(SEVEN_DAYS_STORAGE_KEY);
-    return true;
-  } catch {
-    return false;
-  }
+  const results = await Promise.all([
+    removeWebPrivateStorageItem(
+      target,
+      LEGACY_SEVEN_DAYS_STORAGE_KEY,
+      storage !== undefined,
+    ),
+    removeWebPrivateStorageItem(
+      target,
+      WEB_V2_SEVEN_DAYS_STORAGE_KEY,
+      storage !== undefined,
+    ),
+  ]);
+  return results.every(Boolean);
 }
 
 export function markLevelCleared(

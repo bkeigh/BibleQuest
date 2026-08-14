@@ -3,11 +3,13 @@
 import { purgeAllDeviceLocalJournalDrafts } from "@/lib/questos/journal-drafts";
 import { purgePersistedJourney } from "@/lib/questos/purge";
 import {
-  clearLocalJourneyClaimPending,
   markInitialSyncPending,
   markLocalJourneyClaimPending,
   setLastSyncedUserId,
 } from "./last-user";
+import { commitWebPrivateHandoffOwner } from "@/lib/storage/web-private-cutover";
+import { isNativeTarget } from "@/lib/platform/target";
+import type { WebAccountOperationHandle } from "@/lib/supabase/web-auth-storage";
 import {
   accountLifecycleHandleIsCurrent,
   requireAccountLifecycleIdle,
@@ -19,7 +21,23 @@ export function prepareLocalJourneyHandoff(
   userId: string,
   startFresh: boolean,
   lifecycle?: AccountLifecycleHandle,
-) {
+  webOperation?: WebAccountOperationHandle,
+): Promise<void> {
+  return prepareLocalJourneyHandoffAsync(
+    userId,
+    startFresh,
+    lifecycle,
+    webOperation,
+  );
+}
+
+/** Completes the destructive handoff before publishing its new owner markers. */
+async function prepareLocalJourneyHandoffAsync(
+  userId: string,
+  startFresh: boolean,
+  lifecycle?: AccountLifecycleHandle,
+  webOperation?: WebAccountOperationHandle,
+): Promise<void> {
   if (lifecycle) {
     if (
       lifecycle.userId !== userId ||
@@ -33,14 +51,25 @@ export function prepareLocalJourneyHandoff(
   if (startFresh) {
     if (
       !purgePersistedJourney() ||
-      !purgeAllDeviceLocalJournalDrafts()
+      !(await purgeAllDeviceLocalJournalDrafts())
     ) {
       throw new Error("The previous journey could not be cleared.");
     }
-    clearLocalJourneyClaimPending(userId);
-  } else {
-    markLocalJourneyClaimPending(userId);
   }
-  markInitialSyncPending(userId);
-  setLastSyncedUserId(userId);
+  if (!isNativeTarget()) {
+    if (
+      !webOperation ||
+      !(await commitWebPrivateHandoffOwner(
+        webOperation,
+        userId,
+        !startFresh,
+      ))
+    ) {
+      throw new Error("The account handoff owner could not be stored.");
+    }
+    return;
+  }
+  if (!startFresh) await markLocalJourneyClaimPending(userId);
+  await markInitialSyncPending(userId);
+  await setLastSyncedUserId(userId);
 }

@@ -136,7 +136,7 @@ export function SevenDaysLevelSession({
 
   /** Closes the tips, remembers completion, and restores a useful focus point. */
   const dismissTutorial = useCallback(() => {
-    writeSevenDaysTutorialSeen();
+    void writeSevenDaysTutorialSeen();
     setTutorialOpen(false);
     setAnnouncement(
       stage === "play"
@@ -227,7 +227,7 @@ export function SevenDaysLevelSession({
     }
 
     setInventory(spent);
-    writeInventory(spent);
+    void writeInventory(spent);
   }
 
   /**

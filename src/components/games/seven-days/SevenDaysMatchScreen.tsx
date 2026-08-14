@@ -99,7 +99,7 @@ function SevenDaysMatchInner() {
     (level: SevenDaysLevel) => {
       const updated = markLevelCleared(progress, level);
       setProgress(updated);
-      writeSevenDaysProgress(updated);
+      void writeSevenDaysProgress(updated);
       // The last level of a day hands over to that day's questions; every
       // other level runs straight into the next board.
       const waiting = arcade.gamePass ? null : pendingQuestionDay(updated);
@@ -127,7 +127,7 @@ function SevenDaysMatchInner() {
     (chapter: SevenDaysChapter, firstTryQuestionIds: string[]) => {
       const updated = markDayAnswered(progress, chapter, firstTryQuestionIds);
       setProgress(updated);
-      writeSevenDaysProgress(updated);
+      void writeSevenDaysProgress(updated);
       // One completion for the whole week, not one per level: forty-nine
       // "completed" events would say almost nothing about whether the game
       // works, and would be the only place this app counted play that closely.
@@ -157,7 +157,7 @@ function SevenDaysMatchInner() {
         : markDaySkipped(progress, chapter);
       if (updated !== progress) {
         setProgress(updated);
-        writeSevenDaysProgress(updated);
+        void writeSevenDaysProgress(updated);
       }
       setPurchaseNotice(
         arcade.gamePass

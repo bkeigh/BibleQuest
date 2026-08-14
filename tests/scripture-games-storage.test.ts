@@ -13,10 +13,10 @@ import {
 describe("device-local Scripture game progress", () => {
   beforeEach(() => window.localStorage.clear());
 
-  it("resumes the exact puzzle content version locally", () => {
+  it("resumes the exact puzzle content version locally", async () => {
     const puzzle = connectionPuzzles[0];
     const progress = createConnectionsProgress(puzzle, "2026-08-01:test", 10);
-    expect(writeGameProgress(progress, puzzle)).toBe(true);
+    await expect(writeGameProgress(progress, puzzle)).resolves.toBe(true);
     expect(readGameProgress(puzzle, progress.sessionKey)).toEqual(progress);
   });
 
@@ -44,7 +44,7 @@ describe("device-local Scripture game progress", () => {
     ).toBeNull();
   });
 
-  it("reports unavailable persistence instead of pretending resume was saved", () => {
+  it("reports unavailable persistence instead of pretending resume was saved", async () => {
     const puzzle = connectionPuzzles[0];
     const progress = createConnectionsProgress(puzzle, "2026-08-01:test", 10);
     const unavailable = {
@@ -54,10 +54,12 @@ describe("device-local Scripture game progress", () => {
       },
     } as unknown as Storage;
 
-    expect(writeGameProgress(progress, puzzle, unavailable)).toBe(false);
+    await expect(
+      writeGameProgress(progress, puzzle, unavailable),
+    ).resolves.toBe(false);
   });
 
-  it("bounds retained sessions without touching unrelated local data", () => {
+  it("bounds retained sessions without touching unrelated local data", async () => {
     const puzzle = connectionPuzzles[0];
     window.localStorage.setItem("biblequest:unrelated", "keep");
     for (let index = 0; index < MAX_STORED_GAME_SESSIONS + 5; index += 1) {
@@ -66,7 +68,7 @@ describe("device-local Scripture game progress", () => {
         `2026-08-${String(index + 1).padStart(2, "0")}:${puzzle.id}`,
         index + 1,
       );
-      expect(writeGameProgress(progress, puzzle)).toBe(true);
+      await expect(writeGameProgress(progress, puzzle)).resolves.toBe(true);
     }
     const stored = JSON.parse(window.localStorage.getItem(GAME_STORAGE_KEY)!);
     expect(stored.entries).toHaveLength(MAX_STORED_GAME_SESSIONS);
@@ -139,13 +141,13 @@ describe("device-local Scripture game progress", () => {
     expect(readGameProgress(puzzle, progress.sessionKey)).toBeNull();
   });
 
-  it("clears game progress for Settings without touching unrelated data", () => {
+  it("clears game progress for Settings without touching unrelated data", async () => {
     const puzzle = connectionPuzzles[0];
     const progress = createConnectionsProgress(puzzle, "2026-08-01:test", 10);
-    writeGameProgress(progress, puzzle);
+    await writeGameProgress(progress, puzzle);
     window.localStorage.setItem("biblequest:unrelated", "keep");
 
-    expect(clearGameProgress()).toBe(true);
+    await expect(clearGameProgress()).resolves.toBe(true);
     expect(window.localStorage.getItem(GAME_STORAGE_KEY)).toBeNull();
     expect(window.localStorage.getItem("biblequest:unrelated")).toBe("keep");
   });

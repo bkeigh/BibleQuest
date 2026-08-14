@@ -20,69 +20,77 @@ function memoryStorage() {
 }
 
 describe("account sync generation storage", () => {
-  it("keeps independent monotonic server observations per account", () => {
+  it("keeps independent monotonic server observations per account", async () => {
     const storage = memoryStorage();
     const first = "71000000-0000-4000-8000-000000000001";
     const second = "72000000-0000-4000-8000-000000000002";
 
-    setAccountSyncGeneration(first, 2, storage);
-    setAccountSyncGeneration(second, 7, storage);
-    setAccountSyncGeneration(first, 3, storage);
+    await expect(setAccountSyncGeneration(first, 2, storage)).resolves.toBe(true);
+    await expect(setAccountSyncGeneration(second, 7, storage)).resolves.toBe(true);
+    await expect(setAccountSyncGeneration(first, 3, storage)).resolves.toBe(true);
 
     expect(getAccountSyncGeneration(first, storage)).toBe(3);
     expect(getAccountSyncGeneration(second, storage)).toBe(7);
-    expect(() => setAccountSyncGeneration(first, 2, storage)).toThrow(
-      "Account sync generation cannot move backward.",
-    );
+    await expect(setAccountSyncGeneration(first, 2, storage)).resolves.toBe(false);
   });
 
-  it("rejects malformed values and ignores corrupt storage", () => {
+  it("rejects malformed values and ignores corrupt storage", async () => {
     const storage = memoryStorage();
     const userId = "71000000-0000-4000-8000-000000000001";
 
-    expect(() => setAccountSyncGeneration(userId, -1, storage)).toThrow(
+    await expect(setAccountSyncGeneration(userId, -1, storage)).rejects.toThrow(
       "Invalid account sync generation.",
     );
     storage.setItem("biblequest:account-sync-generation:v1", "not-json");
     expect(getAccountSyncGeneration(userId, storage)).toBeNull();
+    await expect(
+      setAccountSyncGeneration(userId, 2, storage),
+    ).resolves.toBe(false);
+    expect(storage.getItem("biblequest:account-sync-generation:v1")).toBe(
+      "not-json",
+    );
   });
 
-  it("retains a reset latch until the remote baseline has been applied", () => {
+  it("retains a reset latch until the remote baseline has been applied", async () => {
     const storage = memoryStorage();
     const userId = "71000000-0000-4000-8000-000000000001";
-    markAccountSyncResetRequired(userId, 4, storage);
+    await expect(
+      markAccountSyncResetRequired(userId, 4, storage),
+    ).resolves.toBe(true);
 
     expect(getAccountSyncGeneration(userId, storage)).toBe(4);
     expect(accountSyncResetRequired(userId, storage)).toBe(true);
-    setAccountSyncGeneration(userId, 5, storage);
+    await expect(setAccountSyncGeneration(userId, 5, storage)).resolves.toBe(true);
     expect(accountSyncResetRequired(userId, storage)).toBe(true);
 
-    clearAccountSyncResetRequired(userId, storage);
+    await expect(clearAccountSyncResetRequired(userId, storage)).resolves.toBe(true);
     expect(accountSyncResetRequired(userId, storage)).toBe(false);
     expect(getAccountSyncGeneration(userId, storage)).toBe(5);
   });
 
-  it("removes retained account metadata with a deleted device journey", () => {
+  it("removes retained account metadata with a deleted device journey", async () => {
     const storage = memoryStorage();
     const first = "71000000-0000-4000-8000-000000000001";
     const second = "72000000-0000-4000-8000-000000000002";
-    setAccountSyncGeneration(first, 2, storage);
-    setAccountSyncGeneration(second, 7, storage);
+    await setAccountSyncGeneration(first, 2, storage);
+    await setAccountSyncGeneration(second, 7, storage);
 
-    clearStoredAccountSyncGenerations(storage);
+    await expect(clearStoredAccountSyncGenerations(storage)).resolves.toBe(true);
 
     expect(getAccountSyncGeneration(first, storage)).toBeNull();
     expect(getAccountSyncGeneration(second, storage)).toBeNull();
   });
 
-  it("removes only the deleted account from a multi-account ledger", () => {
+  it("removes only the deleted account from a multi-account ledger", async () => {
     const storage = memoryStorage();
     const first = "71000000-0000-4000-8000-000000000001";
     const second = "72000000-0000-4000-8000-000000000002";
-    markAccountSyncResetRequired(first, 2, storage);
-    markAccountSyncResetRequired(second, 7, storage);
+    await markAccountSyncResetRequired(first, 2, storage);
+    await markAccountSyncResetRequired(second, 7, storage);
 
-    removeStoredAccountSyncGeneration(first, storage);
+    await expect(
+      removeStoredAccountSyncGeneration(first, storage),
+    ).resolves.toBe(true);
 
     expect(getAccountSyncGeneration(first, storage)).toBeNull();
     expect(accountSyncResetRequired(first, storage)).toBe(false);

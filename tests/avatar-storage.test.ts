@@ -44,6 +44,7 @@ interface FakeRequest {
 
 function installIndexedDb(options: { failWrites?: boolean } = {}) {
   const data = new Map<string, unknown>();
+  let opened = false;
 
   const makeDb = () => ({
     objectStoreNames: { contains: () => true },
@@ -94,7 +95,8 @@ function installIndexedDb(options: { failWrites?: boolean } = {}) {
         onupgradeneeded: null,
       };
       queueMicrotask(() => {
-        req.onupgradeneeded?.();
+        if (!opened && data.size === 0) req.onupgradeneeded?.();
+        opened = true;
         req.onsuccess?.();
       });
       return req;
@@ -118,6 +120,7 @@ function installWindow() {
       events.push({ type: event.type, detail: event.detail });
       return true;
     },
+    localStorage,
   });
   return events;
 }

@@ -117,8 +117,8 @@ export function ConnectionsGame({
 
   // Persist in the same user action so storage failure is visible immediately.
   function commitProgress(next: ConnectionsProgress) {
-    setResumeAvailable(writeGameProgress(next, puzzle));
     setProgress(next);
+    void writeGameProgress(next, puzzle).then(setResumeAvailable);
   }
 
   function toggle(term: string) {

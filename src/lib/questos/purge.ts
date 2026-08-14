@@ -1,6 +1,18 @@
 "use client";
 
 import { useQuestOS } from "./store";
+import { isNativeTarget } from "@/lib/platform/target";
+import {
+  reviewedWebPrivateWriteRemovalAllowed,
+  webPrivateActiveResetCommitAllowed,
+  type WebAccountOperationHandle,
+} from "@/lib/supabase/web-auth-storage";
+import {
+  LEGACY_QUEST_JOURNEY_STORAGE_KEY,
+  WEB_V2_QUEST_JOURNEY_STORAGE_KEY,
+  readWebPrivateNamespaceState,
+} from "@/lib/storage/web-private-namespace";
+import { isValidLocalJourneyUserId } from "@/lib/sync/last-user";
 import {
   DEFAULT_SETTINGS,
   emptyAccountNudge,
@@ -22,7 +34,10 @@ function emptyRecord(value: unknown): boolean {
 }
 
 /** Prove every account-associated journey field has its reviewed blank value. */
-function journeyStateIsFresh(value: unknown): boolean {
+function journeyStateIsFresh(
+  value: unknown,
+  purgeAccount: string | null = null,
+): boolean {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const state = value as Record<string, unknown>;
   return (
@@ -47,25 +62,82 @@ function journeyStateIsFresh(value: unknown): boolean {
     JSON.stringify(state.accountNudge) ===
       JSON.stringify(emptyAccountNudge()) &&
     emptyRecord(state.guidedProgress) &&
-    JSON.stringify(state.tombstones) === JSON.stringify(emptyTombstones())
+    JSON.stringify(state.tombstones) ===
+      JSON.stringify({ ...emptyTombstones(), purgeAccount })
   );
 }
 
+export interface PurgePersistedJourneyOptions {
+  purgeAccount?: string;
+  webOperation?: WebAccountOperationHandle;
+}
+
 /** Reset the live store and prove the same blank snapshot reached storage. */
-export function purgePersistedJourney(): boolean {
+export function purgePersistedJourney(
+  options: PurgePersistedJourneyOptions = {},
+): boolean {
   try {
-    useQuestOS.getState().clearAllData();
-    if (!journeyStateIsFresh(useQuestOS.getState())) return false;
-    const persisted = useQuestOS.persist.getOptions().storage?.getItem(
-      "biblequest:v1",
-    );
+    if (!isNativeTarget() && !reviewedWebPrivateWriteRemovalAllowed()) {
+      return false;
+    }
+    const purgeAccount = options.purgeAccount ?? null;
     if (
-      !persisted ||
-      (typeof persisted === "object" && "then" in persisted)
+      purgeAccount &&
+      (!options.webOperation ||
+        !isValidLocalJourneyUserId(purgeAccount) ||
+        !webPrivateActiveResetCommitAllowed(
+          options.webOperation,
+          purgeAccount,
+        ))
     ) {
       return false;
     }
-    return journeyStateIsFresh(persisted.state);
+    useQuestOS.getState().clearAllData(
+      purgeAccount ? { purgeAccount } : undefined,
+    );
+    if (!journeyStateIsFresh(useQuestOS.getState(), purgeAccount)) return false;
+    // The normal persistence write is lock-queued and terminal modes refuse
+    // it. Deletion uses this reviewed purge to remove the old bytes directly.
+    window.localStorage.removeItem(LEGACY_QUEST_JOURNEY_STORAGE_KEY);
+    window.localStorage.removeItem(WEB_V2_QUEST_JOURNEY_STORAGE_KEY);
+    if (
+      window.localStorage.getItem(LEGACY_QUEST_JOURNEY_STORAGE_KEY) !== null ||
+      window.localStorage.getItem(WEB_V2_QUEST_JOURNEY_STORAGE_KEY) !== null
+    ) {
+      return false;
+    }
+    if (!purgeAccount) return true;
+    if (
+      !options.webOperation ||
+      readWebPrivateNamespaceState(window.localStorage) !== "v2" ||
+      !webPrivateActiveResetCommitAllowed(
+        options.webOperation,
+        purgeAccount,
+      )
+    ) {
+      return false;
+    }
+
+    // Only this reviewed blank snapshot may be written while ordinary account
+    // persistence is revoked; it carries the remote purge tombstone forward.
+    const serialized = JSON.stringify({
+      state: useQuestOS.getState(),
+      version: 18,
+    });
+    window.localStorage.setItem(WEB_V2_QUEST_JOURNEY_STORAGE_KEY, serialized);
+    if (
+      window.localStorage.getItem(WEB_V2_QUEST_JOURNEY_STORAGE_KEY) !==
+        serialized ||
+      !webPrivateActiveResetCommitAllowed(
+        options.webOperation,
+        purgeAccount,
+      )
+    ) {
+      window.localStorage.removeItem(WEB_V2_QUEST_JOURNEY_STORAGE_KEY);
+      return false;
+    }
+    const persisted = JSON.parse(serialized) as { state?: unknown };
+    return journeyStateIsFresh(persisted.state, purgeAccount);
   } catch {
     return false;
   }

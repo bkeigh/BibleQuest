@@ -473,13 +473,13 @@ describe("Seven Days Match progress", () => {
     });
   });
 
-  it("round-trips through storage", () => {
+  it("round-trips through storage", async () => {
     const storage = memoryStorage();
     const progress = markLevelCleared(
       emptySevenDaysProgress(),
       SEVEN_DAYS_LEVELS[0],
     );
-    expect(writeSevenDaysProgress(progress, storage)).toBe(true);
+    await expect(writeSevenDaysProgress(progress, storage)).resolves.toBe(true);
     expect(readSevenDaysProgress(storage)).toEqual(progress);
   });
 
