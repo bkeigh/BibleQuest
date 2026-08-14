@@ -33,6 +33,42 @@ The failing path is guest adoption: a visitor with no account and no legacy
 data never establishes never-owned guest provenance, so the generation is
 never adopted.
 
+## Precise mechanism
+
+`reconcileWebAuthStorage()` bootstraps the web session on mount. For a visitor
+with no stored session (`state.status === "missing"`) it classifies what to do
+with `decideMissingWebAuthRecovery(readLocalJourneyOwner())`:
+
+- `unowned` -> `acceptFreshGuest()`, which adopts the guest write generation,
+  sets `webBootstrapComplete`, and clears loading. This is the correct path.
+- `owned` -> the locked-journey recovery UI.
+- anything else -> `closeAccount()`, which sets `setSessionLoading(true)` and
+  shows no recovery controls. **That is the hang state**: a permanent veil with
+  no error and no way out.
+
+`readLocalJourneyOwner()` reads through the v2 private boundary, and that read
+is refused until a write generation has been adopted. On a first visit none has
+been, so the owner resolves to neither `unowned` nor `owned`, the decision falls
+to `closed`, and `closeAccount()` strands the session as permanently loading.
+
+The dependency is circular: adopting the generation requires classifying the
+owner as `unowned`, and classifying the owner requires a read that only an
+adopted generation permits.
+
+A confirmed contributing factor is that the fresh-guest path is also reachable
+from the `catch` around `requireCurrentWebAccountRealm`. Where service-worker
+attestation fails — a headless Playwright context, or any environment without a
+controlling worker — execution enters that catch and can still reach
+`acceptFreshGuest()`. On a real deployment attestation succeeds, so that escape
+hatch never runs. This is why every browser test passes and every real
+deployment hangs.
+
+**Not yet proven:** the exact value `readLocalJourneyOwner()` returns on a first
+visit was inferred from the code path and the observed storage, not observed
+directly. Confirm it before changing the classification, because the fix must
+break the circular dependency without weakening the boundary that keeps one
+account's data from being read under another's generation.
+
 ## Why the existing tests did not catch it
 
 Each layer tested something adjacent to the broken case:
