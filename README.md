@@ -127,7 +127,8 @@ docs/                   # Codex + setup/deployment/security/content/QA guides
 
 ## Documentation
 
-- [`docs/CODEBASE_GUIDE.md`](docs/CODEBASE_GUIDE.md) — architecture map and change guide
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the architecture map: layers, the ownership/authority model, platform split, refactor plan
+- [`docs/CODEBASE_GUIDE.md`](docs/CODEBASE_GUIDE.md) — where behavior lives and which files change together
 - [`docs/BIBLEQUEST_CODEX.md`](docs/BIBLEQUEST_CODEX.md) — the source of truth
 - [`docs/SETUP.md`](docs/SETUP.md) — Supabase, auth, migrations, seeding
 - [`docs/FOUNDER_API_SETUP.md`](docs/FOUNDER_API_SETUP.md) — concise provider, API-key, email, support, and subscription setup
