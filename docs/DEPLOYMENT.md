@@ -123,10 +123,26 @@ needed — just don't remove that config.
       push (if enabling sync).
 - [ ] Complete [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md): apply its
       account boundary through `0022`, then the launch capability migrations
-      through `0030`
-      with the reviewed seed applied separately,
+      through `0036` and standalone web account-deletion hardening `0038`, with
+      native beta migration `0037` explicitly excluded and the reviewed seed
+      applied separately,
       configure custom SMTP, and pass production readiness, daily-quest CAS,
       cached-client, and two-user isolation checks.
+- [ ] Require `account_deletion_storage_contract` to contain exactly the fixed
+      contract identity and `ok: true` before any owner Storage sweep; missing,
+      malformed, or false posture is a deletion and release blocker.
+- [ ] Prove `0038` adds no provider-protocol column, adoption RPC, or private
+      protocol policies. The `x-biblequest-web-auth: v2` transport header must
+      remain additive for unadopted accounts so the required `ed28b0b` rollback
+      remains provider-compatible.
+- [ ] Require the cleanup request's 204 to follow its captured-owner latch,
+      Storage sweep, final empty-folder proof, and Auth/profile purge. A timeout
+      or non-204 is pending until the retained owner credential proves deletion
+      or safely resumes the same idempotent route.
+- [ ] Require authenticated session restore to receive exactly the fixed
+      `own_account_deletion_status` contract for the captured owner. Pending
+      deletion stays hidden/resumable; errors stay retry-only and never trigger
+      local purge by themselves.
 - [ ] Require the anonymous `daily_quest_sync_contract` readiness response to
       contain exactly the fixed contract identity and `ok: true`; treat extra
       keys, content, or `ok: false` as a sync launch blocker.

@@ -17,6 +17,8 @@ The replacement is deliberately narrow:
 - the native client uses the modern publishable key only;
 - migration `0037_native_account_beta_availability.sql` adds a remotely
   controlled native account boundary that defaults off;
+- standalone migration `0038_web_account_deletion_hardening.sql` must complete
+  the web Storage/deletion safety phase first without enabling native accounts;
 - email numeric-code accounts, account deletion, and reviewed journey sync are
   in scope;
 - native commerce, Plus acquisition, social OAuth, analytics, APNs, and remote
@@ -170,44 +172,66 @@ execution. Approval of one item is not approval of the next.
    `NOT RUN — OWNER-ACCEPTED NO-STAGING RISK`, the reason, affected gates, and
    UTC acceptance. Local Supabase and a branch created from the Production
    project do not prove a clean-room staging restore.
-4. **Stage the web candidate.** Prevent `main` from auto-moving Production
-   domains, then create an unpromoted Production-environment deployment from
-   the exact frozen SHA. Verify its environment identity, current configured
-   web-account behavior, billing posture, headers, PWA, privacy, and rollback
-   compatibility. A Preview artifact must never be promoted as Production.
-5. **Merge and promote the web candidate.** Merge only after the protected PR
-   checks, enabled-account web regression, rollback rehearsal, and named
-   approvals pass. Promote the already-tested immutable artifact without a
-   rebuild or environment substitution, then run the staffed web watch.
-6. **Apply migration `0037`.** Re-run the read-only guarded dry run, confirm the
+4. **Stage the web candidate against schema `0036`.** Prevent `main` from
+   auto-moving Production domains, then create an unpromoted
+   Production-environment deployment from the exact frozen SHA. Verify its
+   identity, known-good rollback, billing, headers, PWA, privacy, and that the
+   new deletion path fails closed before `0038`. Do not mutate Production data
+   or claim the deletion gate yet. A Preview artifact must never be promoted as
+   Production.
+5. **Apply standalone web migration `0038`.** Re-run its guarded dry run,
+   confirm exact Production history through `0036`, a completed physical backup
+   under 30 hours, the pinned one-packet proposal, and continued absence of
+   native `0037`. Obtain approval for this database-first change; the known-good
+   `ed28b0b` web rollback remains compatible. Never substitute normal Production
+   `db push`, `--include-all`, migration repair, reset, or history editing.
+6. **Re-verify the exact web candidate.** Keep customer domains on the
+   known-good artifact while the unpromoted candidate proves the exact `0038`
+   contract, two-owner isolation, concurrent upload/deletion, zero-residue
+   deletion, billing posture, headers, PWA, privacy, logs, and rollback
+   compatibility.
+7. **Merge and verify the new main artifact.** Merge only after the protected PR
+   checks, exact-artifact web deletion regression, rollback rehearsal, and named
+   approvals pass. Wait for an unpromoted Production-environment deployment from
+   the new exact `main` SHA, repeat its critical checks, and only then rebind
+   customer domains to that artifact; never promote the branch deployment.
+8. **Apply migration `0037`.** Re-run the read-only guarded dry run, confirm the
    exact one-packet proposal and a completed physical backup under 30 hours,
    then obtain the database owner and rollback authority's approval. Apply only
    with the script's pinned confirmation string. Never use normal Production
    `db push`, `--include-all`, migration repair, reset, or history editing.
-7. **Verify the flag remains off.** Re-run the guarded dry run, migration list,
+9. **Verify the flag remains off.** Re-run the guarded dry run, migration list,
    after-check, RLS/grant report, anonymous denials, web account smoke, and
    native-header denials. The availability RPC must report the fixed contract
    with `available:false`.
-8. **Create the internal TestFlight build.** Confirm custom SMTP, exact provider
+10. **Create the internal TestFlight build.** Confirm custom SMTP, exact provider
    and callback settings, the code-only template, resend limits, and in-app
    deletion before creating any tester account. Distribute only the exact
    scanned replacement build to the approved internal cohort.
-9. **Open a staffed native test window.** Enable only the native availability
+11. **Open a staffed native test window.** Enable only the native availability
    flag. Do not alter legacy keys or unrelated Production flags. Disable it at
    the end of the window and verify installed clients stop auth, refresh, pull,
    and writes while retaining the local journey.
-10. **Prepare and submit the replacement.** Update App Store privacy answers,
+12. **Prepare and submit the replacement.** Update App Store privacy answers,
     review notes, reviewer access, deletion/retention disclosures, age rating,
     content rights, export compliance, contact details, and agreements to match
     the exact binary. Use manual release. Submission and public release are two
     separate approvals.
 
-The web candidate contains a narrow pre-`0037` compatibility bridge for the
-existing web account-deletion flow: only an exact PostgREST missing-function
-result for `begin_own_account_deletion` may continue through the prior
-owner-scoped deletion path. Native deletion and every other database error stay
-closed. Remove that bridge only in a later release after Production `0037` is
-verified and the compatible web deployment is stable.
+The web candidate has no missing-latch compatibility bridge. An account cleanup
+must prove the exact fixed `account_deletion_storage_contract`, install the
+durable owner latch, sweep Storage, and call `delete_own_account` from that same
+captured-owner server request so its 204 proves the folder is still empty and
+the profile/Auth purge committed. Any missing or malformed contract fails
+closed before the sweep. A lost response is resolved with the retained captured
+credential: `user_not_found` proves the committed deletion, while a still-live
+pending owner retries the idempotent route. Standalone `0038` installs that
+boundary without native availability; later `0037` reasserts the compatible
+boundary and keeps its own default-off gate. Session restoration must also
+require the exact authenticated `own_account_deletion_status` response;
+`pending:true` keeps the account hidden and resumes the idempotent deletion
+flow, while transport or shape errors remain retry-only and never authorize or
+purge local data.
 
 ## 6. Production-backed device matrix
 
@@ -252,9 +276,10 @@ disable is a hard stop.
    stop new OTP, refresh, pull, and write activity while preserving local data.
 3. For a web-only regression, promote only the verified compatible rollback
    deployment. Do not point old code at an incompatible schema.
-4. `0037` is forward-only. Do not edit/delete its history or restore Production
-   merely to remove it. Correct a defect with a reviewed higher migration unless
-   actual data corruption requires the separately approved backup procedure.
+4. `0038` and later `0037` are forward-only. Do not edit/delete either history
+   row or restore Production merely to remove one. Correct a defect with a
+   reviewed higher migration unless actual data corruption requires the
+   separately approved backup procedure.
 5. A binary defect is handled by stopping manual release, rejecting the build,
    or removing it from sale under the approved incident plan. A processed App
    Store binary is never overwritten; use a new forward build.
