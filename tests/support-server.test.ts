@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import {
-  optionalSupportUser,
   stripeSupportAvailability,
   stripeSupportContractReady,
 } from "@/lib/support/server";
@@ -71,27 +70,5 @@ describe("one-time support server posture", () => {
     expect(
       await stripeSupportContractReady({ rpc } as unknown as SupabaseClient),
     ).toBe(false);
-  });
-
-  it("uses an optional verified session and fails guest-safe", async () => {
-    const user = {
-      id: "d1000000-0000-4000-8000-000000000001",
-      email: "verified@example.test",
-    };
-    const client = {
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user },
-          error: null,
-        }),
-      },
-    } as unknown as SupabaseClient;
-    await expect(optionalSupportUser(async () => client)).resolves.toBe(user);
-
-    await expect(
-      optionalSupportUser(async () => {
-        throw new Error("private provider");
-      }),
-    ).resolves.toBeNull();
   });
 });

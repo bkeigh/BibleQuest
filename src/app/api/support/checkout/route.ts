@@ -16,7 +16,6 @@ import {
   supportCheckoutUrl,
 } from "@/lib/support/records.server";
 import {
-  optionalSupportUser,
   stripeSupportContractReady,
 } from "@/lib/support/server";
 import {
@@ -24,7 +23,6 @@ import {
   recordServerFailureReason,
 } from "@/lib/observability/server-failures";
 import { createAdminSupabase } from "@/lib/supabase/admin.server";
-import { createServerSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -106,7 +104,6 @@ export async function POST(request: Request) {
 
   let admin;
   let configuration;
-  let user;
   let claim;
   try {
     configuration = requireStripeBillingConfiguration();
@@ -118,10 +115,10 @@ export async function POST(request: Request) {
       recordServerFailureReason("support", "claim", "schema");
       return privateError("unavailable", 503);
     }
-    user = await optionalSupportUser(createServerSupabase);
     claim = await claimSupportCheckout(admin, {
       requestId: values.requestId,
-      userId: user?.id ?? null,
+      // Voluntary support is intentionally anonymous at the application edge.
+      userId: null,
       amount: values.amount,
       livemode: configuration.livemode,
     });
@@ -152,9 +149,6 @@ export async function POST(request: Request) {
             {
               mode: "payment",
               customer_creation: "always",
-              ...(user?.email && user.email_confirmed_at
-                ? { customer_email: user.email }
-                : {}),
               client_reference_id: values.requestId,
               line_items: [
                 {

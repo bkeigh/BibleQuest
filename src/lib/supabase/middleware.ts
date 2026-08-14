@@ -1,14 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isSupabaseConfigured } from "./client";
+import { isSupabaseConfigured } from "./configuration";
 import { supabasePublishableKey } from "./config";
-import { accountSyncAvailable } from "@/lib/sync/containment";
 
 /**
- * Refreshes the Supabase auth session cookie on each request so server
- * components see a valid session. No-ops when Supabase isn't configured or
- * guest-only containment is active, unless an independent private surface
- * explicitly requests auth refresh. Local mode remains completely unaffected.
+ * Refreshes only the operator console's legacy Supabase cookie. Customer auth
+ * is browser-owned and bearer-only, so ordinary pages and APIs never receive
+ * a server session write. Local mode remains completely unaffected.
  *
  * Follows the @supabase/ssr guidance: do not run logic between createServerClient
  * and getUser(), and always return the response object it produces.
@@ -16,7 +14,7 @@ import { accountSyncAvailable } from "@/lib/sync/containment";
 export async function updateSession(
   request: NextRequest,
   rewriteUrl?: URL,
-  refreshContainedSession = false,
+  refreshLegacyConsoleSession = false,
 ) {
   const responseForRequest = () => {
     const forwardedHeaders = new Headers(request.headers);
@@ -31,12 +29,9 @@ export async function updateSession(
   };
   let response = responseForRequest();
 
-  // Customer routes stay fully contained. The private console may refresh its
-  // own operator cookie without enabling product account sync.
-  if (
-    !isSupabaseConfigured() ||
-    (!accountSyncAvailable(true) && !refreshContainedSession)
-  ) {
+  // The private console is the sole owner of the legacy server cookie. The
+  // account-sync flag must never reopen middleware writes for customer pages.
+  if (!isSupabaseConfigured() || !refreshLegacyConsoleSession) {
     return response;
   }
 

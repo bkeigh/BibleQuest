@@ -27,9 +27,11 @@ describe("one-time Support BibleQuest API boundary", () => {
     expect(route).not.toContain("export function GET");
   });
 
-  it("lets guests pay without creating an application account", () => {
-    expect(route).toContain("optionalSupportUser(createServerSupabase)");
-    expect(route).toContain("userId: user?.id ?? null");
+  it("keeps support strictly anonymous without creating an account", () => {
+    expect(route).toContain("userId: null");
+    expect(route).not.toContain("optionalSupportUser");
+    expect(route).not.toContain("createServerSupabase");
+    expect(route).not.toContain("customer_email");
     expect(route).not.toMatch(/auth\.signUp|admin\.createUser|inviteUser/);
     expect(migration).toContain(
       "user_id uuid references auth.users(id) on delete set null",

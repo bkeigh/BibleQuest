@@ -42,6 +42,8 @@ export const runtime = "nodejs";
 
 const AVATAR_BUCKET = "profile-avatars";
 const AVATAR_CONTRACT = "biblequest_profile_avatar_v1";
+const ACCOUNT_DELETION_STORAGE_CONTRACT =
+  "biblequest_account_deletion_storage_v1";
 const MAX_FORM_BYTES = MAX_AVATAR_INPUT_BYTES + 64 * 1024;
 const AVATAR_UPLOAD_RATE_POLICIES = [
   { limit: 5, windowMs: 10 * 60_000 },
@@ -83,6 +85,19 @@ function isAvatarContract(value: unknown): boolean {
   );
 }
 
+/** Accepts only the fixed, content-free Storage deletion contract. */
+function isAccountDeletionStorageContract(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.keys(value).sort().join(",") === "contract,ok" &&
+    (value as { contract?: unknown }).contract ===
+      ACCOUNT_DELETION_STORAGE_CONTRACT &&
+    (value as { ok?: unknown }).ok === true
+  );
+}
+
 function ownedAvatarPath(userId: string, value: unknown): value is string {
   return (
     typeof value === "string" &&
@@ -110,6 +125,24 @@ async function avatarContractReady(
   }
   if (!isAvatarContract(data)) {
     if (stage) recordServerFailureReason("avatar", stage, "schema");
+    return false;
+  }
+  return true;
+}
+
+/** Proves the latch, upload serialization, and final empty-folder check. */
+async function accountDeletionStorageContractReady(
+  supabase: SupabaseClient,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc(
+    "account_deletion_storage_contract",
+  );
+  if (error) {
+    recordServerFailure("avatar", "delete", error);
+    return false;
+  }
+  if (!isAccountDeletionStorageContract(data)) {
+    recordServerFailureReason("avatar", "delete", "schema");
     return false;
   }
   return true;
@@ -354,31 +387,14 @@ async function removeAllOwnedObjects(
   }
 }
 
-/** Allows only the known web bridge while Production is still pre-0037. */
-function missingAccountDeletionLatch(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const candidate = error as { code?: unknown; message?: unknown };
-  return (
-    (candidate.code === "PGRST202" || candidate.code === "42883") &&
-    typeof candidate.message === "string" &&
-    candidate.message.includes("begin_own_account_deletion")
-  );
-}
-
-/** Deletes remote media before clearing its profile pointer. */
+/** Deletes avatar media, or completes the latched remote account purge. */
 export async function DELETE(request: Request) {
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
   const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;
   const { storageSupabase, supabase, user } = context;
-  const contractReady = await avatarContractReady(
-    supabase,
-    featureEnabled() ? "delete" : null,
-  );
-  if (!contractReady) {
-    return featureEnabled()
-      ? privateError("unavailable", 503)
-      : new NextResponse(null, { status: 204 });
+  if (!(await avatarContractReady(supabase, "delete"))) {
+    return privateError("unavailable", 503);
   }
 
   let allOwnedObjects = false;
@@ -408,6 +424,12 @@ export async function DELETE(request: Request) {
       request.headers.get(EXPECTED_ACCOUNT_USER_HEADER) === user.id;
     const nativeDeletionCleanup =
       accountDeletionCleanup && isNativeAppOrigin(request);
+    if (
+      accountDeletionCleanup &&
+      !(await accountDeletionStorageContractReady(supabase))
+    ) {
+      return privateError("unavailable", 503);
+    }
     let expectedPath: string | null = null;
     if (!nativeDeletionCleanup) {
       // Normal clears prove the profile read before touching Storage. When the
@@ -419,13 +441,7 @@ export async function DELETE(request: Request) {
       // The durable database latch waits out in-flight uploads and denies new
       // ones before the final owner-folder sweep begins.
       const { error } = await supabase.rpc("begin_own_account_deletion");
-      // The currently deployed web client predates 0037. Preserve its existing
-      // deletion behavior only for the exact missing-function bridge; native
-      // cleanup still requires the latch because it can run while disabled.
-      if (
-        error &&
-        (nativeDeletionCleanup || !missingAccountDeletionLatch(error))
-      ) {
+      if (error) {
         recordServerFailure("avatar", "delete", error);
         return privateError("delete_failed", 503);
       }
@@ -437,8 +453,13 @@ export async function DELETE(request: Request) {
         return privateError("delete_failed", 503);
       }
       if (accountDeletionCleanup) {
-        // The immediately-following account RPC purges the profile itself.
-        // Avoid a redundant row lock between the Storage sweep and deletion.
+        // Keep the captured owner through the final proof and identity purge.
+        // The latch makes retries safe and blocks objects after this sweep.
+        const { error } = await supabase.rpc("delete_own_account");
+        if (error) {
+          recordServerFailure("avatar", "delete", error);
+          return privateError("delete_failed", 503);
+        }
         return new NextResponse(null, {
           status: 204,
           headers: { "Cache-Control": "private, no-store" },

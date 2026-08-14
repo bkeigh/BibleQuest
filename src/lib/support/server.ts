@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { stripeBillingAvailability } from "@/lib/billing/config.server";
 import { STRIPE_SUPPORT_CONTRACT } from "./config";
 
@@ -32,20 +32,4 @@ export async function stripeSupportContractReady(
 ): Promise<boolean> {
   const { data, error } = await client.rpc("stripe_support_contract");
   return !error && isSupportContract(data);
-}
-
-/** Returns an optional verified account without making guest support fail. */
-export async function optionalSupportUser(
-  createClient: () => Promise<SupabaseClient>,
-): Promise<User | null> {
-  try {
-    const client = await createClient();
-    const {
-      data: { user },
-      error,
-    } = await client.auth.getUser();
-    return error ? null : user;
-  } catch {
-    return null;
-  }
 }

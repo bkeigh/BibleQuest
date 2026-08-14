@@ -38,7 +38,7 @@ describe("avatar API boundaries", () => {
     expect(route).toContain("AVATAR_UPLOAD_RATE_POLICIES");
   });
 
-  it("uses the disabled-beta cleanup bypass only for captured native deletion", () => {
+  it("requires the durable deletion latch for every captured owner sweep", () => {
     expect(route).toContain("const accountDeletionCleanup =");
     expect(route).toContain(
       "const accountDeletionCleanup =\n      allOwnedObjects &&",
@@ -57,12 +57,28 @@ describe("avatar API boundaries", () => {
     expect(route.indexOf('supabase.rpc("begin_own_account_deletion")')).toBeLessThan(
       route.indexOf("if (allOwnedObjects) {", route.indexOf("export async function DELETE")),
     );
-    expect(route).toContain("function missingAccountDeletionLatch(");
     expect(route).toContain(
-      "nativeDeletionCleanup || !missingAccountDeletionLatch(error)",
+      'supabase.rpc(\n    "account_deletion_storage_contract",',
     );
-    expect(route).toContain('candidate.code === "PGRST202"');
-    expect(route).toContain('candidate.code === "42883"');
+    expect(
+      route.indexOf("accountDeletionStorageContractReady(supabase)"),
+    ).toBeLessThan(
+      route.indexOf('supabase.rpc("begin_own_account_deletion")'),
+    );
+    const ownerSweep = route.indexOf(
+      "removeAllOwnedObjects(storageSupabase, user.id)",
+    );
+    const finalPurge = route.indexOf('supabase.rpc("delete_own_account")');
+    const cleanupSuccess = route.indexOf(
+      "return new NextResponse(null, {",
+      finalPurge,
+    );
+    expect(finalPurge).toBeGreaterThan(ownerSweep);
+    expect(cleanupSuccess).toBeGreaterThan(finalPurge);
+    expect(route).toContain('avatarContractReady(supabase, "delete")');
+    expect(route).toContain('return privateError("unavailable", 503)');
+    expect(route).not.toContain("missingAccountDeletionLatch");
+    expect(route).not.toContain('candidate.code === "PGRST202"');
   });
 
   it("uses the verified bearer client for every Storage operation", () => {
