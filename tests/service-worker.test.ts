@@ -1,6 +1,8 @@
 import fs from "node:fs";
+import { webcrypto } from "node:crypto";
 import path from "node:path";
 import vm from "node:vm";
+import { MessageChannel, type MessagePort } from "node:worker_threads";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import observability from "../config/observability.json";
@@ -21,7 +23,14 @@ type WorkerPolicy = {
   PUSH_TITLE: string;
   PUSH_BODY: string;
   PUSH_TARGET: string;
+  WEB_AUTH_SW_ATTEST_REQUEST: string;
+  WEB_AUTH_SW_AUDIT_REQUEST: string;
+  WEB_AUTH_SW_CLIENT_CHALLENGE: string;
+  WEB_AUTH_SW_CLIENT_RESPONSE: string;
+  WEB_AUTH_SW_RESULT: string;
   pushKind: (data: { json: () => unknown } | null) => string | null;
+  isWebAuthCustomerPath: (pathname: string) => boolean;
+  isWebAuthCustomerClient: (client: WindowClient | null) => boolean;
   isRequestCacheCandidate: (request: Request) => boolean;
   isOfflineSafeNavigationRequest: (request: Request) => boolean;
   isImmutableStaticRequest: (request: Request) => boolean;
@@ -29,14 +38,24 @@ type WorkerPolicy = {
   isResponseCacheable: (response: Response) => boolean;
 };
 
+type WindowClient = {
+  id?: string;
+  url: string;
+  postMessage?: (message: unknown, transfer?: readonly MessagePort[]) => void;
+  navigate?: (path: string) => Promise<unknown>;
+  focus: () => Promise<unknown>;
+};
+
 type WorkerEvent = {
+  clientId?: string;
   data?: unknown;
   notification?: {
     tag?: string;
     close: () => void;
   };
+  ports?: MessagePort[];
   request?: Request;
-  source?: { postMessage: (message: unknown) => void };
+  source?: WindowClient | { postMessage: (message: unknown) => void };
   respondWith?: (value: Promise<Response> | Response) => void;
   waitUntil: (value: Promise<unknown>) => void;
 };
@@ -45,9 +64,10 @@ type WorkerListener = (event: WorkerEvent) => void;
 
 function makeRequest(
   pathname: string,
-  options: { method?: string; mode?: RequestMode } = {}
+  options: { headers?: HeadersInit; method?: string; mode?: RequestMode } = {}
 ) {
   const result = new Request(new URL(pathname, ORIGIN), {
+    headers: options.headers,
     method: options.method ?? "GET",
   });
   Object.defineProperty(result, "mode", {
@@ -132,11 +152,8 @@ function loadWorker(
     skipped: false,
     notifications: [] as Array<{ title: string; options: Record<string, unknown> }>,
     opened: [] as string[],
-    windowClients: [] as Array<{
-      url: string;
-      navigate?: (path: string) => Promise<unknown>;
-      focus: () => Promise<unknown>;
-    }>,
+    matchAllCalls: [] as Array<Record<string, unknown> | undefined>,
+    windowClients: [] as WindowClient[],
   };
   const worker = {
     __BIBLEQUEST_SW_TESTING__: true as true | WorkerPolicy,
@@ -153,7 +170,11 @@ function loadWorker(
       async claim() {
         state.claimed = true;
       },
-      async matchAll() {
+      async get(id: string) {
+        return state.windowClients.find((client) => client.id === id);
+      },
+      async matchAll(options?: Record<string, unknown>) {
+        state.matchAllCalls.push(options);
         return state.windowClients;
       },
       async openWindow(pathname: string) {
@@ -176,7 +197,12 @@ function loadWorker(
     Request,
     Response,
     URL,
+    MessageChannel,
+    Uint8Array,
+    clearTimeout,
     console,
+    crypto: webcrypto,
+    setTimeout,
   });
   vm.runInContext(WORKER_SOURCE, context, { filename: WORKER_PATH });
 
@@ -202,11 +228,13 @@ function lifecycleEvent() {
 
 async function dispatchFetch(
   harness: ReturnType<typeof loadWorker>,
-  request: Request
+  request: Request,
+  clientId?: string,
 ) {
   const pending: Promise<unknown>[] = [];
   let responsePromise: Promise<Response> | undefined;
   const event: WorkerEvent = {
+    clientId,
     request,
     respondWith(value) {
       responsePromise = Promise.resolve(value);
@@ -219,6 +247,58 @@ async function dispatchFetch(
   const result = responsePromise ? await responsePromise : undefined;
   await Promise.all(pending);
   return result;
+}
+
+/** Creates one bounded v28 client responder for worker challenge tests. */
+function webAuthWindowClient(
+  harness: ReturnType<typeof loadWorker>,
+  id: string,
+  pathname: string,
+  response: "exact" | "wrong" | "throw" = "exact",
+): WindowClient {
+  return {
+    id,
+    url: new URL(pathname, ORIGIN).href,
+    focus: vi.fn().mockResolvedValue(undefined),
+    postMessage(message, transfer) {
+      if (response === "throw") throw new Error("challenge unavailable");
+      const port = transfer?.[0];
+      if (!port) return;
+      const value = message as { nonce?: unknown };
+      port.postMessage({
+        type: harness.policy.WEB_AUTH_SW_CLIENT_RESPONSE,
+        version:
+          response === "exact" ? harness.policy.CACHE_VERSION : "biblequest-v26",
+        nonce: value.nonce,
+      });
+      port.close();
+    },
+  };
+}
+
+/** Dispatches one content-free service-worker protocol request. */
+async function dispatchWebAuthMessage(
+  harness: ReturnType<typeof loadWorker>,
+  source: WindowClient,
+  type: string,
+) {
+  const channel = new MessageChannel();
+  const pending: Promise<unknown>[] = [];
+  const result = new Promise<unknown>((resolve) => {
+    channel.port1.once("message", resolve);
+  });
+  harness.listeners.get("message")!({
+    data: { type, version: harness.policy.CACHE_VERSION },
+    ports: [channel.port2],
+    source,
+    waitUntil(value) {
+      pending.push(Promise.resolve(value));
+    },
+  });
+  const value = await result;
+  await Promise.all(pending);
+  channel.port1.close();
+  return value;
 }
 
 describe("service-worker cache policy", () => {
@@ -279,6 +359,9 @@ describe("service-worker cache policy", () => {
       makeRequest("/api/health"),
       makeRequest("/app?qa=1"),
       makeRequest("/app/games?view=archive"),
+      makeRequest("/app", {
+        headers: { Authorization: "Bearer header.payload.signature" },
+      }),
       makeRequest("/app", { method: "POST" }),
       makeRequest("https://example.com/app"),
     ];
@@ -519,6 +602,171 @@ describe("service-worker fetch behavior", () => {
     expect(await (await runtime.match(artRequest))?.text()).toBe(
       "refreshed tree"
     );
+  });
+});
+
+describe("service-worker browser-auth attestation", () => {
+  it("limits attestation to exact same-origin customer routes", () => {
+    const { policy } = loadWorker();
+    for (const pathname of [
+      "/app",
+      "/app/",
+      "/app/settings",
+      "/onboarding",
+      "/auth/customer-callback",
+    ]) {
+      expect(policy.isWebAuthCustomerPath(pathname), pathname).toBe(true);
+    }
+    for (const pathname of [
+      "/",
+      "/auth/callback",
+      "/auth/customer-callback/extra",
+      "/console",
+      "/console/users",
+    ]) {
+      expect(policy.isWebAuthCustomerPath(pathname), pathname).toBe(false);
+    }
+
+    expect(
+      policy.isWebAuthCustomerClient({
+        id: "customer",
+        url: `${ORIGIN}/app`,
+        focus: vi.fn(),
+      }),
+    ).toBe(true);
+    expect(
+      policy.isWebAuthCustomerClient({
+        id: "external",
+        url: "https://example.com/app",
+        focus: vi.fn(),
+      }),
+    ).toBe(false);
+    expect(
+      policy.isWebAuthCustomerClient({
+        url: `${ORIGIN}/app`,
+        focus: vi.fn(),
+      }),
+    ).toBe(false);
+  });
+
+  it("returns only exact version/pass after every customer window attests", async () => {
+    const harness = loadWorker();
+    const requester = webAuthWindowClient(harness, "requester", "/app");
+    harness.state.windowClients.push(
+      requester,
+      webAuthWindowClient(harness, "onboarding", "/onboarding"),
+      webAuthWindowClient(
+        harness,
+        "callback",
+        "/auth/customer-callback?code=private",
+      ),
+      webAuthWindowClient(harness, "console", "/console", "throw"),
+      webAuthWindowClient(
+        harness,
+        "external",
+        "https://example.com/app",
+        "throw",
+      ),
+    );
+
+    await expect(
+      dispatchWebAuthMessage(
+        harness,
+        requester,
+        harness.policy.WEB_AUTH_SW_ATTEST_REQUEST,
+      ),
+    ).resolves.toEqual({
+      type: harness.policy.WEB_AUTH_SW_RESULT,
+      version: harness.policy.CACHE_VERSION,
+      ok: true,
+    });
+    const result = await dispatchWebAuthMessage(
+      harness,
+      requester,
+      harness.policy.WEB_AUTH_SW_AUDIT_REQUEST,
+    );
+
+    expect(result).toEqual({
+      type: harness.policy.WEB_AUTH_SW_RESULT,
+      version: harness.policy.CACHE_VERSION,
+      ok: true,
+    });
+    expect(Object.keys(result as object).sort()).toEqual([
+      "ok",
+      "type",
+      "version",
+    ]);
+    expect(harness.state.matchAllCalls).toContainEqual({
+      type: "window",
+      includeUncontrolled: true,
+    });
+  });
+
+  it("fails the all-customer-window audit when any customer is stale", async () => {
+    const harness = loadWorker();
+    const requester = webAuthWindowClient(harness, "requester", "/app");
+    harness.state.windowClients.push(
+      requester,
+      webAuthWindowClient(harness, "stale", "/app/prayer", "wrong"),
+    );
+    await dispatchWebAuthMessage(
+      harness,
+      requester,
+      harness.policy.WEB_AUTH_SW_ATTEST_REQUEST,
+    );
+
+    await expect(
+      dispatchWebAuthMessage(
+        harness,
+        requester,
+        harness.policy.WEB_AUTH_SW_AUDIT_REQUEST,
+      ),
+    ).resolves.toEqual({
+      type: harness.policy.WEB_AUTH_SW_RESULT,
+      version: harness.policy.CACHE_VERSION,
+      ok: false,
+    });
+  });
+
+  it("re-attests a v28 customer after restart before forwarding bearer traffic", async () => {
+    const network = vi.fn(async () => makeResponse("protected response"));
+    const harness = loadWorker(network);
+    const customer = webAuthWindowClient(harness, "customer", "/app/settings");
+    harness.state.windowClients.push(customer);
+    const request = makeRequest("https://provider.example.test/rest/v1/profile", {
+      headers: { Authorization: "Bearer header.payload.signature" },
+      mode: "cors",
+    });
+
+    const result = await dispatchFetch(harness, request, customer.id);
+
+    expect(result?.status).toBe(200);
+    expect(await result?.text()).toBe("protected response");
+    expect(network).toHaveBeenCalledOnce();
+    expect(harness.caches.cacheMap.size).toBe(0);
+  });
+
+  it("denies bearer traffic from missing, stale, and non-customer clients", async () => {
+    const network = vi.fn(async () => makeResponse("must not run"));
+    const harness = loadWorker(network);
+    harness.state.windowClients.push(
+      webAuthWindowClient(harness, "stale", "/app", "wrong"),
+      webAuthWindowClient(harness, "console", "/console"),
+    );
+    const request = makeRequest("https://provider.example.test/rest/v1/profile", {
+      headers: { Authorization: "Bearer header.payload.signature" },
+      mode: "cors",
+    });
+
+    for (const clientId of [undefined, "missing", "stale", "console"]) {
+      const result = await dispatchFetch(harness, request, clientId);
+      expect(result?.status, String(clientId)).toBe(403);
+      expect(result?.headers.get("cache-control"), String(clientId)).toBe(
+        "private, no-store",
+      );
+      expect(await result?.text(), String(clientId)).toBe("");
+    }
+    expect(network).not.toHaveBeenCalled();
   });
 });
 

@@ -6,6 +6,10 @@ import {
   reportClientSignal,
 } from "@/lib/observability/client-signals";
 import { isNativeTarget } from "@/lib/platform/target";
+import {
+  installWebAuthServiceWorkerResponder,
+  prepareWebAuthServiceWorker,
+} from "@/lib/platform/web-auth-service-worker";
 
 const VERSION_TIMEOUT_MS = 10_000;
 
@@ -27,6 +31,7 @@ export function ServiceWorkerRegistrar() {
     let versionTimer: number | null = null;
     let observedRegistration: ServiceWorkerRegistration | null = null;
     let observedInstallingWorker: ServiceWorker | null = null;
+    const removeWebAuthResponder = installWebAuthServiceWorkerResponder();
     const reportOnce = (
       outcome: "success" | "failure",
       version?: string,
@@ -96,8 +101,7 @@ export function ServiceWorkerRegistrar() {
         () => reportOnce("failure"),
         VERSION_TIMEOUT_MS,
       );
-      void navigator.serviceWorker
-        .register("/sw.js")
+      void prepareWebAuthServiceWorker()
         .then(async (registration) => {
           observedRegistration = registration;
           registration.addEventListener("updatefound", onUpdateFound);
@@ -127,6 +131,7 @@ export function ServiceWorkerRegistrar() {
         "statechange",
         onInstallingStateChange,
       );
+      removeWebAuthResponder();
     };
   }, []);
   return null;

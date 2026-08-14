@@ -4,11 +4,20 @@
  * validated build assets. Prayers, reflections, and other user data continue
  * to live in the persisted Zustand store; this worker never handles that data.
  */
-const CACHE_VERSION = "biblequest-v27";
+const CACHE_VERSION = "biblequest-v28";
 const CACHE_OWNER_PREFIX = "biblequest-";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const CURRENT_CACHES = [SHELL_CACHE, RUNTIME_CACHE];
+const WEB_AUTH_SW_ATTEST_REQUEST = "BIBLEQUEST_WEB_AUTH_ATTEST_V2";
+const WEB_AUTH_SW_AUDIT_REQUEST = "BIBLEQUEST_WEB_AUTH_AUDIT_V2";
+const WEB_AUTH_SW_CLIENT_CHALLENGE =
+  "BIBLEQUEST_WEB_AUTH_CLIENT_CHALLENGE_V2";
+const WEB_AUTH_SW_CLIENT_RESPONSE =
+  "BIBLEQUEST_WEB_AUTH_CLIENT_RESPONSE_V2";
+const WEB_AUTH_SW_RESULT = "BIBLEQUEST_WEB_AUTH_RESULT_V2";
+const WEB_AUTH_CHALLENGE_TIMEOUT_MS = 2_000;
+const attestedWebAuthClients = new Set();
 
 // These are generic, client-rendered shells. Fetch without credentials during
 // install so an authenticated response can never become a shared offline shell.
@@ -182,11 +191,38 @@ function isForbiddenPath(pathname) {
   );
 }
 
+/** Limits browser-auth attestation to customer pages on this exact origin. */
+function isWebAuthCustomerPath(pathname) {
+  return (
+    pathname === "/app" ||
+    pathname.startsWith("/app/") ||
+    pathname === "/onboarding" ||
+    pathname === "/auth/customer-callback"
+  );
+}
+
+/** Accepts only a same-origin customer window with one opaque client id. */
+function isWebAuthCustomerClient(client) {
+  if (!client || typeof client.id !== "string" || !client.id) return false;
+  try {
+    const url = new URL(client.url);
+    return (
+      url.origin === self.location.origin &&
+      isWebAuthCustomerPath(url.pathname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 function isRequestCacheCandidate(request, url = new URL(request.url)) {
   return (
     request.method === "GET" &&
     url.origin === self.location.origin &&
     url.search === "" &&
+    // Bearer-bearing responses are private even if a future route is omitted
+    // from the explicit forbidden-path list below.
+    !request.headers.has("authorization") &&
     !isForbiddenPath(url.pathname)
   );
 }
@@ -262,6 +298,133 @@ function pushKind(data) {
 
 function absoluteUrl(pathname) {
   return new URL(pathname, self.location.origin).href;
+}
+
+/** Creates a content-free nonce that binds one challenge response. */
+function webAuthChallengeNonce() {
+  if (typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID().replaceAll("-", "");
+  }
+  const bytes = crypto.getRandomValues(new Uint8Array(18));
+  return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join(
+    ""
+  );
+}
+
+/** Accepts only the exact response shape emitted by the current page helper. */
+function isExactWebAuthChallengeResponse(value, nonce) {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.keys(value).sort().join(",") === "nonce,type,version" &&
+    value.type === WEB_AUTH_SW_CLIENT_RESPONSE &&
+    value.version === CACHE_VERSION &&
+    value.nonce === nonce
+  );
+}
+
+/** Challenges one document without returning its URL, id, or failure reason. */
+function challengeWebAuthClient(client) {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    const nonce = webAuthChallengeNonce();
+    let settled = false;
+    const finish = (passed) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      channel.port1.close();
+      resolve(passed);
+    };
+    const timer = setTimeout(
+      () => finish(false),
+      WEB_AUTH_CHALLENGE_TIMEOUT_MS
+    );
+    channel.port1.onmessage = (event) => {
+      finish(isExactWebAuthChallengeResponse(event.data, nonce));
+    };
+    try {
+      // The HTML bfcache reasons include serviceworker-postmessage. The audit
+      // still fails closed on silence because browser implementations vary.
+      client.postMessage(
+        {
+          type: WEB_AUTH_SW_CLIENT_CHALLENGE,
+          version: CACHE_VERSION,
+          nonce,
+        },
+        [channel.port2]
+      );
+    } catch {
+      channel.port2.close();
+      finish(false);
+    }
+  });
+}
+
+/** Proves every live customer window runs the exact current worker protocol. */
+async function auditWebAuthClients(requester) {
+  if (
+    !isWebAuthCustomerClient(requester) ||
+    !attestedWebAuthClients.has(requester.id)
+  ) {
+    return false;
+  }
+  const windows = await self.clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
+  const customers = windows.filter(isWebAuthCustomerClient);
+  if (!customers.some((client) => client.id === requester.id)) return false;
+  const results = await Promise.all(
+    customers.map(async (client) => ({
+      client,
+      passed: await challengeWebAuthClient(client),
+    }))
+  );
+  const passed = results.every((result) => result.passed);
+  if (passed) {
+    attestedWebAuthClients.clear();
+    for (const result of results) {
+      attestedWebAuthClients.add(result.client.id);
+    }
+  } else {
+    for (const result of results) {
+      if (!result.passed) attestedWebAuthClients.delete(result.client.id);
+    }
+  }
+  return passed;
+}
+
+/** Replies with only the current version and one boolean result. */
+function replyWebAuthResult(port, ok) {
+  try {
+    port.postMessage({ type: WEB_AUTH_SW_RESULT, version: CACHE_VERSION, ok });
+  } finally {
+    port.close();
+  }
+}
+
+/** Rejects unverified bearer traffic without returning operational detail. */
+function webAuthAttestationFailure() {
+  return new Response(null, {
+    status: 403,
+    headers: { "Cache-Control": "private, no-store" },
+  });
+}
+
+/** Re-attests a current page after an idle worker restart, then proxies once. */
+async function handleAuthorizedFetch(event) {
+  if (!event.clientId) return webAuthAttestationFailure();
+  const client = await self.clients.get(event.clientId);
+  if (!isWebAuthCustomerClient(client)) return webAuthAttestationFailure();
+  if (!attestedWebAuthClients.has(client.id)) {
+    if (!(await challengeWebAuthClient(client))) {
+      return webAuthAttestationFailure();
+    }
+    attestedWebAuthClients.add(client.id);
+  }
+  return fetch(event.request);
 }
 
 async function precacheShell() {
@@ -384,6 +547,8 @@ self.addEventListener("activate", (event) => {
             .map((key) => caches.delete(key))
         )
       )
+      // Worker activation and claim are standardized bfcache not-restored
+      // reasons; the explicit client audit remains the cross-browser gate.
       .then(() => self.clients.claim())
   );
 });
@@ -400,7 +565,39 @@ self.addEventListener("message", (event) => {
       type: "BIBLEQUEST_SW_VERSION_RESPONSE",
       version: CACHE_VERSION,
     });
+    return;
   }
+
+  const type = event.data?.type;
+  if (
+    type !== WEB_AUTH_SW_ATTEST_REQUEST &&
+    type !== WEB_AUTH_SW_AUDIT_REQUEST
+  ) {
+    return;
+  }
+  if (event.ports.length !== 1) return;
+  const port = event.ports[0];
+  const source = event.source;
+  const exactRequest =
+    event.data !== null &&
+    typeof event.data === "object" &&
+    !Array.isArray(event.data) &&
+    Object.keys(event.data).sort().join(",") === "type,version" &&
+    event.data.version === CACHE_VERSION;
+  if (!exactRequest || !isWebAuthCustomerClient(source)) {
+    replyWebAuthResult(port, false);
+    return;
+  }
+  if (type === WEB_AUTH_SW_ATTEST_REQUEST) {
+    attestedWebAuthClients.add(source.id);
+    replyWebAuthResult(port, true);
+    return;
+  }
+  event.waitUntil(
+    auditWebAuthClients(source)
+      .then((ok) => replyWebAuthResult(port, ok))
+      .catch(() => replyWebAuthResult(port, false))
+  );
 });
 
 // Payloads carry only a bounded kind. Visible copy and navigation are fixed in
@@ -447,6 +644,11 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  if (request.headers.has("authorization")) {
+    event.respondWith(handleAuthorizedFetch(event));
+    return;
+  }
+
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
 
   if (request.mode === "navigate") {
@@ -479,7 +681,14 @@ if (self.__BIBLEQUEST_SW_TESTING__) {
     PUSH_TITLE,
     PUSH_BODY,
     PUSH_TARGET,
+    WEB_AUTH_SW_ATTEST_REQUEST,
+    WEB_AUTH_SW_AUDIT_REQUEST,
+    WEB_AUTH_SW_CLIENT_CHALLENGE,
+    WEB_AUTH_SW_CLIENT_RESPONSE,
+    WEB_AUTH_SW_RESULT,
     OFFLINE_SAFE_NAVIGATION_PATHS,
+    isWebAuthCustomerPath,
+    isWebAuthCustomerClient,
     isForbiddenPath,
     isRequestCacheCandidate,
     isOfflineSafeNavigationPath,
