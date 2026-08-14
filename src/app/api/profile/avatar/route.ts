@@ -431,10 +431,18 @@ export async function DELETE(request: Request) {
       }
     }
     if (allOwnedObjects) {
-      // Deletion cleanup cannot pre-read a disabled beta profile. The exact
-      // cleanup header lets the RPC clear this authenticated owner's pointer.
+      // Deletion cleanup cannot pre-read a disabled beta profile. Its exact
+      // headers authorize only this authenticated owner's bounded sweep.
       if (!(await removeAllOwnedObjects(storageSupabase, user.id))) {
         return privateError("delete_failed", 503);
+      }
+      if (accountDeletionCleanup) {
+        // The immediately-following account RPC purges the profile itself.
+        // Avoid a redundant row lock between the Storage sweep and deletion.
+        return new NextResponse(null, {
+          status: 204,
+          headers: { "Cache-Control": "private, no-store" },
+        });
       }
     } else {
       if (expectedPath) {

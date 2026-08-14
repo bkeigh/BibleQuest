@@ -119,6 +119,10 @@ describe("avatar account-deletion sweep", () => {
     expect(response.status).toBe(204);
     expect(mocks.storageList).toHaveBeenCalledWith(USER_ID, expect.any(Object));
     expect(mocks.userList).not.toHaveBeenCalled();
+    expect(client.rpc).not.toHaveBeenCalledWith(
+      "clear_profile_avatar",
+      expect.anything(),
+    );
   });
 
   it("keeps an ordinary owner sweep on the verified bearer client", async () => {
