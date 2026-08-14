@@ -58,7 +58,15 @@ describe("iOS App Store release configuration", () => {
     const billing = source("src/lib/billing/usePlus.ts");
     const settings = source("src/components/settings/SettingsScreen.tsx");
 
-    expect(api).toContain("return nativePublicApiFetch(url, init);");
+    // The public request path carries no account authority. It was renamed
+    // from nativePublicApiFetch when the browser transport landed and now also
+    // drops cookies outright, so the guest build cannot send ambient identity.
+    expect(api).toContain("return publicApiFetch(url, init);");
+    // Pin the public body itself: "credentials" also appears on the account
+    // paths, so a bare substring would still match if this one lost it.
+    expect(api).toMatch(
+      /function publicApiFetch\([\s\S]{0,160}?return fetch\(url, \{\s*\.\.\.init,\s*credentials: "omit",\s*headers: publicHeaders\(init\?\.headers\),\s*\}\);/,
+    );
     expect(api).toContain('headers.delete(reserved);');
     expect(api).toContain('"authorization",');
     expect(
@@ -67,6 +75,11 @@ describe("iOS App Store release configuration", () => {
       ),
     ).toBeLessThan(
       api.indexOf('await import(\n    "@/lib/supabase/client"'),
+    );
+    // The browser-owned auth transport is reachable only through the exact
+    // non-native branch; a native build always takes the contained path.
+    expect(api).toMatch(
+      /if \(!isNativeTarget\(\)\) \{\s*headers\.set\(WEB_AUTH_PROTOCOL_HEADER, WEB_AUTH_PROTOCOL_VERSION\);\s*return webAuthenticatedApiFetch\(url, expectedUserId, init, headers\);\s*\}\s*return nativeAuthenticatedApiFetch\(url, expectedUserId, init, headers\);/,
     );
     expect(billing).toContain("if (NATIVE_COMMERCE_CONTAINED) return;");
     expect(settings).toMatch(
