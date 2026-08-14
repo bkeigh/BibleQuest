@@ -85,6 +85,14 @@ select ok(
     where policy.schemaname = 'storage'
       and policy.tablename = 'objects'
       and policy.policyname = 'profile avatars: upload own'
+  )
+  and (
+    select policy.permissive = 'RESTRICTIVE'
+      and policy.with_check like '%avatar_upload_allowed%'
+    from pg_catalog.pg_policies as policy
+    where policy.schemaname = 'storage'
+      and policy.tablename = 'objects'
+      and policy.policyname = 'profile avatars: account deletion guard'
   ),
   'the Storage INSERT policy holds the shared owner lock before latch checks'
 );

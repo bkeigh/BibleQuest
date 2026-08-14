@@ -38,6 +38,8 @@
     "check:production-guided-progress": "node scripts/reconcile-production-guided-progress.mjs --dry-run",
     "check:production-provider-rate-limits": "node scripts/reconcile-production-provider-rate-limits.mjs --dry-run",
     "check:production-arcade-store": "node scripts/reconcile-production-arcade-store.mjs --dry-run",
+    "check:production-web-account-deletion": "node scripts/reconcile-production-web-account-deletion.mjs --dry-run",
+    "test:account-deletion-concurrency": "node scripts/test-web-account-deletion-concurrency.mjs",
     "check:production-native-availability": "node scripts/reconcile-production-native-availability.mjs --dry-run",
     "check:staging-migration-history": "node scripts/reconcile-staging-migration-history.mjs --dry-run",
     "check:staging-isolation": "node --env-file-if-exists=.env.staging.local scripts/check-staging-two-user-isolation.mjs",

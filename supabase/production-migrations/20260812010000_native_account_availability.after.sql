@@ -98,6 +98,8 @@ begin
        (public.account_deletion_contract()->>'ready')::boolean,
        false
      ) is not true
+     or public.account_deletion_storage_contract() is distinct from
+       '{"contract":"biblequest_account_deletion_storage_v1","ok":true}'::jsonb
      or coalesce(
        (public.profile_avatar_contract()->>'ok')::boolean,
        false

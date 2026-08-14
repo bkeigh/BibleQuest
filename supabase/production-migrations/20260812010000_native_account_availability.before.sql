@@ -7,9 +7,6 @@ begin
      or pg_catalog.to_regprocedure(
        'public.native_account_beta_request_allowed()'
      ) is not null
-     or pg_catalog.to_regclass(
-       'public.account_deletion_latches'
-     ) is not null
      or exists (
        select 1
        from public.feature_flags
@@ -45,6 +42,8 @@ begin
        (public.account_deletion_contract()->>'ready')::boolean,
        false
      ) is not true
+     or public.account_deletion_storage_contract() is distinct from
+       '{"contract":"biblequest_account_deletion_storage_v1","ok":true}'::jsonb
      or coalesce(
        (public.profile_avatar_contract()->>'ok')::boolean,
        false

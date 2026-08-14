@@ -161,8 +161,10 @@ where namespace.nspname = 'public'
     'guided_progress_sync_contract',
     'avatar_upload_allowed',
     'begin_own_account_deletion',
+    'own_account_deletion_status',
     'delete_own_account',
     'account_deletion_contract',
+    'account_deletion_storage_contract',
     'set_profile_avatar',
     'clear_profile_avatar',
     'profile_avatar_contract',
@@ -337,6 +339,8 @@ select public.mutable_account_sync_contract() as mutable_account_sync_contract;
 select public.account_sync_contract() as account_sync_contract;
 select public.guided_progress_sync_contract() as guided_progress_sync_contract;
 select public.account_deletion_contract() as account_deletion_contract;
+select public.account_deletion_storage_contract()
+  as account_deletion_storage_contract;
 select public.profile_avatar_contract() as profile_avatar_contract;
 select public.push_reminder_contract() as push_reminder_contract;
 select public.stripe_billing_contract() as stripe_billing_contract;

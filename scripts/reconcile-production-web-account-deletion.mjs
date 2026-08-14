@@ -1,6 +1,6 @@
 /**
- * Dry-runs or applies only the reviewed native-availability packet after
- * immutable-history, source-hash, assertion, and physical-backup gates.
+ * Applies only the reviewed web deletion hardening after exact Production
+ * history, checksum, dry-run, and physical-backup checks.
  */
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -13,14 +13,20 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const PROJECT_REF = "iacnjqnssovaaojswjoh";
 const FROZEN_PREFIX_SHA256 =
   "7f6f4ba507d4f314fe3965a0ed9602cce854fd370e63f1e892d34e2f08d0fa04";
-const APPLY_CONFIRMATION = `apply native availability to ${PROJECT_REF}`;
+const EXCLUDED_NATIVE_SHA256 =
+  "f944180398b7115bcbe9a18ef8d5333a697b91efbeb0978fac369a59797484a1";
+const PACKET_BEFORE_SHA256 =
+  "92cdd3dd49a7dd86830e0ecb41a725643aef7f2087a7697cf52fcdc0a6204de0";
+const PACKET_AFTER_SHA256 =
+  "f6dc5095cc4d30f667203f3f973c222df8ef9808fd724b24ac7e96596ee236b7";
+const APPLY_CONFIRMATION = `apply 20260812005000 to ${PROJECT_REF}`;
 const MAX_BACKUP_AGE_MS = 30 * 60 * 60 * 1000;
 const PACKET = {
-  version: "20260812010000",
-  name: "native_account_availability",
-  source: "0037_native_account_beta_availability.sql",
+  version: "20260812005000",
+  name: "web_account_deletion_hardening",
+  source: "0038_web_account_deletion_hardening.sql",
   sourceSha:
-    "f944180398b7115bcbe9a18ef8d5333a697b91efbeb0978fac369a59797484a1",
+    "c14cfae4bea342769423610c31ce1fcb35a2dfe1226ecac4d79c187911fc3e39",
 };
 const PACKET_FILENAME = `${PACKET.version}_${PACKET.name}.sql`;
 
@@ -57,7 +63,6 @@ const REVIEWED_HISTORY = [
   ["20260803010000", "distributed_provider_rate_limits"],
   ["20260803170000", "fix_provider_rate_limit_claim_timestamp"],
   ["20260804035000", "arcade_store_purchases"],
-  ["20260812005000", "web_account_deletion_hardening"],
 ];
 
 /** Stops without reflecting SQL, provider output, or credentials. */
@@ -65,7 +70,7 @@ function fail(message) {
   throw new Error(message);
 }
 
-/** Returns one pinned SHA-256 digest for non-secret migration content. */
+/** Returns one pinned SHA-256 digest for reviewed public source. */
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -84,7 +89,7 @@ function supabase(args, cwd, includeStderr = false) {
   return includeStderr ? `${result.stdout}\n${result.stderr}` : result.stdout;
 }
 
-/** Parses one expected JSON response. */
+/** Parses one expected bounded JSON response. */
 function json(output, label) {
   try {
     return JSON.parse(output);
@@ -93,17 +98,28 @@ function json(output, label) {
   }
 }
 
-/** Verifies the frozen Production prefix and exact native source. */
+/** Verifies the frozen base, excluded native source, and exact 0038 source. */
 async function releaseSource() {
   const directory = join(ROOT, "supabase", "migrations");
   const manifest = await readFile(join(directory, "manifest.sha256"), "utf8");
-  const prefix = `${manifest.trim().split("\n").slice(0, 35).join("\n")}\n`;
+  const lines = manifest.trim().split("\n");
+  const prefix = `${lines.slice(0, 35).join("\n")}\n`;
   if (sha256(prefix) !== FROZEN_PREFIX_SHA256) {
     fail("Reviewed 35-file migration prefix changed");
   }
+  if (
+    !lines.includes(
+      `${EXCLUDED_NATIVE_SHA256}  0037_native_account_beta_availability.sql`,
+    )
+  ) {
+    fail("Excluded native migration source changed");
+  }
   const source = await readFile(join(directory, PACKET.source), "utf8");
   if (sha256(source) !== PACKET.sourceSha) {
-    fail("Reviewed native-availability source changed");
+    fail("Reviewed web account deletion source changed");
+  }
+  if (!lines.includes(`${PACKET.sourceSha}  ${PACKET.source}`)) {
+    fail("Web account deletion manifest entry is invalid");
   }
   return source;
 }
@@ -111,14 +127,14 @@ async function releaseSource() {
 /** Creates an isolated long-version lane matching exact Production history. */
 async function prepareWorkdir(source) {
   const workdir = await mkdtemp(
-    join(tmpdir(), "biblequest-native-availability-"),
+    join(tmpdir(), "biblequest-web-account-deletion-"),
   );
   const migrations = join(workdir, "supabase", "migrations");
   await mkdir(migrations, { recursive: true });
   await writeFile(
     join(workdir, "supabase", "config.toml"),
     [
-      'project_id = "BibleQuest-production-native-availability"',
+      'project_id = "BibleQuest-web-account-deletion"',
       "",
       "[db]",
       "major_version = 17",
@@ -149,6 +165,12 @@ async function prepareWorkdir(source) {
     readFile(`${base}.before.sql`, "utf8"),
     readFile(`${base}.after.sql`, "utf8"),
   ]);
+  if (sha256(before) !== PACKET_BEFORE_SHA256) {
+    fail("Reviewed web deletion before-guard changed");
+  }
+  if (sha256(after) !== PACKET_AFTER_SHA256) {
+    fail("Reviewed web deletion after-guard changed");
+  }
   const packet = `${before.trim()}\n\n${source.trim()}\n\n${after.trim()}\n`;
   await writeFile(join(migrations, PACKET_FILENAME), packet);
   return { workdir, packetSha256: sha256(packet) };
@@ -185,7 +207,7 @@ function historyState(actual) {
   const applied = [...reviewed, PACKET.version];
   if (JSON.stringify(actual) === JSON.stringify(reviewed)) return "reviewed";
   if (JSON.stringify(actual) === JSON.stringify(applied)) return "applied";
-  fail("Production migration history differs from the reviewed release lane");
+  fail("Production history differs from the reviewed web deletion lane");
 }
 
 /** Requires a completed physical Production backup no older than 30 hours. */
@@ -219,7 +241,7 @@ function recentBackup(workdir) {
   return backup.inserted_at;
 }
 
-/** Requires the dry run to propose exactly the one reviewed packet. */
+/** Requires the dry run to propose exactly the reviewed one-packet lane. */
 function dryRun(workdir) {
   const output = supabase(
     ["db", "push", "--linked", "--dry-run", "--workdir", workdir],
@@ -234,7 +256,7 @@ function dryRun(workdir) {
     ),
   ];
   if (JSON.stringify(files) !== JSON.stringify([PACKET_FILENAME])) {
-    fail("Dry run did not propose exactly the reviewed native packet");
+    fail("Dry run did not propose exactly the reviewed web deletion packet");
   }
   return files;
 }
@@ -278,13 +300,13 @@ try {
   const backupAt = recentBackup(workdir);
   const proposed = state === "reviewed" ? dryRun(workdir) : [];
   if (mode === "apply") {
-    if (state === "applied") fail("Reviewed native packet is already applied");
+    if (state === "applied") fail("Reviewed web deletion packet is already applied");
     supabase(
       ["db", "push", "--linked", "--workdir", workdir, "--yes"],
       workdir,
     );
     if (historyState(history(workdir)) !== "applied") {
-      fail("Production did not record the reviewed native packet");
+      fail("Production did not record the reviewed web deletion packet");
     }
   }
   console.log(

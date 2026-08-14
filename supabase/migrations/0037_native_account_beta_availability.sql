@@ -172,6 +172,28 @@ with check (
   and (select public.avatar_upload_allowed())
 );
 
+-- Keep the deletion latch mandatory across all permissive Storage policies.
+drop policy if exists "profile avatars: account deletion guard"
+on storage.objects;
+create policy "profile avatars: account deletion guard"
+on storage.objects
+as restrictive
+for insert
+to authenticated
+with check (
+  bucket_id <> 'profile-avatars'
+  or (
+    (storage.foldername(name))[1] = (select auth.uid()::text)
+    and owner_id = (select auth.uid()::text)
+    and name ~ (
+      '^' || (select auth.uid()::text)
+      || '/avatar-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}'
+      || '-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.]webp$'
+    )
+    and (select public.avatar_upload_allowed())
+  )
+);
+
 -- Stop beta-header writes at the database even when an already-installed
 -- client has not yet observed a remote disable response.
 create or replace function public.enforce_native_account_beta_availability()
@@ -1052,7 +1074,7 @@ with avatar_columns as (
   where bucket.id = 'profile-avatars'
 ), object_policies as (
   select
-    pg_catalog.count(*) = 3
+    pg_catalog.count(*) = 4
     and pg_catalog.bool_and(
       policy.roles = array['authenticated']::name[]
     )
@@ -1066,6 +1088,15 @@ with avatar_columns as (
           and policy.with_check is null
         when 'profile avatars: upload own' then
           policy.cmd = 'INSERT'
+          and policy.qual is null
+          and policy.with_check like '%profile-avatars%'
+          and policy.with_check like '%foldername%'
+          and policy.with_check like '%owner_id%'
+          and policy.with_check like '%avatar-%'
+          and policy.with_check like '%avatar_upload_allowed%'
+        when 'profile avatars: account deletion guard' then
+          policy.permissive = 'RESTRICTIVE'
+          and policy.cmd = 'INSERT'
           and policy.qual is null
           and policy.with_check like '%profile-avatars%'
           and policy.with_check like '%foldername%'
@@ -1087,6 +1118,7 @@ with avatar_columns as (
     and policy.policyname in (
       'profile avatars: read own',
       'profile avatars: upload own',
+      'profile avatars: account deletion guard',
       'profile avatars: delete own'
     )
 ), avatar_constraint as (

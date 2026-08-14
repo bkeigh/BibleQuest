@@ -44,6 +44,7 @@ const EXPECTED_MIGRATIONS = [
   "0035_fix_provider_rate_limit_claim_timestamp.sql",
   "0036_arcade_store_purchases.sql",
   "0037_native_account_beta_availability.sql",
+  "0038_web_account_deletion_hardening.sql",
 ];
 
 /** Hash a migration exactly as the release manifest does. */
@@ -151,7 +152,9 @@ describe("release migration contracts", () => {
     expect(report).toContain("'begin_own_account_deletion'");
     expect(report).toContain("'advance_account_sync_revision'");
     expect(report).toContain("'delete_own_account'");
+    expect(report).toContain("'own_account_deletion_status'");
     expect(report).toContain("'account_deletion_contract'");
+    expect(report).toContain("'account_deletion_storage_contract'");
     expect(report).toContain("'profile_avatar_contract'");
     expect(report).toContain("'set_profile_avatar'");
     expect(report).toContain("'clear_profile_avatar'");
@@ -189,6 +192,9 @@ describe("release migration contracts", () => {
     expect(report).toContain("'ensure_journey_event_date_key'");
     expect(report).toContain(
       "select public.account_deletion_contract() as account_deletion_contract;",
+    );
+    expect(report).toContain(
+      "select public.account_deletion_storage_contract()",
     );
     expect(report).toContain(
       "select public.profile_avatar_contract() as profile_avatar_contract;",

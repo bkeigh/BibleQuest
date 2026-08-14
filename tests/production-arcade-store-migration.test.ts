@@ -53,7 +53,7 @@ function frozenManifest() {
 describe("production Arcade store migration", () => {
   it("is required by the production readiness contract", () => {
     expect(PRODUCTION_READINESS).toContain(
-      'candidate.schema_contract !== "0036"',
+      'candidate.schema_contract !== "0038"',
     );
     expect(PRODUCTION_READINESS).toContain('rpc: "arcade_store_contract"');
     expect(PRODUCTION_READINESS).toContain(
@@ -66,7 +66,7 @@ describe("production Arcade store migration", () => {
     expect(SCRIPT).toContain(sha256(frozenManifest()));
     expect(SCRIPT).toContain(sha256(MIGRATION));
     expect(SCRIPT).toContain('version: "20260804035000"');
-    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(36);
+    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(37);
   });
 
   it("requires exact history, a fresh backup, and a one-packet dry run", () => {
