@@ -23,7 +23,11 @@ import {
   NATIVE_ACCOUNT_BETA_HEADER_VALUE,
 } from "@/lib/sync/native-beta-headers";
 
-type AuthenticatedContext = { supabase: SupabaseClient; user: User };
+type AuthenticatedContext = {
+  supabase: SupabaseClient;
+  storageSupabase: SupabaseClient;
+  user: User;
+};
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -91,7 +95,27 @@ export async function authenticatedServerContext(
     if (error || !user) return privateError("unauthorized", 401);
     const boundary = expectedUserBoundary(request, user);
     if (boundary) return boundary;
-    return { supabase, user };
+    // Rebuild Storage calls from the already-verified cookie token so one
+    // explicit Authorization header, rather than SSR cookie state, owns them.
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+    if (
+      sessionError ||
+      !session?.access_token ||
+      session.user.id !== user.id
+    ) {
+      return privateError("unauthorized", 401);
+    }
+    return {
+      supabase,
+      storageSupabase: createBearerSupabase(
+        session.access_token,
+        databaseBoundaryHeaders(request, false),
+      ),
+      user,
+    };
   } catch (error) {
     // Every authenticated route depends on this, so a missing Supabase
     // variable must not read as an ordinary transient outage.
@@ -144,7 +168,7 @@ async function nativeBearerContext(
     }
     const boundary = expectedUserBoundary(request, user);
     if (boundary) return boundary;
-    return { supabase, user };
+    return { supabase, storageSupabase: supabase, user };
   } catch (error) {
     recordServerFailure("auth", "session", error);
     return privateError("unavailable", 503);

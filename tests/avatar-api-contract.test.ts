@@ -65,20 +65,18 @@ describe("avatar API boundaries", () => {
     expect(route).toContain('candidate.code === "42883"');
   });
 
-  it("uses the server credential only for an explicit account-deletion sweep", () => {
-    const cleanupBranch = route.indexOf(
-      "const storageClient = accountDeletionCleanup",
+  it("uses the verified bearer client for every Storage operation", () => {
+    const storageBoundary = route.indexOf(
+      "const { storageSupabase, supabase, user } = context",
     );
-    const adminClient = route.indexOf("? createAdminSupabase()", cleanupBranch);
     const ownerSweep = route.indexOf(
-      "removeAllOwnedObjects(storageClient, user.id)",
-      cleanupBranch,
+      "removeAllOwnedObjects(storageSupabase, user.id)",
     );
 
-    expect(cleanupBranch).toBeGreaterThan(-1);
-    expect(adminClient).toBeGreaterThan(cleanupBranch);
-    expect(ownerSweep).toBeGreaterThan(adminClient);
-    expect(route).not.toContain("removeAllOwnedObjects(createAdminSupabase()");
+    expect(storageBoundary).toBeGreaterThan(-1);
+    expect(ownerSweep).toBeGreaterThan(storageBoundary);
+    expect(route).not.toContain("createAdminSupabase");
+    expect(route).not.toContain("supabase.storage");
   });
 
   it("pins background avatar reconciliation to its captured account", () => {

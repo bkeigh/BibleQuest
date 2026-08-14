@@ -13,6 +13,11 @@ vi.mock("@/lib/supabase/server", () => ({
 beforeEach(() => {
   vi.resetModules();
   mocks.createServerSupabase.mockReset();
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://auth-fixture.supabase.co");
+  vi.stubEnv(
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    "sb_publishable_auth_fixture_1234567890abcdef",
+  );
 });
 
 /** Build one same-origin request carrying the reviewed deletion boundaries. */
@@ -34,6 +39,15 @@ describe("authenticated server account boundaries", () => {
           data: { user: { id: USER_ID } },
           error: null,
         })),
+        getSession: vi.fn(async () => ({
+          data: {
+            session: {
+              access_token: "header.payload.signature",
+              user: { id: USER_ID },
+            },
+          },
+          error: null,
+        })),
       },
     };
     mocks.createServerSupabase.mockResolvedValue(client);
@@ -48,6 +62,36 @@ describe("authenticated server account boundaries", () => {
       "x-biblequest-account-deletion-cleanup": "v1",
       "x-biblequest-expected-user": USER_ID,
     });
+    expect((result as { storageSupabase?: unknown }).storageSupabase).toBeTruthy();
+  });
+
+  it("rejects a cookie session whose cached owner differs from getUser", async () => {
+    const client = {
+      auth: {
+        getUser: vi.fn(async () => ({
+          data: { user: { id: USER_ID } },
+          error: null,
+        })),
+        getSession: vi.fn(async () => ({
+          data: {
+            session: {
+              access_token: "header.payload.signature",
+              user: { id: "20000000-0000-4000-8000-000000000002" },
+            },
+          },
+          error: null,
+        })),
+      },
+    };
+    mocks.createServerSupabase.mockResolvedValue(client);
+    const { authenticatedServerContext } = await import(
+      "@/lib/supabase/authenticated.server"
+    );
+
+    const result = await authenticatedServerContext(request());
+
+    expect(result).toBeInstanceOf(Response);
+    expect((result as Response).status).toBe(401);
   });
 
   it("rejects a malformed cleanup marker before constructing a client", async () => {

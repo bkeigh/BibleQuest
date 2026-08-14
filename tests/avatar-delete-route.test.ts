@@ -2,17 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   authenticatedContext: vi.fn(),
-  createAdmin: vi.fn(),
   recordFailure: vi.fn(),
   userList: vi.fn(),
-  adminList: vi.fn(),
+  storageList: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/authenticated.server", () => ({
   authenticatedServerContext: mocks.authenticatedContext,
-}));
-vi.mock("@/lib/supabase/admin.server", () => ({
-  createAdminSupabase: mocks.createAdmin,
 }));
 vi.mock("@/lib/observability/server-failures", () => ({
   recordServerFailure: mocks.recordFailure,
@@ -92,47 +88,52 @@ describe("avatar account-deletion sweep", () => {
   beforeEach(() => {
     process.env.BIBLEQUEST_AVATAR_SYNC_ENABLED = "false";
     mocks.authenticatedContext.mockReset();
-    mocks.createAdmin.mockReset();
     mocks.recordFailure.mockReset();
     mocks.userList.mockReset().mockResolvedValue({ data: [], error: null });
-    mocks.adminList.mockReset().mockResolvedValue({ data: [], error: null });
-    mocks.createAdmin.mockReturnValue({
+    mocks.storageList.mockReset().mockResolvedValue({ data: [], error: null });
+  });
+
+  /** Builds the explicit bearer client reserved for Storage operations. */
+  function storageClient() {
+    return {
       storage: {
         from: vi.fn(() => ({
-          list: mocks.adminList,
+          list: mocks.storageList,
           remove: vi.fn(),
         })),
       },
-    });
-  });
+    };
+  }
 
-  it("uses the privileged client only after the explicit owner cleanup boundary", async () => {
+  it("uses the verified bearer client for an owner cleanup sweep", async () => {
     const client = userClient();
+    const storage = storageClient();
     mocks.authenticatedContext.mockResolvedValue({
       supabase: client,
+      storageSupabase: storage,
       user: { id: USER_ID },
     });
 
     const response = await DELETE(request(true));
 
     expect(response.status).toBe(204);
-    expect(mocks.createAdmin).toHaveBeenCalledOnce();
-    expect(mocks.adminList).toHaveBeenCalledWith(USER_ID, expect.any(Object));
+    expect(mocks.storageList).toHaveBeenCalledWith(USER_ID, expect.any(Object));
     expect(mocks.userList).not.toHaveBeenCalled();
   });
 
-  it("keeps an ordinary owner sweep on the authenticated RLS client", async () => {
+  it("keeps an ordinary owner sweep on the verified bearer client", async () => {
     const client = userClient();
+    const storage = storageClient();
     mocks.authenticatedContext.mockResolvedValue({
       supabase: client,
+      storageSupabase: storage,
       user: { id: USER_ID },
     });
 
     const response = await DELETE(request(false));
 
     expect(response.status).toBe(204);
-    expect(mocks.userList).toHaveBeenCalledWith(USER_ID, expect.any(Object));
-    expect(mocks.createAdmin).not.toHaveBeenCalled();
-    expect(mocks.adminList).not.toHaveBeenCalled();
+    expect(mocks.storageList).toHaveBeenCalledWith(USER_ID, expect.any(Object));
+    expect(mocks.userList).not.toHaveBeenCalled();
   });
 });

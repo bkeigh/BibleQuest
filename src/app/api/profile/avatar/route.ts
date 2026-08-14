@@ -30,7 +30,6 @@ import {
   type ServerFailureStage,
 } from "@/lib/observability/server-failures";
 import { authenticatedServerContext } from "@/lib/supabase/authenticated.server";
-import { createAdminSupabase } from "@/lib/supabase/admin.server";
 import { isNativeAppOrigin } from "@/lib/http/native-origin";
 import {
   ACCOUNT_DELETION_CLEANUP_HEADER,
@@ -150,7 +149,7 @@ export async function GET(request: Request) {
   if (!featureEnabled()) return privateError("unavailable", 503);
   const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;
-  const { supabase, user } = context;
+  const { storageSupabase, supabase, user } = context;
   if (!(await avatarContractReady(supabase, "read"))) {
     return privateError("unavailable", 503);
   }
@@ -167,7 +166,7 @@ export async function GET(request: Request) {
       return privateError("not_found", 404);
     }
 
-    const { data, error } = await supabase.storage
+    const { data, error } = await storageSupabase.storage
       .from(AVATAR_BUCKET)
       .download(profile.avatar_path);
     if (error || !data || data.size > MAX_AVATAR_OUTPUT_BYTES) {
@@ -205,7 +204,7 @@ export async function POST(request: Request) {
 
   const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;
-  const { supabase, user } = context;
+  const { storageSupabase, supabase, user } = context;
   if (!(await avatarContractReady(supabase, "write"))) {
     return privateError("unavailable", 503);
   }
@@ -259,7 +258,7 @@ export async function POST(request: Request) {
 
   const version = randomUUID();
   const path = `${user.id}/avatar-${version}.webp`;
-  const { error: uploadError } = await supabase.storage
+  const { error: uploadError } = await storageSupabase.storage
     .from(AVATAR_BUCKET)
     .upload(path, normalized, {
       cacheControl: "31536000",
@@ -288,7 +287,7 @@ export async function POST(request: Request) {
     Number.isNaN(Date.parse(result.avatar_updated_at))
   ) {
     recordServerFailure("avatar", "write", pointerError);
-    const { error: rollbackError } = await supabase.storage
+    const { error: rollbackError } = await storageSupabase.storage
       .from(AVATAR_BUCKET)
       .remove([path]);
     // A stranded object is invisible to the account but still consumes the
@@ -304,7 +303,7 @@ export async function POST(request: Request) {
   ) {
     // The new pointer is already authoritative; obsolete cleanup is best effort
     // and only recorded so repeated leaks are visible to the operator.
-    const { error: cleanupError } = await supabase.storage
+    const { error: cleanupError } = await storageSupabase.storage
       .from(AVATAR_BUCKET)
       .remove([result.previous_path]);
     if (cleanupError) recordServerFailure("avatar", "delete", cleanupError);
@@ -315,11 +314,11 @@ export async function POST(request: Request) {
 
 /** Lists and deletes every owned object in bounded pages for account cleanup. */
 async function removeAllOwnedObjects(
-  supabase: SupabaseClient,
+  storageSupabase: SupabaseClient,
   userId: string,
 ): Promise<boolean> {
   for (;;) {
-    const { data, error } = await supabase.storage
+    const { data, error } = await storageSupabase.storage
       .from(AVATAR_BUCKET)
       .list(userId, {
         limit: 100,
@@ -344,7 +343,7 @@ async function removeAllOwnedObjects(
       )
       .map((name) => `${userId}/${name}`);
     if (paths.length === 0) return true;
-    const { error: removeError } = await supabase.storage
+    const { error: removeError } = await storageSupabase.storage
       .from(AVATAR_BUCKET)
       .remove(paths);
     if (removeError) {
@@ -371,7 +370,7 @@ export async function DELETE(request: Request) {
   if (!hasSameOrigin(request)) return privateError("forbidden", 403);
   const context = await authenticatedServerContext(request);
   if (context instanceof Response) return context;
-  const { supabase, user } = context;
+  const { storageSupabase, supabase, user } = context;
   const contractReady = await avatarContractReady(
     supabase,
     featureEnabled() ? "delete" : null,
@@ -432,16 +431,9 @@ export async function DELETE(request: Request) {
       }
     }
     if (allOwnedObjects) {
-      // The explicit account-deletion boundary uses the server credential for
-      // the final owner-folder sweep. This avoids cookie-session Storage
-      // ambiguity while the authenticated subject still fixes the only prefix
-      // the privileged client may list or remove.
-      const storageClient = accountDeletionCleanup
-        ? createAdminSupabase()
-        : supabase;
       // Deletion cleanup cannot pre-read a disabled beta profile. The exact
       // cleanup header lets the RPC clear this authenticated owner's pointer.
-      if (!(await removeAllOwnedObjects(storageClient, user.id))) {
+      if (!(await removeAllOwnedObjects(storageSupabase, user.id))) {
         return privateError("delete_failed", 503);
       }
     } else {
@@ -449,7 +441,7 @@ export async function DELETE(request: Request) {
         if (!ownedAvatarPath(user.id, expectedPath)) {
           return privateError("delete_failed", 503);
         }
-        const { error } = await supabase.storage
+        const { error } = await storageSupabase.storage
           .from(AVATAR_BUCKET)
           .remove([expectedPath]);
         if (error) {
