@@ -66,8 +66,20 @@ for (const file of files) {
       if (payload?.role === "service_role") {
         throw new Error("Browser bundle contains a service-role credential.");
       }
+      // A legacy anonymous JWT is public by design, but shipping one keeps the
+      // legacy key class alive in released bundles and defeats the point of an
+      // independently rotatable publishable key. The release gate forbids it,
+      // and this makes that clause self-enforcing rather than relying on which
+      // environment happens to still define NEXT_PUBLIC_SUPABASE_ANON_KEY.
+      if (payload?.role === "anon") {
+        throw new Error("Browser bundle contains a legacy anonymous JWT.");
+      }
     } catch (error) {
-      if (error instanceof Error && error.message.includes("service-role")) {
+      if (
+        error instanceof Error &&
+        (error.message.includes("service-role") ||
+          error.message.includes("legacy anonymous"))
+      ) {
         throw error;
       }
     }

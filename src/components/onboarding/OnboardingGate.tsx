@@ -286,14 +286,18 @@ function LockedLocalJourneyRecovery({ clearOnly = false }: { clearOnly?: boolean
         <PaperCard variant="paper" padding="lg">
           <ArtMascot name="key" size={176} className="mb-4" />
           <h1 className="font-display text-[1.375rem] leading-snug text-graphite">
-            This journey is locked
+            {clearOnly
+              ? "Finishing your clear"
+              : ownedJourney
+                ? "This journey belongs to an account"
+                : "Is this your journey?"}
           </h1>
           <p className="mt-2 text-small leading-relaxed text-charcoal">
             {clearOnly
               ? "BibleQuest is finishing the private journey clear you requested. Its prayers and reflections stay hidden."
               : ownedJourney
                 ? "Sign back in to restore the account that owns it, or clear the journey from this browser. Its prayers and reflections stay hidden."
-                : "Choose whether to keep this browser’s local journey or clear it. Its prayers and reflections stay hidden until you decide."}
+                : "This browser holds a BibleQuest journey. Keep it if it’s yours, or clear it to start fresh. Its prayers and reflections stay hidden until you choose."}
           </p>
           {!clearOnly && !ownedJourney && (
             <GentleButton
