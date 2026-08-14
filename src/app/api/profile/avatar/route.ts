@@ -30,6 +30,7 @@ import {
   type ServerFailureStage,
 } from "@/lib/observability/server-failures";
 import { authenticatedServerContext } from "@/lib/supabase/authenticated.server";
+import { createAdminSupabase } from "@/lib/supabase/admin.server";
 import { isNativeAppOrigin } from "@/lib/http/native-origin";
 import {
   ACCOUNT_DELETION_CLEANUP_HEADER,
@@ -431,9 +432,16 @@ export async function DELETE(request: Request) {
       }
     }
     if (allOwnedObjects) {
+      // The explicit account-deletion boundary uses the server credential for
+      // the final owner-folder sweep. This avoids cookie-session Storage
+      // ambiguity while the authenticated subject still fixes the only prefix
+      // the privileged client may list or remove.
+      const storageClient = accountDeletionCleanup
+        ? createAdminSupabase()
+        : supabase;
       // Deletion cleanup cannot pre-read a disabled beta profile. The exact
       // cleanup header lets the RPC clear this authenticated owner's pointer.
-      if (!(await removeAllOwnedObjects(supabase, user.id))) {
+      if (!(await removeAllOwnedObjects(storageClient, user.id))) {
         return privateError("delete_failed", 503);
       }
     } else {
