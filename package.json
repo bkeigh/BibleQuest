@@ -84,6 +84,7 @@
     "@vitest/coverage-v8": "4.1.10",
     "eslint": "^9.39.5",
     "eslint-config-next": "16.2.12",
+    "fake-indexeddb": "6.2.4",
     "png-to-ico": "^3.0.2",
     "tailwindcss": "^4.3.3",
     "typescript": "^5",
