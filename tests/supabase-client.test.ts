@@ -1,9 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  WEB_PRIVATE_NAMESPACE_V2_COMPLETE,
+  WEB_PRIVATE_NAMESPACE_V2_MARKER,
+  WEB_V2_LAST_SYNC_USER_STORAGE_KEY,
+} from "@/lib/storage/web-private-namespace";
 
 const mocks = vi.hoisted(() => ({
   createBrowserClient: vi.fn(),
   createSupabaseClient: vi.fn(),
   requireAttestation: vi.fn(),
+  coordinateHydration: vi.fn(),
+  removeLegacyResidue: vi.fn(),
 }));
 
 const WEB_AUTH_KEY = "biblequest:web-auth:v2";
@@ -31,7 +38,32 @@ function seedWebSession(userId: string, sessionId = "fixture-lineage") {
       },
     }),
   );
+  localStorage.setItem(
+    WEB_PRIVATE_NAMESPACE_V2_MARKER,
+    WEB_PRIVATE_NAMESPACE_V2_COMPLETE,
+  );
+  localStorage.setItem(WEB_V2_LAST_SYNC_USER_STORAGE_KEY, userId);
   return token;
+}
+
+/**
+ * Attests this realm and adopts the private write generation for the seeded
+ * owner. Reads of the active envelope are refused until both hold, so a test
+ * that only takes the account lock never reaches the assertion it intends.
+ */
+async function attestAndAdopt(userId: string): Promise<void> {
+  const {
+    adoptCurrentWebPrivateWriteGeneration,
+    requireCurrentWebAccountRealm,
+    withWebAccountOperationLock,
+  } = await import("@/lib/supabase/web-auth-storage");
+  await withWebAccountOperationLock(async (handle) => {
+    await requireCurrentWebAccountRealm(handle);
+    const adopted = await adoptCurrentWebPrivateWriteGeneration(handle, userId);
+    if (!adopted) {
+      throw new Error("fixture could not adopt the private write generation");
+    }
+  });
 }
 
 vi.mock("@supabase/ssr", () => ({
@@ -44,6 +76,19 @@ vi.mock("@supabase/supabase-js", () => ({
 
 vi.mock("@/lib/platform/web-auth-service-worker", () => ({
   requireWebAuthServiceWorkerAttestation: mocks.requireAttestation,
+}));
+
+vi.mock("@/lib/questos/store", () => ({
+  coordinateQuestOSWebPrivateHydration: mocks.coordinateHydration,
+  useQuestOS: { persist: { rehydrate: vi.fn() } },
+}));
+
+// The residue proof belongs to the cutover engine and is covered by its own
+// suite. Stub only that call so this file keeps testing the client's token
+// boundary rather than re-deriving a full cutover fixture.
+vi.mock("@/lib/storage/web-private-cutover", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  removeAndProveLegacyWebPrivateResidue: mocks.removeLegacyResidue,
 }));
 
 describe("Supabase browser clients", () => {
@@ -59,6 +104,10 @@ describe("Supabase browser clients", () => {
     mocks.createSupabaseClient.mockReset();
     mocks.requireAttestation.mockReset();
     mocks.requireAttestation.mockResolvedValue(undefined);
+    mocks.coordinateHydration.mockReset();
+    mocks.coordinateHydration.mockResolvedValue(true);
+    mocks.removeLegacyResidue.mockReset();
+    mocks.removeLegacyResidue.mockResolvedValue(true);
     delete (
       globalThis as typeof globalThis & {
         __biblequestSupabaseBrowserClient?: unknown;
@@ -247,11 +296,7 @@ describe("Supabase browser clients", () => {
     const syncClient = { rpc: vi.fn() };
     mocks.createSupabaseClient.mockReturnValue(syncClient);
     const { createSyncClient } = await import("@/lib/supabase/client");
-    const {
-      requireCurrentWebAccountRealm,
-      withWebAccountOperationLock,
-    } = await import("@/lib/supabase/web-auth-storage");
-    await withWebAccountOperationLock(requireCurrentWebAccountRealm);
+    await attestAndAdopt(userId);
 
     expect(
       createSyncClient(userId, 4),
@@ -277,14 +322,11 @@ describe("Supabase browser clients", () => {
   });
 
   it("refuses to reuse a token after the authenticated account changes", async () => {
-    seedWebSession("20000000-0000-4000-8000-000000000002", "lineage-b");
+    const seededUserId = "20000000-0000-4000-8000-000000000002";
+    seedWebSession(seededUserId, "lineage-b");
     mocks.createSupabaseClient.mockReturnValue({ rpc: vi.fn() });
     const { createSyncClient } = await import("@/lib/supabase/client");
-    const {
-      requireCurrentWebAccountRealm,
-      withWebAccountOperationLock,
-    } = await import("@/lib/supabase/web-auth-storage");
-    await withWebAccountOperationLock(requireCurrentWebAccountRealm);
+    await attestAndAdopt(seededUserId);
     createSyncClient("10000000-0000-4000-8000-000000000001", 4);
     const options = mocks.createSupabaseClient.mock.calls[0]?.[2];
 
