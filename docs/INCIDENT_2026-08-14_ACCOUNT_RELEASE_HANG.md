@@ -33,41 +33,53 @@ The failing path is guest adoption: a visitor with no account and no legacy
 data never establishes never-owned guest provenance, so the generation is
 never adopted.
 
-## Precise mechanism
+## Precise mechanism (corrected)
 
-`reconcileWebAuthStorage()` bootstraps the web session on mount. For a visitor
-with no stored session (`state.status === "missing"`) it classifies what to do
-with `decideMissingWebAuthRecovery(readLocalJourneyOwner())`:
+An earlier revision of this document blamed a circular dependency in
+`readLocalJourneyOwner()`. **That was wrong** and is retracted: on a first
+visit the namespace state is `legacy`, the selector returns the legacy owner
+key, the value is absent, and the owner correctly resolves to `unowned`.
 
-- `unowned` -> `acceptFreshGuest()`, which adopts the guest write generation,
-  sets `webBootstrapComplete`, and clears loading. This is the correct path.
-- `owned` -> the locked-journey recovery UI.
-- anything else -> `closeAccount()`, which sets `setSessionLoading(true)` and
-  shows no recovery controls. **That is the hang state**: a permanent veil with
-  no error and no way out.
+The real cause is a race on `authStorageRead`.
 
-`readLocalJourneyOwner()` reads through the v2 private boundary, and that read
-is refused until a write generation has been adopted. On a first visit none has
-been, so the owner resolves to neither `unowned` nor `owned`, the decision falls
-to `closed`, and `closeAccount()` strands the session as permanently loading.
+`reconcileWebAuthStorage()` captures `read = ++authStorageRead` and re-checks
+`read !== authStorageRead` after each await, abandoning itself if the counter
+moved. The `onAuthStateChange` handler incremented that same counter as its
+first statement — *before* its `!webBootstrapComplete` guard. On a real
+deployment Supabase emits `INITIAL_SESSION` shortly after subscribe, so:
 
-The dependency is circular: adopting the generation requires classifying the
-owner as `unowned`, and classifying the owner requires a read that only an
-adopted generation permits.
+1. the bootstrap starts and takes `read = 1`;
+2. `INITIAL_SESSION` arrives, bumps the counter to 2, then returns at the
+   `!webBootstrapComplete` guard without doing any work;
+3. the bootstrap reaches its next guard, sees `1 !== 2`, and abandons itself.
 
-A confirmed contributing factor is that the fresh-guest path is also reachable
-from the `catch` around `requireCurrentWebAccountRealm`. Where service-worker
-attestation fails — a headless Playwright context, or any environment without a
-controlling worker — execution enters that catch and can still reach
-`acceptFreshGuest()`. On a real deployment attestation succeeds, so that escape
-hatch never runs. This is why every browser test passes and every real
-deployment hangs.
+Nothing clears `sessionLoading`, so the veil never lifts and no recovery UI
+appears. The observed storage pins this exactly: `web-auth:v2:migration-complete`
+is written immediately before one of those guards, and nothing after it ran.
 
-**Not yet proven:** the exact value `readLocalJourneyOwner()` returns on a first
-visit was inferred from the code path and the observed storage, not observed
-directly. Confirm it before changing the classification, because the fix must
-break the circular dependency without weakening the boundary that keeps one
-account's data from being read under another's generation.
+Local and CI runs never saw it because their fixture Supabase host never
+completes the handshake that emits the racing event.
+
+## Fix status — partial, not merged
+
+`codex/fix-web-bootstrap-race` (`c31980d`) defers the counter bump until after
+the bootstrap completes. Verified on a real deployment in a browser: the
+infinite veil is gone and the private write generation is now adopted
+(`biblequest:web-private-write-generation:v1` is written, which never happened
+before).
+
+**A second defect remains.** A visitor with empty storage still lands on the
+"Is this your journey?" keep/clear gate rather than going straight into the
+app, and pressing "Keep this local journey" does not advance. Two things to
+chase there:
+
+- the app writes `biblequest:analytics-consent` during load, so by the time
+  classification runs the device no longer looks empty and is treated as
+  ambiguous legacy data; and
+- the keep action itself does not complete, so the gate never resolves.
+
+Do not promote until a browser on a real deployment reaches the app from empty
+storage.
 
 ## Why the existing tests did not catch it
 
