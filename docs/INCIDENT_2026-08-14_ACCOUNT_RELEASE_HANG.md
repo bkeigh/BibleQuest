@@ -81,6 +81,43 @@ chase there:
 Do not promote until a browser on a real deployment reaches the app from empty
 storage.
 
+### Lead for the remaining defect
+
+Adoption now runs but still reports failure. On the fixed build a first visit
+writes both `biblequest:web-private-write-generation:v1` and
+`biblequest:web-private:legacy-guest:v1`, yet the UI lands on the keep/clear
+gate — which is `showLockedLocalJourney()`, reached when `acceptFreshGuest()`
+sees `adopted === false`.
+
+That combination points at the tail of
+`adoptCurrentWebPrivateWriteGeneration()`:
+
+    adoptedPrivateWriteGeneration = generation;
+    adoptedPrivateReadAuthority = { generation, kind: "guest" };
+    if (!(await coordinateCurrentWebPrivateJourney()) || !webPrivateReadAllowed()) {
+      revokeWebPrivateMemory();
+      adoptedPrivateWriteGeneration = null;
+      adoptedPrivateReadAuthority = null;
+      privateWriteGenerationInvalidated = true;
+      return false;
+    }
+
+The generation is written to storage *before* this gate and is not rolled back
+when the gate fails, which is exactly the observed state: key present, adoption
+false. So the next thing to establish is why
+`coordinateQuestOSWebPrivateHydration()` returns false on a first visit — it is
+reached through `coordinateCurrentWebPrivateJourney()` and returns false early
+when its own `authorizationIsCurrent()` check fails.
+
+Because `privateWriteGenerationInvalidated` is set to true on that failure, a
+retry within the same page cannot recover, which is consistent with "Keep this
+local journey" not advancing.
+
+Start there, with a browser on a real deployment and instrumentation inside
+`coordinateQuestOSWebPrivateHydration`. Confirm before changing: the failure
+must be fixed without weakening the read authority that keeps one account's
+data from being read under another's generation.
+
 ## Why the existing tests did not catch it
 
 Each layer tested something adjacent to the broken case:
