@@ -163,7 +163,20 @@ async function loadNativeBackend(): Promise<NativeAuthStorageBackend> {
     KeychainAccess.whenUnlockedThisDeviceOnly,
   );
   clearLegacyNativeAuthStorage();
-  return SecureStorage;
+  // Never hand the Capacitor plugin proxy back through a promise. Its `get`
+  // trap answers every unknown property with a native method wrapper —
+  // including `then` — which makes the proxy a thenable. Resolving a promise
+  // with it makes the runtime "adopt" it by invoking a native `then` that does
+  // not exist, so the promise never settles: the Keychain read hangs forever,
+  // Supabase never emits an auth event, and the sign-in screen never appears.
+  // Observed on iOS on 2026-08-15. Delegating through a plain object keeps the
+  // proxy out of promise resolution entirely.
+  return {
+    getItem: (key) => SecureStorage.getItem(key),
+    setItem: (key, value) => SecureStorage.setItem(key, value),
+    removeItem: (key) => SecureStorage.removeItem(key),
+    clear: () => SecureStorage.clear(),
+  };
 }
 
 function defaultBackend(): Promise<NativeAuthStorageBackend> {

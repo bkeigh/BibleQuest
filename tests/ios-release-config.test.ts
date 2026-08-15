@@ -219,6 +219,42 @@ describe("iOS App Store release configuration", () => {
     expect(script).toContain("pnpm ios:release:prepare");
   });
 
+  it("keeps every workflow guest unless it is named for the replacement", () => {
+    const script = source("ios/App/ci_scripts/ci_post_clone.sh");
+
+    // Section 4: a merge to main must never silently upload an account
+    // binary. Guest is the default and the account path is reachable only
+    // through an exactly named workflow.
+    const guestBranch = script.indexOf("pnpm ios:release:prepare");
+    const accountBranch = script.indexOf("pnpm ios:account-release:prepare");
+    expect(guestBranch).toBeGreaterThan(-1);
+    expect(accountBranch).toBeGreaterThan(guestBranch);
+    expect(script).toContain(
+      'ACCOUNT_WORKFLOW_NAME="BibleQuest Account Release"',
+    );
+    expect(script).toContain(
+      'if [[ "$current_workflow" != "$ACCOUNT_WORKFLOW_NAME" ]]; then',
+    );
+
+    // The guest branch has to terminate, or an unnamed workflow would fall
+    // through and build accounts anyway.
+    const guestExit = script.indexOf("exit 0", guestBranch);
+    expect(guestExit).toBeGreaterThan(guestBranch);
+    expect(guestExit).toBeLessThan(accountBranch);
+
+    // A named workflow without the reviewed key must fail rather than build.
+    expect(script).toContain(
+      'if [[ -z "${BIBLEQUEST_IOS_ACCOUNT_RELEASE_PUBLISHABLE_KEY:-}" ]]; then',
+    );
+    expect(script).toMatch(/BIBLEQUEST_IOS_ACCOUNT_RELEASE_PUBLISHABLE_KEY[\s\S]*exit 1/);
+
+    // The key is a credential input: it is written to the ignored env file,
+    // never echoed.
+    expect(script).not.toMatch(
+      /echo[^\n]*\$BIBLEQUEST_IOS_ACCOUNT_RELEASE_PUBLISHABLE_KEY/,
+    );
+  });
+
   it("documents a reusable App Store Connect upload and header-level CORS gate", () => {
     const runbook = source("docs/IOS_TESTFLIGHT_RUNBOOK.md");
 

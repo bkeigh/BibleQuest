@@ -674,6 +674,36 @@ function parseStoredAssignment(
 }
 
 /** Convert an assignment without transmitting a caller-controlled owner or day. */
+/**
+ * Satisfy the server's strictly-increasing window without changing what the
+ * client means by a ready pick.
+ *
+ * A ready (unstarted) quest is stored with `expiresAt === pickedAt` as a "no
+ * countdown yet" marker, and `normalizeAssignmentWindow` deliberately allows
+ * it via `Math.max(expiresMs, pickedMs)`. The RPC contract is stricter: it
+ * rejects any row whose `expires_at <= picked_at`. So a device holding a ready
+ * quest could never push its day — every attempt failed with
+ * `replace_user_daily_quests: invalid row values`, sync never completed, and
+ * the journey never restored. Observed on iOS on 2026-08-15 and in production
+ * web logs before that.
+ *
+ * The nudge is one millisecond and deterministic, so the row the server echoes
+ * back re-serializes identically and does not provoke another write. The value
+ * remains ignored while the status is "assigned".
+ */
+function transmittableWindowEnd(
+  pickedAt: string,
+  expiresAt: string,
+): string {
+  const pickedMs = Date.parse(pickedAt);
+  const expiresMs = Date.parse(expiresAt);
+  if (!Number.isFinite(pickedMs) || !Number.isFinite(expiresMs)) {
+    return expiresAt;
+  }
+  if (expiresMs > pickedMs) return expiresAt;
+  return new Date(pickedMs + 1).toISOString();
+}
+
 function assignmentPayload(
   userId: string,
   assignment: DailyQuestAssignment,
@@ -684,12 +714,16 @@ function assignmentPayload(
   );
   void _owner;
   void _day;
+  const picked_at =
+    canonicalTimestamp(payload.picked_at) ?? payload.picked_at;
+  const expires_at =
+    canonicalTimestamp(payload.expires_at) ?? payload.expires_at;
   return {
     ...payload,
     started_at: canonicalTimestamp(payload.started_at),
     completed_at: canonicalTimestamp(payload.completed_at),
-    picked_at: canonicalTimestamp(payload.picked_at) ?? payload.picked_at,
-    expires_at: canonicalTimestamp(payload.expires_at) ?? payload.expires_at,
+    picked_at,
+    expires_at: transmittableWindowEnd(picked_at, expires_at),
   };
 }
 

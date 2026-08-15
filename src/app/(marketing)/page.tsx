@@ -201,9 +201,10 @@ export default function LandingPage() {
       <section className="relative isolate min-h-[100svh] overflow-hidden">
         <HeroBackdrop />
         <div className="relative mx-auto grid min-h-[100svh] w-full max-w-[90rem] content-start items-start gap-10 px-5 pb-14 pt-24 sm:px-8 sm:pb-20 sm:pt-28 lg:content-center lg:grid-cols-[1.12fr_0.88fr] lg:items-center lg:gap-16 lg:px-12 lg:pb-20 lg:pt-28 xl:gap-20 xl:px-16">
-          {/* A near-solid reading surface keeps every frame of the still and
-              optional video from competing with the invitation. */}
-          <div className="rounded-[2rem] border border-paper/80 bg-paper/[0.94] px-4 py-6 text-center shadow-[0_24px_64px_rgba(45,42,36,0.16)] backdrop-blur-md sm:px-7 sm:py-8 lg:-ml-7 lg:px-7 lg:text-left xl:-ml-9 xl:px-9">
+          {/* A half-transparent reading surface lets the still and optional
+              video show through. The blur does the legibility work the opacity
+              used to: without it, text sits directly on moving footage. */}
+          <div className="rounded-[2rem] border border-paper/60 bg-paper/50 px-4 py-6 text-center shadow-[0_24px_64px_rgba(45,42,36,0.16)] backdrop-blur-xl sm:px-7 sm:py-8 lg:-ml-7 lg:px-7 lg:text-left xl:-ml-9 xl:px-9">
             <Reveal immediate>
               <span className="mx-auto inline-flex items-center justify-center gap-2 rounded-full border border-mist bg-paper/70 px-4 py-2 text-[0.875rem] text-accent backdrop-blur lg:mx-0 lg:text-[0.9375rem]">
                 <ArtIcon name="candle" size={56} animate /> A daily guide for living your faith
@@ -229,18 +230,21 @@ export default function LandingPage() {
             </Reveal>
             <Reveal immediate>
               <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
+                {/* Starting the app is the point of this page, so it leads and
+                    carries the filled treatment; the tour stays available as
+                    the secondary choice. */}
                 <HeroAction
                   primary
-                  href="/#how"
-                  icon="compass"
-                  title="See how it works"
-                  detail="Take a one-minute tour"
-                />
-                <HeroAction
                   href="/onboarding"
                   icon="open-book"
                   title="Get BibleQuest"
                   detail="Begin your daily rhythm"
+                />
+                <HeroAction
+                  href="/#how"
+                  icon="compass"
+                  title="See how it works"
+                  detail="Take a one-minute tour"
                 />
               </div>
             </Reveal>
