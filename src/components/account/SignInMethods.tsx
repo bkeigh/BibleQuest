@@ -77,6 +77,8 @@ interface SignInMethodsProps {
   onEmailSent?: () => void;
   /** Lets onboarding expose its local fallback after auth is unavailable. */
   onUnavailable?: () => void;
+  /** Fired once an email code has installed a verified session. */
+  onSignedIn?: () => void;
   /** Safe same-origin destination after the auth callback completes. */
   nextPath?: string;
 }
@@ -86,6 +88,7 @@ export function SignInMethods({
   intent = "signin",
   onEmailSent,
   onUnavailable,
+  onSignedIn,
   nextPath = "/app",
 }: SignInMethodsProps) {
   const nativeTarget = isNativeTarget();
@@ -100,6 +103,7 @@ export function SignInMethods({
   const [error, setError] = useState<AuthRequestFailure | null>(null);
   const activeOtpAttempt = useRef<EmailOtpAttempt | null>(null);
   const requestedEmailRef = useRef("");
+  const verificationInFlight = useRef(false);
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -112,6 +116,13 @@ export function SignInMethods({
 
   useEffect(
     () => () => {
+      // A verification already in flight owns its attempt; unmounting this form
+      // must not cancel it. Installing the session flips `useSession().loading`,
+      // which swaps this form off screen mid-verify. Cancelling here bumped the
+      // attempt generation and blanked the requested address, so the installer
+      // saw its own success as "the user changed their mind" and deleted the
+      // credential it had just written — sign-in silently did nothing.
+      if (verificationInFlight.current) return;
       cancelEmailOtpAttempt(activeOtpAttempt.current);
       activeOtpAttempt.current = null;
       requestedEmailRef.current = "";
@@ -194,12 +205,9 @@ export function SignInMethods({
   }
 
   /** Verifies off-storage, then installs only the still-current email session. */
-  async function verifyEmailCode() {
-    if (
-      !isEmailOtpReady(emailOtp) ||
-      verifyingOtp ||
-      activeOtpAttempt.current
-    ) {
+  async function verifyEmailCode(submittedCode = emailOtp) {
+    const code = normalizeEmailOtp(submittedCode);
+    if (!isEmailOtpReady(code) || verifyingOtp || activeOtpAttempt.current) {
       return;
     }
 
@@ -212,9 +220,10 @@ export function SignInMethods({
       requireAccountLifecycleIdle(lifecycle);
       attempt = beginEmailOtpAttempt(requestedEmailRef.current);
       activeOtpAttempt.current = attempt;
+      verificationInFlight.current = true;
       const result = await verifyAndInstallEmailOtp(
         attempt,
-        emailOtp,
+        code,
         () => requestedEmailRef.current,
       );
       if (result.status === "stale") return;
@@ -240,6 +249,7 @@ export function SignInMethods({
         category: "ok",
       });
       setEmailOtp("");
+      onSignedIn?.();
       // Supabase emits SIGNED_IN in this same PWA context. The shared session
       // hook verifies the user and advances the existing account flow.
     } catch (verificationError) {
@@ -261,6 +271,7 @@ export function SignInMethods({
       });
       showFailure(emailOtpFailure(verificationError, online()));
     } finally {
+      verificationInFlight.current = false;
       if (!attempt || activeOtpAttempt.current === attempt) {
         cancelEmailOtpAttempt(attempt);
         activeOtpAttempt.current = null;
@@ -371,8 +382,22 @@ export function SignInMethods({
             pattern="[0-9]*"
             value={emailOtp}
             onChange={(event) => {
-              setEmailOtp(normalizeEmailOtp(event.target.value));
+              const next = normalizeEmailOtp(event.target.value);
+              setEmailOtp(next);
               setError(null);
+              // A paste or an iOS one-time-code autofill arrives as a whole
+              // code in a single change, so submit it instead of asking for a
+              // tap the person has already effectively made. Typing advances
+              // one digit at a time and still lands on the button, which keeps
+              // longer local-Supabase codes from submitting at six digits.
+              if (
+                next.length - emailOtp.length > 1 &&
+                isEmailOtpReady(next) &&
+                !verifyingOtp &&
+                !resending
+              ) {
+                void verifyEmailCode(next);
+              }
             }}
             placeholder="Enter the code"
             aria-invalid={Boolean(error)}
