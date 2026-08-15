@@ -789,6 +789,38 @@ describe("service-worker browser-auth attestation", () => {
     }
   });
 
+  it("survives a deploy that bumps the version under an open page", async () => {
+    // The worker calls skipWaiting() and clients.claim(), so a new worker takes
+    // over pages that are already open. `onWorkerChallenge` returns without
+    // answering when the challenge carries a version the page does not
+    // recognise, so a version bump reaches the worker as SILENCE, never as a
+    // wrong answer.
+    //
+    // Before the silence fix that read as refusal, which means any
+    // version-bumping deploy would have 403'd every credentialed request from
+    // an open page until the person reloaded — the "I can't get into my
+    // account" report, arriving for everyone at once.
+    vi.useFakeTimers();
+    try {
+      const network = vi.fn(async () => makeResponse("protected response"));
+      const harness = loadWorker(network);
+      const openPage = webAuthWindowClient(harness, "open-page", "/app", "silent");
+      harness.state.windowClients.push(openPage);
+      const request = makeRequest("https://provider.example.test/auth/v1/token", {
+        headers: { Authorization: "Bearer header.payload.signature" },
+        mode: "cors",
+      });
+
+      const pending = dispatchFetch(harness, request, openPage.id);
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      expect((await pending)?.status).toBe(200);
+      expect(network).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("denies bearer traffic from missing, stale, and non-customer clients", async () => {
     const network = vi.fn(async () => makeResponse("must not run"));
     const harness = loadWorker(network);
