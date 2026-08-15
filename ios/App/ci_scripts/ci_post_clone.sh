@@ -29,4 +29,37 @@ fi
 node --version
 pnpm --version
 pnpm install --frozen-lockfile
-pnpm ios:release:prepare
+
+# Guest is the default for every workflow, so merging to main can never upload
+# an account-enabled binary on its own — required by
+# docs/IOS_ACCOUNT_REPLACEMENT_RELEASE.md section 4. Only a workflow named
+# exactly for the account replacement takes the other path, and only when its
+# reviewed publishable key is present.
+ACCOUNT_WORKFLOW_NAME="BibleQuest Account Release"
+current_workflow="${CI_WORKFLOW:-}"
+
+if [[ "$current_workflow" != "$ACCOUNT_WORKFLOW_NAME" ]]; then
+  echo "Workflow '${current_workflow:-<unset>}': building the guest profile."
+  pnpm ios:release:prepare
+  exit 0
+fi
+
+echo "Workflow '$current_workflow': building the account replacement profile."
+
+# build-native.mjs reads this from .env.account-release.local and refuses any
+# key whose SHA-256 does not match the reviewed target manifest. Supply it as a
+# secret Xcode Cloud environment variable; never echo it.
+if [[ -z "${BIBLEQUEST_IOS_ACCOUNT_RELEASE_PUBLISHABLE_KEY:-}" ]]; then
+  echo "BIBLEQUEST_IOS_ACCOUNT_RELEASE_PUBLISHABLE_KEY is required for the" >&2
+  echo "account replacement workflow. Add it as a secret environment" >&2
+  echo "variable on that workflow in App Store Connect." >&2
+  exit 1
+fi
+
+# The file must contain exactly this one assignment; the build validates that.
+umask 077
+printf 'BIBLEQUEST_IOS_ACCOUNT_RELEASE_PUBLISHABLE_KEY=%s\n' \
+  "$BIBLEQUEST_IOS_ACCOUNT_RELEASE_PUBLISHABLE_KEY" \
+  > .env.account-release.local
+
+pnpm ios:account-release:prepare
