@@ -286,6 +286,12 @@ function AccountInner() {
             key={intent}
             source="account"
             intent={intent}
+            // Land on the journey rather than leaving someone on the account
+            // screen to work out whether the code took.
+            onSignedIn={() => {
+              toast("You're signed in. Your journey is saved to your account.");
+              router.push("/app");
+            }}
           />
         </div>
       </PaperCard>
