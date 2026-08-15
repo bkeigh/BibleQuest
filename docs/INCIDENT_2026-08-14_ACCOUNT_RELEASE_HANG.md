@@ -252,3 +252,51 @@ early `privateWriteGenerationInvalidated` return and each conjunct of the guest
 gate above — and reload a real deployment with empty storage. That will name the
 exact conjunct in one pass. The diagnostic build pattern is on
 `codex/fix-web-bootstrap-race`; remove all `[bq-diag]` logging before merge.
+
+
+## Narrowing, round 3 — the exact failure, with traces
+
+Instrumented every gate of `adoptCurrentWebPrivateWriteGeneration()` and every
+conjunct of `durableNeverOwnedGuestState()`, then loaded `/app` on a real
+deployment with empty storage and no service worker.
+
+Observed console trace, in order:
+
+    adopt: enter {guest: true}
+    guestState { ... legacyProvenanceMatches: false ... }
+    adopt: GATE B stateMatches/generation null
+    adopt: enter {guest: true}
+    guestState { ... legacyProvenanceMatches: false ... }
+    adopt: GATE B stateMatches/generation null
+    adopt: enter {guest: true}
+    adopt: GATE A invalidated
+
+Final storage on that same page:
+
+    biblequest:web-private-write-generation:v1 = <32 hex>
+    biblequest:web-private:legacy-guest:v1     = never-owned
+    (no v2 owner / initial / claim / provenance keys, envelope absent,
+     namespace state "legacy")
+
+**Every conjunct of `durableNeverOwnedGuestState()` is satisfied in the final
+state.** The two evaluations that actually ran both happened *before* the
+never-owned marker existed, so both correctly returned false. The marker is
+written only afterwards. By the third adoption attempt the generation has been
+invalidated, so it returns at GATE A without re-evaluating anything.
+
+In other words: **the establishment of never-owned provenance and the retry of
+adoption are not correctly ordered.** `withNeverOwnedWebPrivateGuestProvenance()`
+returns before its marker is durably readable by the next adoption attempt, and
+it also reports failure even though the write ultimately lands. Making the retry
+unconditional (already done on the fix branch) is necessary but not sufficient,
+because the retry still reads before the write is visible.
+
+**Next step:** inspect `withNeverOwnedWebPrivateGuestProvenance()` and
+`establishNeverOwnedWebPrivateGuestProvenance()` for what they await and what
+they report. The fix is to make the marker durably readable — and the scope's
+return value honest — before adoption is retried, then re-run this exact trace
+and confirm a third `guestState` line appears with
+`legacyProvenanceMatches: true` followed by a successful adoption.
+
+All `[bq-diag]` logging must be removed before merge. The diagnostic build is
+`codex/fix-web-bootstrap-race` @ `69294de`.
