@@ -640,7 +640,11 @@ export async function coordinateQuestOSWebPrivateHydration(
               storage,
             )
           : webPrivateReadAllowed(storage);
-      if (!authorizationIsCurrent()) return false;
+      if (!authorizationIsCurrent()) {
+        // TEMPORARY DIAGNOSTIC — remove before merge.
+        console.warn("[bq-diag] hydration: pre-rehydrate authorization false");
+        return false;
+      }
       const storageKey = selectedWebPrivateStorageKey(
         storage,
         LEGACY_QUEST_JOURNEY_STORAGE_KEY,
@@ -658,18 +662,23 @@ export async function coordinateQuestOSWebPrivateHydration(
       };
       try {
         await useQuestOS.persist.rehydrate();
-        if (
-          webJourneyReadEpoch !== epoch ||
-          !authorizationIsCurrent() ||
-          selectedWebPrivateStorageKey(
-            storage,
-            LEGACY_QUEST_JOURNEY_STORAGE_KEY,
-            WEB_V2_QUEST_JOURNEY_STORAGE_KEY,
-          ) !== storageKey
-        ) {
+        // TEMPORARY DIAGNOSTIC — remove before merge.
+        const diag = {
+          epochChanged: webJourneyReadEpoch !== epoch,
+          authorizationLost: !authorizationIsCurrent(),
+          keyChanged:
+            selectedWebPrivateStorageKey(
+              storage,
+              LEGACY_QUEST_JOURNEY_STORAGE_KEY,
+              WEB_V2_QUEST_JOURNEY_STORAGE_KEY,
+            ) !== storageKey,
+        };
+        if (diag.epochChanged || diag.authorizationLost || diag.keyChanged) {
+          console.warn("[bq-diag] hydration post-rehydrate failed", diag);
           resetQuestOSWebPrivateMemory();
           return false;
         }
+        console.warn("[bq-diag] hydration succeeded");
         return true;
       } catch {
         resetQuestOSWebPrivateMemory();
