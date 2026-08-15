@@ -162,3 +162,47 @@ against this schema.
    a backend that actually responds, not a fixture host that fails fast.
 3. Re-run the artifact audits **and** load the artifact in a browser before
    promoting. Bundle and header gates are necessary and not sufficient.
+
+
+## Verified state of the fix branch (`codex/fix-web-bootstrap-race`, `283e8a9`)
+
+Two real defects are fixed and verified in a browser on a real deployment:
+
+1. **The infinite veil is gone.** `onAuthStateChange` no longer bumps
+   `authStorageRead` before the bootstrap completes, so `INITIAL_SESSION` can
+   no longer cancel the in-flight bootstrap.
+2. **Guest adoption is retried after provenance is durable.** Never-owned
+   provenance is a precondition of guest adoption, so the first attempt fails
+   by design on a first visit; the code established provenance but never
+   retried, and assigned the provenance result to `adopted`.
+
+A first visit now reaches interactive UI rather than a permanent veil, and
+storage shows the expected state:
+
+    biblequest:web-private-write-generation:v1 = <32 hex>
+    biblequest:web-private:legacy-guest:v1     = never-owned
+
+**Still failing.** With both preconditions satisfied, a first visit still lands
+on the "Is this your journey?" gate rather than the app, which means
+`adoptCurrentWebPrivateWriteGeneration()` continues to return false. Since the
+guest branch and its `durableNeverOwnedGuestState` precondition now demonstrably
+pass, the remaining failure is the tail gate:
+
+    if (!(await coordinateCurrentWebPrivateJourney()) || !webPrivateReadAllowed()) {
+      revokeWebPrivateMemory();
+      ...
+      privateWriteGenerationInvalidated = true;
+      return false;
+    }
+
+`coordinateCurrentWebPrivateJourney()` delegates to
+`coordinateQuestOSWebPrivateHydration()`, which returns false either at its
+initial `authorizationIsCurrent()` check or at its post-`rehydrate()` re-check
+of epoch, authorisation, and selected storage key. Because that failure also
+sets `privateWriteGenerationInvalidated`, no in-page retry — including the
+"Keep this local journey" button — can recover.
+
+**Next step:** instrument those three post-rehydrate conditions in
+`coordinateQuestOSWebPrivateHydration()` and load a real deployment with empty
+storage to see which one trips. Fix it without weakening the read authority
+that keeps one account's data from being read under another's generation.
