@@ -254,8 +254,17 @@ coverage may supplement layout checks only.
 - [ ] Sign-out, failed sign-out, account switching, force quit, token refresh,
       reinstall, and account deletion preserve the exact verified owner
       boundary.
-- [ ] Remote disable while installed and while a request is in flight prevents
+- [x] Remote disable while installed and while a request is in flight prevents
       stale responses from committing and retains the local journey.
+      **PASS — 2026-08-15.** Window `16:29:42Z`–`18:11:32Z` on the Production
+      flag, with an account build installed on a physical iPhone and signed in.
+      After the disable the availability RPC returned
+      `{"contract":"biblequest_native_account_beta_v1","available":false}`, and
+      in the following window that device issued only availability probes — no
+      `/auth/v1/*` call, no sync read, no write. The owner confirmed prayers and
+      journey remained usable on the device throughout. Note the deletion path
+      stays reachable while disabled by design, which is what keeps
+      5.1.1(v) satisfiable during a kill switch.
 - [ ] Build 13 remains usable before, during, and after `0037` and the staffed
       test window.
 - [ ] Disposable users and fixtures are deleted; sanitized zero-residual counts
