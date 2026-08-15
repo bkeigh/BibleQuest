@@ -154,6 +154,30 @@ describe("privacy-safe observability contract", () => {
     }
   });
 
+  it("names a row the server refused instead of calling it unknown", () => {
+    // A journey that can never sync used to report "unknown" and retry forever
+    // behind "sync will retry soon". On 2026-08-15 one ready quest raised 22023
+    // and the cause was only found by reading server logs.
+    const refusals = [
+      { code: "22023", label: "invalid parameter, e.g. a rejected quest window" },
+      { code: "23514", label: "check constraint" },
+      { code: "23505", label: "unique violation" },
+      { code: "23502", label: "not null violation" },
+      { code: "23503", label: "foreign key violation" },
+    ];
+
+    for (const { code, label } of refusals) {
+      expect(classifyOperationalError({ code, status: 400 }, true), label).toBe(
+        "invalid",
+      );
+    }
+
+    // A refusal is about the row, not the connection or the schema, and must
+    // not be mistaken for either.
+    expect(classifyOperationalError({ code: "42P01" }, true)).toBe("schema");
+    expect(classifyOperationalError({ code: "22023" }, false)).toBe("offline");
+  });
+
   it("logs only the reconstructed signal and never a hostile request body", async () => {
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     const safeBody = JSON.stringify({
