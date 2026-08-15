@@ -3,8 +3,15 @@
 import { useEffect, useRef } from "react";
 import { AppLoadingScreen } from "@/components/app-shell/AppLoadingScreen";
 import { markAuthCompletionSignal } from "@/lib/auth/completion-signal";
+import {
+  authFailureReason,
+  type AuthFailureReason,
+} from "@/lib/auth/errors";
 import { safeNextPath } from "@/lib/auth/redirect";
-import { completeVerifiedWebOAuth } from "@/lib/supabase/web-auth-storage";
+import {
+  completeVerifiedWebOAuth,
+  WebOAuthCompletionError,
+} from "@/lib/supabase/web-auth-storage";
 import { withWebAccountOperationLock } from "@/lib/supabase/web-auth-storage";
 
 const MAX_AUTHORIZATION_CODE_LENGTH = 4_096;
@@ -31,10 +38,10 @@ function callbackFragment(value: string): { code: string; next: string } | null 
 }
 
 /** Returns one generic same-origin failure path without reflecting provider data. */
-function callbackFailurePath(next: string): string {
+function callbackFailurePath(next: string, reason: AuthFailureReason): string {
   const destination = new URL(next, "https://biblequest.invalid");
   const path = destination.pathname === "/onboarding" ? "/onboarding" : "/app/account";
-  return `${path}?error=invalid`;
+  return `${path}?error=${reason}`;
 }
 
 /** Completes customer PKCE only inside the browser-owned v2 session boundary. */
@@ -61,8 +68,15 @@ export function CustomerAuthCallback() {
         markAuthCompletionSignal();
         window.location.replace(fragment.next);
       },
-      () => {
-        window.location.replace(callbackFailurePath(fragment.next));
+      (error: unknown) => {
+        // Name the actual cause. Reporting every failure as "invalid" told
+        // someone their link was broken when the real answer was that it had
+        // to finish in the browser it started in.
+        const providerCode =
+          error instanceof WebOAuthCompletionError ? error.providerCode : null;
+        window.location.replace(
+          callbackFailurePath(fragment.next, authFailureReason(error, providerCode)),
+        );
       },
     );
   }, []);

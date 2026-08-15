@@ -306,6 +306,19 @@ export class WebAuthUnavailableError extends Error {
   }
 }
 
+/** Carries the provider's failure reason out of a browser OAuth completion. */
+export class WebOAuthCompletionError extends WebAuthUnavailableError {
+  readonly providerCode: string | null;
+
+  constructor(cause: unknown) {
+    super();
+    this.name = "WebOAuthCompletionError";
+    const shape = cause as { code?: unknown } | null;
+    this.providerCode =
+      shape && typeof shape.code === "string" ? shape.code : null;
+  }
+}
+
 /** Distinguishes a live DOM from server imports and ordinary Node fixtures. */
 function isRealBrowserDocument(): boolean {
   return (
@@ -3242,7 +3255,13 @@ export async function completeVerifiedWebOAuth(
     AUTH_VERIFICATION_DEADLINE_MS,
     "Browser OAuth completion",
   );
-  if (result.error || !result.data.session) throw new WebAuthUnavailableError();
+  if (result.error || !result.data.session) {
+    // Carry the provider's reason. Collapsing every cause into one error meant
+    // a link finished in a different browser — the single most common and most
+    // recoverable failure — was reported as "incomplete or invalid", so the
+    // precise guidance this app already writes could never be reached.
+    throw new WebOAuthCompletionError(result.error);
+  }
   const installed = await installVerifiedWebSession(
     handle,
     result.data.session,
