@@ -415,3 +415,64 @@ which is worth confirming rather than assuming.
 Diagnostic build carrying this instrumentation: `codex/fix-web-bootstrap-race`
 @ `89b9ce2`. All `[bq-diag]` logging must be removed before merge; the clean
 single-fix state of that branch is `e4dc08a`.
+
+
+## ROOT CAUSE FOUND — `scrubLegacyWebAuthCookies()` fails on a first visit
+
+Final instrumentation on a real deployment, first visit, empty storage:
+
+    establishPost {"allowedAfterWrite":true,"emptyAfterWrite":true,
+                   "markerValue":"never-owned"}
+    scopeComplete {"hasStorage":true,"generationMatches":true,"guestBefore":true,
+                   "scrubbed":false,"guestAfter":true}
+
+`establish()` fully succeeds — the marker is written and verified. The guest
+state is durable both before and after. **The single false term is
+`scrubbed`.** `scrubLegacyWebAuthCookies()` returns false, so the scope's
+`complete` verification fails, adoption is rolled back, and the visitor is sent
+to the keep/clear gate.
+
+`document.cookie` is `""` on this page, confirmed directly. Tracing the two
+functions with that fact:
+
+    scrubLegacyWebAuthCookies()
+      -> storageKey = legacyStorageKey(); if (!storageKey) return false;
+      -> parse("") yields {}, so no cookie is serialized away
+      -> return legacyWebAuthCookiesAreAbsent()
+           -> storageKey = legacyStorageKey(); if (!storageKey) return false;
+           -> !Object.keys(parse("")).some(...) === true
+
+With no cookies, the only path to `false` in either function is
+`legacyStorageKey()` returning null. That function derives the legacy cookie
+name from `process.env.NEXT_PUBLIC_SUPABASE_URL`:
+
+    const origin = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!origin) return null;
+    const url = new URL(origin);
+    const project = url.hostname.split(".")[0];
+    return project ? `sb-${project}-auth-token` : null;
+
+**So a device with no legacy cookies cannot complete guest adoption**, because a
+helper whose only job is to remove cookies that do not exist reports failure.
+
+### Fix direction
+
+The correct behaviour is that having no legacy cookies is *success*, not
+failure. Two candidate fixes, in order of preference:
+
+1. Make absence explicit: when there are no legacy cookies to scrub, return
+   true regardless of whether the legacy key name can be derived. A missing
+   legacy key name means there is no legacy cookie namespace to clean, which is
+   the same end state the caller requires.
+2. If `legacyStorageKey()` is genuinely returning null on a deployed client,
+   establish why `NEXT_PUBLIC_SUPABASE_URL` is not readable there and fix the
+   access — but note the bundle demonstrably contains the origin, so option 1
+   is the more likely correct change.
+
+Confirm by instrumenting `legacyStorageKey()` once, then verify the whole flow
+in a browser from empty storage: the expected result is `scrubbed:true`,
+adoption succeeding, and `/app` rendering without the keep/clear gate.
+
+Diagnostic build: `codex/fix-web-bootstrap-race` @ `1f742b9`. The clean
+single-fix state of that branch is `e4dc08a`; all `[bq-diag]` logging must be
+removed before merge.
