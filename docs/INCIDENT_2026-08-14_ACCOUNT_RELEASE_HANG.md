@@ -370,3 +370,48 @@ handle still in `activeAccountOperations`, the stored generation equal to the
 authority's rotated generation, namespace `legacy`, envelope missing, and none
 of the terminal/active/locked/installing reset flags set. Instrument those nine
 conditions individually — that is a single pass and will name it outright.
+
+
+## Narrowing, round 4 — final, two candidate expressions
+
+Instrumented on a real deployment, first visit, empty storage, no service worker.
+
+`webPrivateNeverOwnedGuestProvenanceAllowed()` — **all nine conjuncts true**:
+
+    {"hasAuthority":true,"hasStorage":true,"attested":true,"handleLive":true,
+     "generationMatches":true,"namespace":"legacy","envelope":"missing",
+     "terminalCleanup":false,"activeReset":false,"lockedReset":false,
+     "installingReset":false}
+
+`establishNeverOwnedWebPrivateGuestProvenance()` — **all pre-write checks pass**:
+
+    {"allowed1":true,"cutoverState":"none","namespace":"legacy",
+     "localEmpty":true,"avatarsEmpty":true,"localEmpty2":true,"allowed2":true}
+
+So execution reaches the marker write. Everything before it is correct. The
+failure is therefore in exactly one of two places, both evaluated *after*
+`storage.setItem(LEGACY_GUEST_PROVENANCE_STORAGE_KEY, WEB_PRIVATE_NEVER_OWNED_VALUE)`:
+
+1. **`establish()`'s own return**
+
+       return allowed() &&
+         privateLocalStorageIsEmpty(storage, allowed, LEGACY_GUEST_PROVENANCE_STORAGE_KEY);
+
+2. **the enclosing scope's `complete` verification** in
+   `withNeverOwnedWebPrivateGuestProvenance()`
+
+       readPrivateWriteGeneration(storage) === generation &&
+       durableNeverOwnedGuestState(storage) &&
+       scrubLegacyWebAuthCookies() &&
+       durableNeverOwnedGuestState(storage)
+
+Instrument those two expressions term by term — one pass, same pattern as
+above — and the defect is named outright. Note that `durableNeverOwnedGuestState`
+was previously observed returning false only while the marker was absent, which
+it no longer is at these call sites; and `scrubLegacyWebAuthCookies()` has no
+cookies to remove on a first visit but returns `legacyWebAuthCookiesAreAbsent()`,
+which is worth confirming rather than assuming.
+
+Diagnostic build carrying this instrumentation: `codex/fix-web-bootstrap-race`
+@ `89b9ce2`. All `[bq-diag]` logging must be removed before merge; the clean
+single-fix state of that branch is `e4dc08a`.
