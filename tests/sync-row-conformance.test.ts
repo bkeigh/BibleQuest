@@ -25,6 +25,7 @@ import {
   guidedProgressToRows,
 } from "@/lib/sync/mapping";
 import { GUIDED_MOVEMENT_KEYS } from "@/lib/questos/types";
+import { MUTABLE_ACCOUNT_RESOURCES } from "@/lib/sync/mutable-revisions";
 
 const UID = "11111111-1111-4111-8111-111111111111";
 
@@ -149,6 +150,43 @@ describe("recent verse bounds", () => {
     } as never);
 
     expect(transmittableRecentVerseRows([row])).toEqual([row]);
+  });
+});
+
+describe("mutable sync resources", () => {
+  /**
+   * The resource names `upsert_mutable_account_rows` accepts, read from
+   * Production on 2026-08-15. PostgREST resolves this by value, so a name the
+   * function does not branch on is silently written nowhere.
+   */
+  const DB_MUTABLE_RESOURCES = new Set([
+    "notification_preferences",
+    "prayers",
+    "profiles",
+    "reading_progress",
+    "reflections",
+    "user_quests",
+    "user_recent_verses",
+    "user_settings",
+    "verse_bookmarks",
+  ]);
+
+  it("only names resources the RPC actually branches on", () => {
+    // Adding a tenth resource to the client without a migration would push
+    // that data into a function that has no case for it. Nothing would fail
+    // loudly; the rows would simply never arrive.
+    for (const resource of MUTABLE_ACCOUNT_RESOURCES) {
+      expect(DB_MUTABLE_RESOURCES.has(resource), resource).toBe(true);
+    }
+  });
+
+  it("covers every resource the RPC supports", () => {
+    // The reverse drift is quieter: a resource the server supports that the
+    // client never sends is data silently left behind on the device.
+    const clientResources: ReadonlySet<string> = MUTABLE_ACCOUNT_RESOURCES;
+    for (const resource of DB_MUTABLE_RESOURCES) {
+      expect(clientResources.has(resource), resource).toBe(true);
+    }
   });
 });
 
