@@ -68,10 +68,10 @@ describe("guided movement keys", () => {
     // seventh key the client union does not contain.
     expect(rows.length).toBeGreaterThan(1);
 
-    for (const row of rows as Array<Record<string, unknown>>) {
+    for (const row of rows) {
       expect(row.session_key).toBe(`pilgrimage|${contentId}`);
-      expect(String(row.session_key).length).toBeLessThanOrEqual(180);
-      expect(DB_MOVEMENT_KEYS.has(String(row.movement_key))).toBe(true);
+      expect(row.session_key.length).toBeLessThanOrEqual(180);
+      expect(DB_MOVEMENT_KEYS.has(row.movement_key)).toBe(true);
     }
   });
 });
@@ -91,7 +91,7 @@ describe("recent verse bounds", () => {
       reference: "John 1:1-5",
       text: "fixture",
       viewedAt: "2026-08-15T12:00:00.000Z",
-    } as never) as Record<string, number>;
+    } as never);
 
     expect(row.verse_start).toBeGreaterThan(0);
     expect(row.chapter).toBeGreaterThan(0);
@@ -111,7 +111,7 @@ describe("recent verse bounds", () => {
       reference: "John 1:9",
       text: "fixture",
       viewedAt: "2026-08-15T12:00:00.000Z",
-    } as never) as Record<string, number>;
+    } as never);
 
     const wouldViolate = !(row.verse_end >= row.verse_start);
     expect(wouldViolate).toBe(true);
@@ -131,7 +131,7 @@ describe("daily quest windows", () => {
       pickedAt: picked,
       expiresAt: picked,
       rerolls: 0,
-    }) as Record<string, string>;
+    });
 
     // assignmentToRow is the raw mapper; the transmitted window is widened in
     // writeDailyQuestAssignments. Pin the raw shape so the relationship stays
