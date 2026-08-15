@@ -2978,12 +2978,16 @@ async function legacyCookieSession(): Promise<LegacyCookieRead> {
 /** Proves no rollback-readable legacy credential chunk remains. */
 function legacyWebAuthCookiesAreAbsent(): boolean {
   if (typeof document === "undefined") return true;
-  const storageKey = legacyStorageKey();
-  if (!storageKey) return false;
   try {
-    return !Object.keys(parse(document.cookie)).some((name) =>
-      isChunkLike(name, storageKey),
-    );
+    const names = Object.keys(parse(document.cookie));
+    // Observed absence is proof: a document carrying no cookies at all cannot
+    // be carrying a legacy auth cookie, whether or not the legacy key name can
+    // be derived. Requiring the key name first made a first visit — which has
+    // no cookies to remove — report failure and blocked guest adoption.
+    if (names.length === 0) return true;
+    const storageKey = legacyStorageKey();
+    if (!storageKey) return false;
+    return !names.some((name) => isChunkLike(name, storageKey));
   } catch {
     return false;
   }
@@ -2992,10 +2996,13 @@ function legacyWebAuthCookiesAreAbsent(): boolean {
 /** Scrubs every legacy cookie chunk only after private-data absence proof. */
 function scrubLegacyWebAuthCookies(): boolean {
   if (typeof document === "undefined") return true;
-  const storageKey = legacyStorageKey();
-  if (!storageKey) return false;
   try {
     const values = parse(document.cookie);
+    // Nothing to scrub is success, not failure. See the note in
+    // legacyWebAuthCookiesAreAbsent.
+    if (Object.keys(values).length === 0) return true;
+    const storageKey = legacyStorageKey();
+    if (!storageKey) return false;
     const options = { ...DEFAULT_COOKIE_OPTIONS, maxAge: 0 };
     for (const name of Object.keys(values)) {
       if (isChunkLike(name, storageKey)) {
