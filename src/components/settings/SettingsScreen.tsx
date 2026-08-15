@@ -1577,10 +1577,14 @@ function SettingsInner() {
                     <span className="block text-[0.9375rem] text-charcoal">
                       Floating MyShepherd
                     </span>
+                    {/* The launcher is also hidden on Home and the other
+                        screens that already offer MyShepherd inline. Without
+                        saying so, turning this on and seeing nothing reads as
+                        a broken setting. */}
                     <span className="mt-0.5 block text-caption leading-relaxed text-ash">
                       {isPlus
-                        ? "Keep a small Scripture assistant available throughout the app."
-                        : "Keep the MyShepherd button on screen. Asking questions is part of Plus."}
+                        ? "Keep a small Scripture assistant available throughout the app. Home and the writing screens keep it hidden, because they already offer it."
+                        : "Keep the MyShepherd button on screen. Home and the writing screens keep it hidden, because they already offer it. Asking questions is part of Plus."}
                     </span>
                   </span>
                   <Toggle

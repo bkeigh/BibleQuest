@@ -12,8 +12,12 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // Component cases opt into jsdom per file with a
+    // `@vitest-environment jsdom` docblock, so the rest of the suite keeps the
+    // faster node environment.
     include: [
       "tests/**/*.test.ts",
+      "tests/**/*.test.tsx",
       "tests/observability-evidence.test.mjs",
     ],
     setupFiles: ["./tests/setup.ts"],
