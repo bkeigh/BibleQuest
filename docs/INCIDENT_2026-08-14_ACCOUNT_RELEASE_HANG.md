@@ -300,3 +300,47 @@ and confirm a third `guestState` line appears with
 
 All `[bq-diag]` logging must be removed before merge. The diagnostic build is
 `codex/fix-web-bootstrap-race` @ `69294de`.
+
+
+## Correction — the retry change on the fix branch is based on a wrong model
+
+`withNeverOwnedWebPrivateGuestProvenance()` is **self-sufficient**. Reading it
+end to end:
+
+    rotatePrivateWriteGeneration(storage)        // sets privateWriteGenerationInvalidated = true
+    neverOwnedGuestProvenance = { generation, handle }
+    if (!(await establish())) return false;      // <-- returns false here
+    complete = <re-verify generation + guest state + cookie scrub>
+    adoptedPrivateWriteGeneration = generation;
+    adoptedPrivateReadAuthority = { generation, kind: "guest" };
+    privateWriteGenerationInvalidated = false;   // clears its own rotation
+    const hydrated = await coordinateCurrentWebPrivateJourney();
+    return true;
+
+It already performs the adoption, clears the invalidation it caused, and
+coordinates hydration. The original code was therefore **correct** to assign its
+result to `adopted`. The "retry adoption afterwards" change now on
+`codex/fix-web-bootstrap-race` is built on a misreading and should be reverted:
+a separate `adoptCurrentWebPrivateWriteGeneration()` call after this scope will
+hit GATE A, because the scope rotates the generation and only clears the
+invalidation on its own success path.
+
+That also explains the third `adopt: enter` / `GATE A invalidated` line in the
+trace — it is the retry firing after the scope rotated the generation.
+
+**So the single remaining question is narrower than previously stated:** why does
+`establishNeverOwnedWebPrivateGuestProvenance()` return false when it evidently
+writes `biblequest:web-private:legacy-guest:v1 = never-owned`? It is gated by
+`webPrivateNeverOwnedGuestProvenanceAllowed()`; note that the enclosing scope has
+just set `privateWriteGenerationInvalidated = true` via
+`rotatePrivateWriteGeneration()`, so any check that consults that flag — directly
+or through `webPrivateReadAllowed()` — will refuse inside its own scope.
+
+**Recommended next actions, in order:**
+
+1. Revert the retry change on `codex/fix-web-bootstrap-race`, keeping only the
+   verified `authStorageRead` fix, which is correct and independent.
+2. Strip all `[bq-diag]` logging.
+3. Instrument `establishNeverOwnedWebPrivateGuestProvenance()` and
+   `webPrivateNeverOwnedGuestProvenanceAllowed()` and re-run the same trace to
+   see which predicate refuses.
