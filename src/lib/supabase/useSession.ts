@@ -360,10 +360,18 @@ export function useSession(): SessionState {
         if (!adopted) {
           const { establishNeverOwnedWebPrivateGuestProvenance } =
             await import("@/lib/storage/web-private-cutover");
-          adopted = await withNeverOwnedWebPrivateGuestProvenance(
+          const established = await withNeverOwnedWebPrivateGuestProvenance(
             webOperation,
             establishNeverOwnedWebPrivateGuestProvenance,
           );
+          // Same ordering as acceptFreshGuest: provenance is a precondition of
+          // adoption, so retry once it is durable.
+          if (established) {
+            adopted = await adoptCurrentWebPrivateWriteGeneration(
+              webOperation,
+              null,
+            );
+          }
         }
         if (!active) return;
         setRecovery(adopted ? "none" : "locked-local-journey");
@@ -773,10 +781,20 @@ export function useSession(): SessionState {
           if (!adopted) {
             const { establishNeverOwnedWebPrivateGuestProvenance } =
               await import("@/lib/storage/web-private-cutover");
-            adopted = await withNeverOwnedWebPrivateGuestProvenance(
+            const established = await withNeverOwnedWebPrivateGuestProvenance(
               webOperation,
               establishNeverOwnedWebPrivateGuestProvenance,
             );
+            // Durable never-owned provenance is itself a precondition of guest
+            // adoption, so the first attempt above fails by design on a first
+            // visit. Retry once it holds; adoption still proves the full
+            // never-owned state, so this grants nothing it would have refused.
+            if (established) {
+              adopted = await adoptCurrentWebPrivateWriteGeneration(
+                webOperation,
+                null,
+              );
+            }
           }
           if (!adopted) {
             showLockedLocalJourney();
