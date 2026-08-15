@@ -344,3 +344,29 @@ or through `webPrivateReadAllowed()` — will refuse inside its own scope.
 3. Instrument `establishNeverOwnedWebPrivateGuestProvenance()` and
    `webPrivateNeverOwnedGuestProvenanceAllowed()` and re-run the same trace to
    see which predicate refuses.
+
+
+## Eliminated hypotheses (do not retrace)
+
+- **Hydration.** `coordinateQuestOSWebPrivateHydration()` is never reached;
+  instrumented and silent on every branch.
+- **Circular owner read.** `readLocalJourneyOwner()` returns `unowned`
+  correctly on a first visit; the namespace state is `legacy` and the selector
+  returns the legacy key.
+- **Cookie scrub.** `document.cookie` is empty on a first visit and
+  `legacyStorageKey()` resolves from the inlined `NEXT_PUBLIC_SUPABASE_URL`.
+- **Self-invalidating emptiness check.** `establishNeverOwnedWebPrivateGuestProvenance()`
+  passes `LEGACY_GUEST_PROVENANCE_STORAGE_KEY` as `allowedKey` to its
+  post-write `privateLocalStorageIsEmpty()` call, and that helper explicitly
+  exempts the allowed key when its value is `never-owned`. Correct as written.
+- **Missing adoption retry.** `withNeverOwnedWebPrivateGuestProvenance()`
+  performs the adoption itself; adding a retry is wrong and was reverted.
+
+**Remaining surface.** `establishNeverOwnedWebPrivateGuestProvenance()` returns
+false somewhere in its pre-write conjunction, most plausibly through
+`allowed()` = `webPrivateNeverOwnedGuestProvenanceAllowed()`, which requires all
+of: a live `neverOwnedGuestProvenance` authority, `webAccountRealmAttested`, the
+handle still in `activeAccountOperations`, the stored generation equal to the
+authority's rotated generation, namespace `legacy`, envelope missing, and none
+of the terminal/active/locked/installing reset flags set. Instrument those nine
+conditions individually — that is a single pass and will name it outright.
