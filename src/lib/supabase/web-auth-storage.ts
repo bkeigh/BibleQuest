@@ -1646,8 +1646,12 @@ export async function adoptCurrentWebPrivateWriteGeneration(
   expectedUserId: string | null,
 ): Promise<boolean> {
   requireAccountOperation(handle);
+  console.warn("[bq-diag] adopt: enter", { guest: !expectedUserId });
   if (expectedUserId && !webAccountRealmAttested) return false;
-  if (privateWriteGenerationInvalidated) return false;
+  if (privateWriteGenerationInvalidated) {
+    console.warn("[bq-diag] adopt: GATE A invalidated");
+    return false;
+  }
   const currentAuthority = adoptedPrivateReadAuthority;
   if (
     webPrivateReadAllowed() &&
@@ -1727,7 +1731,10 @@ export async function adoptCurrentWebPrivateWriteGeneration(
         ? { generation: created, sessionId: state.sessionId }
         : { generation: created, sessionId: null };
     });
-    if (!adopted) return false;
+    if (!adopted) {
+      console.warn("[bq-diag] adopt: GATE B stateMatches/generation null");
+      return false;
+    }
     const { generation, sessionId } = adopted;
     if (
       adoptedPrivateWriteGeneration &&
@@ -1757,15 +1764,28 @@ export async function adoptCurrentWebPrivateWriteGeneration(
       !expectedUserId &&
       !(await withWebAuthStorageLock(async () => {
         const storage = localStorageSurface();
+        const d = {
+          hasStorage: Boolean(storage),
+          generationMatches:
+            Boolean(storage) &&
+            readPrivateWriteGeneration(storage!) === generation,
+          guestStateBefore:
+            Boolean(storage) && durableNeverOwnedGuestState(storage!),
+          scrubbed: scrubLegacyWebAuthCookies(),
+          guestStateAfter:
+            Boolean(storage) && durableNeverOwnedGuestState(storage!),
+        };
+        console.warn("[bq-diag] adopt: GATE C conjuncts", d);
         return Boolean(
-          storage &&
-            readPrivateWriteGeneration(storage) === generation &&
-            durableNeverOwnedGuestState(storage) &&
-            scrubLegacyWebAuthCookies() &&
-            durableNeverOwnedGuestState(storage),
+          d.hasStorage &&
+            d.generationMatches &&
+            d.guestStateBefore &&
+            d.scrubbed &&
+            d.guestStateAfter,
         );
       }))
     ) {
+      console.warn("[bq-diag] adopt: GATE C failed");
       return false;
     }
     adoptedPrivateWriteGeneration = generation;
