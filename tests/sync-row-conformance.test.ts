@@ -21,6 +21,7 @@ import { describe, expect, it } from "vitest";
 import {
   assignmentToRow,
   recentVerseToRow,
+  transmittableRecentVerseRows,
   guidedProgressToRows,
 } from "@/lib/sync/mapping";
 import { GUIDED_MOVEMENT_KEYS } from "@/lib/questos/types";
@@ -98,23 +99,56 @@ describe("recent verse bounds", () => {
     expect(row.verse_end).toBeGreaterThanOrEqual(row.verse_start);
   });
 
-  it("documents that an inverted selection would be refused", () => {
-    // Not a passing behaviour — a record of the exposure. The mapper forwards
-    // whatever local state holds, so an inverted or zero selection reaching it
-    // fails the entire batch server-side rather than dropping one row.
+  it("drops an unsendable passage instead of stranding the batch", () => {
+    const verse = (over: Record<string, unknown>) =>
+      recentVerseToRow(UID, {
+        bookSlug: "john",
+        bookName: "John",
+        chapter: 1,
+        verseStart: 1,
+        verseEnd: 5,
+        reference: "John 1:1-5",
+        text: "fixture",
+        viewedAt: "2026-08-15T12:00:00.000Z",
+        ...over,
+      } as never);
+
+    const good = verse({});
+    const rows = [
+      good,
+      verse({ verseStart: 9, verseEnd: 2 }), // inverted
+      verse({ verseStart: 0 }), // verse_start > 0
+      verse({ chapter: 0 }), // chapter > 0
+    ];
+
+    const sendable = transmittableRecentVerseRows(rows);
+
+    // The readable passage still syncs; the rest of the journey is not held
+    // hostage to a selection nobody can read back.
+    expect(sendable).toEqual([good]);
+    for (const row of sendable) {
+      expect(row.chapter).toBeGreaterThan(0);
+      expect(row.verse_start).toBeGreaterThan(0);
+      expect(row.verse_end).toBeGreaterThanOrEqual(row.verse_start);
+    }
+  });
+
+  it("keeps a single-verse selection, where end equals start", () => {
+    // The constraint is `verse_end >= verse_start`. Reading one verse is the
+    // common case and must not be mistaken for malformed — the ready-quest bug
+    // was exactly an off-by-one reading of a boundary like this.
     const row = recentVerseToRow(UID, {
       bookSlug: "john",
       bookName: "John",
-      chapter: 1,
-      verseStart: 9,
-      verseEnd: 2,
-      reference: "John 1:9",
+      chapter: 3,
+      verseStart: 16,
+      verseEnd: 16,
+      reference: "John 3:16",
       text: "fixture",
       viewedAt: "2026-08-15T12:00:00.000Z",
     } as never);
 
-    const wouldViolate = !(row.verse_end >= row.verse_start);
-    expect(wouldViolate).toBe(true);
+    expect(transmittableRecentVerseRows([row])).toEqual([row]);
   });
 });
 
