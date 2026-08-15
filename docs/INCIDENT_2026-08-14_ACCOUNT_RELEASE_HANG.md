@@ -1,6 +1,6 @@
 # Incident — account release hang on promotion, 2026-08-14
 
-**Status: production recovered and healthy. `main` is NOT deployable.**
+**Status: RESOLVED. Both defects fixed, merged, and promoted; production verified in a browser.**
 
 ## What happened
 
@@ -476,3 +476,31 @@ adoption succeeding, and `/app` rendering without the keep/clear gate.
 Diagnostic build: `codex/fix-web-bootstrap-race` @ `1f742b9`. The clean
 single-fix state of that branch is `e4dc08a`; all `[bq-diag]` logging must be
 removed before merge.
+
+
+## Resolution
+
+Both defects fixed in #110, merged as `140b13a`, and promoted. Live production
+verified in a browser with cleared storage and no service worker:
+
+- **New visitor, empty storage** — `www.biblequest.co/app` renders
+  "Create your free account" with sign-in available. No veil, no gate.
+- **Returning web user with a legacy journey** — the one-time keep decision
+  completes and the home screen renders as "Good evening, Returning Friend"
+  with the seeded prayer still intact.
+
+Customer domains serve `140b13a`, schema contract 0038, worker v28. Production
+database carries 0038 and 0037 with the native availability flag off.
+
+The two fixes:
+
+1. `onAuthStateChange` no longer bumps `authStorageRead` before the web
+   bootstrap completes, so `INITIAL_SESSION` cannot cancel the in-flight
+   bootstrap.
+2. `scrubLegacyWebAuthCookies()` and `legacyWebAuthCookiesAreAbsent()` read the
+   cookie jar first and treat observed emptiness as success, instead of
+   requiring a derivable legacy key name before they will report that nothing
+   needs removing.
+
+`tests/e2e/first-visit.spec.ts` now covers the empty-storage journey whose
+absence allowed this to ship.
