@@ -1116,23 +1116,6 @@ export function readWebAuthState(
 function durableNeverOwnedGuestState(
   storage: Pick<Storage, "getItem">,
 ): boolean {
-  // TEMPORARY DIAGNOSTIC — remove before merge.
-  console.warn("[bq-diag] guestState", {
-    namespace: readWebPrivateNamespaceState(storage),
-    envelope: readEnvelope(storage).status,
-    legacyOwner: readRaw(storage, LEGACY_LAST_SYNC_USER_STORAGE_KEY).status,
-    legacyInitial: readRaw(storage, LEGACY_INITIAL_SYNC_PENDING_STORAGE_KEY).status,
-    legacyClaim: readRaw(storage, LEGACY_LOCAL_CLAIM_PENDING_STORAGE_KEY).status,
-    v2Owner: readRaw(storage, WEB_V2_LAST_SYNC_USER_STORAGE_KEY).status,
-    v2Initial: readRaw(storage, WEB_V2_INITIAL_SYNC_PENDING_STORAGE_KEY).status,
-    v2Claim: readRaw(storage, WEB_V2_LOCAL_CLAIM_PENDING_STORAGE_KEY).status,
-    v2Provenance: readRaw(storage, WEB_V2_GUEST_PROVENANCE_STORAGE_KEY).status,
-    legacyProvenanceMatches: rawEquals(
-      storage,
-      LEGACY_GUEST_PROVENANCE_STORAGE_KEY,
-      WEB_PRIVATE_NEVER_OWNED_VALUE,
-    ),
-  });
   return (
     readWebPrivateNamespaceState(storage) === "legacy" &&
     readEnvelope(storage).status === "missing" &&
@@ -1663,12 +1646,8 @@ export async function adoptCurrentWebPrivateWriteGeneration(
   expectedUserId: string | null,
 ): Promise<boolean> {
   requireAccountOperation(handle);
-  console.warn("[bq-diag] adopt: enter", { guest: !expectedUserId });
   if (expectedUserId && !webAccountRealmAttested) return false;
-  if (privateWriteGenerationInvalidated) {
-    console.warn("[bq-diag] adopt: GATE A invalidated");
-    return false;
-  }
+  if (privateWriteGenerationInvalidated) return false;
   const currentAuthority = adoptedPrivateReadAuthority;
   if (
     webPrivateReadAllowed() &&
@@ -1748,10 +1727,7 @@ export async function adoptCurrentWebPrivateWriteGeneration(
         ? { generation: created, sessionId: state.sessionId }
         : { generation: created, sessionId: null };
     });
-    if (!adopted) {
-      console.warn("[bq-diag] adopt: GATE B stateMatches/generation null");
-      return false;
-    }
+    if (!adopted) return false;
     const { generation, sessionId } = adopted;
     if (
       adoptedPrivateWriteGeneration &&
@@ -1781,28 +1757,15 @@ export async function adoptCurrentWebPrivateWriteGeneration(
       !expectedUserId &&
       !(await withWebAuthStorageLock(async () => {
         const storage = localStorageSurface();
-        const d = {
-          hasStorage: Boolean(storage),
-          generationMatches:
-            Boolean(storage) &&
-            readPrivateWriteGeneration(storage!) === generation,
-          guestStateBefore:
-            Boolean(storage) && durableNeverOwnedGuestState(storage!),
-          scrubbed: scrubLegacyWebAuthCookies(),
-          guestStateAfter:
-            Boolean(storage) && durableNeverOwnedGuestState(storage!),
-        };
-        console.warn("[bq-diag] adopt: GATE C conjuncts", d);
         return Boolean(
-          d.hasStorage &&
-            d.generationMatches &&
-            d.guestStateBefore &&
-            d.scrubbed &&
-            d.guestStateAfter,
+          storage &&
+            readPrivateWriteGeneration(storage) === generation &&
+            durableNeverOwnedGuestState(storage) &&
+            scrubLegacyWebAuthCookies() &&
+            durableNeverOwnedGuestState(storage),
         );
       }))
     ) {
-      console.warn("[bq-diag] adopt: GATE C failed");
       return false;
     }
     adoptedPrivateWriteGeneration = generation;

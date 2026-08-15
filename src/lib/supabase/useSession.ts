@@ -360,16 +360,9 @@ export function useSession(): SessionState {
         if (!adopted) {
           const { establishNeverOwnedWebPrivateGuestProvenance } =
             await import("@/lib/storage/web-private-cutover");
-          await withNeverOwnedWebPrivateGuestProvenance(
+          adopted = await withNeverOwnedWebPrivateGuestProvenance(
             webOperation,
             establishNeverOwnedWebPrivateGuestProvenance,
-          );
-          // Same ordering as acceptFreshGuest: provenance is a precondition of
-          // adoption, so retry unconditionally and let adoption re-prove the
-          // complete never-owned state for itself.
-          adopted = await adoptCurrentWebPrivateWriteGeneration(
-            webOperation,
-            null,
           );
         }
         if (!active) return;
@@ -780,21 +773,9 @@ export function useSession(): SessionState {
           if (!adopted) {
             const { establishNeverOwnedWebPrivateGuestProvenance } =
               await import("@/lib/storage/web-private-cutover");
-            await withNeverOwnedWebPrivateGuestProvenance(
+            adopted = await withNeverOwnedWebPrivateGuestProvenance(
               webOperation,
               establishNeverOwnedWebPrivateGuestProvenance,
-            );
-            // Durable never-owned provenance is itself a precondition of guest
-            // adoption, so the first attempt above fails by design on a first
-            // visit. Retry unconditionally rather than trusting the
-            // establishment step's own report, which is pessimistic even when
-            // the marker is written correctly. This grants nothing: adoption
-            // independently proves the complete never-owned state, including
-            // that no legacy or v2 owner, pending claim, or v2 provenance key
-            // exists, before it will hand out any authority.
-            adopted = await adoptCurrentWebPrivateWriteGeneration(
-              webOperation,
-              null,
             );
           }
           if (!adopted) {
