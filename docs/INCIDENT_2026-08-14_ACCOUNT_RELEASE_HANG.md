@@ -206,3 +206,49 @@ sets `privateWriteGenerationInvalidated`, no in-page retry — including the
 `coordinateQuestOSWebPrivateHydration()` and load a real deployment with empty
 storage to see which one trips. Fix it without weakening the read authority
 that keeps one account's data from being read under another's generation.
+
+
+## Narrowing, round 2 — hydration is NOT the failure point
+
+Instrumented `coordinateQuestOSWebPrivateHydration()` on a real deployment
+(diagnostic build `b5f0d40`) with logging on its pre-rehydrate authorization
+check and each of its three post-rehydrate conditions, then loaded `/app` with
+empty storage and no service worker.
+
+**No diagnostic fired at all** — not the failure branches, not the success
+branch. That function is never reached. The earlier lead pointing at it is
+therefore **eliminated**; do not spend time there.
+
+So `adoptCurrentWebPrivateWriteGeneration()` returns false *before* its tail
+gate. What is already ruled out by observation:
+
+- the guest `stateMatches` check passes at least once — a generation is created
+  and written (`biblequest:web-private-write-generation:v1` is present);
+- `durableNeverOwnedGuestState()` is satisfiable — the legacy provenance marker
+  reads exactly `never-owned` and the v2 provenance key is absent;
+- `scrubLegacyWebAuthCookies()` has no work to do and should succeed —
+  `document.cookie` is empty on a first visit, and `legacyStorageKey()` resolves
+  from the inlined `NEXT_PUBLIC_SUPABASE_URL` on a deployed build.
+
+That leaves the guest-only gate between generation creation and the hydration
+call, and the generation bookkeeping immediately around it:
+
+    if (!expectedUserId && !(await withWebAuthStorageLock(async () => {
+      const storage = localStorageSurface();
+      return Boolean(
+        storage &&
+          readPrivateWriteGeneration(storage) === generation &&
+          durableNeverOwnedGuestState(storage) &&
+          scrubLegacyWebAuthCookies() &&
+          durableNeverOwnedGuestState(storage),
+      );
+    }))) {
+      return false;
+    }
+
+**Next step:** put the same style of logging inside
+`adoptCurrentWebPrivateWriteGeneration()` — one line per gate, including the
+early `privateWriteGenerationInvalidated` return and each conjunct of the guest
+gate above — and reload a real deployment with empty storage. That will name the
+exact conjunct in one pass. The diagnostic build pattern is on
+`codex/fix-web-bootstrap-race`; remove all `[bq-diag]` logging before merge.
