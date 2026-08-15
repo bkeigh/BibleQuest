@@ -254,7 +254,7 @@ function webAuthWindowClient(
   harness: ReturnType<typeof loadWorker>,
   id: string,
   pathname: string,
-  response: "exact" | "wrong" | "throw" = "exact",
+  response: "exact" | "wrong" | "throw" | "silent" = "exact",
 ): WindowClient {
   return {
     id,
@@ -262,6 +262,10 @@ function webAuthWindowClient(
     focus: vi.fn().mockResolvedValue(undefined),
     postMessage(message, transfer) {
       if (response === "throw") throw new Error("challenge unavailable");
+      // A page that is backgrounded or mid-restore accepts the message and
+      // never gets to answer. iOS does this routinely when someone returns
+      // from another app, and it is not an error the page can report.
+      if (response === "silent") return;
       const port = transfer?.[0];
       if (!port) return;
       const value = message as { nonce?: unknown };
@@ -744,6 +748,45 @@ describe("service-worker browser-auth attestation", () => {
     expect(await result?.text()).toBe("protected response");
     expect(network).toHaveBeenCalledOnce();
     expect(harness.caches.cacheMap.size).toBe(0);
+  });
+
+  it("still forwards bearer traffic when a restoring page cannot answer in time", async () => {
+    // The worker re-challenges after an idle restart, and iOS restarts service
+    // workers constantly — so on iPhone this is the ordinary path, not a rare
+    // one. A page returning from another app accepts the challenge and cannot
+    // answer promptly, which denied sign-in with a 403 the person saw as
+    // "You appear to be offline". Reported 2026-08-15.
+    vi.useFakeTimers();
+    try {
+      const network = vi.fn(async () => makeResponse("protected response"));
+      const harness = loadWorker(network);
+      const restoring = webAuthWindowClient(
+        harness,
+        "restoring",
+        "/app",
+        "silent",
+      );
+      harness.state.windowClients.push(restoring);
+      const request = makeRequest(
+        "https://provider.example.test/auth/v1/otp",
+        {
+          headers: { Authorization: "Bearer header.payload.signature" },
+          mode: "cors",
+        },
+      );
+
+      const pending = dispatchFetch(harness, request, restoring.id);
+      await vi.advanceTimersByTimeAsync(30_000);
+      const result = await pending;
+
+      // The client is a genuine same-origin customer page. Silence about its
+      // visibility is not evidence of an attacker, and refusing here strands
+      // the person with no way to recover except reinstalling.
+      expect(result?.status).toBe(200);
+      expect(network).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("denies bearer traffic from missing, stale, and non-customer clients", async () => {

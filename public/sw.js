@@ -324,25 +324,37 @@ function isExactWebAuthChallengeResponse(value, nonce) {
   );
 }
 
-/** Challenges one document without returning its URL, id, or failure reason. */
+/**
+ * Challenges one document without returning its URL, id, or failure reason.
+ *
+ * Resolves "passed", "refused" for a wrong answer, or "silent" when the page
+ * never answers. Those last two are different evidence and must not be
+ * collapsed: a wrong answer means the page disagrees about the running
+ * version, while silence usually means the page is backgrounded or restoring
+ * and cannot answer at all.
+ */
 function challengeWebAuthClient(client) {
   return new Promise((resolve) => {
     const channel = new MessageChannel();
     const nonce = webAuthChallengeNonce();
     let settled = false;
-    const finish = (passed) => {
+    const finish = (outcome) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       channel.port1.close();
-      resolve(passed);
+      resolve(outcome);
     };
     const timer = setTimeout(
-      () => finish(false),
+      () => finish("silent"),
       WEB_AUTH_CHALLENGE_TIMEOUT_MS
     );
     channel.port1.onmessage = (event) => {
-      finish(isExactWebAuthChallengeResponse(event.data, nonce));
+      finish(
+        isExactWebAuthChallengeResponse(event.data, nonce)
+          ? "passed"
+          : "refused"
+      );
     };
     try {
       // The HTML bfcache reasons include serviceworker-postmessage. The audit
@@ -357,7 +369,7 @@ function challengeWebAuthClient(client) {
       );
     } catch {
       channel.port2.close();
-      finish(false);
+      finish("refused");
     }
   });
 }
@@ -379,7 +391,7 @@ async function auditWebAuthClients(requester) {
   const results = await Promise.all(
     customers.map(async (client) => ({
       client,
-      passed: await challengeWebAuthClient(client),
+      passed: (await challengeWebAuthClient(client)) === "passed",
     }))
   );
   const passed = results.every((result) => result.passed);
@@ -413,16 +425,31 @@ function webAuthAttestationFailure() {
   });
 }
 
-/** Re-attests a current page after an idle worker restart, then proxies once. */
+/**
+ * Re-attests a current page after an idle worker restart, then proxies once.
+ *
+ * iOS restarts service workers aggressively, so on iPhone this re-challenge is
+ * the ordinary path rather than a rare one. A page that is backgrounded or
+ * mid-restore — returning from another app — accepts the challenge and cannot
+ * answer inside the timeout. Treating that silence as a refusal denied sign-in
+ * with a 403 the person saw as "You appear to be offline", with no way to
+ * recover.
+ *
+ * Silence is not evidence of an attacker. The client identity check above
+ * already proves this is a same-origin customer page, and it comes from the
+ * worker's own client registry, which a page cannot forge. Only the running
+ * version stays unproven, so a wrong answer is still refused and silence is
+ * forwarded without being remembered as attested — the next request
+ * challenges again.
+ */
 async function handleAuthorizedFetch(event) {
   if (!event.clientId) return webAuthAttestationFailure();
   const client = await self.clients.get(event.clientId);
   if (!isWebAuthCustomerClient(client)) return webAuthAttestationFailure();
   if (!attestedWebAuthClients.has(client.id)) {
-    if (!(await challengeWebAuthClient(client))) {
-      return webAuthAttestationFailure();
-    }
-    attestedWebAuthClients.add(client.id);
+    const outcome = await challengeWebAuthClient(client);
+    if (outcome === "refused") return webAuthAttestationFailure();
+    if (outcome === "passed") attestedWebAuthClients.add(client.id);
   }
   return fetch(event.request);
 }
