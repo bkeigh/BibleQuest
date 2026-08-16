@@ -110,6 +110,16 @@ const RESOURCE_SET = new Set<MutableAccountResource>([
   "verse_bookmarks",
   "user_recent_verses",
 ]);
+
+/**
+ * The same set, exported so conformance checks can compare it against the
+ * resource names `upsert_mutable_account_rows` actually branches on. PostgREST
+ * resolves that by value, so a name the function has no case for is written
+ * nowhere and fails silently.
+ */
+export const MUTABLE_ACCOUNT_RESOURCES: ReadonlySet<MutableAccountResource> =
+  RESOURCE_SET;
+
 const WRITABLE_KEYS: Record<MutableAccountResource, readonly string[]> = {
   profiles: [
     "display_name",

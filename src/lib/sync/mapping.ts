@@ -329,6 +329,35 @@ export function recentVerseToRow(
   };
 }
 
+/**
+ * Drops passage rows the server's constraints refuse, so one cannot strand the
+ * rest of a journey.
+ *
+ * `user_recent_verses` requires `chapter > 0`, `verse_start > 0`, and
+ * `verse_end >= verse_start`. The mapper forwards whatever local state holds,
+ * and the push sends every passage as one batch, so a single malformed
+ * selection fails all of them — exactly how one ready quest stopped a whole
+ * day of quests syncing on 2026-08-15, leaving "We couldn't restore your
+ * journey" with no way for the person to clear it.
+ *
+ * A passage nobody can read back is not worth stranding someone's prayers for.
+ * Dropping it keeps the rest syncing, and the reading history it came from is
+ * still on the device.
+ */
+export function transmittableRecentVerseRows(
+  rows: RecentVerseRow[],
+): RecentVerseRow[] {
+  return rows.filter(
+    (row) =>
+      Number.isInteger(row.chapter) &&
+      row.chapter > 0 &&
+      Number.isInteger(row.verse_start) &&
+      row.verse_start > 0 &&
+      Number.isInteger(row.verse_end) &&
+      row.verse_end >= row.verse_start,
+  );
+}
+
 export function myQuestToRow(uid: string, q: MyQuest): UserQuestRow {
   return {
     user_id: uid,

@@ -65,6 +65,29 @@ describe("auth diagnostics", () => {
     );
   });
 
+  it("never blames the connection when the browser reports one", () => {
+    // A request that dies locally while the browser is online is usually this
+    // app's own service worker declining it, not the visitor's network.
+    // Reporting "offline" there sent someone hunting their wifi on 2026-08-15
+    // while sign-in had already succeeded at the provider.
+    for (const failure of [
+      emailRequestFailure(new TypeError("Failed to fetch"), true),
+      emailOtpFailure(new TypeError("Failed to fetch"), true),
+      emailRequestFailure({ code: "request_timeout" }, true),
+      emailOtpFailure({ code: "request_timeout" }, true),
+    ]) {
+      expect(failure.reference).toBe("AUTH-REQUEST-BLOCKED");
+      expect(failure.message).not.toMatch(/offline|reconnect/i);
+      // Local continuation stays safe either way.
+      expect(failure.unavailable).toBe(true);
+    }
+
+    // A browser that actually reports no connection is still told the truth.
+    expect(emailOtpFailure(new TypeError("Failed to fetch"), false).reference).toBe(
+      "AUTH-NETWORK",
+    );
+  });
+
   it("keeps email-code verification failures bounded and actionable", () => {
     expect(emailOtpFailure({ code: "otp_expired" })).toMatchObject({
       reference: "AUTH-CODE-INVALID",

@@ -116,11 +116,23 @@ export function emailRequestFailure(
       unavailable: true,
     };
   }
-  if (!online || message.includes("failed to fetch") || code === "request_timeout") {
+  if (!online) {
     return {
       message:
         "You appear to be offline. Reconnect to request a sign-in email, or continue on this device.",
       reference: "AUTH-NETWORK",
+      unavailable: true,
+    };
+  }
+  // The browser reports a working connection, so this is not the visitor's
+  // network. A request that dies locally is usually this app's own service
+  // worker declining it after an idle restart, which reopening clears. Saying
+  // "offline" here sent someone hunting their wifi for hours on 2026-08-15.
+  if (message.includes("failed to fetch") || code === "request_timeout") {
+    return {
+      message:
+        "Something on this device stopped the request. Close and reopen BibleQuest, then try again.",
+      reference: "AUTH-REQUEST-BLOCKED",
       unavailable: true,
     };
   }
@@ -188,11 +200,23 @@ export function emailOtpFailure(
       unavailable: true,
     };
   }
-  if (!online || message.includes("failed to fetch") || code === "request_timeout") {
+  if (!online) {
     return {
       message:
         "You appear to be offline. Reconnect, then enter the code again.",
       reference: "AUTH-NETWORK",
+      unavailable: true,
+    };
+  }
+  // The browser reports a working connection, so this is not the visitor's
+  // network. A request that dies locally is usually this app's own service
+  // worker declining it after an idle restart, which reopening clears. Saying
+  // "offline" here sent someone hunting their wifi for hours on 2026-08-15.
+  if (message.includes("failed to fetch") || code === "request_timeout") {
+    return {
+      message:
+        "Something on this device stopped the request. Close and reopen BibleQuest, then enter the code again.",
+      reference: "AUTH-REQUEST-BLOCKED",
       unavailable: true,
     };
   }
@@ -233,11 +257,23 @@ export function oauthRequestFailure(
   const message = errorMessage(error);
   const providerName = provider === "apple" ? "Apple" : "Google";
   const providerReference = provider === "apple" ? "APPLE" : "GOOGLE";
-  if (!online || message.includes("failed to fetch") || code === "request_timeout") {
+  if (!online) {
     return {
       message:
         "You appear to be offline. Reconnect to sign in, or continue on this device.",
       reference: "AUTH-NETWORK",
+      unavailable: true,
+    };
+  }
+  // The browser reports a working connection, so this is not the visitor's
+  // network. A request that dies locally is usually this app's own service
+  // worker declining it after an idle restart, which reopening clears. Saying
+  // "offline" here sent someone hunting their wifi for hours on 2026-08-15.
+  if (message.includes("failed to fetch") || code === "request_timeout") {
+    return {
+      message:
+        "Something on this device stopped the request. Close and reopen BibleQuest, then try again.",
+      reference: "AUTH-REQUEST-BLOCKED",
       unavailable: true,
     };
   }

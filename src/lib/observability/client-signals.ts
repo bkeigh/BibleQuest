@@ -177,6 +177,14 @@ export function classifyOperationalError(
   ) {
     return "schema";
   }
+  // The server refused the row itself rather than the request. These fell
+  // through to "unknown", so a journey that could never sync reported an
+  // unexplained error and retried forever behind "sync will retry soon".
+  // On 2026-08-15 one ready quest raised 22023 and the cause was only found
+  // by reading server logs; naming it here makes the next one self-evident.
+  if (["22023", "23502", "23503", "23505", "23514"].includes(code)) {
+    return "invalid";
+  }
   if (status >= 500) return "server";
   if (
     error instanceof TypeError ||

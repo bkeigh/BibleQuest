@@ -62,6 +62,7 @@ import {
   profileToRow,
   readingPositionToRow,
   recentVerseToRow,
+  transmittableRecentVerseRows,
   reflectionToRow,
   rowsToSettings,
   settingsToRows,
@@ -2322,7 +2323,9 @@ async function pushFields(
     jobs.push(() =>
       guarded(
         "user_recent_verses",
-        verses.map((verse) => recentVerseToRow(uid, verse)),
+        transmittableRecentVerseRows(
+          verses.map((verse) => recentVerseToRow(uid, verse)),
+        ),
       ),
     );
   }

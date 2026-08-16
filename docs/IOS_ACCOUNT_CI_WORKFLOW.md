@@ -94,3 +94,18 @@ A local development build (`xcodebuild -destination generic/platform=iOS`) is
 enough to test behaviour on an attached device, and that is how the 2026-08-15
 defects were found. It does **not** prove signing, TestFlight delivery,
 reinstall, or the App Store distribution path. Those need this workflow.
+
+## This workflow is the only path, not the preferred one
+
+Checked on 2026-08-15: the development Mac holds **no distribution
+certificate**. `security find-identity -v -p codesigning` returns a single
+"Apple Development" identity and zero "Apple Distribution" ones.
+
+So a distribution-signed archive cannot be produced locally at all, however the
+project is configured. Xcode Cloud signs in Apple's own infrastructure, which
+makes it the only route to TestFlight or App Review unless a distribution
+certificate and provisioning profile are installed here first.
+
+That is worth knowing before anyone spends an afternoon trying to archive
+locally: the failure will look like a signing configuration problem and is
+actually a missing credential.
