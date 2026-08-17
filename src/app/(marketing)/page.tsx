@@ -237,7 +237,7 @@ export default function LandingPage() {
                   primary
                   href="/onboarding"
                   icon="open-book"
-                  title="Get BibleQuest"
+                  title="Open BibleQuest"
                   detail="Begin your daily rhythm"
                 />
                 <HeroAction

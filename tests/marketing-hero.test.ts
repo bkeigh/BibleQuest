@@ -98,7 +98,7 @@ describe("marketing hero wallpaper", () => {
       "utf8",
     );
     const walkthrough = landingPage.indexOf('title="See how it works"');
-    const onboarding = landingPage.indexOf('title="Get BibleQuest"');
+    const onboarding = landingPage.indexOf('title="Open BibleQuest"');
 
     // Reversed on 2026-08-15: starting the app is the point of the page, so
     // it leads and carries the filled treatment. This previously asserted the

@@ -487,7 +487,7 @@ function StepAccount({
       <div className="text-center">
         <StepMascot name="key" size={144} />
         <p className="text-caption uppercase tracking-[0.16em] text-accent">
-          Get BibleQuest
+          Open BibleQuest
         </p>
         <h1
           id={STEP_HEADING_ID}
