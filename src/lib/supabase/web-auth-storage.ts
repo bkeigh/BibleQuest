@@ -2,6 +2,7 @@
 
 import {
   createClient as createSupabaseClient,
+  NavigatorLockAcquireTimeoutError,
   type Session,
 } from "@supabase/supabase-js";
 import {
@@ -306,6 +307,26 @@ export class WebAuthUnavailableError extends Error {
   }
 }
 
+/**
+ * Reports that a cross-tab lock could not be taken, which is not the same
+ * claim as account access being unavailable.
+ *
+ * A lock that is simply held elsewhere is an ordinary, transient condition —
+ * another tab is mid-operation, or a caller passed a deliberately impatient
+ * timeout to skip rather than queue. Reporting that as unavailability is the
+ * same mistake the service worker made when it read silence as refusal.
+ *
+ * It extends WebAuthUnavailableError so every existing caller keeps treating
+ * it exactly as before; only callers that care about the distinction, namely
+ * the auth-js boundary below, need to look for it.
+ */
+export class WebAuthLockUnavailableError extends WebAuthUnavailableError {
+  constructor() {
+    super();
+    this.name = "WebAuthLockUnavailableError";
+  }
+}
+
 /** Carries the provider's failure reason out of a browser OAuth completion. */
 export class WebOAuthCompletionError extends WebAuthUnavailableError {
   readonly providerCode: string | null;
@@ -386,7 +407,9 @@ async function withNamedWebLock<T>(
     );
   } catch (error) {
     if (started) throw error;
-    throw new WebAuthUnavailableError();
+    // The operation never ran, so nothing about account access is proven —
+    // only that this caller did not get the lock in the time it allowed.
+    throw new WebAuthLockUnavailableError();
   } finally {
     if (timer !== null) globalThis.clearTimeout(timer);
   }
@@ -424,17 +447,35 @@ export function withWebAuthStorageLock<T>(
   return withNamedWebLock(AUTH_STORAGE_LOCK, "storage", operation);
 }
 
-/** Supplies auth-js with a strict cross-tab lock rather than its lockless path. */
+/**
+ * Supplies auth-js with a strict cross-tab lock rather than its lockless path.
+ *
+ * auth-js decides what a failed acquire means by `instanceof
+ * LockAcquireTimeoutError`, and rethrows anything else. Its auto-refresh tick
+ * relies on that: it acquires with a zero timeout specifically to skip a tick
+ * when another tab holds the lock, and swallows the timeout error that comes
+ * back. A different error type there is rethrown out of an interval callback
+ * nobody awaits, which surfaces as an unhandled rejection on every tick — for
+ * every visitor, signed in or not.
+ *
+ * So this boundary speaks auth-js's vocabulary: a lock we could not take is
+ * reported as the timeout it actually was. Genuine unavailability, such as a
+ * browser with no Web Locks API at all, still propagates unchanged.
+ */
 export function strictWebAuthSdkLock<T>(
   _name: string,
   acquireTimeout: number,
   operation: () => Promise<T>,
 ): Promise<T> {
-  return withNamedWebLock(
-    AUTH_SDK_LOCK,
-    "sdk",
-    operation,
-    acquireTimeout,
+  return withNamedWebLock(AUTH_SDK_LOCK, "sdk", operation, acquireTimeout).catch(
+    (error: unknown) => {
+      if (error instanceof WebAuthLockUnavailableError) {
+        throw new NavigatorLockAcquireTimeoutError(
+          `Acquiring an exclusive Navigator LockManager lock "${AUTH_SDK_LOCK}" timed out.`,
+        );
+      }
+      throw error;
+    },
   );
 }
 
