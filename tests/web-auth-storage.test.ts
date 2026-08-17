@@ -6,7 +6,10 @@ import {
   serialize,
   stringToBase64URL,
 } from "@supabase/ssr";
-import type { Session } from "@supabase/supabase-js";
+import {
+  NavigatorLockAcquireTimeoutError,
+  type Session,
+} from "@supabase/supabase-js";
 
 const mocks = vi.hoisted(() => ({
   commitOwner: vi.fn(),
@@ -25,7 +28,11 @@ const mocks = vi.hoisted(() => ({
   requireAttestation: vi.fn(),
 }));
 
-vi.mock("@supabase/supabase-js", () => ({
+// Only createClient is faked. The real lock error class has to come through,
+// because auth-js identifies an acquire timeout by instanceof — a stand-in
+// would let the code under test pass while production still rethrew.
+vi.mock("@supabase/supabase-js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@supabase/supabase-js")>()),
   createClient: mocks.createSupabaseClient,
 }));
 
@@ -53,7 +60,9 @@ import {
   WEB_AUTH_V2_KEY,
   WEB_AUTH_V2_MIGRATION_KEY,
   WEB_PRIVATE_WRITE_GENERATION_KEY,
+  WebAuthLockUnavailableError,
   WebAuthUnavailableError,
+  strictWebAuthSdkLock,
   adoptCurrentWebPrivateWriteGeneration,
   beginReviewedWebPrivateRemoval,
   beginWebPrivateWrite,
@@ -1102,6 +1111,76 @@ describe("locks and content-free notification", () => {
     );
     expect(callback).not.toHaveBeenCalled();
     expect(localStorage.getItem("guest-fixture")).toBe("kept");
+  });
+
+  /**
+   * auth-js decides what a failed acquire means with `instanceof
+   * LockAcquireTimeoutError` and rethrows anything else. Its auto-refresh tick
+   * acquires with a zero timeout on purpose so it can skip rather than queue,
+   * and swallows only that error. Any other type is rethrown out of an
+   * interval callback nobody awaits, which reached production as an unhandled
+   * WebAuthUnavailableError on every tick, for every visitor.
+   */
+  it("reports a lock it could not take as auth-js's own acquire timeout", async () => {
+    const browserDocument = {};
+    vi.stubGlobal("document", browserDocument);
+    vi.stubGlobal("window", {
+      ...window,
+      document: browserDocument,
+      localStorage,
+    });
+    // A lock already held elsewhere: the request settles without ever
+    // running the callback, exactly as an aborted acquire does.
+    vi.stubGlobal("navigator", {
+      onLine: true,
+      locks: {
+        request: async () => {
+          throw new Error("AbortError");
+        },
+      },
+    });
+    const operation = vi.fn(async () => "never");
+
+    const error = await strictWebAuthSdkLock("lock:test", 0, operation).catch(
+      (thrown: unknown) => thrown,
+    );
+
+    expect(operation).not.toHaveBeenCalled();
+    expect(error).toBeInstanceOf(NavigatorLockAcquireTimeoutError);
+    expect((error as { isAcquireTimeout?: boolean }).isAcquireTimeout).toBe(
+      true,
+    );
+    // The distinction is the whole point: an untaken lock proves nothing
+    // about whether account access works.
+    expect(error).not.toBeInstanceOf(WebAuthUnavailableError);
+  });
+
+  it("still reports an untaken lock as unavailable to internal callers", async () => {
+    const browserDocument = {};
+    vi.stubGlobal("document", browserDocument);
+    vi.stubGlobal("window", {
+      ...window,
+      document: browserDocument,
+      localStorage,
+    });
+    vi.stubGlobal("navigator", {
+      onLine: true,
+      locks: {
+        request: async () => {
+          throw new Error("AbortError");
+        },
+      },
+    });
+    const callback = vi.fn(async () => undefined);
+
+    const error = await withWebAccountOperationLock(callback).catch(
+      (thrown: unknown) => thrown,
+    );
+
+    expect(callback).not.toHaveBeenCalled();
+    expect(error).toBeInstanceOf(WebAuthLockUnavailableError);
+    // Subclassing keeps every existing internal caller behaving as before.
+    expect(error).toBeInstanceOf(WebAuthUnavailableError);
   });
 
   it("orders account-to-storage work and never replays a thrown callback", async () => {
