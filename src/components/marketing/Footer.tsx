@@ -30,7 +30,7 @@ export function Footer() {
             <FooterCol title="Product">
               <FooterLink href="/#how">How it works</FooterLink>
               <FooterLink href="/pricing">Pricing</FooterLink>
-              <FooterLink href="/onboarding">Get BibleQuest</FooterLink>
+              <FooterLink href="/onboarding">Open BibleQuest</FooterLink>
             </FooterCol>
             <FooterCol title="More">
               <FooterLink href="/about">About</FooterLink>

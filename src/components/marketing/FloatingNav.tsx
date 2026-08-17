@@ -106,7 +106,7 @@ export function FloatingNav() {
 
         <div className="hidden md:block">
           <GentleLink variant="primary" size="sm" href="/onboarding">
-            Get BibleQuest
+            Open BibleQuest
           </GentleLink>
         </div>
 
@@ -175,7 +175,7 @@ export function FloatingNav() {
                   fullWidth
                   className="mt-2"
                 >
-                  Get BibleQuest
+                  Open BibleQuest
                 </GentleLink>
               </div>
             </motion.div>
