@@ -357,8 +357,9 @@ function challengeWebAuthClient(client) {
       );
     };
     try {
-      // The HTML bfcache reasons include serviceworker-postmessage. The audit
-      // still fails closed on silence because browser implementations vary.
+      // The HTML bfcache reasons include serviceworker-postmessage, so a page
+      // can accept this message and never get to answer. Silence is recorded
+      // as its own outcome: it neither attests the page nor refuses it.
       client.postMessage(
         {
           type: WEB_AUTH_SW_CLIENT_CHALLENGE,
@@ -374,7 +375,18 @@ function challengeWebAuthClient(client) {
   });
 }
 
-/** Proves every live customer window runs the exact current worker protocol. */
+/**
+ * Proves the requesting window runs the exact current worker protocol and that
+ * no other window contradicts it.
+ *
+ * This does NOT prove every live window is current. The page responder
+ * (src/lib/platform/web-auth-service-worker.ts) returns without replying on a
+ * version mismatch, so genuine version skew arrives here as "silent", not
+ * "refused". A skewed page is denied at the ATTEST boundary below instead,
+ * which requires event.data.version === CACHE_VERSION, so it can never
+ * complete an account operation of its own; cross-tab writes are separately
+ * invalidated by the localStorage private-write generation.
+ */
 async function auditWebAuthClients(requester) {
   if (
     !isWebAuthCustomerClient(requester) ||
@@ -391,18 +403,41 @@ async function auditWebAuthClients(requester) {
   const results = await Promise.all(
     customers.map(async (client) => ({
       client,
-      passed: (await challengeWebAuthClient(client)) === "passed",
+      outcome: await challengeWebAuthClient(client),
     }))
   );
-  const passed = results.every((result) => result.passed);
+  // Keep the distinction challengeWebAuthClient draws, exactly as
+  // handleAuthorizedFetch already does. Collapsing both into "not passed"
+  // meant one backgrounded tab — routine on iOS — failed the audit for every
+  // other window, blocking sign-in with nothing the person could act on.
+  //
+  // A wrong answer is evidence a page disagrees about the running protocol,
+  // so it still fails the audit closed. Silence is evidence of nothing: the
+  // page accepted the challenge and could not reply. It therefore neither
+  // fails the audit nor earns attestation — it is simply not vouched for, and
+  // a controlled client's own credentialed request is challenged again at
+  // fetch time. An uncontrolled client never reaches the fetch handler, and
+  // equally can never attest, so it gains nothing from being skipped either.
+  //
+  // The requester is live by construction, having just sent this message, so
+  // it must still answer for itself before anything is attested.
+  const requesterPassed = results.some(
+    (result) => result.client.id === requester.id && result.outcome === "passed"
+  );
+  const anyRefused = results.some((result) => result.outcome === "refused");
+  const passed = requesterPassed && !anyRefused;
   if (passed) {
     attestedWebAuthClients.clear();
     for (const result of results) {
-      attestedWebAuthClients.add(result.client.id);
+      if (result.outcome === "passed") {
+        attestedWebAuthClients.add(result.client.id);
+      }
     }
   } else {
     for (const result of results) {
-      if (!result.passed) attestedWebAuthClients.delete(result.client.id);
+      if (result.outcome !== "passed") {
+        attestedWebAuthClients.delete(result.client.id);
+      }
     }
   }
   return passed;
