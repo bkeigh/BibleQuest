@@ -732,6 +732,150 @@ describe("service-worker browser-auth attestation", () => {
     });
   });
 
+  it("does not let one silent tab block the audit for a live one", async () => {
+    // The defect: challengeWebAuthClient distinguishes "silent" from
+    // "refused" — its own comment insists they "must not be collapsed" — but
+    // auditWebAuthClients collapsed both into passed:false, and every() then
+    // failed the whole audit. A second BibleQuest tab suspended by iOS is
+    // ordinary, so one frozen tab blocked sign-in for a live one with no
+    // message the person could act on.
+    const harness = loadWorker();
+    const requester = webAuthWindowClient(harness, "requester", "/app");
+    harness.state.windowClients.push(
+      requester,
+      webAuthWindowClient(harness, "backgrounded", "/app/prayer", "silent"),
+    );
+    await dispatchWebAuthMessage(
+      harness,
+      requester,
+      harness.policy.WEB_AUTH_SW_ATTEST_REQUEST,
+    );
+
+    await expect(
+      dispatchWebAuthMessage(
+        harness,
+        requester,
+        harness.policy.WEB_AUTH_SW_AUDIT_REQUEST,
+      ),
+    ).resolves.toEqual({
+      type: harness.policy.WEB_AUTH_SW_RESULT,
+      version: harness.policy.CACHE_VERSION,
+      ok: true,
+    });
+  });
+
+  it("fails the audit closed when a client answers with a version this worker does not run", async () => {
+    // The other half of the asymmetry: a wrong answer is real evidence, so the
+    // audit must still fail closed. Note what this fixture does and does not
+    // stand for — the shipped responder returns without replying on a version
+    // mismatch, so ordinary version skew reaches the worker as SILENT. This
+    // case therefore covers a malformed or hostile same-origin answer, not the
+    // routine skew of an older tab.
+    const harness = loadWorker();
+    const requester = webAuthWindowClient(harness, "requester", "/app");
+    harness.state.windowClients.push(
+      requester,
+      webAuthWindowClient(harness, "backgrounded", "/app/prayer", "silent"),
+      webAuthWindowClient(harness, "stale", "/app/journal", "wrong"),
+    );
+    await dispatchWebAuthMessage(
+      harness,
+      requester,
+      harness.policy.WEB_AUTH_SW_ATTEST_REQUEST,
+    );
+
+    await expect(
+      dispatchWebAuthMessage(
+        harness,
+        requester,
+        harness.policy.WEB_AUTH_SW_AUDIT_REQUEST,
+      ),
+    ).resolves.toEqual({
+      type: harness.policy.WEB_AUTH_SW_RESULT,
+      version: harness.policy.CACHE_VERSION,
+      ok: false,
+    });
+  });
+
+  it("fails the audit when the requesting tab cannot answer for itself", async () => {
+    // The requester just sent this message, so it is live by construction and
+    // must answer its own challenge. Excusing it would attest a page that
+    // proved nothing, which is not what the silence allowance is for.
+    const harness = loadWorker();
+    const requester = webAuthWindowClient(
+      harness,
+      "requester",
+      "/app",
+      "silent",
+    );
+    harness.state.windowClients.push(requester);
+    await dispatchWebAuthMessage(
+      harness,
+      requester,
+      harness.policy.WEB_AUTH_SW_ATTEST_REQUEST,
+    );
+
+    await expect(
+      dispatchWebAuthMessage(
+        harness,
+        requester,
+        harness.policy.WEB_AUTH_SW_AUDIT_REQUEST,
+      ),
+    ).resolves.toEqual({
+      type: harness.policy.WEB_AUTH_SW_RESULT,
+      version: harness.policy.CACHE_VERSION,
+      ok: false,
+    });
+  });
+
+  it("grants a silent tab no attestation, so its own traffic is challenged", async () => {
+    // Passing the audit must not vouch for a tab that never answered. The
+    // silent tab stays unattested and is challenged when it actually makes a
+    // credentialed request, which is exactly what handleAuthorizedFetch does.
+    const network = vi.fn(async () => makeResponse("protected response"));
+    const harness = loadWorker(network);
+    const requester = webAuthWindowClient(harness, "requester", "/app");
+    const backgrounded = webAuthWindowClient(
+      harness,
+      "backgrounded",
+      "/app/prayer",
+      "silent",
+    );
+    let challenges = 0;
+    const silentPostMessage = backgrounded.postMessage!.bind(backgrounded);
+    backgrounded.postMessage = (message, transfer) => {
+      challenges += 1;
+      return silentPostMessage(message, transfer);
+    };
+    harness.state.windowClients.push(requester, backgrounded);
+    await dispatchWebAuthMessage(
+      harness,
+      requester,
+      harness.policy.WEB_AUTH_SW_ATTEST_REQUEST,
+    );
+    await dispatchWebAuthMessage(
+      harness,
+      requester,
+      harness.policy.WEB_AUTH_SW_AUDIT_REQUEST,
+    );
+    const afterAudit = challenges;
+
+    await dispatchFetch(
+      harness,
+      makeRequest("https://provider.example.test/rest/v1/profile", {
+        headers: { Authorization: "Bearer header.payload.signature" },
+        mode: "cors",
+      }),
+      backgrounded.id,
+    );
+
+    expect(afterAudit).toBeGreaterThan(0);
+    expect(
+      challenges,
+      "an unattested silent tab must be challenged again on its own request",
+    ).toBeGreaterThan(afterAudit);
+  });
+
   it("re-attests a v28 customer after restart before forwarding bearer traffic", async () => {
     const network = vi.fn(async () => makeResponse("protected response"));
     const harness = loadWorker(network);
