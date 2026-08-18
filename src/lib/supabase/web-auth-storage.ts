@@ -805,6 +805,32 @@ async function verifyParsedSession(
   if (!origin || !publishableKey) return "unavailable";
   isolatedVerifierSequence += 1;
   try {
+    const verificationHeaders = {
+      [EXPECTED_ACCOUNT_USER_HEADER]: candidate.credential.userId,
+      [WEB_AUTH_PROTOCOL_HEADER]: WEB_AUTH_PROTOCOL_VERSION,
+    };
+    // Two clients, not one. supabase-js replaces `client.auth` with a Proxy
+    // whose get trap THROWS whenever the `accessToken` option is set, so a
+    // single client cannot both answer auth.getUser and carry the person's
+    // bearer onto PostgREST. One client shipped here anyway: reading
+    // `.getUser` threw before any request was built, the catch below reported
+    // "unavailable", and every web sign-in was silently discarded while the
+    // server said 200 (2026-08-18). The identity client holds no session —
+    // getUser is handed the token explicitly — and the rpc client keeps the
+    // accessToken option because that is the only thing putting the person's
+    // bearer on own_account_deletion_status; without it the RPC would run as
+    // anon and RLS would answer for the wrong principal.
+    const identityVerifier = constructWithoutAuthBroadcast(() =>
+      createSupabaseClient(origin, publishableKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+          storageKey: `biblequest-web-verify-identity-${isolatedVerifierSequence}`,
+        },
+        global: { headers: verificationHeaders },
+      }),
+    );
     const verifier = constructWithoutAuthBroadcast(() =>
       createSupabaseClient(origin, publishableKey, {
         auth: {
@@ -814,16 +840,11 @@ async function verifyParsedSession(
           storageKey: `biblequest-web-verify-${isolatedVerifierSequence}`,
         },
         accessToken: async () => candidate.credential.accessToken,
-        global: {
-          headers: {
-            [EXPECTED_ACCOUNT_USER_HEADER]: candidate.credential.userId,
-            [WEB_AUTH_PROTOCOL_HEADER]: WEB_AUTH_PROTOCOL_VERSION,
-          },
-        },
+        global: { headers: verificationHeaders },
       }),
     );
     const verified = await withDeadline(
-      verifier.auth.getUser(candidate.credential.accessToken),
+      identityVerifier.auth.getUser(candidate.credential.accessToken),
       AUTH_VERIFICATION_DEADLINE_MS,
       "Browser identity verification",
     );
