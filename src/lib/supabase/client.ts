@@ -22,7 +22,7 @@ import { NATIVE_ACCOUNT_BETA_ENABLED } from "@/lib/sync/containment";
 import {
   constructWithoutAuthBroadcast,
   createStrictWebAuthStorage,
-  readActiveWebAuthSession,
+  readActiveWebAuthCredential,
   strictWebAuthSdkLock,
   WEB_AUTH_V2_KEY,
 } from "./web-auth-storage";
@@ -180,7 +180,10 @@ export async function resumeExistingNativeAuthClient(): Promise<void> {
 /** Read a token only while it still belongs to the captured sync identity. */
 async function accountAccessToken(expectedUserId: string): Promise<string> {
   if (!isNativeTarget()) {
-    const session = await readActiveWebAuthSession();
+    // The bearer must be readable before the private journey is adopted:
+    // account RPCs (deletion status) run during first-sign-in bootstrap,
+    // when webPrivateReadAllowed() is still legitimately false.
+    const session = await readActiveWebAuthCredential();
     if (!session || session.userId !== expectedUserId) {
       throw new Error("The account sync session changed.");
     }

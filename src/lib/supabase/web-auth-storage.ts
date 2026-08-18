@@ -1136,13 +1136,24 @@ export function createStrictWebAuthStorage(): StrictStorage {
         }
         const candidate = parsedSession(candidateValue);
         const current = readEnvelope(storage);
-        let sessionChanged = false;
-        try {
-          sessionChanged =
-            current.status === "stored" &&
-            JSON.stringify(current.session) !== JSON.stringify(candidate?.session);
-        } catch {
-          throw new WebAuthUnavailableError();
+        // Re-persisting the credential already stored is a no-op, not news.
+        // auth-js recomputes `expires_in` from the wall clock on every
+        // setSession, so a whole-session JSON comparison reported an identical
+        // credential as "changed" — the bootstrap heard its own persist as a
+        // change, re-ran, persisted again, and looped at 2Hz (2026-08-18).
+        // Equality is the credential essence: the tokens and the identity. A
+        // genuine refresh rotates the tokens and still lands in the write
+        // path below.
+        if (
+          candidate &&
+          current.status === "stored" &&
+          current.mode === "active" &&
+          current.credential.userId === candidate.credential.userId &&
+          current.sessionId === candidate.sessionId &&
+          current.credential.accessToken === candidate.credential.accessToken &&
+          current.credential.refreshToken === candidate.credential.refreshToken
+        ) {
+          return;
         }
         if (
           !candidate ||
@@ -1155,7 +1166,7 @@ export function createStrictWebAuthStorage(): StrictStorage {
         ) {
           throw new WebAuthUnavailableError();
         }
-        changed = sessionChanged;
+        changed = true;
       });
       if (changed) publishAuthStorageChange();
     },
@@ -2403,6 +2414,30 @@ export async function readActiveWebAuthSession(
   if (!webAccountRealmAttested || !webPrivateReadAllowed()) {
     throw new WebAuthUnavailableError();
   }
+  return state.credential;
+}
+
+/**
+ * Reads the active bearer credential behind attestation alone — deliberately
+ * WITHOUT the private-journey read gate.
+ *
+ * The credential is auth-plane state: it exists precisely so account RPCs can
+ * run before the private journey is adopted. Gating it on
+ * webPrivateReadAllowed() made every first web sign-in deadlock (2026-08-18):
+ * the deletion-status RPC needed the gate, the gate needed an adopted
+ * generation and a synced owner marker, sync needed a verified session, and
+ * verification needed the RPC. Journey data readers keep using
+ * readActiveWebAuthSession.
+ */
+export async function readActiveWebAuthCredential(
+  handle?: WebAccountOperationHandle,
+): Promise<ExactNativeAuthSession | null> {
+  const state = await readWebAuthState(handle);
+  if (state.status === "missing") return null;
+  if (state.status !== "stored" || state.mode !== "active") {
+    throw new WebAuthUnavailableError();
+  }
+  if (!webAccountRealmAttested) throw new WebAuthUnavailableError();
   return state.credential;
 }
 
