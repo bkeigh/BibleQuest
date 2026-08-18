@@ -126,6 +126,12 @@ const POSTURE_CONTRACTS = [
     label: "private profile avatar posture",
   },
   {
+    rpc: "account_deletion_storage_contract",
+    contract: "biblequest_account_deletion_storage_v1",
+    migration: "0038",
+    label: "Storage-safe account deletion posture",
+  },
+  {
     rpc: "push_reminder_contract",
     contract: "biblequest_private_push_v1",
     migration: "0024",
@@ -161,12 +167,17 @@ const POSTURE_CONTRACTS = [
     migration: "0035",
     label: "distributed provider rate-limit posture",
   },
+  {
+    rpc: "arcade_store_contract",
+    contract: "biblequest_arcade_store_v1",
+    migration: "0036",
+    label: "Arcade purchase and redemption posture",
+  },
 ];
 
 const supabaseUrlValue = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
 const publishableKey =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
 const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY?.trim();
 const rateLimitSecret = process.env.BIBLEQUEST_RATE_LIMIT_SECRET?.trim();
 const appUrlValue =
@@ -201,11 +212,13 @@ const supabaseUrl = configuredUrl(
 );
 const appUrl = configuredUrl(appUrlValue, "BIBLEQUEST_READINESS_APP_URL");
 
-if (!publishableKey) {
-  failures.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not configured");
+if (!publishableKey?.startsWith("sb_publishable_")) {
+  failures.push(
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not a modern publishable key",
+  );
 }
-if (!supabaseSecretKey || supabaseSecretKey.length < 32) {
-  failures.push("SUPABASE_SECRET_KEY is not configured");
+if (!supabaseSecretKey?.startsWith("sb_secret_") || supabaseSecretKey.length < 32) {
+  failures.push("SUPABASE_SECRET_KEY is not a modern secret key");
 }
 if (!rateLimitSecret || rateLimitSecret.length < 32) {
   failures.push("BIBLEQUEST_RATE_LIMIT_SECRET is not configured");
@@ -269,7 +282,7 @@ function safeHealthBody(value) {
     typeof candidate.canonical_origin_matches !== "boolean" ||
     !["configured", "guest-only", "invalid"].includes(candidate.auth_posture) ||
     !["configured", "disabled", "invalid"].includes(candidate.analytics_posture) ||
-    candidate.schema_contract !== "0035" ||
+    candidate.schema_contract !== "0038" ||
     candidate.content_contract !== "seed-manifest-v1" ||
     !/^biblequest-v\d{1,4}$/.test(candidate.service_worker_version) ||
     !["coming-soon", "test", "live", "invalid"].includes(
@@ -311,7 +324,6 @@ async function supabaseFetch(path, init = {}) {
     ...init,
     headers: {
       apikey: publishableKey,
-      Authorization: `Bearer ${publishableKey}`,
       ...init.headers,
     },
     signal: AbortSignal.timeout(10_000),

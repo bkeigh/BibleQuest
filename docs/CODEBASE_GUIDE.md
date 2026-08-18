@@ -3,7 +3,10 @@
 This guide is the quickest way to understand where behavior lives and which
 files should change together. It complements the product specification in
 [`BIBLEQUEST_CODEX.md`](BIBLEQUEST_CODEX.md); that document defines the product,
-while this one explains the implementation.
+while this one explains the implementation. The structural map — layers, the
+private-storage ownership model, and the authority concepts — lives in
+[`ARCHITECTURE.md`](ARCHITECTURE.md); read that first for auth, storage, or
+sync work.
 
 ## Mental model
 
@@ -182,7 +185,9 @@ free-form search terms, record IDs, or arbitrary URLs to analytics.
 `public/sw.js` precaches a small public shell and uses network-first navigation
 for an explicit allowlist of safe app routes. Immutable build assets use
 stale-while-revalidate. Auth, account, billing, API, cookie-bearing, private, and
-query-bearing responses are excluded from caching.
+query-bearing responses are excluded from caching. A self-contained, script-free
+document handles last-resort offline navigation so it cannot depend on missing
+Next.js chunks during an interrupted worker update.
 
 When the worker policy changes, increment `CACHE_VERSION` and update
 `tests/service-worker.test.ts` in the same change.

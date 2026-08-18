@@ -12,6 +12,7 @@
  * Output: `out-native/`, which capacitor.config.ts names as its webDir.
  */
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   cpSync,
   existsSync,
@@ -29,7 +30,39 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const stage = path.join(repo, ".native");
 const output = path.join(repo, "out-native");
 const RELEASE_ORIGIN = "https://www.biblequest.co";
-const releaseBuild = process.argv.slice(2).includes("--release");
+const ACCOUNT_BETA_ORIGIN = "https://native-staging.biblequest.co";
+const ACCOUNT_BETA_CONFIG_PATH = path.join(
+  repo,
+  "config/ios-account-beta.json",
+);
+const ACCOUNT_RELEASE_CONFIG_PATH = path.join(
+  repo,
+  "config/ios-account-release.json",
+);
+const ACCOUNT_BETA_ENV_PATH = path.join(repo, ".env.account-beta.local");
+const ACCOUNT_RELEASE_ENV_PATH = path.join(
+  repo,
+  ".env.account-release.local",
+);
+const buildArguments = process.argv.slice(2);
+const releaseBuild = buildArguments[0] === "--release";
+const accountBetaBuild = buildArguments[0] === "--account-beta";
+const accountReleaseBuild = buildArguments[0] === "--account-release";
+let accountBetaSupabaseOrigin = "";
+let accountReleaseSupabaseOrigin = "";
+let accountReleasePublishableKeySha256 = "";
+
+if (
+  buildArguments.length > 1 ||
+  (buildArguments.length === 1 &&
+    !releaseBuild &&
+    !accountBetaBuild &&
+    !accountReleaseBuild)
+) {
+  fail(
+    "use no build mode, --release, --account-beta, or --account-release exactly once.",
+  );
+}
 
 /**
  * Pins every privacy- or identity-sensitive public value for the App Store
@@ -48,9 +81,284 @@ function pinReleaseEnvironment() {
     NEXT_PUBLIC_SUPABASE_ANON_KEY: "",
     NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED: "false",
     NEXT_PUBLIC_ACCOUNT_GATE_ENABLED: "false",
+    NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED: "false",
+    NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED: "false",
     NEXT_PUBLIC_ANALYTICS_ENABLED: "false",
     NEXT_PUBLIC_PLAUSIBLE_DOMAIN: "",
     NEXT_PUBLIC_PLAUSIBLE_HOST: "",
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "",
+    NEXT_PUBLIC_GREEN_FEATURES_ENABLED: "true",
+    NEXT_PUBLIC_GUIDED_SCRIPTURE_ENABLED: "true",
+    NEXT_PUBLIC_PILGRIMAGES_ENABLED: "true",
+    NEXT_PUBLIC_SCRIPTURE_GAMES_ENABLED: "true",
+    NEXT_PUBLIC_SCRIPTURE_CONNECTIONS_ENABLED: "true",
+    NEXT_PUBLIC_BIBLE_TIMELINE_ENABLED: "true",
+    NEXT_PUBLIC_SEVEN_DAYS_MATCH_ENABLED: "true",
+    NEXT_PUBLIC_RHYTHM_BUILDER_ENABLED: "true",
+  };
+  for (const [key, value] of Object.entries(values)) {
+    process.env[key] = value;
+  }
+}
+
+/** Reads only the exact reviewed Production account target. */
+function accountReleaseConfiguration() {
+  let value;
+  try {
+    value = JSON.parse(readFileSync(ACCOUNT_RELEASE_CONFIG_PATH, "utf8"));
+  } catch {
+    fail("the checked-in iOS account-release target manifest is invalid.");
+  }
+  const keys = Object.keys(value ?? {}).sort().join(",");
+  if (
+    keys !==
+      "contract,hostedOrigin,reviewed,supabaseOrigin,supabasePublishableKeySha256" ||
+    value.contract !== "biblequest_ios_account_release_target_v1" ||
+    value.reviewed !== true ||
+    value.hostedOrigin !== RELEASE_ORIGIN ||
+    value.supabaseOrigin !==
+      "https://iacnjqnssovaaojswjoh.supabase.co" ||
+    typeof value.supabasePublishableKeySha256 !== "string" ||
+    !/^[a-f0-9]{64}$/.test(value.supabasePublishableKeySha256)
+  ) {
+    fail("the reviewed iOS account-release Production target is incomplete.");
+  }
+  try {
+    const url = new URL(value.supabaseOrigin);
+    if (
+      url.protocol !== "https:" ||
+      url.origin !== value.supabaseOrigin ||
+      url.username ||
+      url.password ||
+      url.pathname !== "/" ||
+      url.search ||
+      url.hash
+    ) {
+      throw new Error("unsafe target");
+    }
+  } catch {
+    fail("the reviewed iOS account-release Supabase origin is invalid.");
+  }
+  return value;
+}
+
+/** Accepts only one modern public key matching the reviewed fingerprint. */
+function accountReleasePublishableKey(expectedSha256) {
+  const key =
+    process.env.BIBLEQUEST_IOS_ACCOUNT_RELEASE_PUBLISHABLE_KEY?.trim();
+  if (
+    !key ||
+    key.length > 2_048 ||
+    /\s/.test(key) ||
+    !key.startsWith("sb_publishable_")
+  ) {
+    fail(
+      "BIBLEQUEST_IOS_ACCOUNT_RELEASE_PUBLISHABLE_KEY must be one modern " +
+        "Supabase publishable key in .env.account-release.local.",
+    );
+  }
+  const actualSha256 = createHash("sha256").update(key).digest("hex");
+  if (actualSha256 !== expectedSha256) {
+    fail("the account-release public key does not match the reviewed target.");
+  }
+  return key;
+}
+
+/** Rejects every release env assignment except its one public key. */
+function validateAccountReleaseEnvironmentFile() {
+  let contents;
+  try {
+    contents = readFileSync(ACCOUNT_RELEASE_ENV_PATH, "utf8");
+  } catch {
+    fail(".env.account-release.local must contain only the public release key.");
+  }
+  const assignments = contents
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"));
+  if (
+    assignments.length !== 1 ||
+    !/^BIBLEQUEST_IOS_ACCOUNT_RELEASE_PUBLISHABLE_KEY=[^\s"']+$/.test(
+      assignments[0],
+    )
+  ) {
+    fail(".env.account-release.local must contain only the public release key.");
+  }
+}
+
+/** Pins account sync to Production while leaving acquisition and telemetry off. */
+function pinAccountReleaseEnvironment() {
+  if (!accountReleaseBuild) return;
+  const configuration = accountReleaseConfiguration();
+  validateAccountReleaseEnvironmentFile();
+  accountReleaseSupabaseOrigin = configuration.supabaseOrigin;
+  accountReleasePublishableKeySha256 =
+    configuration.supabasePublishableKeySha256;
+  for (const key of Object.keys(process.env)) {
+    if (key.startsWith("NEXT_PUBLIC_")) delete process.env[key];
+  }
+  const values = {
+    NEXT_PUBLIC_APP_PLATFORM: "native",
+    NEXT_PUBLIC_APP_URL: RELEASE_ORIGIN,
+    NEXT_PUBLIC_NATIVE_HOSTED_ORIGIN: RELEASE_ORIGIN,
+    NEXT_PUBLIC_NATIVE_AUTH_CALLBACK_URL: "",
+    NEXT_PUBLIC_SUPABASE_URL: accountReleaseSupabaseOrigin,
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: accountReleasePublishableKey(
+      accountReleasePublishableKeySha256,
+    ),
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: "",
+    NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED: "true",
+    NEXT_PUBLIC_ACCOUNT_GATE_ENABLED: "false",
+    NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED: "true",
+    NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED: "false",
+    NEXT_PUBLIC_ANALYTICS_ENABLED: "false",
+    NEXT_PUBLIC_PLAUSIBLE_DOMAIN: "",
+    NEXT_PUBLIC_PLAUSIBLE_HOST: "",
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "",
+    NEXT_PUBLIC_GREEN_FEATURES_ENABLED: "true",
+    NEXT_PUBLIC_GUIDED_SCRIPTURE_ENABLED: "true",
+    NEXT_PUBLIC_PILGRIMAGES_ENABLED: "true",
+    NEXT_PUBLIC_SCRIPTURE_GAMES_ENABLED: "true",
+    NEXT_PUBLIC_SCRIPTURE_CONNECTIONS_ENABLED: "true",
+    NEXT_PUBLIC_BIBLE_TIMELINE_ENABLED: "true",
+    NEXT_PUBLIC_SEVEN_DAYS_MATCH_ENABLED: "true",
+    NEXT_PUBLIC_RHYTHM_BUILDER_ENABLED: "true",
+  };
+  for (const [key, value] of Object.entries(values)) {
+    process.env[key] = value;
+  }
+}
+
+/** Reads only a complete, explicitly reviewed staging-target manifest. */
+function accountBetaConfiguration() {
+  let value;
+  try {
+    value = JSON.parse(readFileSync(ACCOUNT_BETA_CONFIG_PATH, "utf8"));
+  } catch {
+    fail("the checked-in iOS account-beta target manifest is invalid.");
+  }
+  const keys = Object.keys(value ?? {}).sort().join(",");
+  if (
+    keys !==
+      "contract,hostedOrigin,reviewed,supabaseOrigin,supabasePublishableKeySha256" ||
+    value.contract !== "biblequest_ios_account_beta_target_v1" ||
+    value.reviewed !== true ||
+    value.hostedOrigin !== ACCOUNT_BETA_ORIGIN ||
+    typeof value.supabaseOrigin !== "string" ||
+    typeof value.supabasePublishableKeySha256 !== "string" ||
+    !/^[a-f0-9]{64}$/.test(value.supabasePublishableKeySha256)
+  ) {
+    fail(
+      "no reviewed iOS account-beta backend is pinned; complete " +
+        "config/ios-account-beta.json after the staging review.",
+    );
+  }
+  try {
+    const url = new URL(value.supabaseOrigin);
+    if (
+      url.protocol !== "https:" ||
+      !/^[a-z]{20}\.supabase\.co$/.test(url.hostname) ||
+      url.origin !== value.supabaseOrigin ||
+      [
+        "iacnjqnssovaaojswjoh.supabase.co",
+        "yjwlunqssyztxkedstjb.supabase.co",
+        "lorqiyzrfmpvvcvsvghc.supabase.co",
+      ].includes(url.hostname)
+    ) {
+      throw new Error("unsafe target");
+    }
+  } catch {
+    fail("the reviewed iOS account-beta Supabase origin is invalid.");
+  }
+  return value;
+}
+
+/** Accepts only the fingerprinted public key from the dedicated beta file. */
+function accountBetaPublishableKey(expectedSha256) {
+  const key = process.env.BIBLEQUEST_IOS_ACCOUNT_BETA_PUBLISHABLE_KEY?.trim();
+  if (!key || key.length > 2_048 || /\s/.test(key)) {
+    fail(
+      "BIBLEQUEST_IOS_ACCOUNT_BETA_PUBLISHABLE_KEY is required in " +
+        ".env.account-beta.local.",
+    );
+  }
+  if (key.startsWith("sb_secret_")) {
+    fail("the account-beta build accepts only a Supabase publishable key.");
+  }
+  let publishable = key.startsWith("sb_publishable_");
+  if (!publishable) {
+    // Legacy anon JWTs remain supported, but every other JWT role is rejected.
+    try {
+      const parts = key.split(".");
+      if (parts.length !== 3) throw new Error("not a JWT");
+      const payload = JSON.parse(
+        Buffer.from(parts[1], "base64url").toString("utf8"),
+      );
+      publishable = payload?.role === "anon";
+    } catch {
+      publishable = false;
+    }
+  }
+  if (!publishable) {
+    fail("the account-beta Supabase key is not a publishable or anon key.");
+  }
+  const actualSha256 = createHash("sha256").update(key).digest("hex");
+  if (actualSha256 !== expectedSha256) {
+    fail("the account-beta Supabase key does not match the reviewed target.");
+  }
+  return key;
+}
+
+/** Reject every beta env-file assignment except the fingerprinted public key. */
+function validateAccountBetaEnvironmentFile() {
+  let contents;
+  try {
+    contents = readFileSync(ACCOUNT_BETA_ENV_PATH, "utf8");
+  } catch {
+    fail(".env.account-beta.local must contain only the public beta key.");
+  }
+  const assignments = contents
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"));
+  if (
+    assignments.length !== 1 ||
+    !/^BIBLEQUEST_IOS_ACCOUNT_BETA_PUBLISHABLE_KEY=[^\s"']+$/.test(
+      assignments[0],
+    )
+  ) {
+    fail(".env.account-beta.local must contain only the public beta key.");
+  }
+}
+
+/** Pins the one reviewed non-production account target and minimum flags. */
+function pinAccountBetaEnvironment() {
+  if (!accountBetaBuild) return;
+  const configuration = accountBetaConfiguration();
+  validateAccountBetaEnvironmentFile();
+  accountBetaSupabaseOrigin = configuration.supabaseOrigin;
+  // Remove arbitrary inherited public values before adding the reviewed set.
+  for (const key of Object.keys(process.env)) {
+    if (key.startsWith("NEXT_PUBLIC_")) delete process.env[key];
+  }
+  const values = {
+    NEXT_PUBLIC_APP_PLATFORM: "native",
+    NEXT_PUBLIC_APP_URL: ACCOUNT_BETA_ORIGIN,
+    NEXT_PUBLIC_NATIVE_HOSTED_ORIGIN: ACCOUNT_BETA_ORIGIN,
+    NEXT_PUBLIC_NATIVE_AUTH_CALLBACK_URL: "",
+    NEXT_PUBLIC_SUPABASE_URL: accountBetaSupabaseOrigin,
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: accountBetaPublishableKey(
+      configuration.supabasePublishableKeySha256,
+    ),
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: "",
+    NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED: "true",
+    NEXT_PUBLIC_ACCOUNT_GATE_ENABLED: "false",
+    NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED: "true",
+    NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED: "false",
+    NEXT_PUBLIC_ANALYTICS_ENABLED: "false",
+    NEXT_PUBLIC_PLAUSIBLE_DOMAIN: "",
+    NEXT_PUBLIC_PLAUSIBLE_HOST: "",
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "",
     NEXT_PUBLIC_GREEN_FEATURES_ENABLED: "true",
     NEXT_PUBLIC_GUIDED_SCRIPTURE_ENABLED: "true",
     NEXT_PUBLIC_PILGRIMAGES_ENABLED: "true",
@@ -129,9 +437,51 @@ function requiredEnvironment() {
     releaseBuild &&
     (process.env.NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED !== "false" ||
       process.env.NEXT_PUBLIC_ACCOUNT_GATE_ENABLED !== "false" ||
+      process.env.NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED !== "false" ||
       process.env.NEXT_PUBLIC_ANALYTICS_ENABLED !== "false")
   ) {
-    fail("release builds must keep account sync, account gates, and analytics off.");
+    fail(
+      "release builds must keep account sync, account gates, native commerce, and analytics off.",
+    );
+  }
+  if (
+    accountBetaBuild &&
+    (origin !== ACCOUNT_BETA_ORIGIN ||
+      process.env.NEXT_PUBLIC_APP_URL !== ACCOUNT_BETA_ORIGIN ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL !== accountBetaSupabaseOrigin ||
+      process.env.NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED !== "true" ||
+      process.env.NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED !== "true" ||
+      process.env.NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED !== "false" ||
+      process.env.NEXT_PUBLIC_ACCOUNT_GATE_ENABLED !== "false" ||
+      process.env.NEXT_PUBLIC_ANALYTICS_ENABLED !== "false" ||
+      process.env.NEXT_PUBLIC_NATIVE_AUTH_CALLBACK_URL !== "" ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== "" ||
+      process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY !== "")
+  ) {
+    fail("account-beta builds must use the pinned staging-only posture.");
+  }
+  if (
+    accountReleaseBuild &&
+    (origin !== RELEASE_ORIGIN ||
+      process.env.NEXT_PUBLIC_APP_URL !== RELEASE_ORIGIN ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL !== accountReleaseSupabaseOrigin ||
+      process.env.NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED !== "true" ||
+      process.env.NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED !== "true" ||
+      process.env.NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED !== "false" ||
+      process.env.NEXT_PUBLIC_ACCOUNT_GATE_ENABLED !== "false" ||
+      process.env.NEXT_PUBLIC_ANALYTICS_ENABLED !== "false" ||
+      process.env.NEXT_PUBLIC_NATIVE_AUTH_CALLBACK_URL !== "" ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== "" ||
+      process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY !== "")
+  ) {
+    fail("account-release builds must use the pinned Production-only posture.");
+  }
+  if (
+    !accountReleaseBuild &&
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ===
+      "https://iacnjqnssovaaojswjoh.supabase.co"
+  ) {
+    fail("only --account-release may target the Production Supabase project.");
   }
   return { target, origin };
 }
@@ -247,7 +597,8 @@ export default function OnboardingPage() {
 }
 `;
 
-const NATIVE_NEXT_CONFIG = `import type { NextConfig } from "next";
+const NATIVE_NEXT_CONFIG = `import path from "node:path";
+import type { NextConfig } from "next";
 
 /**
  * GENERATED by scripts/build-native.mjs — not part of the web app.
@@ -271,6 +622,8 @@ const nextConfig: NextConfig = {
   output: "export",
   images: { unoptimized: true },
   poweredByHeader: false,
+  // Keep Turbopack inside the repository while allowing the staged dependency symlink.
+  turbopack: { root: path.resolve(process.cwd(), "..") },
 };
 
 export default nextConfig;
@@ -384,9 +737,51 @@ function generatedFiles(directory) {
   return files;
 }
 
+/** Rejects server credentials from every generated native artifact. */
+function verifyNoPrivilegedSupabaseCredentials() {
+  const jwtPattern =
+    /[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}/g;
+  for (const file of generatedFiles(path.join(stage, "out"))) {
+    const contents = readFileSync(file, "utf8");
+    if (/sb_secret_[A-Za-z0-9._-]{20,}/.test(contents)) {
+      fail("native output contains a Supabase secret key.");
+    }
+    for (const candidate of contents.match(jwtPattern) ?? []) {
+      try {
+        const payload = JSON.parse(
+          Buffer.from(candidate.split(".")[1], "base64url").toString("utf8"),
+        );
+        if (payload?.role === "service_role") {
+          fail("native output contains a service-role credential.");
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message.includes("service-role")) {
+          throw error;
+        }
+      }
+    }
+  }
+  log("verified native output contains no privileged Supabase credential");
+}
+
+/** Keeps the deterministic guest artifact completely account-free. */
+function verifyGuestSupabaseAbsence() {
+  if (!releaseBuild) return;
+  for (const file of generatedFiles(path.join(stage, "out"))) {
+    const contents = readFileSync(file, "utf8");
+    if (
+      /https:\/\/[a-z]{20}\.supabase\.co/.test(contents) ||
+      /sb_publishable_[A-Za-z0-9._-]{20,}/.test(contents)
+    ) {
+      fail("guest release output contains Supabase client configuration.");
+    }
+  }
+  log("verified guest release output remains account-free");
+}
+
 /** Fails if a release artifact retains a disposable or protected host. */
 function verifyReleaseOrigin() {
-  if (!releaseBuild) return;
+  if (!releaseBuild && !accountReleaseBuild) return;
   const releaseMarker = Buffer.from(RELEASE_ORIGIN);
   const forbiddenMarkers = [
     "native-staging.biblequest.co",
@@ -413,6 +808,88 @@ function verifyReleaseOrigin() {
     fail(`release output does not contain the required origin ${RELEASE_ORIGIN}.`);
   }
   log(`verified production origin in ${releaseReferences} generated files`);
+}
+
+/** Requires one reviewed Production project and one reviewed public key. */
+function verifyAccountReleaseTarget() {
+  if (!accountReleaseBuild) return;
+  const publicKeyDigests = new Set();
+  let originReferences = 0;
+  for (const file of generatedFiles(path.join(stage, "out"))) {
+    const contents = readFileSync(file, "utf8");
+    const origins =
+      contents.match(/https:\/\/[a-z]{20}\.supabase\.co/g) ?? [];
+    if (origins.some((origin) => origin !== accountReleaseSupabaseOrigin)) {
+      fail("account-release output contains a non-Production Supabase origin.");
+    }
+    if (contents.includes(accountReleaseSupabaseOrigin)) {
+      originReferences += 1;
+    }
+    for (const key of contents.match(/sb_publishable_[A-Za-z0-9._-]+/g) ?? []) {
+      publicKeyDigests.add(createHash("sha256").update(key).digest("hex"));
+    }
+  }
+  if (
+    originReferences === 0 ||
+    publicKeyDigests.size !== 1 ||
+    !publicKeyDigests.has(accountReleasePublishableKeySha256)
+  ) {
+    fail("account-release output does not contain exactly its reviewed public target.");
+  }
+  log("verified the one reviewed Production Supabase client target");
+}
+
+/** Fails if the beta artifact drifts to production or a disposable preview. */
+function verifyAccountBetaOrigin() {
+  if (!accountBetaBuild) return;
+  const requiredMarkers = [
+    ACCOUNT_BETA_ORIGIN,
+    accountBetaSupabaseOrigin,
+  ].map((value) => Buffer.from(value));
+  const forbiddenMarkers = [
+    "iacnjqnssovaaojswjoh.supabase.co",
+    "yjwlunqssyztxkedstjb.supabase.co",
+    "lorqiyzrfmpvvcvsvghc.supabase.co",
+    ".vercel.app",
+  ].map((value) => Buffer.from(value));
+  const references = new Array(requiredMarkers.length).fill(0);
+
+  for (const file of generatedFiles(path.join(stage, "out"))) {
+    const contents = readFileSync(file);
+    const discoveredSupabaseOrigins = contents
+      .toString("utf8")
+      .match(/https:\/\/[a-z]{20}\.supabase\.co/g) ?? [];
+    if (
+      discoveredSupabaseOrigins.some(
+        (origin) => origin !== accountBetaSupabaseOrigin,
+      )
+    ) {
+      fail(
+        `account-beta output contains a non-allowlisted Supabase origin in ${path.relative(
+          path.join(stage, "out"),
+          file,
+        )}`,
+      );
+    }
+    requiredMarkers.forEach((marker, index) => {
+      if (contents.includes(marker)) references[index] += 1;
+    });
+    for (const marker of forbiddenMarkers) {
+      if (contents.includes(marker)) {
+        fail(
+          `account-beta output contains a forbidden host marker in ${path.relative(
+            path.join(stage, "out"),
+            file,
+          )}`,
+        );
+      }
+    }
+  }
+
+  if (references.some((count) => count === 0)) {
+    fail("account-beta output is missing its pinned staging origins.");
+  }
+  log("verified the pinned non-production account-beta origins");
 }
 
 /**
@@ -475,12 +952,25 @@ function publish() {
 }
 
 pinReleaseEnvironment();
+pinAccountBetaEnvironment();
+pinAccountReleaseEnvironment();
 const { origin } = requiredEnvironment();
-log(`mode=${releaseBuild ? "release" : "custom"} target=native hostedOrigin=${origin}`);
+const mode = releaseBuild
+  ? "release"
+  : accountBetaBuild
+    ? "account-beta"
+    : accountReleaseBuild
+      ? "account-release"
+      : "custom";
+log(`mode=${mode} target=native hostedOrigin=${origin}`);
 stageTree();
 pruneServerSurfaces();
 build();
 verifyCommerceRoutesPruned();
+verifyNoPrivilegedSupabaseCredentials();
+verifyGuestSupabaseAbsence();
 verifyReleaseOrigin();
+verifyAccountReleaseTarget();
+verifyAccountBetaOrigin();
 publish();
 log("done — run `pnpm exec cap sync ios` to copy it into the app");

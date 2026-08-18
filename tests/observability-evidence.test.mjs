@@ -544,7 +544,7 @@ describe("sanitized launch evidence", () => {
 
   it("builds complete fixture evidence with every required posture", () => {
     expect(fixtureReadiness()).toMatchObject({
-      check_count: 26,
+      check_count: 27,
       failed_check_count: 0,
       schema_parity: {
         ok: true,
@@ -552,6 +552,11 @@ describe("sanitized launch evidence", () => {
           expect.objectContaining({
             contract: "generation_bound_account_deletion_v2",
             migration: "0022",
+            ok: true,
+          }),
+          expect.objectContaining({
+            contract: "biblequest_account_deletion_storage_v1",
+            migration: "0038",
             ok: true,
           }),
         ]),
@@ -581,7 +586,7 @@ describe("sanitized launch evidence", () => {
       rollback_target_sha: "b".repeat(40),
     });
     expect(evidence.service_worker_version.observed).toEqual([
-      "biblequest-v25",
+      "biblequest-v28",
     ]);
     expect(evidence.alerts).toEqual([
       expect.objectContaining({

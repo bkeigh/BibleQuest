@@ -32,6 +32,10 @@ const MANIFEST = readFileSync(
 const MIGRATION = readFileSync(
   join(ROOT, "supabase", "migrations", "0036_arcade_store_purchases.sql"),
 );
+const PRODUCTION_READINESS = readFileSync(
+  join(ROOT, "scripts", "check-production-readiness.mjs"),
+  "utf8",
+);
 const PACKAGE = JSON.parse(
   readFileSync(join(ROOT, "package.json"), "utf8"),
 ) as { scripts: Record<string, string> };
@@ -41,13 +45,28 @@ function sha256(value: string | Buffer) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+/** Keep the production runner pinned through 0036 as later files append. */
+function frozenManifest() {
+  return `${MANIFEST.toString("utf8").trim().split("\n").slice(0, 35).join("\n")}\n`;
+}
+
 describe("production Arcade store migration", () => {
+  it("is required by the production readiness contract", () => {
+    expect(PRODUCTION_READINESS).toContain(
+      'candidate.schema_contract !== "0038"',
+    );
+    expect(PRODUCTION_READINESS).toContain('rpc: "arcade_store_contract"');
+    expect(PRODUCTION_READINESS).toContain(
+      'contract: "biblequest_arcade_store_v1"',
+    );
+  });
+
   it("pins the target, manifest, source, and long-version packet", () => {
     expect(SCRIPT).toContain('const PROJECT_REF = "iacnjqnssovaaojswjoh";');
-    expect(SCRIPT).toContain(sha256(MANIFEST));
+    expect(SCRIPT).toContain(sha256(frozenManifest()));
     expect(SCRIPT).toContain(sha256(MIGRATION));
     expect(SCRIPT).toContain('version: "20260804035000"');
-    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(35);
+    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(37);
   });
 
   it("requires exact history, a fresh backup, and a one-packet dry run", () => {

@@ -1,3 +1,14 @@
+import {
+  removeWebPrivateStorageItem,
+  setWebPrivateStorageItem,
+  webPrivateStorageReadAllowed,
+} from "@/lib/storage/web-private-write";
+import {
+  LEGACY_ARCADE_BOOST_STORAGE_KEY,
+  WEB_V2_ARCADE_BOOST_STORAGE_KEY,
+  selectedWebPrivateStorageKey,
+} from "@/lib/storage/web-private-namespace";
+
 /**
  * Board helps a reader can hold and spend.
  *
@@ -59,7 +70,7 @@ export const EMPTY_INVENTORY: BoostInventory = Object.freeze({
   gather: 0,
 });
 
-export const BOOST_STORAGE_KEY = "biblequest:arcade-boosts:v1";
+export const BOOST_STORAGE_KEY = LEGACY_ARCADE_BOOST_STORAGE_KEY;
 const MAX_PER_BOOST = 99;
 
 function browserStorage(): Storage | null {
@@ -69,6 +80,15 @@ function browserStorage(): Storage | null {
   } catch {
     return null;
   }
+}
+
+/** Resolves the atomically selected guest or installed-account namespace. */
+export function arcadeBoostStorageKey(storage: Storage): string | null {
+  return selectedWebPrivateStorageKey(
+    storage,
+    LEGACY_ARCADE_BOOST_STORAGE_KEY,
+    WEB_V2_ARCADE_BOOST_STORAGE_KEY,
+  );
 }
 
 /** Rejects anything that is not a plain count of a boost this build knows. */
@@ -96,11 +116,29 @@ export function readInventory(storage?: Storage): BoostInventory {
   const target = storage ?? browserStorage();
   if (!target) return EMPTY_INVENTORY;
   try {
-    const raw = target.getItem(BOOST_STORAGE_KEY);
-    if (!raw) return EMPTY_INVENTORY;
+    if (!webPrivateStorageReadAllowed(target, storage !== undefined)) {
+      return EMPTY_INVENTORY;
+    }
+    const key = arcadeBoostStorageKey(target);
+    if (!key) return EMPTY_INVENTORY;
+    const raw = target.getItem(key);
+    if (
+      !webPrivateStorageReadAllowed(target, storage !== undefined) ||
+      !raw
+    ) {
+      return EMPTY_INVENTORY;
+    }
     const parsed = sanitizeInventory(JSON.parse(raw));
-    if (parsed) return parsed;
-    target.removeItem(BOOST_STORAGE_KEY);
+    if (
+      parsed &&
+      webPrivateStorageReadAllowed(target, storage !== undefined)
+    ) {
+      return parsed;
+    }
+    if (!webPrivateStorageReadAllowed(target, storage !== undefined)) {
+      return EMPTY_INVENTORY;
+    }
+    void removeWebPrivateStorageItem(target, key, storage !== undefined, raw);
   } catch {
     // A device that will not remember simply starts each visit with none.
   }
@@ -110,16 +148,18 @@ export function readInventory(storage?: Storage): BoostInventory {
 export function writeInventory(
   inventory: BoostInventory,
   storage?: Storage,
-): boolean {
+): Promise<boolean> {
   const safe = sanitizeInventory(inventory);
   const target = storage ?? browserStorage();
-  if (!safe || !target) return false;
-  try {
-    target.setItem(BOOST_STORAGE_KEY, JSON.stringify(safe));
-    return true;
-  } catch {
-    return false;
-  }
+  if (!safe || !target) return Promise.resolve(false);
+  const key = arcadeBoostStorageKey(target);
+  if (!key) return Promise.resolve(false);
+  return setWebPrivateStorageItem(
+    target,
+    key,
+    JSON.stringify(safe),
+    storage !== undefined,
+  );
 }
 
 export function grantBoost(

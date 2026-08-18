@@ -4,15 +4,24 @@ import {
   MAX_GLASS_OPACITY,
   MIN_GLASS_OPACITY,
 } from "./glass-opacity";
+import {
+  LEGACY_QUEST_JOURNEY_STORAGE_KEY,
+} from "@/lib/storage/web-private-namespace";
+import { isNativeTarget } from "@/lib/platform/target";
 
 /**
  * Applies persisted appearance classes before React hydrates. The global CSP
  * currently permits the inline scripts Next.js itself requires.
  */
-export const APPEARANCE_BOOTSTRAP_SCRIPT = `
+export function appearanceBootstrapScript(nativeTarget: boolean): string {
+  return `
 (function () {
   try {
-    var raw = window.localStorage.getItem("biblequest:v1");
+    // Web account and guest reads wait for the verified React storage gate.
+    // Native has a separate Keychain/backup boundary and may apply its legacy
+    // local appearance before the first paint.
+    if (!${JSON.stringify(nativeTarget)}) return;
+    var raw = window.localStorage.getItem(${JSON.stringify(LEGACY_QUEST_JOURNEY_STORAGE_KEY)});
     if (!raw) return;
     var persisted = JSON.parse(raw);
     var appearance = persisted && persisted.state && persisted.state.settings && persisted.state.settings.appearance;
@@ -57,3 +66,9 @@ export const APPEARANCE_BOOTSTRAP_SCRIPT = `
     // Storage denial or malformed legacy data should never block first paint.
   }
 })();`;
+}
+
+/** Uses a build-time target so web never reads private appearance before auth. */
+export const APPEARANCE_BOOTSTRAP_SCRIPT = appearanceBootstrapScript(
+  isNativeTarget(),
+);

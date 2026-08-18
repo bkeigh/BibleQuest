@@ -57,7 +57,7 @@ describe("production guided progress migration", () => {
     expect(SCRIPT).toContain(sha256(frozenManifest()));
     expect(SCRIPT).toContain(sha256(MIGRATION));
     expect(SCRIPT).toContain('version: "20260731011500"');
-    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(35);
+    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(37);
   });
 
   it("requires exact history, a fresh physical backup, and a narrow dry run", () => {

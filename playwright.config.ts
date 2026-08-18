@@ -22,8 +22,10 @@ export default defineConfig({
     timeout: 180_000,
     reuseExistingServer: !process.env.CI,
     env: {
-      NEXT_PUBLIC_SUPABASE_URL: "https://header-fixture.supabase.co",
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: "header-fixture-anon-key",
+      // Match the modern, browser-safe fixture shape used by CI builds.
+      NEXT_PUBLIC_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
+        "sb_publishable_header_fixture_1234567890abcdef",
       NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED: "false",
       STRIPE_BILLING_MODE: "coming-soon",
       BIBLEQUEST_STRIPE_PURCHASES_ENABLED: "false",

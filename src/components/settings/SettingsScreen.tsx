@@ -22,9 +22,11 @@ import {
   clearAvatar,
   clearLegacyAvatar,
   profileAvatarMarker,
+  purgeAvatarCache,
   saveAvatar,
   storeRemoteAvatar,
 } from "@/lib/utils/avatar";
+import { purgePersistedJourney } from "@/lib/questos/purge";
 import {
   deleteRemoteAvatar,
   uploadRemoteAvatar,
@@ -36,18 +38,27 @@ import {
   parseSnapshot,
 } from "@/lib/questos/import-schema";
 import { createExportSnapshot } from "@/lib/questos/snapshot";
-import { clearAllDeviceLocalJournalDrafts } from "@/lib/questos/journal-drafts";
+import {
+  clearAllDeviceLocalJournalDrafts,
+  purgeAllDeviceLocalJournalDrafts,
+} from "@/lib/questos/journal-drafts";
 import { clearLastSyncedUserId } from "@/lib/sync/last-user";
 import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
 import { useSession } from "@/lib/supabase/useSession";
 import { createClient } from "@/lib/supabase/client";
-import { clearNativeAuthStorage } from "@/lib/supabase/native-auth-storage";
-import { deleteOwnAccountWithAvatar } from "@/lib/auth/account-deletion";
+import {
+  readActiveWebAuthSession,
+  withActiveWebPrivateWriteReset,
+  withWebAccountOperationLock,
+  type WebAccountOperationHandle,
+} from "@/lib/supabase/web-auth-storage";
+import { commitWebPrivateHandoffOwner } from "@/lib/storage/web-private-cutover";
+import {
+  AccountDeletionPendingError,
+  deleteAccountAndDeviceData,
+} from "@/lib/auth/account-deletion";
 import { track } from "@/lib/analytics/events";
-import { stopSync } from "@/lib/sync/engine";
-import { clearStoredAccountSyncGenerations } from "@/lib/sync/generation";
-import { clearStoredDailyQuestSyncContext } from "@/lib/sync/daily-quests";
-import { clearStoredMutableRevisionContext } from "@/lib/sync/mutable-revisions";
+import { withDeadline } from "@/lib/async/deadline";
 import type { QuestOSSnapshot } from "@/lib/questos/types";
 import { useStrings, LANGUAGES, languageMeta, fmt } from "@/lib/i18n";
 import { IconCheck, IconChevronRight } from "@/components/design-system/icons";
@@ -77,6 +88,7 @@ import { ReminderSettings } from "@/components/settings/ReminderSettings";
 import { GREEN_FEATURES } from "@/lib/features/green";
 import {
   clearRhythmState,
+  purgeRhythmState,
   readRhythmState,
   replaceRhythmState,
 } from "@/lib/rhythm/client";
@@ -86,10 +98,16 @@ import {
   parseDeviceBackupExtras,
   type DeviceBackupExtras,
 } from "@/lib/backup/device-extras";
-import { clearGameProgress } from "@/lib/games/storage";
-import { clearSevenDaysProgress } from "@/lib/games/seven-days/progress";
-import { SEVEN_DAYS_TUTORIAL_STORAGE_KEY } from "@/lib/games/seven-days/tutorial";
-import { BOOST_STORAGE_KEY } from "@/lib/games/arcade/boosts";
+import { clearStandaloneGameData } from "@/lib/auth/device-account-cleanup";
+import {
+  accountLifecycleHandleIsCurrent,
+  beginAccountLifecycle,
+  finishAccountLifecycle,
+} from "@/lib/auth/account-lifecycle";
+import {
+  AccountSignOutError,
+  signOutExpectedAccount,
+} from "@/lib/auth/account-sign-out";
 import {
   purgeJourneyBackup,
   resumeJourneyBackupAfterPurge,
@@ -101,19 +119,9 @@ interface PendingJourneyImport {
   device: DeviceBackupExtras | null;
 }
 
-type DeleteAccountError = "request" | "device" | null;
+type DeleteAccountError = "request" | "pending" | "device" | null;
 
-/** Clears game records that live outside the persisted journey store. */
-function clearStandaloneGameData(): void {
-  clearGameProgress();
-  clearSevenDaysProgress();
-  try {
-    window.localStorage.removeItem(SEVEN_DAYS_TUTORIAL_STORAGE_KEY);
-    window.localStorage.removeItem(BOOST_STORAGE_KEY);
-  } catch {
-    // Restricted storage is already inaccessible and cannot be restored here.
-  }
-}
+const CLEAR_DATA_DEADLINE_MS = 8_000;
 
 function Row({
   label,
@@ -919,12 +927,10 @@ function SettingsInner() {
   const bibleTranslation =
     settings.preferredBibleTranslation ?? DEFAULT_BIBLE_TRANSLATION_KEY;
 
-  // Cancel an obsolete upload when Settings unmounts or a newer pick starts.
+  // Cancel obsolete media work on unmount, a newer pick, or an account swap.
   useEffect(
-    () => () => {
-      photoUploadControllerRef.current?.abort();
-    },
-    [],
+    () => () => photoUploadControllerRef.current?.abort(),
+    [user?.id],
   );
 
   function setAppearance(patch: Partial<typeof appearance>) {
@@ -942,20 +948,39 @@ function SettingsInner() {
 
   // Logs out without removing the journey that remains stored on this device.
   async function logOut() {
+    const expectedUserId = user?.id;
+    if (!expectedUserId || signingOut) return;
     setSigningOut(true);
-    const { error } = await createClient().auth.signOut();
-    if (error) {
-      setSigningOut(false);
+    try {
+      const result = await signOutExpectedAccount(expectedUserId);
+      if (result.status === "session-changed") {
+        toast("Your signed-in account changed. Reloading it safely.");
+        window.location.reload();
+        return;
+      }
+      track("sign_out");
+      toast("Logged out. Your journey stays on this device.");
+      if (result.reloadRequired) {
+        window.location.reload();
+        return;
+      }
+      router.refresh();
+    } catch (error) {
       toast("Couldn’t log out just now. Check your connection and retry.");
-      return;
+      if (
+        error instanceof AccountSignOutError &&
+        error.reloadRequired
+      ) {
+        window.location.reload();
+      }
+    } finally {
+      setSigningOut(false);
     }
-    track("sign_out");
-    toast("Logged out. Your journey stays on this device.");
-    router.refresh();
   }
 
   async function onPhotoPicked(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    const expectedUserId = user?.id ?? null;
     e.target.value = ""; // reset so re-picking the same file still fires onChange
     if (!file || photoBusy) return;
     setPhotoBusy(true);
@@ -970,11 +995,17 @@ function SettingsInner() {
     photoUploadControllerRef.current = controller;
     const previousMarker = profileAvatarMarker(profile);
     try {
-      if (user) {
-        const remote = await uploadRemoteAvatar(file, controller.signal);
+      if (expectedUserId) {
+        const remote = await uploadRemoteAvatar(
+          expectedUserId,
+          file,
+          controller.signal,
+        );
+        if (controller.signal.aborted) return;
         if (!(await storeRemoteAvatar(remote.blob, remote.version))) {
           throw new Error("avatar cache unavailable");
         }
+        if (controller.signal.aborted) return;
         updateProfile({
           avatarVersion: remote.version,
           avatarUpdatedAt: remote.updatedAt,
@@ -988,6 +1019,7 @@ function SettingsInner() {
         if (!(await saveAvatar(file, nextMarker))) {
           throw new Error("avatar cache unavailable");
         }
+        if (controller.signal.aborted) return;
         updateProfile({
           avatarVersion: null,
           avatarUpdatedAt: nextMarker,
@@ -1010,16 +1042,30 @@ function SettingsInner() {
 
   async function removePhoto() {
     if (photoBusy) return;
+    const expectedUserId = user?.id ?? null;
     setPhotoBusy(true);
+    photoUploadControllerRef.current?.abort();
+    const controller = new AbortController();
+    photoUploadControllerRef.current = controller;
     const currentMarker = profileAvatarMarker(profile);
     try {
-      if (user) await deleteRemoteAvatar();
+      if (expectedUserId) {
+        await deleteRemoteAvatar(expectedUserId, {
+          signal: controller.signal,
+        });
+      }
+      if (controller.signal.aborted) return;
       if (currentMarker) await clearAvatar(currentMarker);
+      if (controller.signal.aborted) return;
       await clearLegacyAvatar();
+      if (controller.signal.aborted) return;
       updateProfile({ avatarVersion: null, avatarUpdatedAt: null });
     } catch {
       toast(t.settings.photoError);
     } finally {
+      if (photoUploadControllerRef.current === controller) {
+        photoUploadControllerRef.current = null;
+      }
       setPhotoBusy(false);
     }
   }
@@ -1070,15 +1116,15 @@ function SettingsInner() {
     setPendingImport({ journey: result.data, device: device.data });
   }
 
-  function confirmImport() {
+  async function confirmImport() {
     if (!pendingImport) return;
     importData(
       pendingImport.journey,
       user ? { purgeAccount: user.id } : undefined
     );
-    const rhythmRestored = pendingImport.device
+    const rhythmRestored = await (pendingImport.device
       ? replaceRhythmState(pendingImport.device.rhythm)
-      : clearRhythmState();
+      : clearRhythmState());
     // A restore whose profile carries no photo marker must not resurrect a
     // stale on-device photo blob for the incoming profile.
     if (
@@ -1109,104 +1155,235 @@ function SettingsInner() {
     }
     setDeletingAccount(true);
     setDeleteAccountError(null);
-
-    try {
-      await deleteOwnAccountWithAvatar();
-    } catch {
-      setDeletingAccount(false);
-      setDeleteAccountError("request");
-      return;
-    }
-
-    // The identity is gone; keep clearing independent device stores even if
-    // Keychain access itself is temporarily unavailable.
-    let deviceCleanupFailed = false;
-    try {
-      await clearNativeAuthStorage();
-    } catch {
-      deviceCleanupFailed = true;
-    }
-    try {
-      await purgeNativeReminders();
-    } catch {
-      deviceCleanupFailed = true;
-    }
-
-    // Purge the native mirror before the local reset can become restorable.
-    if (!(await purgeJourneyBackup())) {
+    const deletedUserId = user.id;
+    const lifecycle = beginAccountLifecycle(deletedUserId);
+    if (!lifecycle) {
       setDeletingAccount(false);
       setDeleteAccountError("device");
-      toast(
-        "Your account was deleted, but this device could not finish clearing. Use Clear my journey to remove the remaining local copy.",
-      );
       return;
     }
-    try {
-      // Stop every subscriber before removing the deleted account's local copy.
-      stopSync();
-      clearAllData();
-      clearAllDeviceLocalJournalDrafts();
-      clearLastSyncedUserId();
-      clearStoredAccountSyncGenerations();
-      clearStoredDailyQuestSyncContext();
-      clearStoredMutableRevisionContext();
-      clearRhythmState();
-      clearStandaloneGameData();
-      await clearAvatar();
-    } catch {
-      deviceCleanupFailed = true;
-    } finally {
-      // The primary is now reset, so future backups cannot resurrect old data.
-      resumeJourneyBackupAfterPurge();
-    }
 
-    toast(
-      deviceCleanupFailed
-        ? "Your account was deleted, but some device-only cleanup could not finish. Restart BibleQuest, then use Settings to finish any remaining cleanup."
-        : "Your account and saved journey were deleted.",
-      { variant: deviceCleanupFailed ? "default" : "success" },
-    );
-    router.replace("/onboarding");
+    let retainLifecycle = false;
+    try {
+      let deviceCleared = false;
+      try {
+        deviceCleared = await deleteAccountAndDeviceData(
+          deletedUserId,
+          lifecycle,
+        );
+      } catch (error) {
+        setDeletingAccount(false);
+        if (error instanceof AccountDeletionPendingError) {
+          // A timed-out destructive request can still commit. Keep auth and
+          // sync suspended until a fresh launch verifies the server identity.
+          retainLifecycle = true;
+          setDeleteAccountError("pending");
+          toast(
+            "Account deletion is still being confirmed. Close and reopen BibleQuest before continuing.",
+          );
+          return;
+        }
+        setDeleteAccountError("request");
+        return;
+      }
+
+      // The shared cleanup requires the same durable owner, tombstones the
+      // protected mirror first, and preserves any newer account credential.
+      if (
+        !accountLifecycleHandleIsCurrent(lifecycle) ||
+        !deviceCleared
+      ) {
+        setDeletingAccount(false);
+        setDeleteAccountError("device");
+        toast(
+          "Your account was deleted, but this device could not finish clearing. Use Clear my journey to remove the remaining local copy.",
+        );
+        return;
+      }
+      toast("Your account and saved journey were deleted.", {
+        variant: "success",
+      });
+      router.replace("/onboarding");
+    } finally {
+      if (!retainLifecycle) finishAccountLifecycle(lifecycle);
+    }
   }
 
   /** Removes account media before clearing every local and synced journey. */
   async function clearJourneyData() {
     if (clearingData) return;
+    const expectedUserId = user?.id ?? null;
+    const lifecycle = expectedUserId
+      ? beginAccountLifecycle(expectedUserId)
+      : null;
+    if (expectedUserId && !lifecycle) {
+      toast("BibleQuest is already finishing another account action. Try again shortly.");
+      return;
+    }
     setClearingData(true);
-    let reminderCleanupFailed = false;
+    let deviceCleanupFailed = false;
+    let journeyCleared = false;
     try {
-      if (user) await deleteRemoteAvatar(true);
-      // This await is the privacy boundary: local data remains intact unless
-      // the native filesystem mirror is first made non-restorable.
-      if (!(await purgeJourneyBackup())) {
-        throw new Error("native journey backup could not be purged");
-      }
-      try {
-        await purgeNativeReminders();
-      } catch {
-        // Continue erasing private content after attempting every reminder ID.
-        reminderCleanupFailed = true;
-      }
-      clearAllData(user ? { purgeAccount: user.id } : undefined);
-      clearAllDeviceLocalJournalDrafts();
-      clearRhythmState();
-      clearStandaloneGameData();
-      await clearAvatar();
-      clearLastSyncedUserId();
-      if (reminderCleanupFailed) {
-        toast(
-          "Your journey was cleared, but iOS may still show an old BibleQuest reminder.",
+      /** Holds account-bound remote and local clears behind one web lock. */
+      const clearExpectedJourney = async (
+        webOperation?: WebAccountOperationHandle,
+      ) => {
+        if (expectedUserId) {
+          await withDeadline(
+            deleteRemoteAvatar(expectedUserId, { allOwnedObjects: true }),
+            CLEAR_DATA_DEADLINE_MS,
+            "Remote avatar cleanup",
+          );
+        }
+        // This await is the privacy boundary: local data remains intact unless
+        // the native filesystem mirror is first made non-restorable.
+        const mirrorPurged = await withDeadline(
+          purgeJourneyBackup(),
+          CLEAR_DATA_DEADLINE_MS,
+          "Native journey backup purge",
         );
+        if (!mirrorPurged) {
+          throw new Error("native journey backup could not be purged");
+        }
+        try {
+          await withDeadline(
+            purgeNativeReminders(),
+            CLEAR_DATA_DEADLINE_MS,
+            "Native reminder cleanup",
+          );
+        } catch {
+          // Reminders are best effort after their local preference is removed.
+          deviceCleanupFailed = true;
+        }
+        if (expectedUserId) {
+          let exactUserId: string | null;
+          if (isNativeTarget()) {
+            const observed = await createClient().auth.getSession();
+            exactUserId = observed.error
+              ? null
+              : observed.data.session?.user.id ?? null;
+          } else {
+            exactUserId =
+              (await readActiveWebAuthSession(webOperation))?.userId ?? null;
+          }
+          if (
+            exactUserId !== expectedUserId ||
+            !lifecycle ||
+            !accountLifecycleHandleIsCurrent(lifecycle)
+          ) {
+            throw new Error("account changed during journey clear");
+          }
+        }
+        const guardedWebReset = Boolean(
+          expectedUserId && !isNativeTarget() && webOperation,
+        );
+        if (guardedWebReset) {
+          if (
+            !expectedUserId ||
+            !webOperation ||
+            !purgePersistedJourney({
+              purgeAccount: expectedUserId,
+              webOperation,
+            })
+          ) {
+            throw new Error("account journey reset could not be persisted");
+          }
+        } else {
+          clearAllData(
+            expectedUserId ? { purgeAccount: expectedUserId } : undefined,
+          );
+        }
+        journeyCleared = true;
+        const draftsCleared = expectedUserId
+          ? await purgeAllDeviceLocalJournalDrafts()
+          : (await clearAllDeviceLocalJournalDrafts()) >= 0;
+        const rhythmCleared = guardedWebReset
+          ? await purgeRhythmState()
+          : await clearRhythmState();
+        const gamesCleared = await clearStandaloneGameData();
+        if (!draftsCleared || !rhythmCleared || !gamesCleared) {
+          if (guardedWebReset) {
+            throw new Error("account device stores could not be cleared");
+          }
+          deviceCleanupFailed = true;
+        }
+        try {
+          if (guardedWebReset) {
+            const avatarCleared = await withDeadline(
+              purgeAvatarCache(),
+              CLEAR_DATA_DEADLINE_MS,
+              "Local avatar cleanup",
+            );
+            if (avatarCleared === false) {
+              throw new Error("avatar cache could not be cleared");
+            }
+          } else {
+            await withDeadline(
+              clearAvatar(),
+              CLEAR_DATA_DEADLINE_MS,
+              "Local avatar cleanup",
+            );
+          }
+        } catch {
+          // The primary journey is already empty; report cache cleanup honestly.
+          if (guardedWebReset) throw new Error("avatar cache could not be cleared");
+          deviceCleanupFailed = true;
+        }
+        if (guardedWebReset) {
+          if (
+            !expectedUserId ||
+            !webOperation ||
+            !(await commitWebPrivateHandoffOwner(
+              webOperation,
+              expectedUserId,
+              false,
+            ))
+          ) {
+            throw new Error("account owner reset could not be committed");
+          }
+        } else {
+          await clearLastSyncedUserId();
+        }
+      };
+      if (!expectedUserId || isNativeTarget()) {
+        await clearExpectedJourney();
+      } else {
+        const resetComplete = await withWebAccountOperationLock((webOperation) =>
+          withActiveWebPrivateWriteReset(
+            webOperation,
+            expectedUserId,
+            async () => {
+              await clearExpectedJourney(webOperation);
+              return true;
+            },
+          ),
+        );
+        if (!resetComplete) {
+          throw new Error("account journey reset did not reopen safely");
+        }
       }
+      toast(
+        deviceCleanupFailed
+          ? "Your journey was cleared, but some device-only cleanup could not finish. Restart BibleQuest before continuing."
+          : "Your BibleQuest journey was cleared.",
+        { variant: deviceCleanupFailed ? "default" : "success" },
+      );
+
+      // Keep native navigation inside Next's router: Capacitor cannot resolve
+      // extensionless routes as fresh document requests.
       router.replace("/onboarding");
     } catch {
       toast(
-        "Your data could not be fully cleared. Some cleanup may have completed; try again before continuing.",
+        journeyCleared
+          ? "Your journey was cleared, but this device could not finish cleanup. Restart BibleQuest before continuing."
+          : "BibleQuest could not safely clear your journey. Your saved journey remains on this device; restart the app and try again.",
       );
-      setClearingData(false);
     } finally {
       // A failed purge already resumes itself; this is harmless on that path.
       resumeJourneyBackupAfterPurge();
+      if (lifecycle) finishAccountLifecycle(lifecycle);
+      setConfirmClear(false);
+      setClearingData(false);
     }
   }
 
@@ -1400,10 +1577,14 @@ function SettingsInner() {
                     <span className="block text-[0.9375rem] text-charcoal">
                       Floating MyShepherd
                     </span>
+                    {/* The launcher is also hidden on Home and the other
+                        screens that already offer MyShepherd inline. Without
+                        saying so, turning this on and seeing nothing reads as
+                        a broken setting. */}
                     <span className="mt-0.5 block text-caption leading-relaxed text-ash">
                       {isPlus
-                        ? "Keep a small Scripture assistant available throughout the app."
-                        : "Keep the MyShepherd button on screen. Asking questions is part of Plus."}
+                        ? "Keep a small Scripture assistant available throughout the app. Home and the writing screens keep it hidden, because they already offer it."
+                        : "Keep the MyShepherd button on screen. Home and the writing screens keep it hidden, because they already offer it. Asking questions is part of Plus."}
                     </span>
                   </span>
                   <Toggle
@@ -1826,7 +2007,9 @@ function SettingsInner() {
                     <p role="alert" className="mt-2 text-caption text-rose-700">
                       {deleteAccountError === "request"
                         ? "We couldn’t delete your account. Nothing on this device was removed. Check your connection and try again."
-                        : "Your account was deleted, but this device could not finish clearing its local copy. Use Clear my journey above to try again."}
+                        : deleteAccountError === "pending"
+                          ? "Deletion is still being confirmed. Close and reopen BibleQuest; startup verification will finish safely."
+                          : "Your account was deleted, but this device could not finish clearing its local copy. Use Clear my journey above to try again."}
                     </p>
                   )}
                   <div className="mt-3 flex flex-wrap gap-2.5">

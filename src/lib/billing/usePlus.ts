@@ -17,10 +17,12 @@ import {
 import { track } from "@/lib/analytics/events";
 import { useSession } from "@/lib/supabase/useSession";
 import type { PlanKey } from "@/lib/questos/types";
-import { apiFetch } from "@/lib/platform/api";
+import {
+  apiFetch,
+  authenticatedApiFetch,
+} from "@/lib/platform/api";
 import { purchaseAdapter } from "@/lib/platform/purchases";
-import { isNativeTarget } from "@/lib/platform/target";
-import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
+import { NATIVE_COMMERCE_CONTAINED } from "./containment";
 import type { BillingInterval, BillingPlan } from "./validation";
 
 export type PlusStatus =
@@ -136,6 +138,19 @@ async function billingFetch(
   });
 }
 
+/** Reads or mutates billing only for the still-current captured account. */
+async function authenticatedBillingFetch(
+  expectedUserId: string,
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
+  return authenticatedApiFetch(expectedUserId, path, {
+    credentials: "same-origin",
+    cache: "no-store",
+    ...init,
+  });
+}
+
 // Native billing remains unavailable until a separately audited adapter is supplied.
 const purchases = purchaseAdapter();
 
@@ -174,14 +189,13 @@ export interface PlusState {
 /** Coordinates one account-bound, server-authoritative Plus projection. */
 function usePlusCoordinator(): PlusState {
   const session = useSession();
-  const nativeGuestOnly = isNativeTarget() && ACCOUNT_SYNC_CONTAINED;
   const subjectKey = session.loading
     ? "session:pending"
     : session.user
       ? `user:${session.user.id}`
       : "guest";
   const [stored, setStored] = useState<StoredPlusState>(() =>
-    nativeGuestOnly
+    NATIVE_COMMERCE_CONTAINED
       ? containedNativeState(subjectKey)
       : initialState(subjectKey),
   );
@@ -199,13 +213,13 @@ function usePlusCoordinator(): PlusState {
   const visible =
     stored.subjectKey === subjectKey
       ? stored
-      : nativeGuestOnly
+      : NATIVE_COMMERCE_CONTAINED
         ? containedNativeState(subjectKey)
         : initialState(subjectKey);
 
   const load = useCallback(async () => {
     if (session.loading) return;
-    if (nativeGuestOnly) {
+    if (NATIVE_COMMERCE_CONTAINED) {
       setStored(containedNativeState(subjectKey));
       return;
     }
@@ -245,8 +259,10 @@ function usePlusCoordinator(): PlusState {
         return;
       }
 
+      const expectedUserId = session.user?.id;
+      if (!expectedUserId) throw new Error("account changed");
       const [statusResponse, plansResponse] = await Promise.all([
-        billingFetch("/api/billing/status"),
+        authenticatedBillingFetch(expectedUserId, "/api/billing/status"),
         billingFetch("/api/billing/plans"),
       ]);
       if (
@@ -323,7 +339,7 @@ function usePlusCoordinator(): PlusState {
         returnNotice: safeReturnNotice(),
       });
     }
-  }, [nativeGuestOnly, session.loading, subjectKey]);
+  }, [session.loading, session.user, subjectKey]);
 
   // Start after the effect commits so async state never cascades in its body.
   useEffect(() => {
@@ -332,7 +348,7 @@ function usePlusCoordinator(): PlusState {
   }, [load]);
 
   useEffect(() => {
-    if (nativeGuestOnly) return;
+    if (NATIVE_COMMERCE_CONTAINED) return;
     if (session.loading) return;
     const refreshOnReturn = () => void load();
     const refreshWhenVisible = () => {
@@ -348,11 +364,15 @@ function usePlusCoordinator(): PlusState {
       window.removeEventListener("online", refreshOnReturn);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [load, nativeGuestOnly, session.loading]);
+  }, [load, session.loading]);
 
   const refresh = useCallback(async () => {
+    if (NATIVE_COMMERCE_CONTAINED) {
+      await load();
+      return;
+    }
     if (session.user) {
-      const outcome = await purchases.restore();
+      const outcome = await purchases.restore(session.user.id);
       if (outcome === "failed" || outcome === "unavailable") {
         throw new Error("refresh failed");
       }
@@ -366,6 +386,7 @@ function usePlusCoordinator(): PlusState {
   // membership at "free" until someone pressed a button. Reconcile against
   // Stripe once on return; the server projection still decides entitlement.
   useEffect(() => {
+    if (NATIVE_COMMERCE_CONTAINED) return;
     if (session.loading || !session.user) return;
     if (reconciledReturn.current) return;
     if (safeReturnNotice() !== "checkout-returned") return;
@@ -391,7 +412,7 @@ function usePlusCoordinator(): PlusState {
       ) {
         return false;
       }
-      const outcome = await purchases.purchase(interval);
+      const outcome = await purchases.purchase(session.user.id, interval);
       if (outcome !== "redirected") return false;
       track("plus_checkout_opened", { interval });
       return true;
@@ -401,7 +422,7 @@ function usePlusCoordinator(): PlusState {
 
   const openCustomerPortal = useCallback(async () => {
     if (!session.user || !visible.hasCustomer) return false;
-    const outcome = await purchases.manage();
+    const outcome = await purchases.manage(session.user.id);
     if (outcome !== "redirected") return false;
     track("plus_billing_portal_opened");
     return true;

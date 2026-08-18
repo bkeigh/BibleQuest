@@ -13,6 +13,8 @@ const SUPABASE = "https://fixture.supabase.co";
 const RELEASE = "a".repeat(40);
 const PRIVATE_MARKER = "private-prayer-fixture-do-not-report";
 const STATIC_ASSET = "/_next/static/chunks/app-fixture.js";
+const SUPABASE_CONTENT_URL = `${SUPABASE}/rest/v1/daily_verses?select=id&limit=1`;
+const SUPABASE_SETTINGS_URL = `${SUPABASE}/auth/v1/settings`;
 
 function health(overrides = {}) {
   return {
@@ -25,9 +27,9 @@ function health(overrides = {}) {
     canonical_origin_matches: true,
     auth_posture: "configured",
     analytics_posture: "disabled",
-    schema_contract: "0036",
+    schema_contract: "0038",
     content_contract: "seed-manifest-v1",
-    service_worker_version: "biblequest-v25",
+    service_worker_version: "biblequest-v28",
     billing_mode: "coming-soon",
     billing_purchases_enabled: false,
     billing_support_enabled: false,
@@ -72,17 +74,17 @@ function healthyRoutes(): Map<string, Response> {
     ],
     [
       `${CANONICAL}/sw.js`,
-      response('const CACHE_VERSION = "biblequest-v25";', 200, {
+      response('const CACHE_VERSION = "biblequest-v28";', 200, {
         "cache-control": "no-cache, no-store, must-revalidate",
       }),
     ],
     [`${CANONICAL}${STATIC_ASSET}`, response("fixture bundle")],
     [
-      `${SUPABASE}/rest/v1/daily_verses?select=id&limit=1`,
+      SUPABASE_CONTENT_URL,
       response([{ id: "11111111-1111-4111-8111-111111111111" }]),
     ],
     [
-      `${SUPABASE}/auth/v1/settings`,
+      SUPABASE_SETTINGS_URL,
       response({ external: { email: true, google: true, phone: false } }),
     ],
   ]);
@@ -117,9 +119,10 @@ function environment(): NodeJS.ProcessEnv {
 
 describe("daily synthetic health", () => {
   it("passes a healthy production fixture with sanitized reports", async () => {
+    const fetchImpl = fixtureFetch(healthyRoutes());
     const report = await runSyntheticHealth({
       env: environment(),
-      fetchImpl: fixtureFetch(healthyRoutes()),
+      fetchImpl,
       retries: 0,
       now: new Date("2026-07-24T12:00:00.000Z"),
     });
@@ -147,6 +150,20 @@ describe("daily synthetic health", () => {
     expect(syntheticHealthMarkdown(report)).toContain(
       "response bodies, credentials, user records",
     );
+    // Exact fixture URLs prevent a lookalike hostname from entering the
+    // credential-bearing request assertions.
+    const supabaseUrls = new Set([SUPABASE_CONTENT_URL, SUPABASE_SETTINGS_URL]);
+    const supabaseCalls = fetchImpl.mock.calls.filter(([input]) =>
+      supabaseUrls.has(String(input)),
+    );
+    expect(supabaseCalls).toHaveLength(2);
+    for (const [, init] of supabaseCalls) {
+      const headers = new Headers(init?.headers);
+      expect(headers.get("apikey")).toBe(
+        environment().BIBLEQUEST_MONITOR_SUPABASE_ANON_KEY,
+      );
+      expect(headers.has("authorization")).toBe(false);
+    }
   });
 
   it("pins deployed contracts independently from the checkout on main", async () => {

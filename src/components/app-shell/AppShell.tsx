@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils/cn";
 import { isNativeTarget } from "@/lib/platform/target";
 import { usePlus } from "@/lib/billing/usePlus";
 import { listenForNativeReminderOpen } from "@/lib/native/reminders";
+import { rehydrateNativeRouteState } from "@/lib/native/route-state";
 
 const FloatingMyShepherd = dynamic(
   () =>
@@ -53,6 +54,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     pathname === "/app/prayer/new" ||
     pathname === "/app/prayer/reflection/new" ||
     pathname === "/app/games/seven-days";
+
+  useEffect(() => {
+    // Native static routes can resume a cached screen after another route has
+    // persisted a change. Re-read the canonical local snapshot at the route
+    // boundary so profile and settings edits appear without an app restart.
+    void rehydrateNativeRouteState();
+  }, [pathname]);
 
   useEffect(() => {
     // Analytics events queued while offline flush when the shell mounts

@@ -29,23 +29,35 @@ class MemoryStorage implements Storage {
   }
 }
 
+/**
+ * jsdom files get a real Window. Replacing it with the fixture below removes
+ * HTMLInputElement and breaks React's event delegation, so a mounted component
+ * never sees a change event and no state ever updates — which looks exactly
+ * like a broken component rather than a broken harness.
+ */
+const hasRealDom =
+  typeof document !== "undefined" &&
+  typeof globalThis.window?.HTMLInputElement === "function";
+
 function installDeterministicGlobals() {
   const storage = new MemoryStorage();
   let uuid = 0;
   vi.stubGlobal("localStorage", storage);
-  vi.stubGlobal("window", {
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    localStorage: storage,
-    location: {
-      href: "https://biblequest.test/app/journey?fixture=ignored#fixture-ignored",
-      origin: "https://biblequest.test",
-      pathname: "/app/journey",
-      search: "?fixture=ignored",
-      hash: "#fixture-ignored",
-    },
-  });
-  vi.stubGlobal("navigator", { doNotTrack: "0", onLine: true });
+  if (!hasRealDom) {
+    vi.stubGlobal("window", {
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      localStorage: storage,
+      location: {
+        href: "https://biblequest.test/app/journey?fixture=ignored#fixture-ignored",
+        origin: "https://biblequest.test",
+        pathname: "/app/journey",
+        search: "?fixture=ignored",
+        hash: "#fixture-ignored",
+      },
+    });
+    vi.stubGlobal("navigator", { doNotTrack: "0", onLine: true });
+  }
   vi.stubGlobal("crypto", {
     getRandomValues: webcrypto.getRandomValues.bind(webcrypto),
     randomUUID: () =>

@@ -8,10 +8,8 @@ const mocks = vi.hoisted(() => ({
   claim: vi.fn(),
   complete: vi.fn(),
   checkoutUrl: vi.fn(),
-  optionalUser: vi.fn(),
   contractReady: vi.fn(),
   createAdmin: vi.fn(),
-  createServer: vi.fn(),
   createSession: vi.fn(),
   retrieveSession: vi.fn(),
 }));
@@ -34,14 +32,10 @@ vi.mock("@/lib/support/records.server", () => ({
   supportCheckoutUrl: mocks.checkoutUrl,
 }));
 vi.mock("@/lib/support/server", () => ({
-  optionalSupportUser: mocks.optionalUser,
   stripeSupportContractReady: mocks.contractReady,
 }));
 vi.mock("@/lib/supabase/admin.server", () => ({
   createAdminSupabase: mocks.createAdmin,
-}));
-vi.mock("@/lib/supabase/server", () => ({
-  createServerSupabase: mocks.createServer,
 }));
 
 import { POST } from "@/app/api/support/checkout/route";
@@ -109,8 +103,6 @@ describe("one-time support Checkout route", () => {
     mocks.distributedGuard.mockReset().mockResolvedValue(null);
     mocks.configuration.mockReset().mockReturnValue(CONFIGURATION);
     mocks.createAdmin.mockReset().mockReturnValue({ role: "admin" });
-    mocks.createServer.mockReset();
-    mocks.optionalUser.mockReset().mockResolvedValue(null);
     mocks.contractReady.mockReset().mockResolvedValue(true);
     mocks.claim.mockReset().mockResolvedValue({
       status: "claimed",
@@ -227,37 +219,17 @@ describe("one-time support Checkout route", () => {
     );
   });
 
-  it("prefills only a verified account email without creating an account", async () => {
-    mocks.optionalUser.mockResolvedValue({
-      id: "d3000000-0000-4000-8000-000000000003",
-      email: "verified@example.test",
-      email_confirmed_at: "2026-07-24T00:00:00.000Z",
-    });
+  it("ignores presented account state and creates only an anonymous Session", async () => {
+    const presented = request();
+    presented.headers.set("Authorization", "Bearer header.payload.signature");
+    presented.headers.set("Cookie", "sb-legacy-auth-token=ignored");
+    presented.headers.set("x-biblequest-web-auth", "v2");
 
-    expect(await POST(request())).toMatchObject({ status: 201 });
+    expect(await POST(presented)).toMatchObject({ status: 201 });
     expect(mocks.claim).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({
-        userId: "d3000000-0000-4000-8000-000000000003",
-      }),
+      expect.objectContaining({ userId: null }),
     );
-    expect(mocks.createSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        customer_email: "verified@example.test",
-      }),
-      expect.anything(),
-    );
-    expect(mocks.createServer).not.toHaveBeenCalled();
-  });
-
-  it("does not prefill an unconfirmed account email", async () => {
-    mocks.optionalUser.mockResolvedValue({
-      id: "d3000000-0000-4000-8000-000000000003",
-      email: "unconfirmed@example.test",
-      email_confirmed_at: null,
-    });
-
-    expect(await POST(request())).toMatchObject({ status: 201 });
     const [parameters] = mocks.createSession.mock.calls[0];
     expect(parameters).not.toHaveProperty("customer_email");
   });

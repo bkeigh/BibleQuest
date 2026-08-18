@@ -13,15 +13,32 @@ const REQUIRED_ENV = [
   "BIBLEQUEST_STAGING_PROJECT_REF",
   "BIBLEQUEST_CONFIRM_STAGING_TWO_USER_TEST",
   "NEXT_PUBLIC_SUPABASE_URL",
-  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-  "SUPABASE_SERVICE_ROLE_KEY",
 ];
+
+/** Prefers modern keys while retaining explicit legacy staging compatibility. */
+function publicKey() {
+  return (
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+  );
+}
+
+/** Prefers the modern server key for disposable-user administration. */
+function adminKey() {
+  return (
+    process.env.SUPABASE_SECRET_KEY?.trim() ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  );
+}
 
 /** Stops before any mutation when the staging-only safety contract is absent. */
 function requireEnvironment() {
   const missing = REQUIRED_ENV.filter((name) => !process.env[name]);
   if (missing.length > 0) {
     throw new Error(`Missing required environment: ${missing.join(", ")}`);
+  }
+  if (!publicKey() || !adminKey()) {
+    throw new Error("Missing required Supabase public or server key class");
   }
   if (
     process.env.BIBLEQUEST_CONFIRM_STAGING_TWO_USER_TEST !== CONFIRMATION
@@ -63,6 +80,23 @@ function client(key) {
       detectSessionInUrl: false,
       persistSession: false,
     },
+    ...(key.startsWith("sb_secret_")
+      ? {
+          global: {
+            // A modern secret belongs only in apikey, never the JWT channel.
+            fetch: (input, init = {}) => {
+              const headers = new Headers(
+                init.headers ??
+                  (input instanceof Request ? input.headers : undefined),
+              );
+              if (headers.get("authorization") === `Bearer ${key}`) {
+                headers.delete("authorization");
+              }
+              return fetch(input, { ...init, headers });
+            },
+          },
+        }
+      : {}),
   });
 }
 
@@ -82,7 +116,7 @@ async function createActor(admin, label) {
   );
   check(created.user?.id, `create actor ${label} returned no user`);
 
-  const actorClient = client(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const actorClient = client(publicKey());
   const signedIn = requireResult(
     await actorClient.auth.signInWithPassword({ email, password }),
     `sign in actor ${label}`,
@@ -440,7 +474,7 @@ async function deleteActor(admin, actor) {
       password,
     });
     if (!updated.error && actor.email) {
-      actorClient = client(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+      actorClient = client(publicKey());
       const signedIn = await actorClient.auth.signInWithPassword({
         email: actor.email,
         password,
@@ -507,7 +541,7 @@ async function cleanup(admin, actors) {
 }
 
 requireEnvironment();
-const admin = client(process.env.SUPABASE_SERVICE_ROLE_KEY);
+const admin = client(adminKey());
 const actors = [];
 let primaryError = null;
 let resultSummary = null;

@@ -1,5 +1,5 @@
 import { accountSyncAvailable } from "@/lib/sync/containment";
-import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { isSupabaseConfigured } from "@/lib/supabase/configuration";
 
 /**
  * Whether prayers, quests, the arcade, and the journey require an account.

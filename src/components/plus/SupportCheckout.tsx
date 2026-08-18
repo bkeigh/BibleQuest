@@ -47,7 +47,6 @@ export function SupportCheckout({
     try {
       const response = await apiFetch("/api/support/checkout", {
         method: "POST",
-        credentials: "same-origin",
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

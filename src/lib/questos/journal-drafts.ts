@@ -16,6 +16,19 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
+import {
+  removeWebPrivateStorageItem,
+  webPrivateStorageReadAllowed,
+  withWebPrivateRemovalGuard,
+  withWebPrivateWriteGuard,
+} from "@/lib/storage/web-private-write";
+import {
+  LEGACY_JOURNAL_DRAFT_STORAGE_PREFIX,
+  LEGACY_JOURNAL_DRAFTS_CLEARED_STORAGE_KEY,
+  WEB_V2_JOURNAL_DRAFT_STORAGE_PREFIX,
+  WEB_V2_JOURNAL_DRAFTS_CLEARED_STORAGE_KEY,
+  selectedWebPrivateStorageKey,
+} from "@/lib/storage/web-private-namespace";
 
 export type JournalDraftKind = "prayer" | "reflection";
 export type JournalDraftField = string | number | boolean | null | undefined;
@@ -60,9 +73,10 @@ export interface UseDeviceLocalJournalDraftResult<
 }
 
 export const JOURNAL_DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1_000;
-const STORAGE_PREFIX = "biblequest:journal-draft";
+const STORAGE_PREFIX = LEGACY_JOURNAL_DRAFT_STORAGE_PREFIX;
 const DRAFTS_CLEARED_EVENT = "biblequest:journal-drafts-cleared";
-const DRAFTS_CLEARED_STORAGE_KEY = "biblequest:journal-drafts-cleared-at";
+const MAX_DRAFT_KEYS = 64;
+const MAX_DRAFT_KEY_CHARACTERS = 512;
 
 function normalizedEntryId(entryId?: string): string | null {
   return entryId?.trim() || null;
@@ -86,6 +100,36 @@ function resolveStorage(storage: Storage | null | undefined): Storage | null {
   }
 }
 
+/** Selects the journal prefix only after an exact namespace decision. */
+function selectedDraftPrefix(storage: Storage): string | null {
+  return selectedWebPrivateStorageKey(
+    storage,
+    LEGACY_JOURNAL_DRAFT_STORAGE_PREFIX,
+    WEB_V2_JOURNAL_DRAFT_STORAGE_PREFIX,
+  );
+}
+
+/** Selects the matching destructive epoch key in the same namespace. */
+function selectedDraftEpochKey(storage: Storage): string | null {
+  return selectedWebPrivateStorageKey(
+    storage,
+    LEGACY_JOURNAL_DRAFTS_CLEARED_STORAGE_KEY,
+    WEB_V2_JOURNAL_DRAFTS_CLEARED_STORAGE_KEY,
+  );
+}
+
+/** Builds one selected draft key without exposing interrupted cutover bytes. */
+function selectedJournalDraftStorageKey(
+  storage: Storage,
+  kind: JournalDraftKind,
+  entryId?: string,
+): string | null {
+  const prefix = selectedDraftPrefix(storage);
+  if (!prefix) return null;
+  const scope = normalizedEntryId(entryId) ?? "new";
+  return `${prefix}:${kind}:${encodeURIComponent(scope)}`;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -102,60 +146,101 @@ function isDraftFields(value: unknown): value is JournalDraftFields {
   );
 }
 
-function removeQuietly(storage: Storage, key: string): boolean {
-  try {
-    storage.removeItem(key);
-    return true;
-  } catch {
-    return false;
-  }
+function removeQuietly(
+  storage: Storage,
+  key: string,
+  testFixtureStorage: boolean,
+  expectedValue?: string | null,
+): Promise<boolean> {
+  return removeWebPrivateStorageItem(
+    storage,
+    key,
+    testFixtureStorage,
+    expectedValue,
+  );
 }
 
-function journalDraftKeys(storage: Storage): string[] {
+/** Enumerates bounded draft keys only while the supplied authority survives. */
+function enumerateJournalDraftKeys(
+  storage: Storage,
+  prefix: string,
+  authorizationIsCurrent: () => boolean,
+): string[] | null {
   try {
+    if (!authorizationIsCurrent() || storage.length > 512) return null;
     const keys: string[] = [];
     for (let index = 0; index < storage.length; index += 1) {
+      if (!authorizationIsCurrent()) return null;
       const key = storage.key(index);
-      if (key?.startsWith(`${STORAGE_PREFIX}:`)) keys.push(key);
+      if (!key?.startsWith(`${prefix}:`)) continue;
+      if (
+        key.length > MAX_DRAFT_KEY_CHARACTERS ||
+        keys.length >= MAX_DRAFT_KEYS
+      ) {
+        return null;
+      }
+      keys.push(key);
     }
-    return keys;
-  } catch {
-    return [];
-  }
-}
-
-function readDraftClearEpoch(storage: Storage): string | null {
-  try {
-    return storage.getItem(DRAFTS_CLEARED_STORAGE_KEY);
+    return authorizationIsCurrent() ? keys : null;
   } catch {
     return null;
   }
 }
 
-function advanceDraftClearEpoch(
-  target: Storage,
-): boolean {
-  // Updating a non-sensitive epoch key creates a native `storage` event in
-  // every other tab. A unique suffix ensures two fast resets still notify.
+/** Enumerates selected draft keys only under the exact private read lease. */
+function journalDraftKeys(
+  storage: Storage,
+  prefix = selectedDraftPrefix(storage),
+  testFixtureStorage = false,
+): string[] | null {
+  if (!prefix) return null;
+  return enumerateJournalDraftKeys(
+    storage,
+    prefix,
+    () => webPrivateStorageReadAllowed(storage, testFixtureStorage),
+  );
+}
+
+/** Reads the selected destructive epoch with pre/post authority checks. */
+function readDraftClearEpoch(
+  storage: Storage,
+  testFixtureStorage = false,
+): string | null {
   try {
-    const unique =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : Math.random().toString(36).slice(2);
-    target.setItem(
-      DRAFTS_CLEARED_STORAGE_KEY,
-      `${new Date().toISOString()}:${unique}`,
-    );
-    return true;
+    if (!webPrivateStorageReadAllowed(storage, testFixtureStorage)) {
+      return null;
+    }
+    const key = selectedDraftEpochKey(storage);
+    const epoch = key ? storage.getItem(key) : null;
+    return webPrivateStorageReadAllowed(storage, testFixtureStorage)
+      ? epoch
+      : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-function removeAllJournalDraftKeys(storage: Storage): number {
+function nextDraftClearEpoch(): string {
+  // Updating a non-sensitive epoch key creates a native `storage` event in
+  // every other tab. A unique suffix ensures two fast resets still notify.
+  const unique =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2);
+  return `${new Date().toISOString()}:${unique}`;
+}
+
+function removeAllJournalDraftKeys(
+  storage: Storage,
+  prefix: string,
+  testFixtureStorage: boolean,
+): number {
   let removed = 0;
-  for (const key of journalDraftKeys(storage)) {
-    if (removeQuietly(storage, key)) removed += 1;
+  const keys = journalDraftKeys(storage, prefix, testFixtureStorage);
+  if (!keys) return -1;
+  for (const key of keys) {
+    storage.removeItem(key);
+    if (storage.getItem(key) === null) removed += 1;
   }
   return removed;
 }
@@ -172,26 +257,123 @@ function notifyDraftHooksAfterClear(storage: Storage | null | undefined) {
  * storage. Destructive data controls and account hand-offs must call this so
  * private text cannot survive after the journey itself has been removed.
  */
-export function clearAllDeviceLocalJournalDrafts(
+export async function clearAllDeviceLocalJournalDrafts(
   storage?: Storage | null,
-): number {
+): Promise<number> {
   const target = resolveStorage(storage);
-  if (!target) return 0;
-
-  // This is the linearization point for every open tab. Writers that ran
-  // before it are removed below; writers that run after it see a new epoch and
-  // refuse stale content, even if their storage event has not arrived yet.
-  const epochAdvanced = advanceDraftClearEpoch(target);
-  let removed = removeAllJournalDraftKeys(target);
-  if (!epochAdvanced) {
-    // A full quota can reject the sentinel even though drafts are writable.
-    // The first sweep frees space; advancing the epoch and sweeping again
-    // closes the gap where another tab could otherwise rewrite old memory.
-    advanceDraftClearEpoch(target);
-    removed += removeAllJournalDraftKeys(target);
-  }
+  if (!target) return -1;
+  const testFixtureStorage = storage !== undefined;
+  const result = await withWebPrivateWriteGuard(() => {
+    const prefix = selectedDraftPrefix(target);
+    const epochKey = selectedDraftEpochKey(target);
+    const draftKeys = journalDraftKeys(
+      target,
+      prefix,
+      testFixtureStorage,
+    );
+    if (!prefix || !epochKey || !draftKeys) return { value: -1 };
+    const previousEpoch = target.getItem(epochKey);
+    const previousDrafts = new Map(
+      draftKeys.map((key) => [key, target.getItem(key)]),
+    );
+    const nextEpoch = nextDraftClearEpoch();
+    let epochAdvanced = false;
+    try {
+      target.setItem(epochKey, nextEpoch);
+      epochAdvanced = target.getItem(epochKey) === nextEpoch;
+    } catch {
+      epochAdvanced = target.getItem(epochKey) === nextEpoch;
+    }
+    let removed = removeAllJournalDraftKeys(
+      target,
+      prefix,
+      testFixtureStorage,
+    );
+    if (removed < 0) throw new Error("draft enumeration failed");
+    if (!epochAdvanced) {
+      // Clearing drafts may free quota for the cross-tab epoch sentinel.
+      target.setItem(epochKey, nextEpoch);
+      if (target.getItem(epochKey) !== nextEpoch) {
+        throw new Error("draft clear epoch failed");
+      }
+      const finalSweep = removeAllJournalDraftKeys(
+        target,
+        prefix,
+        testFixtureStorage,
+      );
+      if (finalSweep < 0) throw new Error("draft enumeration failed");
+      removed += finalSweep;
+    }
+    return {
+      value: removed,
+      rollback: () => {
+        if (target.getItem(epochKey) !== nextEpoch) return;
+        if (previousEpoch === null) {
+          target.removeItem(epochKey);
+        } else {
+          target.setItem(epochKey, previousEpoch);
+        }
+        for (const [key, value] of previousDrafts) {
+          if (value !== null && target.getItem(key) === null) {
+            target.setItem(key, value);
+          }
+        }
+      },
+    };
+  }, testFixtureStorage);
+  if (!result.committed || result.value < 0) return -1;
   notifyDraftHooksAfterClear(storage);
-  return removed;
+  return result.value;
+}
+
+/** Prove the destructive draft epoch and every private draft key were removed. */
+export async function purgeAllDeviceLocalJournalDrafts(
+  storage?: Storage | null,
+): Promise<boolean> {
+  const target = resolveStorage(storage);
+  if (!target) return false;
+  const result = await withWebPrivateRemovalGuard(
+    (authorizationIsCurrent) => {
+      const keys: string[] = [];
+      for (const prefix of [
+        LEGACY_JOURNAL_DRAFT_STORAGE_PREFIX,
+        WEB_V2_JOURNAL_DRAFT_STORAGE_PREFIX,
+      ]) {
+        const selected = enumerateJournalDraftKeys(
+          target,
+          prefix,
+          authorizationIsCurrent,
+        );
+        if (!selected) return { value: false };
+        keys.push(...selected);
+      }
+      keys.push(
+        LEGACY_JOURNAL_DRAFTS_CLEARED_STORAGE_KEY,
+        WEB_V2_JOURNAL_DRAFTS_CLEARED_STORAGE_KEY,
+      );
+      for (const key of new Set(keys)) {
+        if (!authorizationIsCurrent()) return { value: false };
+        target.removeItem(key);
+        if (target.getItem(key) !== null) return { value: false };
+      }
+      for (const prefix of [
+        LEGACY_JOURNAL_DRAFT_STORAGE_PREFIX,
+        WEB_V2_JOURNAL_DRAFT_STORAGE_PREFIX,
+      ]) {
+        const remaining = enumerateJournalDraftKeys(
+          target,
+          prefix,
+          authorizationIsCurrent,
+        );
+        if (!remaining || remaining.length !== 0) return { value: false };
+      }
+      return { value: authorizationIsCurrent() };
+    },
+    storage !== undefined,
+  );
+  if (!result.committed || !result.value) return false;
+  notifyDraftHooksAfterClear(storage);
+  return true;
 }
 
 /**
@@ -199,18 +381,29 @@ export function clearAllDeviceLocalJournalDrafts(
  * cannot run its own clock while BibleQuest is closed, so expiry is enforced
  * at the next launch as well as whenever an individual draft is read.
  */
-export function purgeExpiredDeviceLocalJournalDrafts(
+export async function purgeExpiredDeviceLocalJournalDrafts(
   storage?: Storage | null,
   now = Date.now(),
-): number {
+): Promise<number> {
   const target = resolveStorage(storage);
   if (!target) return 0;
+  const testFixtureStorage = storage !== undefined;
+  if (!webPrivateStorageReadAllowed(target, testFixtureStorage)) return 0;
 
-  const clearEpoch = readDraftClearEpoch(target);
+  const clearEpoch = readDraftClearEpoch(target, testFixtureStorage);
   let removed = 0;
-  for (const key of journalDraftKeys(target)) {
+  const draftKeys = journalDraftKeys(target, undefined, testFixtureStorage);
+  if (!draftKeys) return 0;
+  for (const key of draftKeys) {
+    if (!webPrivateStorageReadAllowed(target, testFixtureStorage)) {
+      return removed;
+    }
+    let raw: string | null = null;
     try {
-      const raw = target.getItem(key);
+      raw = target.getItem(key);
+      if (!webPrivateStorageReadAllowed(target, testFixtureStorage)) {
+        return removed;
+      }
       const parsed: unknown = raw ? JSON.parse(raw) : null;
       if (
         !isRecord(parsed) ||
@@ -220,10 +413,19 @@ export function purgeExpiredDeviceLocalJournalDrafts(
         !Number.isFinite(Date.parse(parsed.updatedAt)) ||
         now - Date.parse(parsed.updatedAt) > JOURNAL_DRAFT_MAX_AGE_MS
       ) {
-        if (removeQuietly(target, key)) removed += 1;
+        if (
+          await removeQuietly(target, key, storage !== undefined, raw)
+        ) {
+          removed += 1;
+        }
       }
     } catch {
-      if (removeQuietly(target, key)) removed += 1;
+      if (
+        raw !== null &&
+        await removeQuietly(target, key, storage !== undefined, raw)
+      ) {
+        removed += 1;
+      }
     }
   }
   return removed;
@@ -237,15 +439,24 @@ export function readDeviceLocalJournalDraft<T extends JournalDraftFields>(
 ): DeviceLocalJournalDraft<T> | null {
   const target = resolveStorage(storage);
   if (!target) return null;
+  const testFixtureStorage = storage !== undefined;
+  if (!webPrivateStorageReadAllowed(target, testFixtureStorage)) return null;
 
-  const key = journalDraftStorageKey(kind, entryId);
+  const key = selectedJournalDraftStorageKey(target, kind, entryId);
+  if (!key) return null;
+  let raw: string | null = null;
   try {
-    const raw = target.getItem(key);
-    if (!raw) return null;
+    raw = target.getItem(key);
+    if (!webPrivateStorageReadAllowed(target, testFixtureStorage) || !raw) {
+      return null;
+    }
 
     const parsed: unknown = JSON.parse(raw);
     const expectedEntryId = normalizedEntryId(entryId);
-    const expectedClearEpoch = readDraftClearEpoch(target);
+    const expectedClearEpoch = readDraftClearEpoch(
+      target,
+      testFixtureStorage,
+    );
     if (
       !isRecord(parsed) ||
       parsed.version !== 2 ||
@@ -256,75 +467,92 @@ export function readDeviceLocalJournalDraft<T extends JournalDraftFields>(
       !Number.isFinite(Date.parse(parsed.updatedAt)) ||
       !isDraftFields(parsed.fields)
     ) {
-      removeQuietly(target, key);
+      void removeQuietly(target, key, storage !== undefined, raw);
       return null;
     }
 
     if (Date.now() - Date.parse(parsed.updatedAt) > JOURNAL_DRAFT_MAX_AGE_MS) {
-      removeQuietly(target, key);
+      void removeQuietly(target, key, storage !== undefined, raw);
       return null;
     }
 
-    return parsed as unknown as DeviceLocalJournalDraft<T>;
+    return webPrivateStorageReadAllowed(target, testFixtureStorage)
+      ? (parsed as unknown as DeviceLocalJournalDraft<T>)
+      : null;
   } catch {
-    removeQuietly(target, key);
+    if (raw !== null) {
+      void removeQuietly(target, key, storage !== undefined, raw);
+    }
     return null;
   }
 }
 
 /** Persist a bounded, JSON-safe draft envelope. Returns false on quota/privacy failures. */
-export function writeDeviceLocalJournalDraft<T extends JournalDraftFields>(
+export async function writeDeviceLocalJournalDraft<T extends JournalDraftFields>(
   kind: JournalDraftKind,
   entryId: string | undefined,
   fields: T,
   storage?: Storage | null,
   expectedClearEpoch?: string | null,
-): boolean {
+): Promise<boolean> {
   const target = resolveStorage(storage);
   if (!target || !isDraftFields(fields)) return false;
-
-  const clearEpoch = readDraftClearEpoch(target);
-  if (
-    expectedClearEpoch !== undefined &&
-    expectedClearEpoch !== clearEpoch
-  ) {
-    removeQuietly(target, journalDraftStorageKey(kind, entryId));
-    return false;
-  }
-
-  const draft: DeviceLocalJournalDraft<T> = {
-    version: 2,
-    kind,
-    entryId: normalizedEntryId(entryId),
-    fields,
-    updatedAt: new Date().toISOString(),
-    clearEpoch,
-  };
-
-  try {
-    const key = journalDraftStorageKey(kind, entryId);
-    target.setItem(key, JSON.stringify(draft));
+  const testFixtureStorage = storage !== undefined;
+  const result = await withWebPrivateWriteGuard(() => {
+    const clearEpoch = readDraftClearEpoch(target, testFixtureStorage);
+    if (
+      expectedClearEpoch !== undefined &&
+      expectedClearEpoch !== clearEpoch
+    ) {
+      return { value: false };
+    }
+    const draft: DeviceLocalJournalDraft<T> = {
+      version: 2,
+      kind,
+      entryId: normalizedEntryId(entryId),
+      fields,
+      updatedAt: new Date().toISOString(),
+      clearEpoch,
+    };
+    const key = selectedJournalDraftStorageKey(target, kind, entryId);
+    if (!key) return { value: false };
+    const previous = target.getItem(key);
+    const encoded = JSON.stringify(draft);
+    target.setItem(key, encoded);
+    if (target.getItem(key) !== encoded) {
+      throw new Error("journal draft storage failed");
+    }
     // A reset can race between the preflight read and setItem in another tab.
     // Recheck after the write so stale text cannot survive that ordering.
-    if (readDraftClearEpoch(target) !== clearEpoch) {
-      removeQuietly(target, key);
-      return false;
+    if (readDraftClearEpoch(target, testFixtureStorage) !== clearEpoch) {
+      if (target.getItem(key) === encoded) target.removeItem(key);
+      return { value: false };
     }
-    return true;
-  } catch {
-    return false;
-  }
+    return {
+      value: true,
+      rollback: () => {
+        if (target.getItem(key) !== encoded) return;
+        if (previous === null) target.removeItem(key);
+        else target.setItem(key, previous);
+      },
+    };
+  }, testFixtureStorage);
+  return result.committed && result.value;
 }
 
 export function clearDeviceLocalJournalDraft(
   kind: JournalDraftKind,
   entryId?: string,
   storage?: Storage | null,
-): boolean {
+): Promise<boolean> {
   const target = resolveStorage(storage);
+  const key = target
+    ? selectedJournalDraftStorageKey(target, kind, entryId)
+    : null;
   return target
-    ? removeQuietly(target, journalDraftStorageKey(kind, entryId))
-    : false;
+    && key
+    ? removeQuietly(target, key, storage !== undefined)
+    : Promise.resolve(false);
 }
 
 function defaultIsEmpty<T extends JournalDraftFields>(draft: T): boolean {
@@ -385,13 +613,18 @@ export function useDeviceLocalJournalDraft<T extends JournalDraftFields>({
     setValueState(next);
   }, []);
 
-  const persistNow = useCallback(() => {
+  const persistNow = useCallback(async () => {
     if (!enabledRef.current || suppressPersistence.current) return;
     const target = resolveStorage(storageRef.current);
     if (!target) return;
-    if (readDraftClearEpoch(target) !== clearEpochRef.current) {
+    if (
+      readDraftClearEpoch(
+        target,
+        storageRef.current !== undefined,
+      ) !== clearEpochRef.current
+    ) {
       suppressPersistence.current = true;
-      clearDeviceLocalJournalDraft(
+      await clearDeviceLocalJournalDraft(
         kindRef.current,
         entryIdRef.current,
         storageRef.current,
@@ -400,7 +633,7 @@ export function useDeviceLocalJournalDraft<T extends JournalDraftFields>({
     }
     const current = valueRef.current;
     if (isEmptyRef.current(current)) {
-      clearDeviceLocalJournalDraft(
+      await clearDeviceLocalJournalDraft(
         kindRef.current,
         entryIdRef.current,
         storageRef.current,
@@ -410,7 +643,7 @@ export function useDeviceLocalJournalDraft<T extends JournalDraftFields>({
     }
 
     if (
-      writeDeviceLocalJournalDraft(
+      await writeDeviceLocalJournalDraft(
         kindRef.current,
         entryIdRef.current,
         current,
@@ -426,7 +659,9 @@ export function useDeviceLocalJournalDraft<T extends JournalDraftFields>({
   useEffect(() => {
     suppressPersistence.current = false;
     const target = resolveStorage(storageRef.current);
-    clearEpochRef.current = target ? readDraftClearEpoch(target) : null;
+    clearEpochRef.current = target
+      ? readDraftClearEpoch(target, storageRef.current !== undefined)
+      : null;
     const draft = readDeviceLocalJournalDraft<T>(
       kindRef.current,
       entryIdRef.current,
@@ -441,21 +676,25 @@ export function useDeviceLocalJournalDraft<T extends JournalDraftFields>({
 
   useEffect(() => {
     if (!enabled || suppressPersistence.current) return;
-    const timer = window.setTimeout(persistNow, Math.max(0, debounceMs));
+    const timer = window.setTimeout(
+      () => void persistNow(),
+      Math.max(0, debounceMs),
+    );
     return () => window.clearTimeout(timer);
   }, [debounceMs, enabled, persistNow, scopeKey, value]);
 
   // Page transitions and app backgrounding should not discard the last keystrokes.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    window.addEventListener("pagehide", persistNow);
-    return () => window.removeEventListener("pagehide", persistNow);
+    const saveBeforeHide = () => void persistNow();
+    window.addEventListener("pagehide", saveBeforeHide);
+    return () => window.removeEventListener("pagehide", saveBeforeHide);
   }, [persistNow]);
 
   // App Router transitions and iOS swipe-back can unmount without pagehide.
   // The ref-backed callback captures the latest value, while clearDraft's
   // suppression flag prevents Done/Discard from resurrecting cleared text.
-  useEffect(() => () => persistNow(), [persistNow]);
+  useEffect(() => () => void persistNow(), [persistNow]);
 
   // A destructive reset can originate in a persistent app-shell sibling while
   // a composer remains mounted behind it. Clear both its storage and memory,
@@ -467,13 +706,15 @@ export function useDeviceLocalJournalDraft<T extends JournalDraftFields>({
       // A debounce in another tab may have won the race after the initiating
       // tab removed all keys but before this tab received the clear epoch.
       // Remove this scope again so the signal is idempotently destructive.
-      clearDeviceLocalJournalDraft(
+      void clearDeviceLocalJournalDraft(
         kindRef.current,
         entryIdRef.current,
         storageRef.current,
       );
       const target = resolveStorage(storageRef.current);
-      clearEpochRef.current = target ? readDraftClearEpoch(target) : null;
+      clearEpochRef.current = target
+        ? readDraftClearEpoch(target, storageRef.current !== undefined)
+        : null;
       const nextValue = clearedValueRef.current;
       valueRef.current = nextValue;
       setValueState(nextValue);
@@ -481,7 +722,12 @@ export function useDeviceLocalJournalDraft<T extends JournalDraftFields>({
       setSavedAt(null);
     };
     const onStorage = (event: StorageEvent) => {
-      if (event.key === DRAFTS_CLEARED_STORAGE_KEY) onAllDraftsCleared();
+      if (
+        event.key === LEGACY_JOURNAL_DRAFTS_CLEARED_STORAGE_KEY ||
+        event.key === WEB_V2_JOURNAL_DRAFTS_CLEARED_STORAGE_KEY
+      ) {
+        onAllDraftsCleared();
+      }
     };
     window.addEventListener(DRAFTS_CLEARED_EVENT, onAllDraftsCleared);
     window.addEventListener("storage", onStorage);
@@ -493,7 +739,7 @@ export function useDeviceLocalJournalDraft<T extends JournalDraftFields>({
 
   const clearDraft = useCallback(() => {
     suppressPersistence.current = true;
-    clearDeviceLocalJournalDraft(
+    void clearDeviceLocalJournalDraft(
       kindRef.current,
       entryIdRef.current,
       storageRef.current,
@@ -507,7 +753,7 @@ export function useDeviceLocalJournalDraft<T extends JournalDraftFields>({
     setValue,
     restored,
     savedAt,
-    saveDraft: persistNow,
+    saveDraft: () => void persistNow(),
     clearDraft,
   };
 }

@@ -10,7 +10,7 @@ health, browser signals, thresholds, and synthetic routing use
 custom SMTP, auth templates, and content reconciliation are executed through
 [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md).
 Provider-console and physical-device work can be coordinated with the
-guardrailed [`Claude Cowork launch-operator prompt`](CLAUDE_COWORK_LAUNCH_PROMPT.md);
+guardrailed [`Claude Cowork launch-operator prompt`](archive/CLAUDE_COWORK_LAUNCH_PROMPT.md);
 that prompt does not replace any gate in this runbook.
 
 No unchecked item is a pass. `OPEN`, `TBD`, and blank evidence fields are
@@ -43,7 +43,7 @@ Vercel deployments. A Preview build is never the production artifact.
 | Staging rehearsal deployment | `[IMMUTABLE PREVIEW DEPLOYMENT URL]` | Vercel inspection showing the release SHA and confirmed staging Supabase pair: `[EVIDENCE URL]` | OPEN |
 | Staged production candidate | `[IMMUTABLE PRODUCTION-ENVIRONMENT DEPLOYMENT URL]` | Same release SHA; Production Supabase pair and other masked Production environment posture; custom domains not yet assigned: `[EVIDENCE URL]` | OPEN |
 | Production URL after promotion | Canonical `https://www.biblequest.co`; apex redirects to `www` | DNS/TLS, redirect, metadata, Supabase Site URL/callback, and Vercel `NEXT_PUBLIC_APP_URL`: `[EVIDENCE URL]` | OPEN |
-| Database migration set | Exact `0001`–`0012` and `0014`–`0032`; `0013` must remain absent and immutable `0014` must retain its pinned hash; record and verify the checked-in 31-file SHA-256 manifest at freeze | [Staging forward-only reconciliation](launch-evidence/2026-07-29-staging-migration-reconciliation.md); local and production evidence: `[EVIDENCE URLS]` | OPEN |
+| Database migration set | Exact historical Production prefix `0001`–`0012` and `0014`–`0036`, followed only by standalone web hardening `0038`; `0013` must remain absent and immutable `0014` must retain its pinned hash. Record the reviewed 35-file prefix and exact `0038` SHA-256 at freeze. Beta-only `0037` remains excluded until the separate native release. | [Staging forward-only reconciliation](launch-evidence/2026-07-29-staging-migration-reconciliation.md); local and production evidence: `[EVIDENCE URLS]` | OPEN |
 | Production backup | `[UTC TIMESTAMP]`; method `[DAILY BACKUP / PITR / OTHER]`; restore point `[ID WITHOUT CREDENTIALS]` | Provider backup record: `[RESTRICTED EVIDENCE URL]` | OPEN |
 | Previous known-good deployment | `[IMMUTABLE VERCEL DEPLOYMENT URL]`, commit `[SHA]` | Rollback rehearsal and PWA/privacy checks: `[EVIDENCE URL]` | OPEN |
 | Database compatibility decision | `[BACKWARD COMPATIBLE / APP FIRST / DB FIRST / ROLLBACK RESTRICTED]` | Signed decision: `[EVIDENCE URL]` | OPEN |
@@ -54,9 +54,12 @@ Vercel deployments. A Preview build is never the production artifact.
 Freeze the migration manifest without revealing credentials:
 
 ```bash
-find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print0 \
-  | sort -z \
-  | xargs -0 shasum -a 256
+for file in supabase/migrations/*.sql; do
+  case "$file" in
+    */0037_native_account_beta_availability.sql) continue ;;
+  esac
+  shasum -a 256 "$file"
+done
 ```
 
 Expected filenames, in order:
@@ -93,7 +96,21 @@ Expected filenames, in order:
 0030_operator_plus_grants.sql
 0031_stripe_subscription_conflict_key.sql
 0032_stripe_dispute_signal_prefix.sql
+0033_guided_pilgrimage_progress.sql
+0034_distributed_provider_rate_limits.sql
+0035_fix_provider_rate_limit_claim_timestamp.sql
+0036_arcade_store_purchases.sql
+0038_web_account_deletion_hardening.sql
 ```
+
+The 37-entry repository manifest also contains
+`0037_native_account_beta_availability.sql`. It is staging/account-beta-only
+and is not part of the Production web set above. The standalone `0038` packet
+is deliberately self-contained so Production can advance from `0036` to
+`0038` while `0037` remains absent. The separate review and guarded Production
+execution record for an account-enabled iOS replacement lives in
+[`IOS_ACCOUNT_REPLACEMENT_RELEASE.md`](IOS_ACCOUNT_REPLACEMENT_RELEASE.md);
+the existence of that packet does not add `0037` to this web launch contract.
 
 The immutable `0014_journey_event_identity.sql` SHA-256 must remain:
 
@@ -161,9 +178,12 @@ approve that exact action; the preparation work above is not blanket approval.
    may still build `main`; it must not move production traffic. Treat the
    resulting domainless Production-environment deployment as the staged
    candidate only if its SHA and masked Production environment pass; otherwise
-   create one with `vercel --prod --skip-domain`. Promotion is a later, separate
-   approval using the exact deployment ID. See Vercel's official
-   [staged deployment workflow](https://vercel.com/docs/cli/deploying-from-cli).
+   create one with `GITHUB_SHA=<full frozen SHA> vercel --prod --skip-domain`
+   and verify `/api/health` reports that exact SHA. The build embeds this public
+   release identity; passing it only as a runtime variable is not sufficient.
+   Promotion is a later, separate approval using the exact deployment ID. See
+   Vercel's official [staged deployment
+   workflow](https://vercel.com/docs/cli/deploying-from-cli).
 4. **Freeze and rehearse:** after the first three items pass, freeze clean
    `main`, rerun every source check, create the distinct staging and staged
    Production-environment deployments from the same SHA, and execute sections
@@ -273,8 +293,8 @@ billing, legal, monitoring, and rollback gates remain mandatory in both tracks.
 | Gate | Pass evidence required | Owner | No-go / recovery action | Status |
 | --- | --- | --- | --- | --- |
 | Account launch posture | Exactly one track is selected. Enabled requires every active auth/sync gate below. Guest-only requires the frozen source's `ACCOUNT_SYNC_CONTAINED` constant to be `true`; `/api/health` reports `guest-only`; customer enrollment, sign-in, and account-action controls are absent (a status-only containment notice/page is allowed); customer callback code/token exchange, middleware session refresh, and browser sync/client creation are no-ops; clean and upgraded customer browsers show no Supabase Auth, session-refresh, user-table, or sync-RPC network traffic; the separately allowlisted operator console is tested as a private surface; the complete local-first core loop, persistence, export/clear, offline/reconnect, and PWA update pass; the named account posture owner and rollback authority accept the evidence and residual cached-client risk | Account posture + QA + rollback authority | Hold or roll back on a customer posture mismatch, visible customer account action, customer exchange/refresh/client creation, customer-browser Supabase auth/sync request, local-data loss, or unaccepted residual client; use backend containment when a stale open client makes the browser latch insufficient | OPEN |
-| Migration history | Clean local reset; the checked-in 31-file manifest ends at `0032`, `0013` is absent, and immutable `0014` matches its pinned SHA; the [staging forward-only attestation](launch-evidence/2026-07-29-staging-migration-reconciliation.md) passes; staging and production migration lists are captured and mapped to the reviewed forward-only versions; the guarded production checks verify the exact legacy history, applied lifetime and 0029 packets, fresh backup, pinned hashes, and exact reviewed `0030`–`0032` forward-only proposal | Database owner | Stop on any filename/hash/history mismatch or replay of renamed `0002`-`0006`; follow the forward-only reconciliation procedure; never use `--include-all`, normal production `db push`, or repair as a shortcut | OPEN |
-| RLS | Catalog report shows all 40 expected public tables with RLS enabled, only documented policies, correct roles, sealed avatar/push/billing/support/console/entitlement functions, and the account identity/generation/revision/row-size/billing-correction boundary through `0032` | Database owner | Stop application rollout; correct with a new higher-numbered migration and repeat all DB gates | OPEN |
+| Migration history | Clean local reset; the 37-entry repository manifest contains the reviewed 35-file Production prefix ending at `0036`, separately excluded beta-only `0037`, and standalone web hardening `0038`; `0013` is absent, and immutable `0014` matches its pinned SHA. Staging and Production lists are captured, and the guarded Production check proves a fresh backup, pinned hashes, and exactly the `0038` packet after the legacy history. | Database owner | Stop on any filename/hash/history mismatch or replay of renamed `0002`-`0006`; follow the forward-only reconciliation procedure; never use `--include-all`, normal Production `db push`, or repair as a shortcut | OPEN |
+| RLS | Catalog report shows all 45 expected public tables with RLS enabled, only documented policies, correct roles, sealed avatar/push/billing/support/console/entitlement/Arcade functions, and the account identity/generation/revision/row-size/Storage-deletion boundary through `0038`; no provider-v2 adoption state or policies exist, and native `0037` remains gated | Database owner | Stop application rollout; correct with a new higher-numbered migration and repeat all DB gates | OPEN |
 | Daily-quest CAS | In both tracks, all 59 local CAS/contract DB tests and deterministic client tests pass and the public posture RPC returns only the fixed contract identity plus `ok: true`. Enabled auth/sync additionally requires staging simultaneous-device, stale-revision, duplicate-retry, rollback, unpick, completion-durability, bounded-conflict, and old-cached-client evidence. Guest-only records those active client scenarios out of scope until enablement | Database + QA owners | Keep account rollout on hold for any overwrite, resurrection, completion loss, retry loop, RLS, contract, or cached-client failure; a guest-only launch may continue only if containment remains proven | OPEN |
 | Content mirror | After schema/RLS passes: regenerated seed/manifest have clean diffs and approved digests; seed dry run reports no pending migrations; production readiness proves exact natural-key/content hashes for 150 quests, 180 passages, 38 milestones, and 32/32 prompts | Database + content owners | Keep sync beta-gated; inspect mismatch totals and frozen artifacts; never reset production or paste ad hoc SQL from chat | OPEN |
 | Auth email and callback | Enabled auth/sync: custom SMTP DNS/provider verification passes; Supabase Site URL and exact callback use canonical `www`; new and existing users complete real Gmail/iCloud links cross-browser. Guest-only: record active email/provider/callback completion `OUT OF SCOPE — APPROVED GUEST-ONLY`; prove enrollment/sign-in actions are absent (status-only containment copy is allowed) and every callback form exits without exchange or session creation | Deploy + QA owners | Stop invitations; correct provider/template/canonical configuration and retest without exposing single-use tokens, or return to reviewed guest-only containment | OPEN |
@@ -338,13 +358,15 @@ command, timestamp, exit code, and summary against the frozen SHA. Do not upload
 | `pnpm test` | Exit 0; all Vitest files/tests pass |
 | `pnpm test:headers` | Exit 0; production build plus live production/development response-header integration tests pass |
 | `pnpm test:service-worker` | Exit 0; all cache-policy, fetch, and lifecycle tests pass |
+| `pnpm test:account-deletion-concurrency` | Against local Supabase only, two real PostgreSQL connections prove an in-flight upload delays the deletion latch and a post-latch upload waits, fails, and leaves no object |
 | `pnpm test:observability` | Exit 0; allowlist, redaction, bounded queue, aggregation, worker-version, and threshold tests pass |
 | `pnpm test:launch-evidence` | Exit 0; the one-command evidence fixture reports only the intentional guest-only `REVIEW` warning and emits no raw logs. `REVIEW` is accepted only through the selected-track decision below, never silently treated as `PASS` |
 | `pnpm build` | Exit 0; Next.js production build completes |
 | `pnpm audit --prod` | Full production advisory report is reviewed and linked; every advisory has a disposition |
 | `pnpm audit --prod --audit-level high` | Exit 0; no high or critical production advisory |
 | `git diff --check` | Exit 0; no whitespace errors |
-| `pnpm check:production-readiness` | After the approved production push: all public schema through `0032`, including account, avatar, push, billing, lifetime entitlement, support, console, row-size hardening, audited operator Plus grants, and the Stripe subscription/dispute corrections, plus content, health, metadata, and auth-provider checks pass; deployed controls and other manual gates remain separate |
+| `pnpm check:production-web-account-deletion` | Before approval, the guarded dry run proves the exact Production target/history, fresh physical backup, pinned `0038` source, exclusion of `0037`, and exactly one proposed packet |
+| `pnpm check:production-readiness` | After the approved Production packet: all public schema through standalone `0038`, including the fixed Storage-safe deletion contract, plus account, avatar, push, billing, entitlement, support, console, row-size, operator, guided, provider-limit, Arcade, content, health, metadata, and auth-provider checks pass; deployed controls and other manual gates remain separate |
 
 The repository currently has no Markdown or link-check script in `package.json`.
 If one is added before freeze, it becomes required and its exact command and
@@ -366,7 +388,7 @@ docker exec -i supabase_db_BibleQuest \
   < supabase/evidence/rls_policy_report.sql
 ```
 
-Pass means all thirty-one checked-in migrations apply in the documented order,
+Pass means all 37 checked-in migrations apply in the documented local order,
 with `0013` absent and immutable `0014` matching its pinned SHA. Analytics
 consent defaults to and is reset to explicit opt-in (`false`) by `0009`, the
 rolling/recent-verse schema from `0010` exists, the Bible preference and
@@ -376,16 +398,19 @@ the daily-quest CAS/legacy compatibility contract from `0015` passes, the
 mutable-write, identity, generation, server-revision, and account-deletion
 boundaries from `0016` through `0022` pass, and the private avatar, push,
 billing, lifetime entitlement, one-time support, console, row-size, and operator
-Plus and Stripe correction boundaries from `0023` through `0032` pass. Every
+Plus, Stripe correction, guided progress, distributed provider-limit, and
+Arcade store boundaries from `0023` through `0036` pass, native `0037` remains
+default-off, and standalone `0038` proves serialized avatar uploads plus an
+empty owner folder before Auth deletion. Every
 content-free public posture RPC reports the fixed contract identity and
-`ok: true`, and the report meets the 40-table RLS gate. Supabase CLI and
+`ok: true`, and the report meets the 45-table RLS gate. Supabase CLI and
 a Docker-compatible daemon are required.
 
 For a linked project, retain every history/RLS safeguard in the security
 runbook and follow the seed/auth/content sequence in
 [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md). The reviewed dry run must
-match the frozen manifest and end at `0032`; a column probe alone is not
-migration-history evidence.
+match the frozen web manifest, include `0038`, and keep `0037` absent; a column
+probe alone is not migration-history evidence.
 
 ### Immutable deployment checks
 
@@ -530,7 +555,8 @@ restores.
    - Checkpoint: production-targeted migration, RLS/grant, CAS posture, and
      anonymous-denial portions of E04/E05/E06 become PASS; no staging result is
      relabeled as production evidence; the linked migration list has no pending
-     version through `0032`. Do not continue to content until this passes.
+     standalone web version `0038`, with native `0037` absent. Do not continue
+     to content until this passes.
    - Abort: any command error, unexpected row effect, RLS failure, privacy,
      auth, or sync regression. `0009` deliberately resets existing analytics
      consent to `false`; `0010` backfills/deduplicates data; `0011` changes
@@ -539,8 +565,11 @@ restores.
      revisions plus installs CAS/legacy triggers; `0016`–`0022` harden mutable
      sync, identity/generation/revision ordering, and account deletion; and
      `0023`–`0030` add sealed avatar, push, recurring/lifetime billing,
-     support, and console boundaries; `0031`–`0032` correct the Stripe
-     subscription conflict key and dispute-signal prefix.
+     support, and console boundaries; `0031`–`0032` correct Stripe projections;
+     `0033` adds guided progress; `0034`–`0035` add the distributed provider
+     limit; `0036` adds the sealed Arcade store; and standalone `0038` adds the
+     Storage-safe web deletion latch and final owner-folder proof. Native
+     `0037` remains a separate release phase.
      Capture failures and stop rather than attempting an ad hoc reversal.
 7. **Apply the approved content seed.** Regenerate the seed, require
    `git diff --exit-code -- supabase/seed.sql supabase/seed-manifest.json`,
@@ -688,7 +717,9 @@ vercel logs --environment production --status-code 5xx --since 5m
 
 Vercel plan limits may restrict eligible targets. A rollback restores old build
 output; it does **not** undo Supabase migrations, data writes, Stripe
-state, DNS changes, or other external effects. After rollback, production-domain
+state, DNS changes, or other external effects. Standalone `0038` is deliberately
+provider-compatible with `ed28b0b`; this release must not create a per-owner v2
+adoption boundary. After rollback, production-domain
 auto-assignment is disabled until an approved deployment is promoted; do not
 re-enable it during the incident by accident.
 
@@ -702,8 +733,11 @@ adds daily-quest revisions/CAS and legacy tracking; `0016`–`0019` harden the
 mutable account sync boundary; and `0020`–`0022` harden self-service,
 generation-bound account deletion. `0023`–`0030` add private avatar storage,
 encrypted push state, recurring/lifetime billing projection, one-time support
-records, and the private console foundation. `0031`–`0032` correct the Stripe
-subscription conflict key and dispute-signal prefix.
+records, and the private console foundation. `0031`–`0032` correct Stripe
+projections, `0033` adds guided progress, `0034`–`0035` add the distributed
+provider limit, `0036` adds the sealed Arcade store, and standalone `0038`
+adds the Storage-safe web deletion boundary. Native `0037` remains separately
+gated and excluded from this web rollout.
 The reviewed seed upserts public content. An app rollback does not undo any
 of those row or schema changes. If verification fails, create a new
 higher-numbered reviewed corrective migration; never delete/edit an applied
@@ -787,8 +821,8 @@ or raw production logs.
 | E02 | CI/local verification | Commands, exit codes, test counts, build summary | Deploy owner | `[UTC / URL]` | OPEN |
 | E03 | Immutable environment deployments | Staging rehearsal and staged Production-environment URLs; same frozen SHA; confirmed masked Supabase pair and environment posture for each; staging artifact marked never-promote | Deploy owner | `[UTC / URL]` | OPEN |
 | E04 | Migration history | Local/staging/production lists and reviewed migration-only dry run | Database owner | `[UTC / URL]` | OPEN |
-| E05 | RLS catalog | Sanitized 40-table policy/function report plus account, avatar, push, billing, support, console, and entitlement grants/contracts | Database owner | `[UTC / URL]` | OPEN |
-| E06 | Isolation | Enabled: A/B and anonymous negative-test summary with no sentinel values. Guest-only: active A/B client behavior marked out of scope, plus mandatory 40-table RLS/grant and anonymous mutation-denial evidence | Database + QA | `[UTC / URL]` | OPEN |
+| E05 | RLS catalog | Sanitized 45-table policy/function report plus account, avatar, deletion-latch, push, billing, support, console, entitlement, and Arcade grants/contracts | Database owner | `[UTC / URL]` | OPEN |
+| E06 | Isolation | Enabled: A/B and anonymous negative-test summary with no sentinel values. Guest-only: active A/B client behavior marked out of scope, plus mandatory 45-table RLS/grant and anonymous mutation-denial evidence | Database + QA | `[UTC / URL]` | OPEN |
 | E07 | Backup/restore | Backup timestamp/method and isolated restore drill | Database owner | `[UTC / URL]` | OPEN |
 | E08 | Privacy telemetry | Consent/DNT findings plus operational allowlist/redaction/queue evidence | QA + monitoring | `[UTC / URL]` | OPEN |
 | E09 | Device/PWA | iPhone and desktop cache/update matrix | QA owner | `[UTC / URL]` | OPEN |

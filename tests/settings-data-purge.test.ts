@@ -5,6 +5,10 @@ const SETTINGS = readFileSync(
   "src/components/settings/SettingsScreen.tsx",
   "utf8",
 );
+const DEVICE_CLEANUP = readFileSync(
+  "src/lib/auth/device-account-cleanup.ts",
+  "utf8",
+);
 
 /** Returns one Settings handler so ordering assertions stay narrowly scoped. */
 function handler(name: string, nextMarker: string): string {
@@ -16,36 +20,53 @@ function handler(name: string, nextMarker: string): string {
 describe("Settings device-data purge", () => {
   it("awaits the native mirror purge before resetting the primary journey", () => {
     const clear = handler("clearJourneyData", "\n\n  return (");
-    const purge = clear.indexOf("await purgeJourneyBackup()");
-    const reset = clear.indexOf("clearAllData(");
+    const purge = clear.indexOf("purgeJourneyBackup()");
+    const reset = clear.indexOf("purgePersistedJourney({");
 
     expect(purge).toBeGreaterThan(-1);
     expect(reset).toBeGreaterThan(purge);
+    expect(clear).toContain("withDeadline(");
     expect(clear).toContain("resumeJourneyBackupAfterPurge()");
   });
 
   it("also purges standalone Seven Days, tutorial, and boost records", () => {
-    const standalone = SETTINGS.slice(
-      SETTINGS.indexOf("function clearStandaloneGameData"),
-      SETTINGS.indexOf("function Row"),
+    const standalone = DEVICE_CLEANUP.slice(
+      DEVICE_CLEANUP.indexOf("function clearStandaloneGameData"),
+      DEVICE_CLEANUP.indexOf("export function purgeDeletedAccountDeviceData"),
     );
 
-    expect(standalone).toContain("clearGameProgress()");
-    expect(standalone).toContain("clearSevenDaysProgress()");
-    expect(standalone).toContain("SEVEN_DAYS_TUTORIAL_STORAGE_KEY");
-    expect(standalone).toContain("BOOST_STORAGE_KEY");
+    expect(standalone).toContain("purgeGameProgress()");
+    expect(standalone).toContain("purgeSevenDaysProgress()");
+    expect(standalone).toContain("LEGACY_SEVEN_DAYS_TUTORIAL_STORAGE_KEY");
+    expect(standalone).toContain("WEB_V2_SEVEN_DAYS_TUTORIAL_STORAGE_KEY");
+    expect(standalone).toContain("LEGACY_ARCADE_BOOST_STORAGE_KEY");
+    expect(standalone).toContain("WEB_V2_ARCADE_BOOST_STORAGE_KEY");
 
     const deletion = handler("deleteAccount", "\n\n  /** Removes account");
     const clear = handler("clearJourneyData", "\n\n  return (");
-    expect(deletion).toContain("clearStandaloneGameData()");
-    expect(clear).toContain("clearStandaloneGameData()");
+    expect(deletion).toContain("deleteAccountAndDeviceData(");
+    expect(DEVICE_CLEANUP).toContain("clearStandaloneGameData,");
+    expect(clear).toContain("await clearStandaloneGameData()");
+    expect(clear).toContain("commitWebPrivateHandoffOwner(");
+    expect(clear).toContain("if (!resetComplete)");
   });
 
   it("cancels native reminders during both destructive Settings paths", () => {
     const deletion = handler("deleteAccount", "\n\n  /** Removes account");
     const clear = handler("clearJourneyData", "\n\n  return (");
 
-    expect(deletion).toContain("await purgeNativeReminders()");
-    expect(clear).toContain("await purgeNativeReminders()");
+    expect(deletion).toContain("deleteAccountAndDeviceData(");
+    expect(DEVICE_CLEANUP).toContain("purgeNativeReminders");
+    expect(clear).toContain("purgeNativeReminders(),");
+  });
+
+  it("always releases the clear button and returns to onboarding", () => {
+    const clear = handler("clearJourneyData", "\n\n  return (");
+    const finallyBlock = clear.slice(clear.indexOf("} finally {"));
+
+    expect(finallyBlock).toContain("setConfirmClear(false)");
+    expect(finallyBlock).toContain("setClearingData(false)");
+    expect(clear).toContain('router.replace("/onboarding")');
+    expect(clear).not.toContain("window.location.replace");
   });
 });

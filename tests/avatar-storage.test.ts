@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AVATAR_CHANGED_EVENT,
   clearAvatar,
+  purgeAvatarCache,
   clearLegacyAvatar,
   loadAvatar,
   loadLegacyAvatar,
@@ -43,6 +44,7 @@ interface FakeRequest {
 
 function installIndexedDb(options: { failWrites?: boolean } = {}) {
   const data = new Map<string, unknown>();
+  let opened = false;
 
   const makeDb = () => ({
     objectStoreNames: { contains: () => true },
@@ -93,7 +95,8 @@ function installIndexedDb(options: { failWrites?: boolean } = {}) {
         onupgradeneeded: null,
       };
       queueMicrotask(() => {
-        req.onupgradeneeded?.();
+        if (!opened && data.size === 0) req.onupgradeneeded?.();
+        opened = true;
         req.onsuccess?.();
       });
       return req;
@@ -117,6 +120,7 @@ function installWindow() {
       events.push({ type: event.type, detail: event.detail });
       return true;
     },
+    localStorage,
   });
   return events;
 }
@@ -282,5 +286,25 @@ describe("clearAvatar", () => {
     await clearAvatar();
     expect(data.size).toBe(0);
     expect(events).toEqual([{ type: AVATAR_CHANGED_EVENT, detail: null }]);
+  });
+
+  it("confirms a complete cache purge for terminal account deletion", async () => {
+    const data = installIndexedDb();
+    installWindow();
+    data.set("pfp", webpBlob());
+    data.set(`avatar:${MARKER}`, webpBlob());
+
+    await expect(purgeAvatarCache()).resolves.toBe(true);
+    expect(data.size).toBe(0);
+  });
+
+  it("reports a failed terminal purge without announcing or losing retry data", async () => {
+    const data = installIndexedDb({ failWrites: true });
+    const events = installWindow();
+    data.set(`avatar:${MARKER}`, webpBlob());
+
+    await expect(purgeAvatarCache()).resolves.toBe(false);
+    expect(data.has(`avatar:${MARKER}`)).toBe(true);
+    expect(events).toEqual([]);
   });
 });

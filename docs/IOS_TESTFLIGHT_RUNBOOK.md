@@ -9,7 +9,7 @@ release instructions.
 | --- | --- |
 | Apple team | `W8KU6X34XR` — WINTERHILL MEDIA LLC |
 | Bundle ID | `co.biblequest.app` |
-| Version / build | `1.0 (4)` |
+| Version / build | `1.0` / Xcode Cloud run number (local baseline `4`) |
 | Device family | iPhone |
 | Hosted API/public origin | `https://www.biblequest.co` |
 | Account sync | Off and build-pinned |
@@ -82,6 +82,10 @@ Automatic signing is configured. Xcode Organizer can use Apple's cloud-managed
 distribution signing when the account has permission; a local Apple
 Distribution identity is not required in advance.
 
+Xcode Cloud maps its increasing `CI_BUILD_NUMBER` to `CFBundleVersion` in
+`ci_post_clone.sh`, so each cloud upload is unique. Manual local archives retain
+the checked-in build number and still need a deliberate increment after upload.
+
 ## 4. Archive and upload the reusable candidate
 
 Open `ios/App/App.xcodeproj`, select **Any iOS Device (arm64)**, then choose
@@ -93,14 +97,15 @@ Do not choose **TestFlight Internal Only**. That designation prevents the build
 from later reaching external testers or customers. A normal App Store Connect
 upload can still be assigned to an internal TestFlight group.
 
-If build 4 has already been uploaded, increment the build number before the next
-archive. Keep marketing version `1.0` until this release is approved.
+For a manual local archive, increment the checked-in build number if it has
+already been uploaded. Keep marketing version `1.0` until this release is
+approved.
 
 ## 5. Internal TestFlight gate
 
 After processing:
 
-1. Add build 4 to an Internal Testing group.
+1. Add the processed release candidate to an Internal Testing group.
 2. Install it from TestFlight on a physical iPhone.
 3. Complete the matrix below before selecting the build for App Review.
 
@@ -129,8 +134,9 @@ review, and submit. The tester-feedback PDF must be triaged before this step.
 
 ## Current production-origin state
 
-On August 10, 2026, the production-only latch was set to `true`, the current
-merged `main` deployment was rebuilt and aliased to `www.biblequest.co`, and
-both checks above returned `Access-Control-Allow-Origin:
-capacitor://localhost`. Treat the commands—not this note—as the release gate;
-they must stay green for every candidate.
+On August 10, 2026, the production-only latch was set to `true`, and both checks
+above returned `Access-Control-Allow-Origin: capacitor://localhost`. Treat the
+commands—not this note—as the release gate; they must stay green for every
+candidate. The separate production health SHA must also match the deployment
+the team approved. Resolve any synthetic `release_sha_drift` alert instead of
+assuming a successful preview build moved the `www` production alias.

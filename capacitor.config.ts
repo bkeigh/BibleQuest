@@ -45,7 +45,9 @@ const config: CapacitorConfig = {
     androidScheme: "https",
   },
   ios: {
-    contentInset: "always",
+    // CSS safe-area utilities own every edge; UIKit insets would apply the
+    // same top and bottom clearance twice around the WebView content.
+    contentInset: "never",
     limitsNavigationsToAppBoundDomains: false,
     // TextZoom needs the mobile content mode on iPad; iPhone is unchanged.
     preferredContentMode: "mobile",
@@ -65,6 +67,9 @@ const config: CapacitorConfig = {
       launchAutoHide: true,
       launchShowDuration: 3000,
       backgroundColor: "#faf6ec",
+      // Keep startup focused on the reviewed artwork, with no native spinner
+      // competing with the matching in-app restore screen.
+      showSpinner: false,
     },
     /**
      * Left disabled on purpose. CapacitorHttp patches fetch/XHR onto native

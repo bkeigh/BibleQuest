@@ -1,8 +1,13 @@
 import observability from "../../../config/observability.json";
 import { stripeBillingAvailability } from "@/lib/billing/config";
 import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
+import { supabasePublishableKey } from "@/lib/supabase/config";
 
 const SHA = /^[a-f0-9]{40}$/i;
+
+// Next.js replaces this static access with the public release identity captured
+// by next.config.ts, so it survives a runtime environment without CI metadata.
+const BUNDLED_BUILD_SHA = process.env.BIBLEQUEST_BUILD_SHA;
 
 export type AuthPosture = "configured" | "guest-only" | "invalid";
 export type AnalyticsPosture = "configured" | "disabled" | "invalid";
@@ -33,16 +38,18 @@ function safeSha(value: string | undefined): string | null {
   return candidate && SHA.test(candidate) ? candidate.toLowerCase() : null;
 }
 
+/** Trusts the runtime provider identity, then the immutable bundled identity. */
+function releaseSha(env: PublicEnvironment): string | null {
+  return safeSha(env.VERCEL_GIT_COMMIT_SHA) ?? safeSha(BUNDLED_BUILD_SHA);
+}
+
 /** Reports configuration shape without exposing a Supabase host or key. */
 function authPosture(
   env: PublicEnvironment,
   accountSyncContained: boolean,
 ): AuthPosture {
   const hasUrl = Boolean(env.NEXT_PUBLIC_SUPABASE_URL?.trim());
-  const hasKey = Boolean(
-    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
-      env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim(),
-  );
+  const hasKey = Boolean(supabasePublishableKey(env));
   if (hasUrl && hasKey) {
     return accountSyncContained ? "guest-only" : "configured";
   }
@@ -89,7 +96,7 @@ export function buildReleaseHealth(
     status: "ok",
     app: "biblequest",
     contract: observability.contract,
-    release_sha: safeSha(env.VERCEL_GIT_COMMIT_SHA ?? env.GITHUB_SHA),
+    release_sha: releaseSha(env),
     rollback_sha: safeSha(env.BIBLEQUEST_ROLLBACK_SHA),
     canonical_origin: observability.canonicalOrigin,
     canonical_origin_matches:

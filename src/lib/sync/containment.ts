@@ -1,14 +1,21 @@
-/**
- * Temporary incident latch for the production Journey schema mismatch.
- * Account sync fails closed unless one reviewed build target explicitly
- * enables it after migrations through 0022 and the isolation gates pass.
- */
+import { isNativeTarget } from "@/lib/platform/target";
+
+/** Fail closed unless a reviewed build explicitly enables account sync. */
 export function accountSyncContained(enabled: string | undefined): boolean {
   return enabled !== "true";
 }
 
 export const ACCOUNT_SYNC_CONTAINED = accountSyncContained(
   process.env.NEXT_PUBLIC_ACCOUNT_SYNC_ENABLED,
+);
+
+/** Native account traffic requires the separate deterministic beta profile. */
+export function nativeAccountBetaEnabled(value: string | undefined): boolean {
+  return value === "true";
+}
+
+export const NATIVE_ACCOUNT_BETA_ENABLED = nativeAccountBetaEnabled(
+  process.env.NEXT_PUBLIC_NATIVE_ACCOUNT_BETA_ENABLED,
 );
 
 /** Truthful copy shared by every disabled account-sync entry point. */
@@ -19,6 +26,12 @@ export const ACCOUNT_SYNC_CONTAINMENT_NOTICE =
 export function accountSyncAvailable(
   supabaseConfigured: boolean,
   contained = ACCOUNT_SYNC_CONTAINED,
+  nativeTarget = isNativeTarget(),
+  nativeBetaEnabled = NATIVE_ACCOUNT_BETA_ENABLED,
 ): boolean {
-  return supabaseConfigured && !contained;
+  return (
+    supabaseConfigured &&
+    !contained &&
+    (!nativeTarget || nativeBetaEnabled)
+  );
 }

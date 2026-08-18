@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuestOS } from "@/lib/questos/store";
 import { useSession } from "@/lib/supabase/useSession";
-import { createClient } from "@/lib/supabase/client";
 import { retrySync } from "@/lib/sync/engine";
 import { useSyncStatus } from "@/lib/sync/status";
 import {
   getLastSyncedUserId,
   initialSyncIsPending,
   localDataBelongsToOtherUser,
+  readLocalJourneyOwner,
 } from "@/lib/sync/last-user";
 import {
   accountRestorePhase,
@@ -25,11 +25,28 @@ import {
   shouldRedirectAppToOnboarding,
 } from "@/lib/auth/onboarding-resume";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
+import { AppLoadingScreen } from "@/components/app-shell/AppLoadingScreen";
 import { ArtMascot } from "@/components/design-system/ArtMascot";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton } from "@/components/design-system/GentleButton";
 import { accountSyncResetRequired } from "@/lib/sync/generation";
 import { isNativeTarget } from "@/lib/platform/target";
+import {
+  AccountSignOutError,
+  signOutExpectedAccount,
+} from "@/lib/auth/account-sign-out";
+import { SignInMethods } from "@/components/account/SignInMethods";
+import {
+  resumeInstallingWebSession,
+  withLegacyWebPrivateGuestRecovery,
+  withLockedLocalJourneyPrivateReset,
+  withWebAccountOperationLock,
+} from "@/lib/supabase/web-auth-storage";
+import {
+  adoptAmbiguousLegacyWebPrivateDataAsGuest,
+  purgeAllWebPrivateDataNamespaces,
+  purgeAmbiguousWebPrivateDataAndEstablishGuest,
+} from "@/lib/storage/web-private-cutover";
 
 /** Redirects stale web-only Plus hand-offs to the native app home. */
 function safeLaunchDestination(stage: ReturnType<typeof getOnboardingResumeStage>) {
@@ -112,17 +129,211 @@ function OnboardingRouteGate({ children }: { children: React.ReactNode }) {
 }
 
 function LoadingVeil() {
+  return <AppLoadingScreen />;
+}
+
+/** Keeps provisional auth private while offering a bounded cutover retry. */
+function InstallingAccountRecovery() {
+  const [working, setWorking] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function retry(
+    authorization:
+      | "automatic"
+      | "explicit-keep-local-journey"
+      | "explicit-start-fresh",
+  ) {
+    if (working) return;
+    setWorking(true);
+    setFailed(false);
+    try {
+      const result = await withWebAccountOperationLock((handle) =>
+        resumeInstallingWebSession(handle, authorization),
+      );
+      if (result === "activated") {
+        window.location.reload();
+        return;
+      }
+      setFailed(true);
+    } catch {
+      setFailed(true);
+    } finally {
+      setWorking(false);
+    }
+  }
+
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-parchment">
-      <ArtMascot name="lantern" size={176} />
-      <p
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        className="text-small text-ash"
-      >
-        Restoring your journey…
-      </p>
+    <div className="flex min-h-dvh items-center justify-center bg-parchment px-5">
+      <div className="w-full max-w-sm">
+        <PaperCard variant="paper" padding="lg">
+          <ArtMascot name="lantern" size={176} className="mb-4" />
+          <h1 className="font-display text-[1.375rem] leading-snug text-graphite">
+            Finish securing this journey
+          </h1>
+          <p className="mt-2 text-small leading-relaxed text-charcoal">
+            BibleQuest is keeping account progress hidden until this browser’s
+            private storage is safely prepared.
+          </p>
+          <GentleButton
+            variant="primary"
+            size="md"
+            fullWidth
+            className="mt-5"
+            disabled={working}
+            onClick={() => void retry("automatic")}
+          >
+            {working ? "Checking…" : "Try again"}
+          </GentleButton>
+          <GentleButton
+            variant="outline"
+            size="md"
+            fullWidth
+            className="mt-2"
+            disabled={working}
+            onClick={() => void retry("explicit-keep-local-journey")}
+          >
+            Keep this device’s journey
+          </GentleButton>
+          <GentleButton
+            variant="ghost"
+            size="sm"
+            fullWidth
+            className="mt-2"
+            disabled={working}
+            onClick={() => void retry("explicit-start-fresh")}
+          >
+            Start fresh and clear this device
+          </GentleButton>
+          {failed && (
+            <p role="alert" className="mt-3 text-caption text-rose-700">
+              We couldn’t finish safely. Your journey is still locked; reconnect
+              and retry.
+            </p>
+          )}
+        </PaperCard>
+      </div>
+    </div>
+  );
+}
+
+/** Exposes only reviewed recovery choices without mounting private descendants. */
+function LockedLocalJourneyRecovery({ clearOnly = false }: { clearOnly?: boolean }) {
+  const [clearing, setClearing] = useState(false);
+  const [clearFailed, setClearFailed] = useState(false);
+  const [keeping, setKeeping] = useState(false);
+  const ownerAtRender = readLocalJourneyOwner();
+  const ownedJourney = ownerAtRender.status === "owned";
+
+  async function keepAmbiguousJourney() {
+    if (keeping || clearing || clearOnly || ownedJourney) return;
+    setKeeping(true);
+    setClearFailed(false);
+    try {
+      const complete = await withWebAccountOperationLock((handle) =>
+        withLegacyWebPrivateGuestRecovery(
+          handle,
+          "explicit-keep",
+          adoptAmbiguousLegacyWebPrivateDataAsGuest,
+        ),
+      );
+      if (complete) {
+        window.location.reload();
+        return;
+      }
+      setClearFailed(true);
+    } catch {
+      setClearFailed(true);
+    } finally {
+      setKeeping(false);
+    }
+  }
+
+  async function clearLockedJourney() {
+    if (clearing || keeping) return;
+    const owner = readLocalJourneyOwner();
+    setClearing(true);
+    setClearFailed(false);
+    try {
+      const complete = await withWebAccountOperationLock((handle) => {
+        if (owner.status === "owned") {
+          return withLockedLocalJourneyPrivateReset(
+            handle,
+            owner.userId,
+            purgeAllWebPrivateDataNamespaces,
+          );
+        }
+        return withLegacyWebPrivateGuestRecovery(
+          handle,
+          "explicit-clear",
+          purgeAmbiguousWebPrivateDataAndEstablishGuest,
+        );
+      });
+      if (complete) {
+        window.location.reload();
+        return;
+      }
+      setClearFailed(true);
+    } catch {
+      setClearFailed(true);
+    } finally {
+      setClearing(false);
+    }
+  }
+
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-parchment px-5 py-8">
+      <div className="w-full max-w-sm space-y-4">
+        <PaperCard variant="paper" padding="lg">
+          <ArtMascot name="key" size={176} className="mb-4" />
+          <h1 className="font-display text-[1.375rem] leading-snug text-graphite">
+            {clearOnly
+              ? "Finishing your clear"
+              : ownedJourney
+                ? "This journey belongs to an account"
+                : "Is this your journey?"}
+          </h1>
+          <p className="mt-2 text-small leading-relaxed text-charcoal">
+            {clearOnly
+              ? "BibleQuest is finishing the private journey clear you requested. Its prayers and reflections stay hidden."
+              : ownedJourney
+                ? "Sign back in to restore the account that owns it, or clear the journey from this browser. Its prayers and reflections stay hidden."
+                : "This browser holds a BibleQuest journey. Keep it if it’s yours, or clear it to start fresh. Its prayers and reflections stay hidden until you choose."}
+          </p>
+          {!clearOnly && !ownedJourney && (
+            <GentleButton
+              variant="outline"
+              size="md"
+              fullWidth
+              className="mt-4"
+              disabled={clearing || keeping}
+              onClick={() => void keepAmbiguousJourney()}
+            >
+              {keeping ? "Securing…" : "Keep this local journey"}
+            </GentleButton>
+          )}
+          <GentleButton
+            variant="ghost"
+            size="sm"
+            fullWidth
+            className={clearOnly || ownedJourney ? "mt-4" : "mt-2"}
+            disabled={clearing || keeping}
+            onClick={() => void clearLockedJourney()}
+          >
+            {clearing ? "Clearing…" : "Clear this browser’s journey"}
+          </GentleButton>
+          {clearFailed && (
+            <p role="alert" className="mt-2 text-caption text-rose-700">
+              Nothing was opened or replaced. Retry when browser storage is
+              available.
+            </p>
+          )}
+        </PaperCard>
+        {!clearOnly && ownedJourney && (
+          <PaperCard variant="paper" padding="lg">
+            <SignInMethods source="account" intent="signin" />
+          </PaperCard>
+        )}
+      </div>
     </div>
   );
 }
@@ -155,10 +366,20 @@ function RestoreError({
   async function signOut() {
     setSigningOut(true);
     setSignOutError(false);
-    const { error } = await createClient().auth.signOut();
-    if (error) {
+    try {
+      const result = await signOutExpectedAccount(userId);
+      if (result.reloadRequired) {
+        window.location.reload();
+      }
+    } catch (error) {
       setSigningOut(false);
       setSignOutError(true);
+      if (
+        error instanceof AccountSignOutError &&
+        error.reloadRequired
+      ) {
+        window.location.reload();
+      }
     }
   }
 
@@ -278,8 +499,17 @@ function LocalRestoreNotice({
  * pull has completed. This is what lets a fresh browser recover the remote
  * onboarding profile before deciding which route belongs on screen.
  */
-function AccountRestoreBoundary({ children }: { children: React.ReactNode }) {
-  const { user, loading, configured } = useSession();
+function ReadyAccountRestoreBoundary({
+  children,
+  configured,
+  loading,
+  userId,
+}: {
+  children: React.ReactNode;
+  configured: boolean;
+  loading: boolean;
+  userId: string | null;
+}) {
   const sync = useSyncStatus();
   const [localRecoveryUserId, setLocalRecoveryUserId] = useState<string | null>(
     null,
@@ -287,7 +517,6 @@ function AccountRestoreBoundary({ children }: { children: React.ReactNode }) {
   const localOnboardingCompleted = useQuestOS(
     (state) => state.profile?.onboardingCompleted ?? false,
   );
-  const userId = user?.id ?? null;
   const initialSyncPending = Boolean(
     userId && initialSyncIsPending(userId),
   );
@@ -344,10 +573,47 @@ function AccountRestoreBoundary({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export function OnboardingGate({ children }: { children: React.ReactNode }) {
+/** Routes content-free auth recovery before any private store descendant mounts. */
+function AccountRestoreBoundary({
+  children,
+  services,
+}: {
+  children: React.ReactNode;
+  services?: React.ReactNode;
+}) {
+  const { user, loading, configured, recovery } = useSession();
+  if (recovery === "installing") return <InstallingAccountRecovery />;
+  if (recovery === "locked-local-journey") {
+    return <LockedLocalJourneyRecovery />;
+  }
+  if (recovery === "clearing-local-journey") {
+    return <LockedLocalJourneyRecovery clearOnly />;
+  }
+  if (loading) return <LoadingVeil />;
+  return (
+    <>
+      {services}
+      <ReadyAccountRestoreBoundary
+        configured={configured}
+        loading={false}
+        userId={user?.id ?? null}
+      >
+        {children}
+      </ReadyAccountRestoreBoundary>
+    </>
+  );
+}
+
+export function OnboardingGate({
+  children,
+  services,
+}: {
+  children: React.ReactNode;
+  services?: React.ReactNode;
+}) {
   return (
     <ClientOnly fallback={<LoadingVeil />}>
-      <AccountRestoreBoundary>
+      <AccountRestoreBoundary services={services}>
         <Gate>{children}</Gate>
       </AccountRestoreBoundary>
     </ClientOnly>
@@ -357,12 +623,14 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
 /** Account-aware hold for the public onboarding route itself. */
 export function OnboardingAccountRestoreGate({
   children,
+  services,
 }: {
   children: React.ReactNode;
+  services?: React.ReactNode;
 }) {
   return (
     <ClientOnly fallback={<LoadingVeil />}>
-      <AccountRestoreBoundary>
+      <AccountRestoreBoundary services={services}>
         <OnboardingRouteGate>{children}</OnboardingRouteGate>
       </AccountRestoreBoundary>
     </ClientOnly>

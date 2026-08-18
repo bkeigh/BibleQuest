@@ -17,6 +17,7 @@ with expected (table_name, classification) as (
     ('milestones', 'public content'),
     ('feature_flags', 'public content'),
     ('profiles', 'user-owned'),
+    ('account_deletion_latches', 'server-owned account deletion state'),
     ('user_sync_state', 'retained user-owned state'),
     ('user_settings', 'user-owned'),
     ('user_daily_quests', 'user-owned'),
@@ -154,9 +155,16 @@ where namespace.nspname = 'public'
     'delete_user_sync_rows',
     'account_sync_generation',
     'account_sync_contract',
+    'native_account_beta_availability',
+    'native_account_beta_request_allowed',
+    'enforce_native_account_beta_availability',
     'guided_progress_sync_contract',
+    'avatar_upload_allowed',
+    'begin_own_account_deletion',
+    'own_account_deletion_status',
     'delete_own_account',
     'account_deletion_contract',
+    'account_deletion_storage_contract',
     'set_profile_avatar',
     'clear_profile_avatar',
     'profile_avatar_contract',
@@ -257,7 +265,8 @@ where table_namespace.nspname = 'public'
     'user_milestones',
     'verse_bookmarks',
     'reading_progress',
-    'chapters_read'
+    'chapters_read',
+    'user_sync_state'
   )
   and not trigger.tgisinternal
 order by table_class.relname, trigger.tgname;
@@ -330,6 +339,8 @@ select public.mutable_account_sync_contract() as mutable_account_sync_contract;
 select public.account_sync_contract() as account_sync_contract;
 select public.guided_progress_sync_contract() as guided_progress_sync_contract;
 select public.account_deletion_contract() as account_deletion_contract;
+select public.account_deletion_storage_contract()
+  as account_deletion_storage_contract;
 select public.profile_avatar_contract() as profile_avatar_contract;
 select public.push_reminder_contract() as push_reminder_contract;
 select public.stripe_billing_contract() as stripe_billing_contract;

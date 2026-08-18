@@ -3,7 +3,14 @@
 BibleQuest now has a Capacitor iOS project that ships a local static bundle.
 The canonical execution checklist is
 [`IOS_TESTFLIGHT_RUNBOOK.md`](IOS_TESTFLIGHT_RUNBOOK.md); product-page material
-is in [`APP_STORE_SUBMISSION.md`](APP_STORE_SUBMISSION.md).
+is in [`APP_STORE_SUBMISSION.md`](APP_STORE_SUBMISSION.md). The sequenced work
+after the parity foundation is in [`IOS_PHASE_5_PLAN.md`](archive/IOS_PHASE_5_PLAN.md).
+
+This document remains the contract for the guest-only 1.0 binary. The later
+account-enabled replacement has separate migration, device, privacy, metadata,
+and release gates in
+[`IOS_ACCOUNT_REPLACEMENT_RELEASE.md`](IOS_ACCOUNT_REPLACEMENT_RELEASE.md).
+Do not use the guest checklist to approve that replacement.
 
 ## Locked 1.0 scope
 

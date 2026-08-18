@@ -51,7 +51,7 @@ describe("daily Scripture game selection", () => {
     );
   });
 
-  it("exposes Start and Resume orientation for integrating surfaces", () => {
+  it("exposes Start and Resume orientation for integrating surfaces", async () => {
     const first = getDailyGameSnapshot(
       "2026-08-01",
       allEnabled,
@@ -65,7 +65,7 @@ describe("daily Scripture game selection", () => {
       first.puzzle.kind === "connections"
         ? createConnectionsProgress(first.puzzle, first.sessionKey, 1)
         : createTimelineProgress(first.puzzle, first.sessionKey, 1);
-    writeGameProgress(progress, first.puzzle);
+    await expect(writeGameProgress(progress, first.puzzle)).resolves.toBe(true);
     expect(
       getDailyGameSnapshot("2026-08-01", allEnabled, window.localStorage)
         .actionLabel,
@@ -89,7 +89,9 @@ describe("daily Scripture game selection", () => {
           : null;
     expect(completed).not.toBeNull();
     if (!completed) return;
-    expect(writeGameProgress(completed, first.puzzle)).toBe(true);
+    await expect(writeGameProgress(completed, first.puzzle)).resolves.toBe(
+      true,
+    );
     expect(
       getDailyGameSnapshot("2026-08-01", allEnabled, window.localStorage)
         .actionLabel,

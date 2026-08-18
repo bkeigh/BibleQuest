@@ -19,6 +19,21 @@ import type { NextConfig } from "next";
  */
 const isProduction = process.env.NODE_ENV === "production";
 
+// Accept only a full commit identity before embedding public release metadata.
+function releaseSha(value: string | undefined) {
+  const candidate = value?.trim();
+  return candidate && /^[a-f0-9]{40}$/i.test(candidate)
+    ? candidate.toLowerCase()
+    : null;
+}
+
+// Preserve the first validated build-provider identity inside the server
+// bundle so an invalid Vercel value cannot mask a valid GitHub commit.
+const buildReleaseSha =
+  releaseSha(process.env.VERCEL_GIT_COMMIT_SHA) ??
+  releaseSha(process.env.GITHUB_SHA) ??
+  "";
+
 // Next.js App Router streams the RSC payload through inline <script> tags and
 // injects inline <style> (next/font, Tailwind, framer-motion) — both need
 // 'unsafe-inline' unless we wire nonces through the request proxy (future hardening).
@@ -185,6 +200,8 @@ const privateNoStoreHeader = {
 };
 
 const nextConfig: NextConfig = {
+  // This value is public operational metadata, not a credential.
+  env: { BIBLEQUEST_BUILD_SHA: buildReleaseSha },
   // Avoid exposing framework identity on every response.
   poweredByHeader: false,
   // This repository can sit beneath unrelated lockfiles on a workstation.

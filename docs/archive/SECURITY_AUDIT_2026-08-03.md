@@ -1,5 +1,8 @@
 # BibleQuest security and product-health follow-up — 2026-08-03
 
+> **STATUS (2026-08-14):** Historical audit record. Findings were remediated in the releases that followed.
+
+
 ## Executive result
 
 No unresolved critical or high-severity application or production-dependency

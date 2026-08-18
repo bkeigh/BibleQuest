@@ -79,14 +79,25 @@ interface MutableRevisionStorage {
 
 export interface MutableRevisionContext {
   entries: Map<string, MutableObservation>;
+  epoch: number;
   generation: number | null;
   observedResources: Set<MutableAccountResource>;
   storage: MutableRevisionStorage | null;
   userId: string | null;
 }
 
+/** Content-free failure used when a CAS baseline cannot survive relaunch. */
+export class MutableRevisionPersistenceError extends Error {
+  readonly code = "mutable_revision_persistence_unavailable";
+
+  constructor() {
+    super("Mutable account sync metadata could not be persisted.");
+    this.name = "MutableRevisionPersistenceError";
+  }
+}
+
 const STORAGE_KEY = "biblequest:mutable-account-cas:v1";
-const MAX_STORED_ENTRIES = 10_000;
+export const MAX_DURABLE_MUTABLE_OBSERVATIONS = 10_000;
 const MAX_STORED_ACCOUNTS = 4;
 const RESOURCE_SET = new Set<MutableAccountResource>([
   "profiles",
@@ -99,6 +110,16 @@ const RESOURCE_SET = new Set<MutableAccountResource>([
   "verse_bookmarks",
   "user_recent_verses",
 ]);
+
+/**
+ * The same set, exported so conformance checks can compare it against the
+ * resource names `upsert_mutable_account_rows` actually branches on. PostgREST
+ * resolves that by value, so a name the function has no case for is written
+ * nowhere and fails silently.
+ */
+export const MUTABLE_ACCOUNT_RESOURCES: ReadonlySet<MutableAccountResource> =
+  RESOURCE_SET;
+
 const WRITABLE_KEYS: Record<MutableAccountResource, readonly string[]> = {
   profiles: [
     "display_name",
@@ -193,6 +214,7 @@ const WRITABLE_KEYS: Record<MutableAccountResource, readonly string[]> = {
 export function createMutableRevisionContext(): MutableRevisionContext {
   return {
     entries: new Map(),
+    epoch: 0,
     generation: null,
     observedResources: new Set(),
     storage: null,
@@ -203,6 +225,7 @@ export function createMutableRevisionContext(): MutableRevisionContext {
 /** Reset in-memory observations without deleting a safe persisted baseline. */
 export function resetMutableRevisionContext(context: MutableRevisionContext) {
   context.entries.clear();
+  context.epoch += 1;
   context.generation = null;
   context.observedResources.clear();
   context.storage = null;
@@ -218,6 +241,36 @@ export function clearStoredMutableRevisionContext(
     storage.removeItem(STORAGE_KEY);
   } catch {
     // Private browsing may make local storage unavailable.
+  }
+}
+
+/** Remove one deleted account without discarding other accounts' CAS baselines. */
+export function removeStoredMutableRevisionContext(
+  userId: string,
+  storage: MutableRevisionStorage | null = browserStorage(),
+): boolean {
+  if (!userId || !storage) return false;
+  try {
+    const raw = storage.getItem(STORAGE_KEY);
+    if (!raw) return true;
+    const ledger = parseStoredLedger(JSON.parse(raw));
+    if (!ledger) return false;
+    const accounts = ledger.accounts.filter(
+      (account) => account.userId !== userId,
+    );
+    if (accounts.length === ledger.accounts.length) return true;
+    if (accounts.length === 0) {
+      storage.removeItem(STORAGE_KEY);
+      return storage.getItem(STORAGE_KEY) === null;
+    }
+    const encoded = JSON.stringify(
+      { accounts, version: 1 } satisfies StoredMutableSyncLedger,
+    );
+    storage.setItem(STORAGE_KEY, encoded);
+    return storage.getItem(STORAGE_KEY) === encoded;
+  } catch {
+    // An unreadable ledger cannot be rewritten without risking another account.
+    return false;
   }
 }
 
@@ -396,11 +449,31 @@ export async function reconcileMutableRows(
   },
 ): Promise<ReconciledMutableRow[]> {
   assertContextOwner(context, options.expectedUserId);
+  const epoch = context.epoch;
+  const generation = context.generation;
   const local = await indexRows(resource, localRows, options.expectedUserId, false);
   const remote = await indexRows(resource, remoteRows, options.expectedUserId, true);
+  assertContextBoundary(
+    context,
+    options.expectedUserId,
+    generation,
+    epoch,
+  );
   const hadResourceBaseline = context.observedResources.has(resource);
   const keys = new Set([...local.keys(), ...remote.keys()]);
   const reconciled: ReconciledMutableRow[] = [];
+
+  // Refuse a pull before mutating its CAS context when the accepted aggregate
+  // cannot be represented by the durable ledger used after an offline relaunch.
+  let prospectiveEntryCount = context.entries.size;
+  for (const keyId of keys) {
+    if (!context.entries.has(observationMapId(resource, keyId))) {
+      prospectiveEntryCount += 1;
+    }
+  }
+  if (prospectiveEntryCount > MAX_DURABLE_MUTABLE_OBSERVATIONS) {
+    throw new Error("Mutable account sync metadata exceeds durable capacity.");
+  }
 
   for (const keyId of [...keys].sort()) {
     const localRow = local.get(keyId);
@@ -443,11 +516,14 @@ export async function prepareMutableWrites(
   expectedUserId: string,
 ): Promise<PreparedMutableWrite[]> {
   assertContextOwner(context, expectedUserId);
+  const epoch = context.epoch;
+  const generation = context.generation;
   if (!context.observedResources.has(resource)) {
     throw new Error("Mutable account sync has no canonical baseline.");
   }
 
   const indexed = await indexRows(resource, rows, expectedUserId, false);
+  assertContextBoundary(context, expectedUserId, generation, epoch);
   const prepared: PreparedMutableWrite[] = [];
   for (const [keyId, current] of indexed) {
     const observation = context.entries.get(observationMapId(resource, keyId));
@@ -576,6 +652,37 @@ function assertContextOwner(
   }
 }
 
+/** Reject work that resumed after this protocol context was reset or replaced. */
+export function assertMutableRevisionContextBoundary(
+  context: MutableRevisionContext,
+  expectedUserId: string,
+  expectedGeneration: number,
+  expectedEpoch: number,
+) {
+  assertContextBoundary(
+    context,
+    expectedUserId,
+    expectedGeneration,
+    expectedEpoch,
+  );
+}
+
+/** Compare all mutable-protocol ownership fields after an async boundary. */
+function assertContextBoundary(
+  context: MutableRevisionContext,
+  expectedUserId: string,
+  expectedGeneration: number | null,
+  expectedEpoch: number,
+) {
+  if (
+    context.userId !== expectedUserId ||
+    context.generation !== expectedGeneration ||
+    context.epoch !== expectedEpoch
+  ) {
+    throw new Error("Mutable account sync context changed.");
+  }
+}
+
 /** Persist only bounded revision metadata and canonical hashes. */
 function persistContext(context: MutableRevisionContext) {
   if (!context.storage || !context.userId || context.generation === null) return;
@@ -585,7 +692,7 @@ function persistContext(context: MutableRevisionContext) {
       const parsed = parseObservationId(id);
       entries.push({ ...parsed, ...observation });
     }
-    if (entries.length > MAX_STORED_ENTRIES) {
+    if (entries.length > MAX_DURABLE_MUTABLE_OBSERVATIONS) {
       throw new Error("Mutable account sync metadata is too large.");
     }
     const state: StoredMutableSyncState = {
@@ -597,7 +704,13 @@ function persistContext(context: MutableRevisionContext) {
     let accounts: StoredMutableSyncState[] = [];
     const existing = context.storage.getItem(STORAGE_KEY);
     if (existing) {
-      accounts = parseStoredLedger(JSON.parse(existing))?.accounts ?? [];
+      try {
+        accounts = parseStoredLedger(JSON.parse(existing))?.accounts ?? [];
+      } catch {
+        // A malformed old ledger is untrusted but does not prevent replacing
+        // it with the complete, newly verified canonical observation set.
+        accounts = [];
+      }
     }
     const ledger: StoredMutableSyncLedger = {
       accounts: [
@@ -606,7 +719,11 @@ function persistContext(context: MutableRevisionContext) {
       ].slice(0, MAX_STORED_ACCOUNTS),
       version: 1,
     };
-    context.storage.setItem(STORAGE_KEY, JSON.stringify(ledger));
+    const encoded = JSON.stringify(ledger);
+    context.storage.setItem(STORAGE_KEY, encoded);
+    if (context.storage.getItem(STORAGE_KEY) !== encoded) {
+      throw new MutableRevisionPersistenceError();
+    }
   } catch {
     // An older persisted baseline could misclassify imported canonical data
     // as a local edit after reload, so invalidate it on any failed rewrite.
@@ -615,6 +732,9 @@ function persistContext(context: MutableRevisionContext) {
     } catch {
       // Storage can be wholly unavailable; this session still uses memory.
     }
+    // Reporting success without this baseline can lose the next offline edit
+    // after relaunch, so the enclosing sync must stop before importing rows.
+    throw new MutableRevisionPersistenceError();
   }
 }
 
@@ -651,7 +771,7 @@ function parseStoredAccount(value: unknown): StoredMutableSyncState | null {
     !Number.isSafeInteger(candidate.generation) ||
     (candidate.generation as number) < 0 ||
     !Array.isArray(candidate.entries) ||
-    candidate.entries.length > MAX_STORED_ENTRIES ||
+    candidate.entries.length > MAX_DURABLE_MUTABLE_OBSERVATIONS ||
     !Array.isArray(candidate.observedResources)
   ) {
     return null;

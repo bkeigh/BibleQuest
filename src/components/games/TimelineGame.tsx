@@ -58,8 +58,8 @@ export function TimelineGame({
 
   // Persist in the same user action so storage failure is visible immediately.
   function commitProgress(next: TimelineProgress) {
-    setResumeAvailable(writeGameProgress(next, puzzle));
     setProgress(next);
+    void writeGameProgress(next, puzzle).then(setResumeAvailable);
   }
 
   function choose(itemId: string) {

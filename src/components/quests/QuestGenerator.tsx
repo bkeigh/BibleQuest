@@ -28,8 +28,9 @@ import {
   QUEST_CATEGORY_LABEL,
 } from "@/lib/questos/quest-presentation";
 import { IconPlus } from "@/components/design-system/icons";
-import { apiFetch } from "@/lib/platform/api";
+import { authenticatedApiFetch } from "@/lib/platform/api";
 import { isNativeTarget } from "@/lib/platform/target";
+import { useSession } from "@/lib/supabase/useSession";
 
 const DURATIONS: QuestDuration[] = [5, 10, 15, 30, 60, 240, 480];
 const provider = createReviewedQuestProvider(seedQuests);
@@ -52,6 +53,7 @@ export function QuestGenerator({
   const assignments = useQuestOS((state) => state.assignments);
   const completions = useQuestOS((state) => state.completions);
   const myQuests = useQuestOS(selectMyQuests);
+  const { user } = useSession();
 
   // A free native build has no acquisition path, so it omits the preview
   // rather than advertising a feature the reader cannot unlock in-app.
@@ -95,6 +97,7 @@ export function QuestGenerator({
   }
 
   async function generate() {
+    if (!user) return;
     setWorking(true);
     setError(null);
     variation.current += 1;
@@ -105,12 +108,16 @@ export function QuestGenerator({
       variation: variation.current,
     };
     try {
-      const response = await apiFetch("/api/ai/quest", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
-      });
+      const response = await authenticatedApiFetch(
+        user.id,
+        "/api/ai/quest",
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(request),
+        },
+      );
       if (!response.ok) throw new Error("provider");
       const next = (await response.json()) as QuestGenerationResult;
       setResult(next);

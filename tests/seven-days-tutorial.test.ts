@@ -23,10 +23,10 @@ function memoryStorage(): Storage {
 }
 
 describe("Seven Days Match tutorial persistence", () => {
-  it("round-trips one versioned seen marker", () => {
+  it("round-trips one versioned seen marker", async () => {
     const storage = memoryStorage();
     expect(readSevenDaysTutorialSeen(storage)).toBe(false);
-    expect(writeSevenDaysTutorialSeen(storage)).toBe(true);
+    await expect(writeSevenDaysTutorialSeen(storage)).resolves.toBe(true);
     expect(readSevenDaysTutorialSeen(storage)).toBe(true);
     expect(JSON.parse(storage.getItem(SEVEN_DAYS_TUTORIAL_STORAGE_KEY)!)).toEqual(
       {
@@ -54,7 +54,7 @@ describe("Seven Days Match tutorial persistence", () => {
     }
   });
 
-  it("does not block play when storage is restricted", () => {
+  it("does not block play when storage is restricted", async () => {
     const restricted = {
       getItem: () => {
         throw new Error("blocked");
@@ -64,7 +64,7 @@ describe("Seven Days Match tutorial persistence", () => {
       },
     } as unknown as Storage;
     expect(readSevenDaysTutorialSeen(restricted)).toBe(false);
-    expect(writeSevenDaysTutorialSeen(restricted)).toBe(false);
+    await expect(writeSevenDaysTutorialSeen(restricted)).resolves.toBe(false);
   });
 });
 

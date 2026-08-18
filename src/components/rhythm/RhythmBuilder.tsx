@@ -100,7 +100,7 @@ function RhythmEditor({
     }));
   };
 
-  const save = () => {
+  const save = async () => {
     if (!draft.label.trim() || draft.days.length === 0) {
       toast("Choose a name and at least one day.");
       return;
@@ -110,7 +110,7 @@ function RhythmEditor({
       toast("Choose at least one gentle practice.");
       return;
     }
-    const saved = saveRhythmBlock(
+    const saved = await saveRhythmBlock(
       {
         ...draft,
         label: draft.label.trim(),
@@ -405,8 +405,8 @@ export function RhythmBuilder() {
                     <GentleButton
                       variant="danger"
                       size="sm"
-                      onClick={() => {
-                        if (removeRhythmBlock(block.id)) {
+                      onClick={async () => {
+                        if (await removeRhythmBlock(block.id)) {
                           setRemovingId(null);
                           toast("Rhythm removed.", { variant: "success" });
                         } else {

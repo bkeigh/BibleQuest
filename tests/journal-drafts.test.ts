@@ -4,6 +4,7 @@ import {
   clearAllDeviceLocalJournalDrafts,
   clearDeviceLocalJournalDraft,
   journalDraftStorageKey,
+  purgeAllDeviceLocalJournalDrafts,
   purgeExpiredDeviceLocalJournalDrafts,
   readDeviceLocalJournalDraft,
   writeDeviceLocalJournalDraft,
@@ -16,21 +17,21 @@ describe("device-local journal drafts", () => {
     vi.setSystemTime(new Date("2026-07-19T16:00:00.000Z"));
   });
 
-  it("round-trips JSON-safe composer fields without mixing draft scopes", () => {
-    expect(
+  it("round-trips JSON-safe composer fields without mixing draft scopes", async () => {
+    await expect(
       writeDeviceLocalJournalDraft(
         "prayer",
         undefined,
         { title: "A beginning", body: "Please help.", category: "general" },
       ),
-    ).toBe(true);
-    expect(
+    ).resolves.toBe(true);
+    await expect(
       writeDeviceLocalJournalDraft(
         "reflection",
         "reflection-1",
         { body: "A thought", mood: "tender" },
       ),
-    ).toBe(true);
+    ).resolves.toBe(true);
 
     expect(readDeviceLocalJournalDraft("prayer")?.fields).toEqual({
       title: "A beginning",
@@ -92,21 +93,23 @@ describe("device-local journal drafts", () => {
     expect(window.localStorage.getItem(key)).toBeNull();
   });
 
-  it("clears only the requested kind and entry scope", () => {
-    writeDeviceLocalJournalDraft("prayer", undefined, { body: "new" });
-    writeDeviceLocalJournalDraft("prayer", "existing", { body: "edit" });
+  it("clears only the requested kind and entry scope", async () => {
+    await writeDeviceLocalJournalDraft("prayer", undefined, { body: "new" });
+    await writeDeviceLocalJournalDraft("prayer", "existing", { body: "edit" });
 
-    expect(clearDeviceLocalJournalDraft("prayer", "existing")).toBe(true);
+    await expect(
+      clearDeviceLocalJournalDraft("prayer", "existing"),
+    ).resolves.toBe(true);
     expect(readDeviceLocalJournalDraft("prayer", "existing")).toBeNull();
     expect(readDeviceLocalJournalDraft("prayer")?.fields).toEqual({ body: "new" });
   });
 
-  it("clears every journal draft without touching unrelated device data", () => {
-    writeDeviceLocalJournalDraft("prayer", undefined, { body: "new" });
-    writeDeviceLocalJournalDraft("reflection", "existing", { body: "edit" });
+  it("clears every journal draft without touching unrelated device data", async () => {
+    await writeDeviceLocalJournalDraft("prayer", undefined, { body: "new" });
+    await writeDeviceLocalJournalDraft("reflection", "existing", { body: "edit" });
     window.localStorage.setItem("biblequest:unrelated", "keep");
 
-    expect(clearAllDeviceLocalJournalDrafts()).toBe(2);
+    await expect(clearAllDeviceLocalJournalDrafts()).resolves.toBe(2);
     expect(readDeviceLocalJournalDraft("prayer")).toBeNull();
     expect(readDeviceLocalJournalDraft("reflection", "existing")).toBeNull();
     expect(window.localStorage.getItem("biblequest:unrelated")).toBe("keep");
@@ -115,8 +118,8 @@ describe("device-local journal drafts", () => {
     ).toBeTruthy();
   });
 
-  it("sweeps expired and malformed drafts at the next application launch", () => {
-    writeDeviceLocalJournalDraft("prayer", undefined, { body: "current" });
+  it("sweeps expired and malformed drafts at the next application launch", async () => {
+    await writeDeviceLocalJournalDraft("prayer", undefined, { body: "current" });
     const staleKey = journalDraftStorageKey("reflection", "stale");
     window.localStorage.setItem(
       staleKey,
@@ -136,24 +139,24 @@ describe("device-local journal drafts", () => {
       "not json",
     );
 
-    expect(purgeExpiredDeviceLocalJournalDrafts()).toBe(2);
+    await expect(purgeExpiredDeviceLocalJournalDrafts()).resolves.toBe(2);
     expect(readDeviceLocalJournalDraft("prayer")?.fields).toEqual({
       body: "current",
     });
     expect(window.localStorage.getItem(staleKey)).toBeNull();
   });
 
-  it("rejects every draft written against an older destructive-clear epoch", () => {
-    expect(
+  it("rejects every draft written against an older destructive-clear epoch", async () => {
+    await expect(
       writeDeviceLocalJournalDraft("prayer", undefined, { body: "before" }),
-    ).toBe(true);
+    ).resolves.toBe(true);
     window.localStorage.setItem(
       "biblequest:journal-drafts-cleared-at",
       "2026-07-19T16:01:00.000Z:reset",
     );
 
     expect(readDeviceLocalJournalDraft("prayer")).toBeNull();
-    expect(
+    await expect(
       writeDeviceLocalJournalDraft(
         "prayer",
         undefined,
@@ -161,18 +164,18 @@ describe("device-local journal drafts", () => {
         undefined,
         null,
       ),
-    ).toBe(false);
+    ).resolves.toBe(false);
     expect(readDeviceLocalJournalDraft("prayer")).toBeNull();
 
-    expect(
+    await expect(
       writeDeviceLocalJournalDraft("prayer", undefined, { body: "after" }),
-    ).toBe(true);
+    ).resolves.toBe(true);
     expect(readDeviceLocalJournalDraft("prayer")?.fields).toEqual({
       body: "after",
     });
   });
 
-  it("retries the clear epoch after a quota failure before the final sweep", () => {
+  it("retries the clear epoch after a quota failure before the final sweep", async () => {
     let rejectFirstEpoch = true;
     const quotaStorage = {
       get length() {
@@ -202,20 +205,20 @@ describe("device-local journal drafts", () => {
       },
     } satisfies Storage;
 
-    expect(
+    await expect(
       writeDeviceLocalJournalDraft(
         "reflection",
         undefined,
         { body: "private text occupying storage" },
         quotaStorage,
       ),
-    ).toBe(true);
+    ).resolves.toBe(true);
 
-    expect(clearAllDeviceLocalJournalDrafts(quotaStorage)).toBe(1);
-    expect(
+    await expect(clearAllDeviceLocalJournalDrafts(quotaStorage)).resolves.toBe(1);
+    await expect(
       quotaStorage.getItem("biblequest:journal-drafts-cleared-at"),
     ).toBeTruthy();
-    expect(
+    await expect(
       writeDeviceLocalJournalDraft(
         "reflection",
         undefined,
@@ -223,11 +226,17 @@ describe("device-local journal drafts", () => {
         quotaStorage,
         null,
       ),
-    ).toBe(false);
+    ).resolves.toBe(false);
     expect(readDeviceLocalJournalDraft("reflection", undefined, quotaStorage)).toBeNull();
+    await expect(
+      purgeAllDeviceLocalJournalDrafts(quotaStorage),
+    ).resolves.toBe(true);
+    expect(
+      quotaStorage.getItem("biblequest:journal-drafts-cleared-at"),
+    ).toBeNull();
   });
 
-  it("fails quietly when browser privacy or quota settings reject storage", () => {
+  it("fails quietly when browser privacy or quota settings reject storage", async () => {
     const throwingStorage = {
       get length() {
         return 0;
@@ -249,19 +258,22 @@ describe("device-local journal drafts", () => {
       },
     } satisfies Storage;
 
-    expect(
+    await expect(
       writeDeviceLocalJournalDraft(
         "prayer",
         undefined,
         { body: "not persisted" },
         throwingStorage,
       ),
-    ).toBe(false);
+    ).resolves.toBe(false);
     expect(
       readDeviceLocalJournalDraft("prayer", undefined, throwingStorage),
     ).toBeNull();
-    expect(
+    await expect(
       clearDeviceLocalJournalDraft("prayer", undefined, throwingStorage),
-    ).toBe(false);
+    ).resolves.toBe(false);
+    await expect(
+      purgeAllDeviceLocalJournalDrafts(throwingStorage),
+    ).resolves.toBe(false);
   });
 });

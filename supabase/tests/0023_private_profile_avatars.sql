@@ -64,8 +64,8 @@ select is(
       and tablename = 'objects'
       and policyname like 'profile avatars:%'
   ),
-  3::bigint,
-  'Storage exposes only the three owner policies'
+  4::bigint,
+  'Storage exposes only the three owner policies and deletion guard'
 );
 select ok(
   has_function_privilege(

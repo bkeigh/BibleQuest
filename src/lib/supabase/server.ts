@@ -1,16 +1,18 @@
 /**
- * Supabase server client for auth callbacks, server components, and routes.
- * Uses the anon key with the user's cookie session; RLS enforces ownership.
- * See docs/SETUP.md and supabase/migrations.
+ * Legacy Supabase server-cookie client reserved for the operator console.
+ * Customer account requests use explicit bearer clients and must never import
+ * this factory. See docs/SETUP.md and supabase/migrations.
  */
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { isSupabaseConfigured } from "./client";
+import { isSupabaseConfigured } from "./configuration";
 import { supabasePublishableKey } from "./config";
 
 export { isSupabaseConfigured };
 
-export async function createServerSupabase() {
+export async function createServerSupabase(
+  boundaryHeaders: Record<string, string> = {},
+) {
   if (!isSupabaseConfigured()) {
     throw new Error(
       "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY — see docs/SETUP.md.",
@@ -21,6 +23,7 @@ export async function createServerSupabase() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     supabasePublishableKey()!,
     {
+      global: { headers: boundaryHeaders },
       cookies: {
         getAll() {
           return cookieStore.getAll();

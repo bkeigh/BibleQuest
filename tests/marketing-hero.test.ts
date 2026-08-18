@@ -83,21 +83,29 @@ describe("marketing hero wallpaper", () => {
 
     // The image can vary by crop and the video varies over time, so contrast
     // belongs to the complete reading surface rather than one sampled frame.
-    expect(landingPage).toContain("bg-paper/[0.94]");
-    expect(landingPage).toContain("backdrop-blur-md");
+    //
+    // The owner asked for a half-transparent surface on 2026-08-15, so the
+    // opacity no longer carries that contrast alone — the blur has to. Keep
+    // both pinned together: dropping the blur while the surface is this
+    // translucent puts hero copy directly over moving footage.
+    expect(landingPage).toContain("bg-paper/50");
+    expect(landingPage).toContain("backdrop-blur-xl");
   });
 
-  it("leads a new visitor through the tour before asking them to begin", () => {
+  it("leads a new visitor into the app before offering the tour", () => {
     const landingPage = readFileSync(
       path.join(process.cwd(), "src/app/(marketing)/page.tsx"),
       "utf8",
     );
     const walkthrough = landingPage.indexOf('title="See how it works"');
-    const onboarding = landingPage.indexOf('title="Get BibleQuest"');
+    const onboarding = landingPage.indexOf('title="Open BibleQuest"');
 
-    expect(walkthrough).toBeGreaterThan(-1);
-    expect(onboarding).toBeGreaterThan(walkthrough);
-    expect(landingPage.slice(walkthrough - 120, walkthrough)).toContain(
+    // Reversed on 2026-08-15: starting the app is the point of the page, so
+    // it leads and carries the filled treatment. This previously asserted the
+    // opposite order.
+    expect(onboarding).toBeGreaterThan(-1);
+    expect(walkthrough).toBeGreaterThan(onboarding);
+    expect(landingPage.slice(onboarding - 120, onboarding)).toContain(
       "primary",
     );
   });

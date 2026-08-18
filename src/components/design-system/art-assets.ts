@@ -134,6 +134,7 @@ export const ART_VISUAL_WEIGHT: Partial<Record<ArtSpriteName, number>> = {
 // Larger still-life and character art used for onboarding and empty states.
 export const ART_MASCOTS = defineAssets({
   lamb: artWebp("mascot-lamb"),
+  "open-book": ART_SPRITES["open-book"],
   lantern: ART_SPRITES.lantern,
   scroll: ART_SPRITES.scroll,
   dove: ART_SPRITES.dove,

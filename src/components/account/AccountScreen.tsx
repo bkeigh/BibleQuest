@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/supabase/useSession";
-import { createClient } from "@/lib/supabase/client";
 import { useSyncStatus } from "@/lib/sync/status";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { PageHeader, PageContainer } from "@/components/app-shell/PageHeader";
@@ -27,13 +26,30 @@ import { isStandaloneWebApp } from "@/lib/pwa/install-guidance";
 import {
   ACCOUNT_SYNC_CONTAINED,
   ACCOUNT_SYNC_CONTAINMENT_NOTICE,
+  NATIVE_ACCOUNT_BETA_ENABLED,
 } from "@/lib/sync/containment";
+import { isNativeTarget } from "@/lib/platform/target";
+import {
+  AccountDeletionPendingError,
+  deleteAccountAndDeviceData,
+  verifiedNativeDeletionUserId,
+} from "@/lib/auth/account-deletion";
+import {
+  accountLifecycleHandleIsCurrent,
+  beginAccountLifecycle,
+  finishAccountLifecycle,
+} from "@/lib/auth/account-lifecycle";
+import {
+  AccountSignOutError,
+  signOutExpectedAccount,
+} from "@/lib/auth/account-sign-out";
 
 function AccountInner() {
   const router = useRouter();
   const { toast } = useToast();
   const { user, loading, configured } = useSession();
   const sync = useSyncStatus();
+  const [signingOut, setSigningOut] = useState(false);
   // Installed app users are returning to a saved account more often than
   // creating one, while ordinary browser visitors keep the onboarding default.
   const [intent, setIntent] = useState<AccountIntent>(() =>
@@ -97,6 +113,9 @@ function AccountInner() {
             this browser on this device.
           </p>
         </PaperCard>
+        {isNativeTarget() && NATIVE_ACCOUNT_BETA_ENABLED ? (
+          <UnavailableAccountDeletion />
+        ) : null}
       </Frame>
     );
   }
@@ -112,17 +131,34 @@ function AccountInner() {
   }
 
   async function signOut() {
-    const { error } = await createClient().auth.signOut();
-    if (error) {
-      // supabase-js keeps the local session when the revoke call fails
-      // (offline / 5xx), so telling the user they're signed out would be a
-      // lie — and on a shared device, a dangerous one.
+    const expectedUserId = user?.id;
+    if (!expectedUserId || signingOut) return;
+    setSigningOut(true);
+    try {
+      const result = await signOutExpectedAccount(expectedUserId);
+      if (result.status === "session-changed") {
+        toast("Your signed-in account changed. Reloading it safely.");
+        window.location.reload();
+        return;
+      }
+      track("sign_out");
+      toast("Signed out. Your journey stays on this device.");
+      if (result.reloadRequired) {
+        window.location.reload();
+        return;
+      }
+      router.refresh();
+    } catch (error) {
       toast("Couldn’t sign out just now. Check your connection and retry.");
-      return;
+      if (
+        error instanceof AccountSignOutError &&
+        error.reloadRequired
+      ) {
+        window.location.reload();
+      }
+    } finally {
+      setSigningOut(false);
     }
-    track("sign_out");
-    toast("Signed out. Your journey stays on this device.");
-    router.refresh();
   }
 
   if (user) {
@@ -155,9 +191,10 @@ function AccountInner() {
             variant="outline"
             size="sm"
             className="mt-4"
-            onClick={signOut}
+            disabled={signingOut}
+            onClick={() => void signOut()}
           >
-            Sign out
+            {signingOut ? "Signing out…" : "Sign out"}
           </GentleButton>
         </PaperCard>
       </Frame>
@@ -249,10 +286,128 @@ function AccountInner() {
             key={intent}
             source="account"
             intent={intent}
+            // Land on the journey rather than leaving someone on the account
+            // screen to work out whether the code took.
+            onSignedIn={() => {
+              toast("You're signed in. Your journey is saved to your account.");
+              router.push("/app");
+            }}
           />
         </div>
       </PaperCard>
     </Frame>
+  );
+}
+
+/** Keeps self-service deletion reachable without reopening disabled account UI. */
+function UnavailableAccountDeletion() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [expanded, setExpanded] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<"request" | "pending" | "device" | null>(
+    null,
+  );
+
+  const removeUnavailableAccount = async () => {
+    if (busy || confirmation !== "DELETE") return;
+    setBusy(true);
+    setError(null);
+    let lifecycle: ReturnType<typeof beginAccountLifecycle> = null;
+    let retainLifecycle = false;
+    try {
+      const expectedUserId = await verifiedNativeDeletionUserId();
+      lifecycle = beginAccountLifecycle(expectedUserId);
+      if (!lifecycle) {
+        setError("device");
+        return;
+      }
+      const deviceCleared = await deleteAccountAndDeviceData(
+        expectedUserId,
+        lifecycle,
+      );
+      if (
+        !accountLifecycleHandleIsCurrent(lifecycle) ||
+        !deviceCleared
+      ) {
+        setError("device");
+        return;
+      }
+      toast("Your account and saved journey were deleted.", {
+        variant: "success",
+      });
+      router.replace("/onboarding");
+    } catch (caught) {
+      if (caught instanceof AccountDeletionPendingError) {
+        // Keep every ordinary account path suspended until relaunch verifies
+        // whether the irreversible server request committed.
+        retainLifecycle = lifecycle !== null;
+        setError("pending");
+      } else {
+        setError("request");
+      }
+    } finally {
+      if (lifecycle && !retainLifecycle) finishAccountLifecycle(lifecycle);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <PaperCard variant="paper" padding="lg" className="mt-4">
+      <h2 className="text-base text-graphite">Delete an existing account</h2>
+      <p className="mt-2 text-small leading-relaxed text-ash">
+        Account access is disabled, but you can still permanently delete the
+        account already saved on this device. Normal sign-in and sync stay off.
+      </p>
+      {!expanded ? (
+        <GentleButton
+          variant="danger"
+          size="sm"
+          className="mt-4"
+          onClick={() => setExpanded(true)}
+        >
+          Start account deletion
+        </GentleButton>
+      ) : (
+        <div className="mt-4">
+          <label htmlFor="unavailable-account-delete" className="text-caption text-ash">
+            Type DELETE to confirm
+          </label>
+          <input
+            id="unavailable-account-delete"
+            value={confirmation}
+            onChange={(event) => {
+              setConfirmation(event.target.value);
+              setError(null);
+            }}
+            disabled={busy}
+            autoComplete="off"
+            spellCheck={false}
+            className="mt-1.5 w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-body text-graphite outline-none focus:border-accent/50"
+          />
+          <GentleButton
+            variant="danger"
+            size="sm"
+            className="mt-3"
+            disabled={busy || confirmation !== "DELETE"}
+            aria-busy={busy}
+            onClick={() => void removeUnavailableAccount()}
+          >
+            {busy ? "Deleting account…" : "Permanently delete account"}
+          </GentleButton>
+          {error ? (
+            <p role="alert" className="mt-3 text-caption text-rose-700">
+              {error === "pending"
+                ? "Deletion is still being confirmed. Close and reopen BibleQuest before continuing."
+                : error === "device"
+                  ? "The account was deleted, but this device could not finish clearing its local copy."
+                  : "BibleQuest could not verify and delete the saved account. Check your connection and try again."}
+            </p>
+          ) : null}
+        </div>
+      )}
+    </PaperCard>
   );
 }
 

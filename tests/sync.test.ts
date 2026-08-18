@@ -8,10 +8,20 @@ const mocks = vi.hoisted(() => ({
   track: vi.fn(),
   generations: new Map<string, number>(),
   resetRequired: new Set<string>(),
+  commitHandoffOwner: vi.fn(),
+}));
+
+// Committing the private handoff owner is the cutover engine's contract and is
+// covered by its own suite. Stub only that call so these tests keep exercising
+// sync ownership and merge safety rather than re-deriving a cutover fixture.
+vi.mock("@/lib/storage/web-private-cutover", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  commitWebPrivateHandoffOwner: mocks.commitHandoffOwner,
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
   createClient: mocks.createClient,
+  createSyncControlClient: () => mocks.createClient(),
   createSyncClient: () => mocks.createClient.mock.results.at(-1)?.value,
   isSupabaseConfigured: () => true,
 }));
@@ -20,14 +30,17 @@ vi.mock("@/lib/sync/generation", () => ({
   getAccountSyncGeneration: (userId: string) => mocks.generations.get(userId) ?? null,
   setAccountSyncGeneration: (userId: string, generation: number) => {
     mocks.generations.set(userId, generation);
+    return true;
   },
   accountSyncResetRequired: (userId: string) => mocks.resetRequired.has(userId),
   markAccountSyncResetRequired: (userId: string, generation: number) => {
     mocks.generations.set(userId, generation);
     mocks.resetRequired.add(userId);
+    return true;
   },
   clearAccountSyncResetRequired: (userId: string) => {
     mocks.resetRequired.delete(userId);
+    return true;
   },
 }));
 
@@ -44,7 +57,6 @@ vi.mock("@/lib/sync/containment", () => ({
 
 import {
   filterByTombstones,
-  INITIAL_SYNC_DEADLINE_MS,
   isMissingBibleSyncColumn,
   isMissingRecentVersesTable,
   mergeSnapshots,
@@ -53,14 +65,28 @@ import {
   startSync,
   stopSync,
 } from "@/lib/sync/engine";
+import { SYNC_REQUEST_DEADLINE_MS } from "@/lib/sync/request";
 import {
   clearLastSyncedUserId,
   getLastSyncedUserId,
   initialSyncIsPending,
   localJourneyClaimIsPending,
+  markInitialSyncPending,
+  markLocalJourneyClaimPending,
   setLastSyncedUserId,
 } from "@/lib/sync/last-user";
 import { prepareLocalJourneyHandoff } from "@/lib/sync/handoff";
+import { seedWebAuthEnvelope } from "./fixtures/web-auth";
+import {
+  withActiveWebPrivateWriteReset,
+  withWebAccountOperationLock,
+} from "@/lib/supabase/web-auth-storage";
+import {
+  LEGACY_JOURNAL_DRAFTS_CLEARED_STORAGE_KEY,
+  LEGACY_QUEST_JOURNEY_STORAGE_KEY,
+  WEB_V2_JOURNAL_DRAFTS_CLEARED_STORAGE_KEY,
+  WEB_V2_QUEST_JOURNEY_STORAGE_KEY,
+} from "@/lib/storage/web-private-namespace";
 import { useQuestOS } from "@/lib/questos/store";
 import { useSyncStatus } from "@/lib/sync/status";
 import {
@@ -72,6 +98,27 @@ import {
 } from "@/lib/sync/mapping";
 
 const OK = { data: null, error: null };
+
+/**
+ * Applies a handoff through the same shape SyncManager uses on the web: an
+ * account-operation handle for every handoff, and a private write reset scope
+ * around the destructive start-fresh purge. Without that scope the reviewed
+ * removal authority is absent and the purge refuses, so a test that skipped it
+ * would assert against a failure it created itself.
+ */
+async function handoff(userId: string, startFresh: boolean): Promise<void> {
+  seedWebAuthEnvelope(userId);
+  await withWebAccountOperationLock(async (handle) => {
+    if (!startFresh) {
+      await prepareLocalJourneyHandoff(userId, false, undefined, handle);
+      return;
+    }
+    await withActiveWebPrivateWriteReset(handle, userId, async () => {
+      await prepareLocalJourneyHandoff(userId, true, undefined, handle);
+      return true;
+    });
+  });
+}
 
 function deferred() {
   let resolve!: () => void;
@@ -381,18 +428,33 @@ function fakeClient(
 }
 
 describe("sync ownership, lifecycle, and merge safety", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     stopSync();
-    clearLastSyncedUserId();
+    await clearLastSyncedUserId();
     useQuestOS.getState().clearAllData();
     useSyncStatus.setState({ state: "off", lastSyncedAt: null });
     mocks.createClient.mockReset();
     mocks.generations.clear();
     mocks.resetRequired.clear();
+    mocks.commitHandoffOwner.mockReset();
+    // Reproduce the owner markers the real contract publishes, so the engine
+    // still sees a genuine ownership change rather than a bare true.
+    mocks.commitHandoffOwner.mockImplementation(
+      async (
+        _webOperation: unknown,
+        userId: string,
+        keepLocalJourney: boolean,
+      ) => {
+        if (keepLocalJourney) await markLocalJourneyClaimPending(userId);
+        await markInitialSyncPending(userId);
+        await setLastSyncedUserId(userId);
+        return true;
+      },
+    );
   });
 
   it("refuses an automatic handoff to a different user", async () => {
-    setLastSyncedUserId("account-a");
+    await setLastSyncedUserId("account-a");
 
     await startSync("account-b");
 
@@ -404,8 +466,8 @@ describe("sync ownership, lifecycle, and merge safety", () => {
   it("preserves the journey after an explicit keep-this-journey handoff", async () => {
     const snapshot = currentSnapshot();
     useQuestOS.getState().importData(snapshot);
-    setLastSyncedUserId("account-a");
-    prepareLocalJourneyHandoff("account-b", false);
+    await setLastSyncedUserId("account-a");
+    await handoff("account-b", false);
     mocks.createClient.mockReturnValue(fakeClient());
 
     await startSync("account-b");
@@ -435,6 +497,160 @@ describe("sync ownership, lifecycle, and merge safety", () => {
     expect(useQuestOS.getState().bookmarks).toEqual([
       { ...snapshot.bookmarks[0], translationKey: "web" },
     ]);
+  });
+
+  it("does not import remote rows when the mutable CAS baseline cannot persist", async () => {
+    const local = currentSnapshot();
+    local.profile = { ...local.profile!, displayName: "Local guest" };
+    useQuestOS.getState().importData(local);
+    const remoteProfile = {
+      ...local.profile,
+      displayName: "Remote account",
+    };
+    mocks.createClient.mockReturnValue(
+      fakeClient(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        async (table) =>
+          table === "profiles"
+            ? {
+                data: profileToRow("account-a", remoteProfile),
+                error: null,
+              }
+            : undefined,
+      ),
+    );
+    const nativeSetItem = window.localStorage.setItem.bind(window.localStorage);
+    const storageWrite = vi
+      .spyOn(window.localStorage, "setItem")
+      .mockImplementation((key, value) => {
+        if (key === "biblequest:mutable-account-cas:v1") {
+          throw new Error("fixture storage unavailable");
+        }
+        nativeSetItem(key, value);
+      });
+
+    try {
+      await startSync("account-a");
+
+      expect(useSyncStatus.getState()).toMatchObject({
+        state: "error",
+        initialSyncComplete: false,
+      });
+      expect(useQuestOS.getState().profile?.displayName).toBe("Local guest");
+      expect(initialSyncIsPending("account-a")).toBe(true);
+    } finally {
+      storageWrite.mockRestore();
+      stopSync();
+    }
+  });
+
+  it("does not import remote rows when the daily CAS baseline cannot persist", async () => {
+    const local = currentSnapshot();
+    local.profile = { ...local.profile!, displayName: "Local guest" };
+    useQuestOS.getState().importData(local);
+    const remoteProfile = {
+      ...local.profile,
+      displayName: "Remote account",
+    };
+    mocks.createClient.mockReturnValue(
+      fakeClient(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        async (table) =>
+          table === "profiles"
+            ? {
+                data: profileToRow("account-a", remoteProfile),
+                error: null,
+              }
+            : undefined,
+      ),
+    );
+    const nativeSetItem = window.localStorage.setItem.bind(window.localStorage);
+    const storageWrite = vi
+      .spyOn(window.localStorage, "setItem")
+      .mockImplementation((key, value) => {
+        if (key === "biblequest:daily-quest-cas:v1") {
+          throw new Error("fixture storage unavailable");
+        }
+        nativeSetItem(key, value);
+      });
+
+    try {
+      await startSync("account-a");
+
+      expect(useSyncStatus.getState()).toMatchObject({
+        state: "error",
+        initialSyncComplete: false,
+      });
+      expect(useQuestOS.getState().profile?.displayName).toBe("Local guest");
+      expect(initialSyncIsPending("account-a")).toBe(true);
+    } finally {
+      storageWrite.mockRestore();
+      stopSync();
+    }
+  });
+
+  it("resumes guest adoption interrupted before its generation was stored", async () => {
+    const snapshot = currentSnapshot();
+    useQuestOS.getState().importData(snapshot);
+    // Recreate the durable state left if iOS stops after owner stamping but
+    // before the first merged generation reaches local storage.
+    await markInitialSyncPending("account-a");
+    await setLastSyncedUserId("account-a");
+    mocks.createClient.mockReturnValue(fakeClient());
+
+    await startSync("account-a");
+
+    expect(useSyncStatus.getState().state).toBe("idle");
+    expect(mocks.generations.get("account-a")).toBe(0);
+    expect(useQuestOS.getState().profile?.displayName).toBe(
+      snapshot.profile?.displayName,
+    );
+    expect(useQuestOS.getState().prayers).toEqual(snapshot.prayers);
+    expect(useQuestOS.getState().reflections).toEqual(snapshot.reflections);
+    expect(initialSyncIsPending("account-a")).toBe(false);
+  });
+
+  it("keeps an existing account authoritative during interrupted adoption", async () => {
+    const guest = currentSnapshot();
+    useQuestOS.getState().importData(guest);
+    await markInitialSyncPending("account-a");
+    await setLastSyncedUserId("account-a");
+    const existingProfile = {
+      ...guest.profile!,
+      displayName: "Existing account owner",
+    };
+    mocks.createClient.mockReturnValue(
+      fakeClient(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        async (table) =>
+          table === "profiles"
+            ? {
+                data: profileToRow("account-a", existingProfile),
+                error: null,
+              }
+            : undefined,
+      ),
+    );
+
+    await startSync("account-a");
+
+    expect(useQuestOS.getState().profile?.displayName).toBe(
+      "Existing account owner",
+    );
+    expect(useQuestOS.getState().prayers).toEqual(guest.prayers);
+    expect(initialSyncIsPending("account-a")).toBe(false);
   });
 
   it("joins unique guest rows without replacing an existing account", async () => {
@@ -506,8 +722,8 @@ describe("sync ownership, lifecycle, and merge safety", () => {
 
   it("clears the other journey after an explicit start-fresh handoff", async () => {
     useQuestOS.getState().importData(currentSnapshot());
-    setLastSyncedUserId("account-a");
-    prepareLocalJourneyHandoff("account-b", true);
+    await setLastSyncedUserId("account-a");
+    await handoff("account-b", true);
     mocks.createClient.mockReturnValue(fakeClient());
 
     await startSync("account-b");
@@ -516,6 +732,63 @@ describe("sync ownership, lifecycle, and merge safety", () => {
     expect(useQuestOS.getState().profile).toBeNull();
     expect(useQuestOS.getState().prayers).toEqual([]);
     expect(localJourneyClaimIsPending("account-b")).toBe(false);
+  });
+
+  it("does not stamp the new owner when the blank journey was not persisted", async () => {
+    useQuestOS.getState().importData(currentSnapshot());
+    await setLastSyncedUserId("account-a");
+    // The reviewed purge removes the journey bytes directly and proves the
+    // removal by reading them back, so leaving the bytes in place is what
+    // fails that proof. Both namespaces are covered because which key the
+    // store selects depends on the cutover state.
+    const blocked = new Set<string>([
+      LEGACY_QUEST_JOURNEY_STORAGE_KEY,
+      WEB_V2_QUEST_JOURNEY_STORAGE_KEY,
+    ]);
+    window.localStorage.setItem(LEGACY_QUEST_JOURNEY_STORAGE_KEY, "{}");
+    const nativeRemoveItem = window.localStorage.removeItem.bind(
+      window.localStorage,
+    );
+    const removeItem = vi
+      .spyOn(window.localStorage, "removeItem")
+      .mockImplementation((key: string) => {
+        if (!blocked.has(key)) nativeRemoveItem(key);
+      });
+
+    await expect(
+      handoff("account-b", true),
+    ).rejects.toThrow("The previous journey could not be cleared.");
+    expect(getLastSyncedUserId()).toBe("account-a");
+    removeItem.mockRestore();
+  });
+
+  it("does not stamp the new owner when private draft cleanup cannot commit", async () => {
+    useQuestOS.getState().importData(currentSnapshot());
+    await setLastSyncedUserId("account-a");
+    // Draft cleanup also proves its removals by reading them back, so a key
+    // that survives removal is what makes the cleanup refuse to commit.
+    const blocked = new Set<string>([
+      LEGACY_JOURNAL_DRAFTS_CLEARED_STORAGE_KEY,
+      WEB_V2_JOURNAL_DRAFTS_CLEARED_STORAGE_KEY,
+    ]);
+    window.localStorage.setItem(
+      LEGACY_JOURNAL_DRAFTS_CLEARED_STORAGE_KEY,
+      "2026-08-01T00:00:00.000Z",
+    );
+    const nativeRemoveItem = window.localStorage.removeItem.bind(
+      window.localStorage,
+    );
+    const removeItem = vi
+      .spyOn(window.localStorage, "removeItem")
+      .mockImplementation((key: string) => {
+        if (!blocked.has(key)) nativeRemoveItem(key);
+      });
+
+    await expect(
+      handoff("account-b", true),
+    ).rejects.toThrow("The previous journey could not be cleared.");
+    expect(getLastSyncedUserId()).toBe("account-a");
+    removeItem.mockRestore();
   });
 
   it("downgrades only the two additive Bible columns during migration rollout", () => {
@@ -874,7 +1147,7 @@ describe("sync ownership, lifecycle, and merge safety", () => {
   );
 
   it("allows the same user to stop and restart sync", async () => {
-    setLastSyncedUserId("account-a");
+    await setLastSyncedUserId("account-a");
     mocks.createClient
       .mockReturnValueOnce(fakeClient())
       .mockReturnValueOnce(fakeClient());
@@ -904,7 +1177,7 @@ describe("sync ownership, lifecycle, and merge safety", () => {
       },
     ];
     useQuestOS.getState().importData(snapshot);
-    prepareLocalJourneyHandoff("account-a", false);
+    await handoff("account-a", false);
 
     const legacyBatches: unknown[][] = [];
     const revisionedResources: unknown[] = [];
@@ -968,14 +1241,14 @@ describe("sync ownership, lifecycle, and merge safety", () => {
     expect(initialSyncIsPending("account-a")).toBe(false);
   });
 
-  it("turns a stalled initial restore into a retryable error", async () => {
+  it("turns a stalled account request into a retryable error", async () => {
     vi.useFakeTimers();
     const stalledPull = deferred();
     mocks.createClient.mockReturnValue(fakeClient(stalledPull.promise));
 
     try {
       const restore = startSync("account-a");
-      await vi.advanceTimersByTimeAsync(INITIAL_SYNC_DEADLINE_MS);
+      await vi.advanceTimersByTimeAsync(SYNC_REQUEST_DEADLINE_MS);
       await restore;
 
       expect(useSyncStatus.getState()).toMatchObject({
@@ -987,6 +1260,41 @@ describe("sync ownership, lifecycle, and merge safety", () => {
     } finally {
       stopSync();
       stalledPull.resolve();
+      vi.useRealTimers();
+    }
+  });
+
+  it("allows a large restore to exceed one request deadline in aggregate", async () => {
+    vi.useFakeTimers();
+    const startedAt = Date.now();
+    mocks.createClient.mockReturnValue(
+      fakeClient(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        async () => {
+          await new Promise((resolve) => setTimeout(resolve, 6_000));
+          return undefined;
+        },
+      ),
+    );
+
+    try {
+      const restore = startSync("account-a");
+      await vi.runAllTimersAsync();
+      await restore;
+
+      expect(Date.now() - startedAt).toBeGreaterThan(
+        SYNC_REQUEST_DEADLINE_MS,
+      );
+      expect(useSyncStatus.getState()).toMatchObject({
+        state: "idle",
+        userId: "account-a",
+        initialSyncComplete: true,
+      });
+    } finally {
+      stopSync();
       vi.useRealTimers();
     }
   });
@@ -1022,7 +1330,7 @@ describe("sync ownership, lifecycle, and merge safety", () => {
       id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
     }));
     useQuestOS.getState().importData(snapshot);
-    prepareLocalJourneyHandoff("account-a", false);
+    await handoff("account-a", false);
     const mutableBatches: Array<{ resource: unknown; size: number }> = [];
     const directMutableUpserts: string[] = [];
     mocks.createClient.mockReturnValue(
@@ -1082,7 +1390,7 @@ describe("sync ownership, lifecycle, and merge safety", () => {
 
   it("serializes provider writes and stops before later tables after failure", async () => {
     useQuestOS.getState().importData(currentSnapshot());
-    prepareLocalJourneyHandoff("account-a", false);
+    await handoff("account-a", false);
     const directWrites: string[] = [];
     const mutableWrites: unknown[] = [];
     mocks.createClient.mockReturnValue(
@@ -1125,7 +1433,7 @@ describe("sync ownership, lifecycle, and merge safety", () => {
     vi.useFakeTimers();
     try {
       useQuestOS.getState().importData(currentSnapshot());
-      prepareLocalJourneyHandoff("account-a", false);
+      await handoff("account-a", false);
       const firstProfileStarted = deferred();
       const releaseFirstProfile = deferred();
       const profileNames: unknown[] = [];
@@ -1186,7 +1494,7 @@ describe("sync ownership, lifecycle, and merge safety", () => {
 
   it("fails the initial sync closed when a mutable revision conflicts", async () => {
     useQuestOS.getState().importData(currentSnapshot());
-    prepareLocalJourneyHandoff("account-a", false);
+    await handoff("account-a", false);
     mocks.createClient.mockReturnValue(
       fakeClient(
         undefined,
@@ -1224,7 +1532,7 @@ describe("sync ownership, lifecycle, and merge safety", () => {
     vi.useFakeTimers();
     try {
       useQuestOS.getState().importData(currentSnapshot());
-      prepareLocalJourneyHandoff("account-a", false);
+      await handoff("account-a", false);
       let profileWrites = 0;
       const client = fakeClient(
         undefined,
@@ -1307,7 +1615,7 @@ describe("sync ownership, lifecycle, and merge safety", () => {
 
   it("replaces stale local account fields after a generation advance", async () => {
     useQuestOS.getState().importData(currentSnapshot());
-    setLastSyncedUserId("account-a");
+    await setLastSyncedUserId("account-a");
     mocks.generations.set("account-a", 0);
     mocks.createClient.mockReturnValue(
       fakeClient(
@@ -1334,7 +1642,7 @@ describe("sync ownership, lifecycle, and merge safety", () => {
     const snapshot = currentSnapshot();
     useQuestOS.getState().importData(snapshot);
     useQuestOS.getState().deletePrayer(snapshot.prayers[0].id);
-    setLastSyncedUserId("account-a");
+    await setLastSyncedUserId("account-a");
     mocks.generations.set("account-a", 0);
     const deletionGenerations: unknown[] = [];
     mocks.createClient.mockReturnValue(
@@ -1376,7 +1684,7 @@ describe("sync ownership, lifecycle, and merge safety", () => {
     let generation = 0;
     let bookmarkPresent = true;
     const profileWrites: unknown[] = [];
-    setLastSyncedUserId("account-a");
+    await setLastSyncedUserId("account-a");
     mocks.generations.set("account-a", 0);
     mocks.createClient.mockReturnValue(
       fakeClient(
@@ -1457,7 +1765,7 @@ describe("sync ownership, lifecycle, and merge safety", () => {
       let generation = 0;
       let purged = false;
       const dailyWrites: Array<{ generation: unknown; rows: unknown[] }> = [];
-      setLastSyncedUserId("account-a");
+      await setLastSyncedUserId("account-a");
       mocks.generations.set("account-a", 0);
       mocks.createClient.mockReturnValue(
         fakeClient(
@@ -1557,7 +1865,7 @@ describe("sync ownership, lifecycle, and merge safety", () => {
     });
     useQuestOS.getState().importData(snapshot);
     useQuestOS.getState().deletePrayer(snapshot.prayers[0].id);
-    setLastSyncedUserId("account-a");
+    await setLastSyncedUserId("account-a");
     mocks.generations.set("account-a", 0);
     let liveGeneration = 2;
     const deletionGenerations: unknown[] = [];
@@ -1603,7 +1911,7 @@ describe("sync ownership, lifecycle, and merge safety", () => {
     try {
       const snapshot = currentSnapshot();
       useQuestOS.getState().importData(snapshot);
-      prepareLocalJourneyHandoff("account-a", false);
+      await handoff("account-a", false);
       mocks.generations.set("account-a", 0);
       let liveGeneration = 0;
       let injectConflict = true;

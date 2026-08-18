@@ -46,13 +46,18 @@ function sha256(value: string | Buffer) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+/** Keep the production runner pinned through 0036 as later files append. */
+function frozenManifest() {
+  return `${MANIFEST.toString("utf8").trim().split("\n").slice(0, 35).join("\n")}\n`;
+}
+
 describe("production provider rate-limit migration", () => {
   it("pins the target, current manifest, source, and long-version packet", () => {
     expect(SCRIPT).toContain('const PROJECT_REF = "iacnjqnssovaaojswjoh";');
-    expect(SCRIPT).toContain(sha256(MANIFEST));
+    expect(SCRIPT).toContain(sha256(frozenManifest()));
     expect(SCRIPT).toContain(sha256(MIGRATION));
     expect(SCRIPT).toContain('version: "20260803170000"');
-    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(35);
+    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(37);
   });
 
   it("requires exact history, a fresh backup, and a one-packet dry run", () => {
