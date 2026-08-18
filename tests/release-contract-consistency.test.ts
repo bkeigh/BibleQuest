@@ -29,6 +29,28 @@ describe("release contract consistency", () => {
     expect(config.serviceWorkerVersion).toBe(declared);
   });
 
+  it("binds the page-side challenge version to the worker's own", () => {
+    // The page answers the worker's challenge only when the incoming version
+    // equals its own constant, and stays SILENT otherwise. Nothing bound the
+    // two together: a bump that edited sw.js and observability.json but missed
+    // this constant would pass the whole suite, then in production the worker
+    // would reject every attest and audit and sign-in would fail for everyone.
+    // That is invisible to every other test here, which hardcode the version.
+    const worker = readFileSync("public/sw.js", "utf8");
+    const helper = readFileSync(
+      "src/lib/platform/web-auth-service-worker.ts",
+      "utf8",
+    );
+    const workerVersion = worker.match(/const CACHE_VERSION = "([^"]+)"/)?.[1];
+    const pageVersion = helper.match(
+      /WEB_AUTH_SERVICE_WORKER_VERSION = "([^"]+)"/,
+    )?.[1];
+
+    expect(workerVersion).toBeTruthy();
+    expect(pageVersion).toBeTruthy();
+    expect(pageVersion).toBe(workerVersion);
+  });
+
   it("advertises production while the exact beta-only migration stays separate", () => {
     // The monitor compares this against production, so a config left behind a
     // production migration reads as drift. The fail-closed native availability
