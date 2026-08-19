@@ -18,6 +18,7 @@ import {
   requestIsolatedEmailOtp,
   verifyAndInstallEmailOtp,
 } from "@/lib/auth/email-otp-verification";
+import { emailOtpFailure } from "@/lib/auth/errors";
 
 const USER_A = "10000000-0000-4000-8000-000000000001";
 const USER_B = "20000000-0000-4000-8000-000000000002";
@@ -376,6 +377,44 @@ describe("isolated email OTP verification", () => {
     expect(credentialClearProvesReconciliation("not-native")).toBe(false);
     expect(credentialClearProvesReconciliation("unavailable")).toBe(false);
     expect(credentialClearProvesReconciliation("different-session")).toBe(true);
+  });
+
+  it("tells the person their code was right when the install fails", async () => {
+    // Wiring test, not a mapping test. The message helper is only honest if the
+    // real flow actually attaches the shared code — constructing the error by
+    // hand in the errors suite would still pass if a call site quietly went
+    // back to a bare Error, which is exactly how the code-blaming default
+    // survived for so long.
+    vi.stubEnv("NEXT_PUBLIC_APP_PLATFORM", "web");
+    const sessionA = session(USER_A, EMAIL_A);
+    const verifyOtp = vi.fn(async () => ({
+      data: { session: sessionA, user: sessionA.user },
+      error: null,
+    })) as SupabaseClient["auth"]["verifyOtp"];
+    const attempt = beginEmailOtpAttempt(EMAIL_A);
+
+    const result = await verifyAndInstallEmailOtp(
+      attempt,
+      "111111",
+      () => EMAIL_A,
+      {
+        verificationClient: verificationClient(verifyOtp),
+        // The server accepted and consumed the code; only the local install
+        // failed.
+        installWebSession: vi.fn(async () => "unavailable" as const),
+        clearInstalledSession: vi.fn(async () => "different-session" as const),
+      },
+    );
+    cancelEmailOtpAttempt(attempt);
+
+    expect(verifyOtp).toHaveBeenCalledTimes(1);
+    expect(result.status).toBe("error");
+    const failure = emailOtpFailure(
+      (result as { status: "error"; error: unknown }).error,
+    );
+    expect(failure.reference).toBe("AUTH-INSTALL-INCOMPLETE");
+    expect(failure.message).not.toMatch(/check it carefully/i);
+    expect(failure.message).toMatch(/code was correct/i);
   });
 
   it("attests the web realm before consuming and direct-installing a code", async () => {

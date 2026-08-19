@@ -19,6 +19,7 @@ import {
   type ExactNativeAuthSession,
 } from "./exact-session";
 import { isNativeTarget } from "@/lib/platform/target";
+import { EMAIL_OTP_POST_VERIFICATION_CODE } from "./errors";
 import {
   WebAuthUnavailableError,
   installVerifiedWebSession,
@@ -103,6 +104,19 @@ export function requestIsolatedEmailOtp(
 }
 
 /** Requires a fresh document when an ambiguous install cannot be reconciled. */
+/**
+ * A failure after the server already consumed the code. Carries the shared
+ * code so the message can say so instead of blaming the code the person typed.
+ */
+export class EmailOtpInstallationError extends Error {
+  readonly code = EMAIL_OTP_POST_VERIFICATION_CODE;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "EmailOtpInstallationError";
+  }
+}
+
 export class EmailOtpInstallationRecoveryError extends Error {
   readonly code = "email_otp_installation_recovery_required";
   readonly reloadRequired = true;
@@ -179,7 +193,9 @@ function verifiedAttemptSession(
     canonicalEmail(user.email ?? "") !== attempt.email ||
     canonicalEmail(session.user.email ?? "") !== attempt.email
   ) {
-    throw new Error("Email-code verification returned an invalid session.");
+    throw new EmailOtpInstallationError(
+      "Email-code verification returned an invalid session.",
+    );
   }
   return session;
 }
@@ -311,7 +327,10 @@ export async function verifyAndInstallEmailOtp(
       if (!isNativeTarget()) {
         if (!webOperation) {
           return {
-            result: { status: "error", error: new Error("Account unavailable.") },
+            result: {
+              status: "error",
+              error: new EmailOtpInstallationError("Account unavailable."),
+            },
             safeToRelease: true,
           };
         }
@@ -356,7 +375,9 @@ export async function verifyAndInstallEmailOtp(
                 ? { status: "stale" }
                 : {
                     status: "error",
-                    error: new Error("Email-code installation unavailable."),
+                    error: new EmailOtpInstallationError(
+                      "Email-code installation unavailable.",
+                    ),
                   },
             safeToRelease,
           };
@@ -364,7 +385,7 @@ export async function verifyAndInstallEmailOtp(
         return {
           result: {
             status: "error",
-            error: new Error("Email-code session was rejected."),
+            error: new EmailOtpInstallationError("Email-code session was rejected."),
           },
           safeToRelease: true,
         };
@@ -435,7 +456,9 @@ export async function verifyAndInstallEmailOtp(
       return {
         result: {
           status: "error",
-          error: new Error("Email-code session installation changed identity."),
+          error: new EmailOtpInstallationError(
+            "Email-code session installation changed identity.",
+          ),
         },
         safeToRelease,
       };
