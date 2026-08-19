@@ -57,7 +57,7 @@ describe("production provider rate-limit migration", () => {
     expect(SCRIPT).toContain(sha256(frozenManifest()));
     expect(SCRIPT).toContain(sha256(MIGRATION));
     expect(SCRIPT).toContain('version: "20260803170000"');
-    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(37);
+    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(38);
   });
 
   it("requires exact history, a fresh backup, and a one-packet dry run", () => {

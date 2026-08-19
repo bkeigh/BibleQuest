@@ -337,7 +337,7 @@ describe("privacy-safe observability contract", () => {
       canonical_origin_matches: true,
       auth_posture: "configured",
       analytics_posture: "configured",
-      schema_contract: "0038",
+      schema_contract: "0039",
       service_worker_version: "biblequest-v28",
       billing_mode: "coming-soon",
       billing_purchases_enabled: false,

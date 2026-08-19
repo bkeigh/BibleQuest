@@ -1,9 +1,7 @@
 import "server-only";
 
+import { createAdminSupabase } from "@/lib/supabase/admin.server";
 import type { SigninHealthAccount } from "./signin-health";
-
-const PAGE_SIZE = 200;
-const MAX_PAGES = 50;
 
 export class SigninAccountsError extends Error {
   constructor(
@@ -16,104 +14,73 @@ export class SigninAccountsError extends Error {
 }
 
 /**
- * Lists accounts through the Auth admin API, carrying the key the way this
- * codebase already decided each class must be carried.
+ * Lists account timestamps for the sign-in monitor, over PostgREST.
  *
- * Deliberately not routed through createAdminSupabase: that client installs a
- * fetch wrapper whose behaviour is tuned for PostgREST, and this call is not
- * PostgREST. Here the key travels the way the platform documents, and a
- * failure says what the upstream actually answered instead of leaving the
- * next person to guess a header shape.
+ * It used to call GoTrue's admin API directly, and that call never once
+ * succeeded in production. Three revisions argued about whether a modern
+ * secret key belongs on `apikey`, on `Authorization: Bearer`, or on both —
+ * and when the response body was finally logged it turned out to be a
+ * Cloudflare HTML block page, not a GoTrue error at all. `/auth/v1/admin/*`
+ * is refused at the edge from this deployment's egress regardless of headers.
+ *
+ * PostgREST from the same egress is fine — it is how every other server
+ * feature here reaches Supabase — so the monitor reads the two columns it
+ * needs through `public.signin_health_accounts()` (migration 0039). That
+ * function is `security definer`, granted to service_role alone, and returns
+ * timestamps with no identity attached.
+ *
+ * The judgement stays in `assessSigninHealth`, against a fixed clock.
  */
 export async function listSigninAccounts(): Promise<SigninHealthAccount[]> {
-  const origin = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const key =
-    process.env.SUPABASE_SECRET_KEY?.trim() ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!origin || !key || key.length < 32) {
+  let admin;
+  try {
+    admin = createAdminSupabase();
+  } catch {
     throw new SigninAccountsError(
       "configuration",
       "Supabase admin configuration unavailable.",
     );
   }
 
-  // Publishable and secret keys travel on `apikey` alone. They are not JWTs,
-  // so the bearer channel rejects them; the platform's one documented
-  // exception — a bearer that exactly equals the apikey header — only means
-  // the gateway forwards the request, which is then "rejected as the value is
-  // not a JWT". A previous revision read that sentence as permission to send
-  // the pair, and it was not. A legacy service-role key IS a JWT and is still
-  // carried in both channels, which is what it has always wanted.
-  const modern = key.startsWith("sb_secret_") || key.startsWith("sb_publishable_");
-  const headers: Record<string, string> = { apikey: key };
-  if (!modern) headers.Authorization = `Bearer ${key}`;
+  const { data, error } = await admin.rpc("signin_health_accounts");
 
-  const accounts: SigninHealthAccount[] = [];
-  for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const response = await fetch(
-      `${origin}/auth/v1/admin/users?page=${page}&per_page=${PAGE_SIZE}`,
-      { headers, cache: "no-store" },
+  if (error) {
+    // Name it. A blanket "unknown" is what left the original failure
+    // undiagnosable for days, and a bare 503 is what kept the next three
+    // revisions guessing.
+    const code = typeof error.code === "string" ? error.code : "";
+    const reason =
+      code === "42501" || code === "42883"
+        ? "permission"
+        : code === "PGRST301" || code === "401"
+          ? "auth"
+          : "provider";
+    console.error(
+      JSON.stringify({
+        kind: "signin_accounts_failure",
+        reason,
+        code,
+        message: String(error.message ?? "").slice(0, 200),
+      }),
     );
-    if (!response.ok) {
-      // Three revisions of this call have now failed on a header theory, each
-      // learning only "503". The upstream says which thing is wrong in its
-      // body, and that body carries no credential — so record it, bounded,
-      // alongside the key CLASS. The key itself never appears.
-      await describeAdminRefusal(response, key);
-      if (response.status === 401) {
-        throw new SigninAccountsError("auth", "Admin API rejected the key.");
-      }
-      if (response.status === 403) {
-        throw new SigninAccountsError("permission", "Admin API forbade the key.");
-      }
-      throw new SigninAccountsError(
-        "provider",
-        `Admin API returned ${response.status}.`,
-      );
-    }
-    const body: unknown = await response.json();
-    const users =
-      body && typeof body === "object" && Array.isArray((body as { users?: unknown }).users)
-        ? ((body as { users: Record<string, unknown>[] }).users)
-        : [];
-    for (const user of users) {
-      accounts.push({
-        created_at: typeof user.created_at === "string" ? user.created_at : null,
-        last_sign_in_at:
-          typeof user.last_sign_in_at === "string" ? user.last_sign_in_at : null,
-      });
-    }
-    if (users.length < PAGE_SIZE) return accounts;
+    throw new SigninAccountsError(
+      reason,
+      `Sign-in account read failed (${code || "no code"}).`,
+    );
   }
-  return accounts;
-}
 
-/**
- * Logs why the admin API refused, without ever logging the key.
- *
- * Only the key's class is recorded — the prefix that decides which header
- * shape it wants — because "which class is actually deployed" has been the
- * unknown behind every failure of this call. The upstream body is GoTrue's
- * own error payload (`error_code`, `msg`) and is bounded before it travels.
- */
-async function describeAdminRefusal(
-  response: Response,
-  key: string,
-): Promise<void> {
-  const keyClass = key.startsWith("sb_secret_")
-    ? "sb_secret"
-    : key.startsWith("sb_publishable_")
-      ? "sb_publishable"
-      : key.startsWith("eyJ")
-        ? "legacy_jwt"
-        : "unrecognised";
-  const body = await response.text().catch(() => "");
-  console.error(
-    JSON.stringify({
-      kind: "signin_admin_refusal",
-      status: response.status,
-      keyClass,
-      upstream: body.slice(0, 300),
-    }),
-  );
+  if (!Array.isArray(data)) {
+    throw new SigninAccountsError(
+      "provider",
+      "Sign-in account read returned no rows.",
+    );
+  }
+
+  // Keep only the two fields the assessment reads. The function already
+  // returns nothing else, and this makes that true at the boundary too.
+  return data.map((row: Record<string, unknown>) => ({
+    created_at: typeof row.created_at === "string" ? row.created_at : null,
+    last_sign_in_at:
+      typeof row.last_sign_in_at === "string" ? row.last_sign_in_at : null,
+  }));
 }
