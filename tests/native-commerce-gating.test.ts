@@ -61,7 +61,14 @@ describe("native commerce gating", () => {
     const rhythm = source("src/components/rhythm/RhythmBuilder.tsx");
     const home = source("src/components/home/HomeScreen.tsx");
 
-    expect(settings).toContain("{!nativeTarget && (");
+    // Anchored on the wallpaper controls themselves. A bare
+    // `{!nativeTarget && (` is also how the analytics toggle further down is
+    // gated, so this test passed its own name while both wallpaper gates
+    // could have been deleted outright.
+    expect(settings).toMatch(/\{!nativeTarget && \(\s*<WallpaperPicker/);
+    expect(settings).toMatch(
+      /\{!nativeTarget && \(\s*<Row label="Wallpaper style">/,
+    );
     expect(settings).toContain("{(!nativeTarget || isPlus) && (");
     expect(shell).toContain("(!isNativeTarget() || isPlus)");
     expect(quests).toMatch(
