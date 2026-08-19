@@ -1,0 +1,77 @@
+name: Sign-in health
+
+on:
+  schedule:
+    # Twice daily, offset from the hour to avoid scheduler congestion. The
+    # check looks back 48h, so two runs a day means a stuck person is noticed
+    # the same day rather than by someone happening to look — which is how
+    # every auth defect between 2026-08-14 and 2026-08-18 was actually found.
+    - cron: "41 8,20 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: signin-health
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Is anyone stuck signing in
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # Only a monitor token. The report is computed on the deployment, which
+      # already holds the Supabase secret — this repository is public and no
+      # database credential has ever been placed in its Actions secrets.
+      SIGNIN_HEALTH_SECRET: ${{ secrets.SIGNIN_HEALTH_SECRET }}
+    steps:
+      - name: Ask production whether anyone is newly stuck
+        id: check
+        shell: bash
+        run: |
+          if [[ -z "$SIGNIN_HEALTH_SECRET" ]]; then
+            echo "::error::SIGNIN_HEALTH_SECRET is not configured."
+            exit 1
+          fi
+          # Counts are deliberately not echoed: workflow logs on a public
+          # repository are world-readable, and how many people cannot sign in
+          # is not something to publish. Only the verdict reaches the log.
+          body="$(curl --silent --show-error --fail --retry 2 --retry-all-errors \
+            --retry-delay 5 --max-time 45 \
+            --header "Authorization: Bearer $SIGNIN_HEALTH_SECRET" \
+            https://www.biblequest.co/api/health/signin)" || {
+              echo "::error::Sign-in health endpoint unreachable."
+              exit 1
+            }
+          if [[ "$body" == *'"ok":true'* ]]; then
+            echo "Nobody newly stuck."
+            echo "stuck=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Someone created an account recently and never signed in."
+            echo "stuck=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Open or update the alert issue
+        if: steps.check.outputs.stuck == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          title="Sign-in health: someone is stuck"
+          existing="$(gh issue list --state open --search "$title in:title" \
+            --json number --jq '.[0].number // empty')"
+          note="The sign-in health check found at least one account created in the\
+          last 48h that has never signed in. They cannot report this themselves —\
+          to them the code simply did not work.\n\nRun \`pnpm check:signin\` for the\
+          counts (kept out of this public log deliberately), and see\
+          docs/POST_PROMOTION_SIGNIN_VERIFICATION.md.\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          if [[ -n "$existing" ]]; then
+            gh issue comment "$existing" --body "$(echo -e "$note")"
+          else
+            gh issue create --title "$title" --body "$(echo -e "$note")"
+          fi
+      - name: Preserve failing status
+        if: steps.check.outputs.stuck == 'true'
+        run: exit 1
