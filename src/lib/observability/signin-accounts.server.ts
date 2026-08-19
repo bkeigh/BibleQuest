@@ -20,11 +20,10 @@ export class SigninAccountsError extends Error {
  * codebase already decided each class must be carried.
  *
  * Deliberately not routed through createAdminSupabase: that client installs a
- * fetch wrapper which strips the Authorization header for the modern secret
- * key. That is correct for PostgREST, which rejects a non-JWT bearer — but
- * GoTrue's admin API requires the bearer/apikey PAIR and answers 403 to
- * apikey alone, so the wrapper broke this call with nothing to say beyond
- * "unknown". Here the pair is sent explicitly and every failure names itself.
+ * fetch wrapper whose behaviour is tuned for PostgREST, and this call is not
+ * PostgREST. Here the key travels the way the platform documents, and a
+ * failure says what the upstream actually answered instead of leaving the
+ * next person to guess a header shape.
  */
 export async function listSigninAccounts(): Promise<SigninHealthAccount[]> {
   const origin = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
@@ -38,18 +37,16 @@ export async function listSigninAccounts(): Promise<SigninHealthAccount[]> {
     );
   }
 
-  // Both header channels, identical value, for BOTH key classes. The gateway
-  // documents the exception this relies on: a secret key is rejected in the
-  // bearer channel "except if the value exactly equals the apikey header".
-  // GoTrue's admin API accepts the pair; apikey alone answers 403 — measured
-  // in production on 2026-08-19 after the previous revision sent apikey only.
-  // (PostgREST is the opposite: it rejects a non-JWT bearer outright, which
-  // is why createAdminSupabase strips it there and why this module is
-  // deliberately separate from that client.)
-  const headers: Record<string, string> = {
-    apikey: key,
-    Authorization: `Bearer ${key}`,
-  };
+  // Publishable and secret keys travel on `apikey` alone. They are not JWTs,
+  // so the bearer channel rejects them; the platform's one documented
+  // exception — a bearer that exactly equals the apikey header — only means
+  // the gateway forwards the request, which is then "rejected as the value is
+  // not a JWT". A previous revision read that sentence as permission to send
+  // the pair, and it was not. A legacy service-role key IS a JWT and is still
+  // carried in both channels, which is what it has always wanted.
+  const modern = key.startsWith("sb_secret_") || key.startsWith("sb_publishable_");
+  const headers: Record<string, string> = { apikey: key };
+  if (!modern) headers.Authorization = `Bearer ${key}`;
 
   const accounts: SigninHealthAccount[] = [];
   for (let page = 1; page <= MAX_PAGES; page += 1) {
@@ -57,13 +54,18 @@ export async function listSigninAccounts(): Promise<SigninHealthAccount[]> {
       `${origin}/auth/v1/admin/users?page=${page}&per_page=${PAGE_SIZE}`,
       { headers, cache: "no-store" },
     );
-    if (response.status === 401) {
-      throw new SigninAccountsError("auth", "Admin API rejected the key.");
-    }
-    if (response.status === 403) {
-      throw new SigninAccountsError("permission", "Admin API forbade the key.");
-    }
     if (!response.ok) {
+      // Three revisions of this call have now failed on a header theory, each
+      // learning only "503". The upstream says which thing is wrong in its
+      // body, and that body carries no credential — so record it, bounded,
+      // alongside the key CLASS. The key itself never appears.
+      await describeAdminRefusal(response, key);
+      if (response.status === 401) {
+        throw new SigninAccountsError("auth", "Admin API rejected the key.");
+      }
+      if (response.status === 403) {
+        throw new SigninAccountsError("permission", "Admin API forbade the key.");
+      }
       throw new SigninAccountsError(
         "provider",
         `Admin API returned ${response.status}.`,
@@ -84,4 +86,34 @@ export async function listSigninAccounts(): Promise<SigninHealthAccount[]> {
     if (users.length < PAGE_SIZE) return accounts;
   }
   return accounts;
+}
+
+/**
+ * Logs why the admin API refused, without ever logging the key.
+ *
+ * Only the key's class is recorded — the prefix that decides which header
+ * shape it wants — because "which class is actually deployed" has been the
+ * unknown behind every failure of this call. The upstream body is GoTrue's
+ * own error payload (`error_code`, `msg`) and is bounded before it travels.
+ */
+async function describeAdminRefusal(
+  response: Response,
+  key: string,
+): Promise<void> {
+  const keyClass = key.startsWith("sb_secret_")
+    ? "sb_secret"
+    : key.startsWith("sb_publishable_")
+      ? "sb_publishable"
+      : key.startsWith("eyJ")
+        ? "legacy_jwt"
+        : "unrecognised";
+  const body = await response.text().catch(() => "");
+  console.error(
+    JSON.stringify({
+      kind: "signin_admin_refusal",
+      status: response.status,
+      keyClass,
+      upstream: body.slice(0, 300),
+    }),
+  );
 }

@@ -26,22 +26,26 @@ function stubFetch(handler: (headers: Headers, url: string) => Response) {
 }
 
 describe("listSigninAccounts", () => {
-  it("sends the bearer/apikey pair with identical values for a modern key", () => {
-    // GoTrue's admin API answers 403 to apikey alone — measured in production
-    // on 2026-08-19, after a revision that asserted the exact opposite here.
-    // The gateway forwards a secret key in the bearer channel only when it
-    // exactly equals the apikey header, and that pair is the admin contract.
+  it("sends a modern secret key on apikey alone, never as a bearer", () => {
+    // A secret key is not a JWT. The bearer channel rejects it, and the one
+    // documented exception — a bearer equal to the apikey header — only gets
+    // the request forwarded, then "rejected as the value is not a JWT". A
+    // previous revision read that as permission to send both and shipped a
+    // third failing header shape.
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://fixture.supabase.co");
     vi.stubEnv("SUPABASE_SECRET_KEY", MODERN);
     const seen = stubFetch(() => new Response(JSON.stringify({ users: [] }), { status: 200 }));
 
     return listSigninAccounts().then(() => {
       expect(seen[0].get("apikey")).toBe(MODERN);
-      expect(seen[0].get("authorization")).toBe(`Bearer ${MODERN}`);
+      expect(seen[0].get("authorization")).toBeNull();
     });
   });
 
-  it("sends the same pair for a legacy service-role JWT", () => {
+  it("still carries a legacy service-role JWT in both channels", () => {
+    // The legacy key IS a JWT, so the bearer channel is exactly where it
+    // belongs. The classes genuinely differ; that is the whole reason this
+    // module branches at all.
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://fixture.supabase.co");
     vi.stubEnv("SUPABASE_SECRET_KEY", "");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", LEGACY);
@@ -51,6 +55,33 @@ describe("listSigninAccounts", () => {
       expect(seen[0].get("apikey")).toBe(LEGACY);
       expect(seen[0].get("authorization")).toBe(`Bearer ${LEGACY}`);
     });
+  });
+
+  it("records what the upstream refused with, and never the key", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://fixture.supabase.co");
+    vi.stubEnv("SUPABASE_SECRET_KEY", MODERN);
+    const logged: string[] = [];
+    const error = vi
+      .spyOn(console, "error")
+      .mockImplementation((line: unknown) => void logged.push(String(line)));
+    stubFetch(
+      () =>
+        new Response(
+          JSON.stringify({ error_code: "user_not_allowed", msg: "User not allowed" }),
+          { status: 403 },
+        ),
+    );
+
+    await expect(listSigninAccounts()).rejects.toMatchObject({ reason: "permission" });
+    error.mockRestore();
+
+    const refusal = logged.find((line) => line.includes("signin_admin_refusal"));
+    expect(refusal, "the refusal must describe itself").toBeDefined();
+    expect(refusal).toContain("user_not_allowed");
+    expect(refusal).toContain("sb_secret");
+    // The class travels; the credential does not.
+    expect(refusal).not.toContain(MODERN);
+    expect(logged.join("\n")).not.toContain(MODERN);
   });
 
   it("names why it failed rather than reporting unknown", async () => {
