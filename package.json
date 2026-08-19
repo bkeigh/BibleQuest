@@ -50,7 +50,8 @@
     "test:synthetic-health": "vitest run tests/synthetic-health.test.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "verify:promotion": "node scripts/verify-promotion.mjs"
+    "verify:promotion": "node scripts/verify-promotion.mjs",
+    "check:signin": "node scripts/check-signin-health.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
