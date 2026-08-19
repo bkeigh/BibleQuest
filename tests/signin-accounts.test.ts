@@ -26,21 +26,22 @@ function stubFetch(handler: (headers: Headers, url: string) => Response) {
 }
 
 describe("listSigninAccounts", () => {
-  it("keeps a modern secret key out of the bearer channel", () => {
-    // sb_secret_… is not a JWT. Putting it in Authorization is exactly what the
-    // admin client's fetch wrapper exists to prevent, and getting this wrong is
-    // why the first production run answered 503 with nothing to say.
+  it("sends the bearer/apikey pair with identical values for a modern key", () => {
+    // GoTrue's admin API answers 403 to apikey alone — measured in production
+    // on 2026-08-19, after a revision that asserted the exact opposite here.
+    // The gateway forwards a secret key in the bearer channel only when it
+    // exactly equals the apikey header, and that pair is the admin contract.
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://fixture.supabase.co");
     vi.stubEnv("SUPABASE_SECRET_KEY", MODERN);
     const seen = stubFetch(() => new Response(JSON.stringify({ users: [] }), { status: 200 }));
 
     return listSigninAccounts().then(() => {
       expect(seen[0].get("apikey")).toBe(MODERN);
-      expect(seen[0].get("authorization")).toBeNull();
+      expect(seen[0].get("authorization")).toBe(`Bearer ${MODERN}`);
     });
   });
 
-  it("still sends a legacy service-role JWT as a bearer", () => {
+  it("sends the same pair for a legacy service-role JWT", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://fixture.supabase.co");
     vi.stubEnv("SUPABASE_SECRET_KEY", "");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", LEGACY);
