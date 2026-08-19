@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  EMAIL_OTP_POST_VERIFICATION_CODE,
   authFailureMessage,
   authFailureReason,
   emailOtpFailure,
@@ -7,6 +8,7 @@ import {
   oauthRequestFailure,
   parseAuthFailureReason,
 } from "@/lib/auth/errors";
+import { EmailOtpInstallationError } from "@/lib/auth/email-otp-verification";
 
 describe("auth diagnostics", () => {
   it("maps callback failures to bounded, user-safe reasons", () => {
@@ -85,6 +87,68 @@ describe("auth diagnostics", () => {
     // A browser that actually reports no connection is still told the truth.
     expect(emailOtpFailure(new TypeError("Failed to fetch"), false).reference).toBe(
       "AUTH-NETWORK",
+    );
+  });
+
+  it("does not blame the code for a failure that happened after it was accepted", () => {
+    // The server had already verified and CONSUMED the code; only the local
+    // install failed. The old default told the person to "check it carefully
+    // or request a new one" — advice that cannot work, because the code was
+    // right and is now spent. Requesting another repeats the same wall, which
+    // is what a stuck person actually does.
+    const failure = emailOtpFailure(
+      new EmailOtpInstallationError("Email-code installation unavailable."),
+    );
+
+    expect(failure.reference).toBe("AUTH-INSTALL-INCOMPLETE");
+    expect(failure.message).not.toMatch(/check it carefully/i);
+    expect(failure.message).not.toMatch(/request a new(er)? code/i);
+    // It must say the code was fine and that retrying the sign-in is the move.
+    expect(failure.message).toMatch(/code was (correct|accepted)/i);
+  });
+
+  it("routes every post-verification failure to the same honest message", () => {
+    // All five install-phase failures were codeless Errors, so all five fell
+    // through to the code-blaming default. They are one family: the server
+    // accepted the code and something afterwards failed.
+    for (const message of [
+      "Email-code installation unavailable.",
+      "Email-code session was rejected.",
+      "Account unavailable.",
+      "Email-code session installation changed identity.",
+      "Email-code verification returned an invalid session.",
+    ]) {
+      expect(
+        emailOtpFailure(new EmailOtpInstallationError(message)).reference,
+        message,
+      ).toBe("AUTH-INSTALL-INCOMPLETE");
+    }
+    // The shared code is the contract between the two modules.
+    expect(new EmailOtpInstallationError("x").code).toBe(
+      EMAIL_OTP_POST_VERIFICATION_CODE,
+    );
+  });
+
+  it("leaves the ordinary verify default intact for an unrecognised error", () => {
+    // Without this, widening the install branch to catch everything would go
+    // unnoticed: a genuinely unknown verify failure must still land on
+    // AUTH-CODE-VERIFY, not be relabelled as a post-verification install.
+    expect(emailOtpFailure(new Error("something we have never seen"))).toMatchObject(
+      {
+        reference: "AUTH-CODE-VERIFY",
+        unavailable: false,
+      },
+    );
+  });
+
+  it("still blames the code when the code really is wrong", () => {
+    // Guard against over-correcting: a genuinely bad or expired code must keep
+    // telling the person to check it or request another.
+    expect(emailOtpFailure({ code: "invalid_otp" })).toMatchObject({
+      reference: "AUTH-CODE-INVALID",
+    });
+    expect(emailOtpFailure({ code: "otp_expired" }).message).toMatch(
+      /invalid or has expired/i,
     );
   });
 

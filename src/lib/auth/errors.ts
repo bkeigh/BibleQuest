@@ -92,6 +92,17 @@ export function authFailureMessage(reason: AuthFailureReason): string {
   }
 }
 
+/**
+ * Marks a failure that happened AFTER the server accepted and consumed the
+ * one-time code — the install/verification phase on this device.
+ *
+ * These used to be codeless Errors, so they fell through to the default
+ * "check it carefully or request a new one". That advice cannot work: the
+ * code was correct and is already spent, so requesting another just repeats
+ * the same wall. The shared code lets the message tell the truth instead.
+ */
+export const EMAIL_OTP_POST_VERIFICATION_CODE = "email_otp_installation_failed";
+
 export interface AuthRequestFailure {
   message: string;
   reference: string;
@@ -238,6 +249,14 @@ export function emailOtpFailure(
       message: "Too many attempts. Wait a minute, then request a new code.",
       reference: "AUTH-RATE-LIMIT",
       unavailable: false,
+    };
+  }
+  if (code === EMAIL_OTP_POST_VERIFICATION_CODE) {
+    return {
+      message:
+        "Your code was correct — BibleQuest couldn’t finish opening your account on this device. Try again in a moment; a new code won’t help.",
+      reference: "AUTH-INSTALL-INCOMPLETE",
+      unavailable: true,
     };
   }
   return {
