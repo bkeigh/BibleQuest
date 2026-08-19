@@ -884,7 +884,7 @@ function BibleTranslationPicker({
 function SettingsInner() {
   const router = useRouter();
   const { toast } = useToast();
-  const { isPlus } = usePlus();
+  const { isPlus, loading: plusLoading } = usePlus();
   const nativeTarget = isNativeTarget();
   // Signed-in clears/restores must also purge the account copy, or the next
   // initial sync merges it straight back (see lib/sync/engine.ts).
@@ -915,6 +915,7 @@ function SettingsInner() {
   const [photoBusy, setPhotoBusy] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
 
   const appearance = settings.appearance;
   const shouldReduceMotion = useShouldReduceMotion();
@@ -926,12 +927,69 @@ function SettingsInner() {
   const language = settings.language ?? "en";
   const bibleTranslation =
     settings.preferredBibleTranslation ?? DEFAULT_BIBLE_TRANSLATION_KEY;
+  const themeNames: Record<Exclude<ThemeId, "system">, string> = {
+    paper: t.settings.themePaper,
+    candlelight: t.settings.themeDark,
+    light: t.settings.themeLight,
+    dark: t.settings.themePlainDark,
+  };
+  // Closed, the card still says which look is on — the same courtesy the
+  // translation and language cards pay, and the reason a shut Appearance
+  // isn't just a word and a chevron.
+  const appearanceSummary =
+    appearance.theme === "system"
+      ? t.settings.themeSystem
+      : themeNames[appearance.theme];
 
   // Cancel obsolete media work on unmount, a newer pick, or an account swap.
   useEffect(
     () => () => photoUploadControllerRef.current?.abort(),
     [user?.id],
   );
+
+  // Journey's "Customize" button links straight to #appearance, and a card
+  // that stayed shut would swallow that landing.
+  //
+  // Nothing arrives here by itself. This screen is behind two ClientOnly
+  // gates, so at the moment the browser looks for the fragment the DOM is
+  // still a LoadingVeil and there is no #appearance to find — the scroll is
+  // ours to do or not happen at all. It waits on Plus for the same reason
+  // ChapterReader waits on `resolved.loading`: on native the Plus card above
+  // renders only once the entitlement settles, and landing first means
+  // landing above the target.
+  //
+  // Mount covers arriving from Journey, which crosses routes and remounts
+  // this screen. hashchange and popstate cover back/forward and a hand-typed
+  // URL. A same-route #appearance link would fire none of the three — the App
+  // Router treats it as a soft navigation, the trap ChapterReaderRoute
+  // already documents — so add one only with this effect in hand.
+  useEffect(() => {
+    if (plusLoading) return;
+    let frame = 0;
+    function openFromHash() {
+      if (window.location.hash !== "#appearance") return;
+      setAppearanceOpen(true);
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const node = document.getElementById("appearance");
+        if (!node) return;
+        const still =
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+          document.documentElement.classList.contains("force-reduce-motion");
+        // The anchor sits above the collapse, so its position does not move as
+        // the card opens — one scroll lands, with no second jump to correct.
+        node.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
+      });
+    }
+    openFromHash();
+    window.addEventListener("hashchange", openFromHash);
+    window.addEventListener("popstate", openFromHash);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("hashchange", openFromHash);
+      window.removeEventListener("popstate", openFromHash);
+    };
+  }, [plusLoading]);
 
   function setAppearance(patch: Partial<typeof appearance>) {
     const next = { ...appearance, ...patch };
@@ -1601,110 +1659,119 @@ function SettingsInner() {
           </>
         )}
 
-        {/* Always visible — text size and bold text are comfort settings
-            people shouldn't have to hunt for behind a disclosure. */}
-        <section id="appearance" className="scroll-mt-6">
-          <SectionTitle>{t.settings.appearance}</SectionTitle>
-          <PaperCard
-            variant="paper"
-            padding="none"
-            className="overflow-hidden px-4"
-          >
-            {!nativeTarget && (
-              <WallpaperPicker
-                value={appearance.wallpaperId}
-                onChange={(wallpaperId) => setAppearance({ wallpaperId })}
-              />
-            )}
-            <div className="divide-y divide-mist/70">
+
+        <DisclosureGroup className="mt-6">
+          {/* Appearance is a card in the same stack as every other group.
+              It used to be the one section left open, on the argument that
+              text size and bold text are comfort settings nobody should have
+              to hunt for. That was reversed deliberately, for one settings
+              page that reads the same all the way down; the cost is real and
+              it is a tap. Reopening the question means weighing that tap, not
+              rediscovering it. */}
+          <section id="appearance" className="scroll-mt-6">
+            <Disclosure
+              variant="card"
+              // The wallpaper carousel bleeds past the padding on purpose, and
+              // the card variant does not clip. PaperCard used to do this.
+              className="overflow-hidden"
+              label={t.settings.appearance}
+              summary={
+                <span className="text-[0.8125rem] text-ash">
+                  {appearanceSummary}
+                </span>
+              }
+              open={appearanceOpen}
+              onOpenChange={setAppearanceOpen}
+            >
               {!nativeTarget && (
-                <Row label="Wallpaper style">
+                <WallpaperPicker
+                  value={appearance.wallpaperId}
+                  onChange={(wallpaperId) => setAppearance({ wallpaperId })}
+                />
+              )}
+              <div className="divide-y divide-mist/70">
+                {!nativeTarget && (
+                  <Row label="Wallpaper style">
+                    <Segmented
+                      label="Wallpaper style"
+                      value={appearance.wallpaperMode}
+                      onChange={(wallpaperMode) => setAppearance({ wallpaperMode })}
+                      options={[
+                        { value: "still", label: "Still" },
+                        { value: "live", label: "Live" },
+                      ]}
+                    />
+                  </Row>
+                )}
+                <Row label="Glass surfaces">
+                  <Toggle
+                    label="Glass surfaces"
+                    on={appearance.glassSurfaces}
+                    onChange={(glassSurfaces) => setAppearance({ glassSurfaces })}
+                  />
+                </Row>
+                <GlassOpacitySlider
+                  // A durable external change remounts the short-lived drag draft.
+                  key={appearance.glassOpacity}
+                  value={appearance.glassOpacity}
+                  glassEnabled={appearance.glassSurfaces}
+                  onPreview={(glassOpacity) =>
+                    applyAppearance({ ...appearance, glassOpacity })
+                  }
+                  onCommit={(glassOpacity) => setAppearance({ glassOpacity })}
+                />
+                <ThemePicker
+                  label={t.settings.theme}
+                  systemLabel={t.settings.themeSystem}
+                  names={themeNames}
+                  value={appearance.theme}
+                  onChange={(theme) => setAppearance({ theme })}
+                />
+                <Row label={t.settings.textSize}>
                   <Segmented
-                    label="Wallpaper style"
-                    value={appearance.wallpaperMode}
-                    onChange={(wallpaperMode) => setAppearance({ wallpaperMode })}
+                    label={t.settings.textSize}
+                    value={appearance.textSize}
+                    onChange={(textSize) => setAppearance({ textSize })}
                     options={[
-                      { value: "still", label: "Still" },
-                      { value: "live", label: "Live" },
+                      { value: "default", label: t.settings.textSizeDefault },
+                      { value: "large", label: t.settings.textSizeLarge },
                     ]}
                   />
                 </Row>
-              )}
-              <Row label="Glass surfaces">
-                <Toggle
-                  label="Glass surfaces"
-                  on={appearance.glassSurfaces}
-                  onChange={(glassSurfaces) => setAppearance({ glassSurfaces })}
-                />
-              </Row>
-              <GlassOpacitySlider
-                // A durable external change remounts the short-lived drag draft.
-                key={appearance.glassOpacity}
-                value={appearance.glassOpacity}
-                glassEnabled={appearance.glassSurfaces}
-                onPreview={(glassOpacity) =>
-                  applyAppearance({ ...appearance, glassOpacity })
-                }
-                onCommit={(glassOpacity) => setAppearance({ glassOpacity })}
-              />
-              <ThemePicker
-                label={t.settings.theme}
-                systemLabel={t.settings.themeSystem}
-                names={{
-                  paper: t.settings.themePaper,
-                  candlelight: t.settings.themeDark,
-                  light: t.settings.themeLight,
-                  dark: t.settings.themePlainDark,
-                }}
-                value={appearance.theme}
-                onChange={(theme) => setAppearance({ theme })}
-              />
-              <Row label={t.settings.textSize}>
-                <Segmented
-                  label={t.settings.textSize}
-                  value={appearance.textSize}
-                  onChange={(textSize) => setAppearance({ textSize })}
-                  options={[
-                    { value: "default", label: t.settings.textSizeDefault },
-                    { value: "large", label: t.settings.textSizeLarge },
-                  ]}
-                />
-              </Row>
-              <Row label={t.settings.boldText}>
-                <Toggle
-                  label={t.settings.boldText}
-                  on={appearance.boldText}
-                  onChange={(boldText) => setAppearance({ boldText })}
-                />
-              </Row>
-              {nativeTarget && (
-                <p className="py-3.5 text-caption leading-relaxed text-ash">
-                  BibleQuest also follows iOS text size and Bold Text. Large
-                  adds an extra reading boost on top of your device choice.
+                <Row label={t.settings.boldText}>
+                  <Toggle
+                    label={t.settings.boldText}
+                    on={appearance.boldText}
+                    onChange={(boldText) => setAppearance({ boldText })}
+                  />
+                </Row>
+                {nativeTarget && (
+                  <p className="py-3.5 text-caption leading-relaxed text-ash">
+                    BibleQuest also follows iOS text size and Bold Text. Large
+                    adds an extra reading boost on top of your device choice.
+                  </p>
+                )}
+                <Row label={t.settings.reduceMotion}>
+                  <Toggle
+                    label={t.settings.reduceMotion}
+                    on={appearance.reducedMotion}
+                    onChange={(reducedMotion) => setAppearance({ reducedMotion })}
+                  />
+                </Row>
+              </div>
+              {!nativeTarget &&
+                appearance.wallpaperMode === "live" &&
+                shouldReduceMotion && (
+                <p className="border-t border-mist/70 py-3 text-caption leading-relaxed text-ash">
+                  Live is saved as your preference. The matching still is shown
+                  while {appearance.reducedMotion
+                    ? "Reduce Motion is"
+                    : "your device’s Reduce Motion setting is"} on.
                 </p>
-              )}
-              <Row label={t.settings.reduceMotion}>
-                <Toggle
-                  label={t.settings.reduceMotion}
-                  on={appearance.reducedMotion}
-                  onChange={(reducedMotion) => setAppearance({ reducedMotion })}
-                />
-              </Row>
-            </div>
-            {!nativeTarget &&
-              appearance.wallpaperMode === "live" &&
-              shouldReduceMotion && (
-              <p className="border-t border-mist/70 py-3 text-caption leading-relaxed text-ash">
-                Live is saved as your preference. The matching still is shown
-                while {appearance.reducedMotion
-                  ? "Reduce Motion is"
-                  : "your device’s Reduce Motion setting is"} on.
-              </p>
-              )}
-          </PaperCard>
-        </section>
+                )}
+            </Disclosure>
+          </section>
 
-        <DisclosureGroup className="mt-6">
           <Disclosure
             variant="card"
             label={bibleTranslationCopy.label}
