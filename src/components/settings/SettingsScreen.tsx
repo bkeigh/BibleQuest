@@ -1674,9 +1674,6 @@ function SettingsInner() {
               // The wallpaper carousel bleeds past the padding on purpose, and
               // the card variant does not clip. PaperCard used to do this.
               className="overflow-hidden"
-              // The rows carry their own vertical rhythm, as they did in the
-              // card, so the content wrapper adds none of its own.
-              contentClassName="pb-0"
               label={t.settings.appearance}
               summary={
                 <span className="text-[0.8125rem] text-ash">
