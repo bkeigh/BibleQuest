@@ -1,28 +1,50 @@
 /**
- * Decides whether sign-in looks broken, from the user list alone.
+ * Decides whether sign-in looks broken, from the account list alone.
  *
- * Kept free of network and clock access so the thresholds can be tested
- * directly. `scripts/check-signin-health.mjs` supplies the real inputs.
+ * Free of clock, network and environment so the thresholds can be tested
+ * directly. The route supplies the real inputs.
  *
  * The signal is a person who created an account and never signed in. Supabase
- * omits `last_sign_in_at` entirely until a first successful sign-in, so its
- * absence is the fact — no inference required.
+ * omits `last_sign_in_at` until a first success, so its absence is a fact
+ * rather than an inference.
  */
 
 export const DEFAULT_FRESH_HOURS = 48;
+
+export interface SigninHealthAccount {
+  created_at?: string | null;
+  last_sign_in_at?: string | null;
+}
+
+export interface SigninHealthReport {
+  totalUsers: number;
+  neverSignedIn: number;
+  newlyStuck: number;
+  backlogStuck: number;
+  oldestStuckHours: number;
+  signedInLastDay: number;
+  problems: string[];
+  ok: boolean;
+}
 
 /**
  * Splits never-signed-in accounts into the ones worth waking someone for and
  * the historical backlog.
  *
- * Only the fresh ones raise a problem. The backlog is reported but never
- * alerts: five accounts have been stuck since well before this check existed,
- * and an alert that fires every run for a known number is one people learn to
- * ignore — which is how the original failures went unnoticed for days.
+ * Only the fresh ones raise a problem. Several accounts have been stuck since
+ * before this check existed, and an alert that fires every run for a known
+ * number is one people learn to ignore — which is how the original failures
+ * went unnoticed for days.
  */
-export function assessSigninHealth(users, now, options = {}) {
+export function assessSigninHealth(
+  accounts: SigninHealthAccount[],
+  now: Date,
+  options: { freshHours?: number } = {},
+): SigninHealthReport {
   const freshHours = options.freshHours ?? DEFAULT_FRESH_HOURS;
-  if (!Array.isArray(users)) throw new TypeError("users must be an array");
+  if (!Array.isArray(accounts)) {
+    throw new TypeError("accounts must be an array");
+  }
   if (!(now instanceof Date) || Number.isNaN(now.getTime())) {
     throw new TypeError("now must be a valid Date");
   }
@@ -37,10 +59,10 @@ export function assessSigninHealth(users, now, options = {}) {
   let signedInLastDay = 0;
   let oldestStuckHours = 0;
 
-  for (const user of users) {
-    const createdAt = Date.parse(user?.created_at ?? "");
-    const lastSignIn = user?.last_sign_in_at
-      ? Date.parse(user.last_sign_in_at)
+  for (const account of accounts) {
+    const createdAt = Date.parse(account?.created_at ?? "");
+    const lastSignIn = account?.last_sign_in_at
+      ? Date.parse(account.last_sign_in_at)
       : null;
 
     if (lastSignIn !== null && !Number.isNaN(lastSignIn)) {
@@ -55,7 +77,7 @@ export function assessSigninHealth(users, now, options = {}) {
     oldestStuckHours = Math.max(oldestStuckHours, Math.round(ageMs / 3_600_000));
   }
 
-  const problems = [];
+  const problems: string[] = [];
   if (newlyStuck > 0) {
     problems.push(
       `${newlyStuck} ${newlyStuck === 1 ? "person" : "people"} created an account in the last ` +
@@ -64,7 +86,7 @@ export function assessSigninHealth(users, now, options = {}) {
   }
 
   return {
-    totalUsers: users.length,
+    totalUsers: accounts.length,
     neverSignedIn,
     newlyStuck,
     backlogStuck: neverSignedIn - newlyStuck,

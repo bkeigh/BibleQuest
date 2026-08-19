@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessSigninHealth } from "../scripts/lib/signin-health.mjs";
+import { assessSigninHealth } from "@/lib/observability/signin-health";
 
 const NOW = new Date("2026-08-18T12:00:00.000Z");
 
@@ -79,7 +79,12 @@ describe("sign-in health", () => {
   it("refuses malformed input instead of reporting a false all-clear", () => {
     // A check that answers "fine" when it cannot actually tell is the exact
     // failure shape this whole effort has been chasing.
-    expect(() => assessSigninHealth(null, NOW)).toThrow(TypeError);
+    // Cast deliberately: the types forbid this, but the route can still be
+    // handed junk at runtime, and answering "fine" when it cannot tell is the
+    // exact failure shape this whole effort has been chasing.
+    expect(() =>
+      assessSigninHealth(null as unknown as [], NOW),
+    ).toThrow(TypeError);
     expect(() => assessSigninHealth([], new Date("nonsense"))).toThrow(TypeError);
     expect(() => assessSigninHealth([], NOW, { freshHours: 0 })).toThrow(RangeError);
   });
