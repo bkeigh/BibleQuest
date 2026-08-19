@@ -111,7 +111,22 @@ export async function claimDistributedRateLimits(
       p_limit: policy.limit,
       p_window_seconds: policy.windowSeconds,
     });
-    if (error) throw new DistributedRateLimitError("dependency");
+    if (error) {
+      // Name what the database actually said. "dependency" alone is how this
+      // failure looked in production for an unknown length of time: a 503 on
+      // every rate-limited route, with nothing to distinguish a revoked key
+      // from a missing grant from an outage. PostgREST error payloads carry a
+      // code, a message and no credential, so record them bounded.
+      console.error(
+        JSON.stringify({
+          kind: "rate_limit_claim_refusal",
+          scope,
+          code: typeof error.code === "string" ? error.code : "",
+          message: String(error.message ?? "").slice(0, 200),
+        }),
+      );
+      throw new DistributedRateLimitError("dependency");
+    }
     const claim = parseClaim(data);
     retryAfter = Math.max(retryAfter, claim.retryAfter);
     if (!claim.allowed) return { allowed: false, retryAfter: claim.retryAfter };
