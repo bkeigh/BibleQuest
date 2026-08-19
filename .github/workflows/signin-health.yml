@@ -20,6 +20,14 @@ concurrency:
 jobs:
   check:
     name: Is anyone stuck signing in
+    # Quiet until deliberately switched on, so merging this does not start a
+    # twice-daily failure alarm before SIGNIN_HEALTH_SECRET exists. This is
+    # "not enabled yet", not "quiet when broken": once the variable is true a
+    # missing secret fails loudly rather than reporting a false all-clear.
+    # Same gate push-reminders.yml uses. Manual runs always work.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      vars.BIBLEQUEST_SIGNIN_HEALTH_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:

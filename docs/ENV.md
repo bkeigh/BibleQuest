@@ -28,6 +28,7 @@ template in [`../.env.example`](../.env.example).
 | `PUSH_SUBSCRIPTION_ENCRYPTION_KEYS` | Optional rotation secret | **Server-only.** JSON object mapping retained integer key versions to 32-byte base64 keys. |
 | `PUSH_SCHEDULER_SECRET` | Push secret | **Server-only and GitHub Actions secret.** At least 32 random characters shared with the authenticated scheduler route. |
 | `SIGNIN_HEALTH_SECRET` | Sign-in monitor | **Server-only and GitHub Actions secret.** At least 32 random characters shared with `/api/health/signin`. The scheduled workflow carries only this token — the report is computed on the deployment, so no Supabase credential goes near this public repository. |
+| `BIBLEQUEST_SIGNIN_HEALTH_ENABLED` | Sign-in monitor | **GitHub Actions repository variable.** Set to `true` to start the twice-daily schedule. Left unset the workflow stays quiet, so merging it does not alarm before the secret exists; `workflow_dispatch` always runs. |
 | `BIBLEQUEST_MONITOR_SUPABASE_URL` | Monitor secret | Exact production Supabase HTTPS origin, stored as a GitHub Actions secret so reports never expose the project host. |
 | `BIBLEQUEST_MONITOR_SUPABASE_ANON_KEY` | Monitor secret | Production publishable key stored as a GitHub Actions secret; used only for anonymous public-content and auth-settings probes. |
 | `BIBLEQUEST_MONITOR_EXPECTED_SHA` | Monitor gate | Non-secret 40-character deployed commit, stored as a repository variable after each approved release. |
