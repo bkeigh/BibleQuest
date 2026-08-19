@@ -21,11 +21,10 @@ export class SigninAccountsError extends Error {
  *
  * Deliberately not routed through createAdminSupabase: that client installs a
  * fetch wrapper which strips the Authorization header for the modern secret
- * key, because `sb_secret_…` is not a JWT and the auth channel rejects it.
- * That wrapper is correct for PostgREST, but it left this call failing in
- * production with nothing to say beyond "unknown". Here the classes are
- * explicit — modern keys travel as `apikey`, a legacy JWT also as a bearer —
- * and every failure names itself.
+ * key. That is correct for PostgREST, which rejects a non-JWT bearer — but
+ * GoTrue's admin API requires the bearer/apikey PAIR and answers 403 to
+ * apikey alone, so the wrapper broke this call with nothing to say beyond
+ * "unknown". Here the pair is sent explicitly and every failure names itself.
  */
 export async function listSigninAccounts(): Promise<SigninHealthAccount[]> {
   const origin = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
@@ -39,11 +38,18 @@ export async function listSigninAccounts(): Promise<SigninHealthAccount[]> {
     );
   }
 
-  const modern = key.startsWith("sb_secret_");
-  const headers: Record<string, string> = { apikey: key };
-  // A legacy service-role JWT is still accepted in the bearer channel; the
-  // modern key is not, which is the whole reason the classes differ here.
-  if (!modern) headers.Authorization = `Bearer ${key}`;
+  // Both header channels, identical value, for BOTH key classes. The gateway
+  // documents the exception this relies on: a secret key is rejected in the
+  // bearer channel "except if the value exactly equals the apikey header".
+  // GoTrue's admin API accepts the pair; apikey alone answers 403 — measured
+  // in production on 2026-08-19 after the previous revision sent apikey only.
+  // (PostgREST is the opposite: it rejects a non-JWT bearer outright, which
+  // is why createAdminSupabase strips it there and why this module is
+  // deliberately separate from that client.)
+  const headers: Record<string, string> = {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+  };
 
   const accounts: SigninHealthAccount[] = [];
   for (let page = 1; page <= MAX_PAGES; page += 1) {
