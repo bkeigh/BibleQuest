@@ -1,8 +1,18 @@
-# Staffed release session — owner checklist
+# Archive — pre-migration staffed release session
 
-Everything the account release still needs that an agent cannot do. Each step
-names what must be true before it starts and what to record. Work top to
-bottom; the order is enforced by the tooling, not just by convention.
+> **Do not execute this checklist.** It records the earlier `cb8f97e` /
+> schema-`0036` rollout that applied `0038`, merged the web work, and then
+> applied `0037`. Production is recorded on 2026-08-20 at `9680ff7`, schema
+> contract `0038`, with native availability off. Replaying sections 1–6 would
+> repeat completed database and deployment work. Use
+> [`IOS_ACCOUNT_REPLACEMENT_RELEASE.md`](IOS_ACCOUNT_REPLACEMENT_RELEASE.md)
+> sections 4 and 6 for current source/device gates and
+> [`IOS_ACCOUNT_CI_WORKFLOW.md`](IOS_ACCOUNT_CI_WORKFLOW.md) for the Xcode Cloud
+> path. Every external action still needs Brendan’s fresh approval.
+
+This file recorded what the account release still needed before the migrations
+shipped. Each historical step named what had to be true and what to record; it
+is retained for audit context only.
 
 **Never record** an email code, access token, publishable-key input,
 service-role key, database URL, private writing, or a real user identifier in
