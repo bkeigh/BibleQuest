@@ -38,11 +38,13 @@ export default function ContactPage() {
 
       <ProseHeading>Privacy and data</ProseHeading>
       <Prose>
-        BibleQuest 1.0 stores your journey locally and does not send it to
-        BibleQuest servers. iOS may include app data in device backups. Settings
-        lets you export or clear it. For a privacy question or an account created
-        in an earlier version, email the address above from the relevant account
-        address so the request can be verified.
+        Guest use may keep journey data on your device, and iOS may include app
+        data in device backups. If you use a supported sign-in journey, the
+        supported parts of your journey can sync to your protected account.
+        Settings has ways to export or clear journey data and, when you are
+        signed in, request account deletion. For a privacy or account-and-data
+        question, email the address above from the relevant account address when
+        possible so the request can be verified.
       </Prose>
       <Prose>
         Read the <Link href="/privacy">Privacy Policy</Link> and{" "}
