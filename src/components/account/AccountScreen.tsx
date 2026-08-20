@@ -19,6 +19,7 @@ import {
   parseAuthFailureReason,
 } from "@/lib/auth/errors";
 import {
+  accountAccessDescription,
   initialAccountIntent,
   type AccountIntent,
 } from "@/lib/auth/account-intent";
@@ -233,9 +234,7 @@ function AccountInner() {
 
       <PaperCard variant="paper" padding="lg">
         <p className="text-small leading-relaxed text-charcoal">
-          {intent === "create"
-            ? "A free account syncs this device’s journey across your devices behind per-user access controls. Journal text stays out of analytics and AI."
-            : "Use the email, Apple, or Google account connected to BibleQuest. We’ll restore its saved journey before opening the app."}
+          {accountAccessDescription(intent, isNativeTarget())}
         </p>
 
         <ul className="mt-4 space-y-2">
