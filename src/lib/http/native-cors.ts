@@ -30,11 +30,10 @@ import {
  */
 
 /**
- * `/api/billing/plans` sets `Cache-Control: public, max-age=300` — the one
- * shared-cacheable API response — while `next.config.ts` blankets `/api/:path*`
- * with `private, no-store`. Which one a given cache honors is unresolved, and
- * stamping CORS on a possibly shared-cacheable response is a poisoning hazard,
- * so the route is excluded rather than guessed about.
+ * `/api/billing/plans` stays outside the native CORS surface because the iOS
+ * account replacement has no native pricing or acquisition. The route itself
+ * is private/no-store, so this exclusion now describes product scope rather
+ * than relying on conflicting cache instructions.
  */
 const EXCLUDED_API_PATH = "/api/billing/plans";
 
