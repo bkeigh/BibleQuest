@@ -68,7 +68,8 @@ describe("iOS App Store release configuration", () => {
       /function publicApiFetch\([\s\S]{0,160}?return fetch\(url, \{\s*\.\.\.init,\s*credentials: "omit",\s*headers: publicHeaders\(init\?\.headers\),\s*\}\);/,
     );
     expect(api).toContain('headers.delete(reserved);');
-    expect(api).toContain('"authorization",');
+    expect(api).toContain('RESERVED_ACCOUNT_HEADERS = ["authorization"]');
+    expect(api).toContain('BIBLEQUEST_AUTHORITY_HEADER_PREFIX = "x-biblequest-"');
     expect(
       api.indexOf(
         "if (ACCOUNT_SYNC_CONTAINED || !NATIVE_ACCOUNT_BETA_ENABLED)",

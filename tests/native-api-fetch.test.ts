@@ -144,6 +144,7 @@ describe("apiFetch on the web target", () => {
         "x-biblequest-expected-user": USER_A,
         "x-biblequest-native-account-beta": "v1",
         "x-biblequest-web-auth": "v2",
+        "x-biblequest-future-authority": "caller-owned",
         "x-public": "kept",
       },
     };
@@ -158,6 +159,7 @@ describe("apiFetch on the web target", () => {
     expect(headers.has("x-biblequest-expected-user")).toBe(false);
     expect(headers.has("x-biblequest-native-account-beta")).toBe(false);
     expect(headers.has("x-biblequest-web-auth")).toBe(false);
+    expect(headers.has("x-biblequest-future-authority")).toBe(false);
   });
 
   it("sends only the exact active v2 bearer for a captured web subject", async () => {

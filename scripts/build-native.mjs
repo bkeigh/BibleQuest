@@ -536,6 +536,25 @@ const REMOVE = [
   ],
 ];
 
+const GUEST_ACCOUNT_CONTAINMENT_REPLACEMENTS = [
+  [
+    "src/native/guest/lib/supabase/config.ts",
+    "src/lib/supabase/config.ts",
+  ],
+  [
+    "src/native/guest/lib/sync/native-beta-headers.ts",
+    "src/lib/sync/native-beta-headers.ts",
+  ],
+  [
+    "src/native/guest/lib/sync/native-beta-contract.ts",
+    "src/lib/sync/native-beta-contract.ts",
+  ],
+  [
+    "src/native/guest/lib/sync/availability.ts",
+    "src/lib/sync/availability.ts",
+  ],
+];
+
 /**
  * `/` is served by the marketing group, which is removed above. Without a root
  * page the export emits no out/index.html and the WebView loads a blank screen
@@ -702,6 +721,15 @@ function pruneServerSurfaces() {
   writeFileSync(path.join(stage, "next.config.ts"), NATIVE_NEXT_CONFIG);
 }
 
+/** Replaces account modules with audited fail-closed guest implementations. */
+function stageGuestAccountContainment() {
+  if (!releaseBuild) return;
+  for (const [source, destination] of GUEST_ACCOUNT_CONTAINMENT_REPLACEMENTS) {
+    cpSync(path.join(stage, source), path.join(stage, destination));
+  }
+  log("staged fail-closed guest account modules");
+}
+
 function build() {
   log("running next build with output:\"export\"");
   execFileSync(
@@ -777,6 +805,34 @@ function verifyGuestSupabaseAbsence() {
     }
   }
   log("verified guest release output remains account-free");
+}
+
+const GUEST_FORBIDDEN_ACCOUNT_MARKERS = [
+  "x-biblequest-native-account-beta",
+  "biblequest_native_account_beta_v1",
+  "native_account_beta_availability",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+];
+
+/** Enforces the release runbook's literal guest account-marker boundary. */
+function verifyGuestAccountMarkersAbsent() {
+  if (!releaseBuild) return;
+  for (const file of generatedFiles(path.join(stage, "out"))) {
+    const contents = readFileSync(file, "utf8");
+    if (
+      GUEST_FORBIDDEN_ACCOUNT_MARKERS.some((marker) =>
+        contents.includes(marker),
+      )
+    ) {
+      fail(
+        `guest release output contains a forbidden account marker in ${path.relative(
+          path.join(stage, "out"),
+          file,
+        )}`,
+      );
+    }
+  }
+  log("verified guest release output contains no account markers");
 }
 
 /** Fails if a release artifact retains a disposable or protected host. */
@@ -965,10 +1021,12 @@ const mode = releaseBuild
 log(`mode=${mode} target=native hostedOrigin=${origin}`);
 stageTree();
 pruneServerSurfaces();
+stageGuestAccountContainment();
 build();
 verifyCommerceRoutesPruned();
 verifyNoPrivilegedSupabaseCredentials();
 verifyGuestSupabaseAbsence();
+verifyGuestAccountMarkersAbsent();
 verifyReleaseOrigin();
 verifyAccountReleaseTarget();
 verifyAccountBetaOrigin();
