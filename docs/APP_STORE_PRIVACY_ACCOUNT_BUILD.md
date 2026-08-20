@@ -35,18 +35,23 @@ and both are true:
 - **Tracking is `false` across the board**, and `NSPrivacyTrackingDomains` is
   empty.
 
-Also established: analytics is off in Production (`analytics_posture:
-disabled`), and this build has no payments, no remote push, and no native
-commerce.
+The release profile pins analytics, payments configuration, native commerce,
+and remote push off. That configuration is not enough by itself: the frozen
+artifact still has to prove that no out-of-scope transport is executable. A
+2026-08-20 local preflight found that the account build could still reach the
+Arcade status and consume endpoints, so **do not claim “no native commerce”
+until that defect is fixed and the final payload is rescanned**. Brendan must
+also re-confirm the current Production analytics posture before submission.
 
 The manifest additionally declares the `FileTimestamp` API under reason
 `C617.1`, for the durable local journey mirror inside the app's own container.
 
-## The one real gap between the manifest and reality
+## The unresolved gap between the manifest and observed data flow
 
-`docs/APP_STORE_NEXT_STEPS.md` recommends declaring **Device ID** and
-**Diagnostics**. The manifest declares neither. That disagreement needs
-resolving before submission, and here is the evidence for deciding it.
+The manifest declares neither **Device ID** nor **Diagnostics**. The checked-in
+source can prove the rate-limit flow below, but it cannot prove what Vercel or
+the Scripture provider logs or how long they retain it. Those questions must be
+resolved before submission.
 
 The app reads Scripture through `/api/bible/*`, which is rate limited. The
 limiter stores a SHA-256 keyed on `network:<first x-forwarded-for address>` in
@@ -66,7 +71,7 @@ Three defensible readings, and this is the owner's call with legal input:
 1. **Not disclosable.** It is a one-way hash of a network address, used only to
    protect the service, never linked to an account and never used for tracking.
 2. **Disclose as Identifiers → Device ID**, purpose App Functionality, linked
-   No, tracking No — the conservative answer `APP_STORE_NEXT_STEPS.md` reaches.
+   No, tracking No — the conservative paperwork choice.
 3. **Fix the cause instead.** Give the table a scheduled purge and a stated
    retention period, which makes the disclosure question smaller and is worth
    doing regardless.
@@ -77,8 +82,7 @@ casually.
 
 ## Open — the owner must resolve these before publishing
 
-Carried forward from `docs/APP_STORE_NEXT_STEPS.md`; none is answerable from
-the codebase:
+None of these provider facts is answerable from the checked-in codebase:
 
 - **Retention for the rate-limit records.** Currently unbounded in practice, as
   measured above. Either set one or disclose the collection.
