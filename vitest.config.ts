@@ -18,6 +18,7 @@ export default defineConfig({
     include: [
       "tests/**/*.test.ts",
       "tests/**/*.test.tsx",
+      "tests/apple-client-secret.test.mjs",
       "tests/observability-evidence.test.mjs",
     ],
     setupFiles: ["./tests/setup.ts"],
