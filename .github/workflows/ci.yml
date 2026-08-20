@@ -224,8 +224,10 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
+      # GitHub-hosted Ubuntu runners already include Chromium's shared libraries.
       - name: Install Chromium runtime
-        run: pnpm exec playwright install --with-deps chromium
+        timeout-minutes: 5
+        run: pnpm exec playwright install chromium
       - name: Exercise browser release paths
         run: pnpm test:e2e
 
