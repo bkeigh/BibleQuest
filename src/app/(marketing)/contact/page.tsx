@@ -39,8 +39,9 @@ export default function ContactPage() {
       <ProseHeading>Privacy and data</ProseHeading>
       <Prose>
         Guest use may keep journey data on your device, and iOS may include app
-        data in device backups. If you use a supported sign-in journey, the
-        supported parts of your journey can sync to your protected account.
+        data in device backups. If you sign in to a supported BibleQuest
+        account, supported parts of your journey can sync to that protected
+        account.
         Settings has ways to export or clear journey data and, when you are
         signed in, request account deletion. For a privacy or account-and-data
         question, email the address above from the relevant account address when

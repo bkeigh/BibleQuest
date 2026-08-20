@@ -12,8 +12,8 @@ describe("public contact data copy", () => {
     expect(CONTACT_PAGE).toContain(
       "Guest use may keep journey data on your device",
     );
-    expect(CONTACT_PAGE).toContain("supported sign-in journey");
-    expect(CONTACT_PAGE).toContain("sync to your protected account");
+    expect(CONTACT_PAGE).toContain("sign in to a supported BibleQuest");
+    expect(CONTACT_PAGE).toContain("sync to that protected");
     expect(CONTACT_PAGE).not.toContain(
       "stores your journey locally and does not send it to",
     );
