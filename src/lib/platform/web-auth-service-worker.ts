@@ -1,6 +1,11 @@
 "use client";
 
 import { isNativeTarget } from "./target";
+import { withDeadline } from "@/lib/async/deadline";
+import {
+  WEB_AUTH_SERVICE_WORKER_CONTROLLER_TIMEOUT_MS,
+  WEB_AUTH_SERVICE_WORKER_RESULT_TIMEOUT_MS,
+} from "@/lib/auth/request-budget";
 
 export const WEB_AUTH_SERVICE_WORKER_VERSION = "biblequest-v28";
 export const WEB_AUTH_SW_ATTEST_REQUEST =
@@ -13,8 +18,6 @@ export const WEB_AUTH_SW_CLIENT_RESPONSE =
   "BIBLEQUEST_WEB_AUTH_CLIENT_RESPONSE_V2";
 export const WEB_AUTH_SW_RESULT = "BIBLEQUEST_WEB_AUTH_RESULT_V2";
 
-const RESULT_TIMEOUT_MS = 6_000;
-const CONTROLLER_TIMEOUT_MS = 15_000;
 const NONCE = /^[A-Za-z0-9_-]{16,128}$/;
 
 let registrationPromise: Promise<ServiceWorkerRegistration> | null = null;
@@ -43,16 +46,18 @@ export function isWebAuthCustomerPath(pathname: string): boolean {
 /** Registers the root worker without permitting an HTTP-cache-stale script. */
 export function prepareWebAuthServiceWorker(): Promise<ServiceWorkerRegistration> {
   if (!registrationPromise) {
-    registrationPromise = navigator.serviceWorker
+    const pending = navigator.serviceWorker
       .register("/sw.js", { scope: "/", updateViaCache: "none" })
       .then(async (registration) => {
         await registration.update();
         return registration;
-      })
-      .catch((error) => {
-        registrationPromise = null;
-        throw error;
       });
+    const tracked = pending.catch((error) => {
+      // A superseded failure must not erase a newer healthy registration.
+      if (registrationPromise === tracked) registrationPromise = null;
+      throw error;
+    });
+    registrationPromise = tracked;
   }
   return registrationPromise;
 }
@@ -61,13 +66,14 @@ export function prepareWebAuthServiceWorker(): Promise<ServiceWorkerRegistration
 function workerResult(
   worker: ServiceWorker,
   type: typeof WEB_AUTH_SW_ATTEST_REQUEST | typeof WEB_AUTH_SW_AUDIT_REQUEST,
+  timeoutMs = WEB_AUTH_SERVICE_WORKER_RESULT_TIMEOUT_MS,
 ): Promise<boolean> {
   return new Promise((resolve, reject) => {
     const channel = new MessageChannel();
     const timer = window.setTimeout(() => {
       channel.port1.close();
       reject(new WebAuthServiceWorkerUnavailableError());
-    }, RESULT_TIMEOUT_MS);
+    }, Math.max(1, timeoutMs));
     channel.port1.onmessage = (event: MessageEvent<unknown>) => {
       window.clearTimeout(timer);
       channel.port1.close();
@@ -122,19 +128,40 @@ function nextControllerChange(timeoutMs: number): Promise<void> {
 
 /** Confirms the controller script and its private v28 protocol response. */
 async function exactActiveController(): Promise<ServiceWorker> {
-  await prepareWebAuthServiceWorker();
-  const deadline = Date.now() + CONTROLLER_TIMEOUT_MS;
+  const deadline =
+    Date.now() + WEB_AUTH_SERVICE_WORKER_CONTROLLER_TIMEOUT_MS;
+  const registration = prepareWebAuthServiceWorker();
+  try {
+    // Registration and update are part of the same inner gate as controller proof.
+    await withDeadline(
+      registration,
+      WEB_AUTH_SERVICE_WORKER_CONTROLLER_TIMEOUT_MS,
+      "Browser account worker registration",
+    );
+  } catch {
+    // A stuck browser registration must be retryable on the next user action.
+    if (registrationPromise === registration) registrationPromise = null;
+    throw new WebAuthServiceWorkerUnavailableError();
+  }
   while (Date.now() < deadline) {
     const controller = navigator.serviceWorker.controller;
     if (controller) {
       try {
         const script = new URL(controller.scriptURL);
+        const remaining = Math.max(1, deadline - Date.now());
         if (
           script.origin === window.location.origin &&
           script.pathname === "/sw.js" &&
           !script.search &&
           !script.hash &&
-          (await workerResult(controller, WEB_AUTH_SW_ATTEST_REQUEST))
+          (await workerResult(
+            controller,
+            WEB_AUTH_SW_ATTEST_REQUEST,
+            Math.min(
+              WEB_AUTH_SERVICE_WORKER_RESULT_TIMEOUT_MS,
+              remaining,
+            ),
+          ))
         ) {
           return controller;
         }
@@ -142,7 +169,10 @@ async function exactActiveController(): Promise<ServiceWorker> {
         // A stale or malformed controller remains unavailable until replaced.
       }
     }
-    await nextControllerChange(Math.min(1_000, deadline - Date.now()));
+    const remaining = deadline - Date.now();
+    if (remaining > 0) {
+      await nextControllerChange(Math.min(1_000, remaining));
+    }
   }
   throw new WebAuthServiceWorkerUnavailableError();
 }

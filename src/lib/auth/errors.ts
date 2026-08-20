@@ -110,13 +110,59 @@ export interface AuthRequestFailure {
   unavailable: boolean;
 }
 
+/** Keep online browser blockers separate so the UI gives the right next step. */
+function onlineAuthRequestFailure(
+  error: unknown,
+  retryAction: "try again" | "enter the code again",
+): AuthRequestFailure | null {
+  const code = errorCode(error);
+  const message = errorMessage(error);
+
+  // A bounded lock wait means another tab still owns the account operation.
+  if (code === "web_auth_lock_unavailable") {
+    return {
+      message: `Another BibleQuest tab is busy. Finish there or close it, then ${retryAction}.`,
+      reference: "AUTH-TAB-BUSY",
+      unavailable: true,
+    };
+  }
+
+  // A typed worker failure needs a refresh, not generic network advice.
+  if (code === "web_auth_service_worker_unavailable") {
+    return {
+      message: `BibleQuest’s sign-in helper did not become ready. Close and reopen BibleQuest, then ${retryAction}.`,
+      reference: "AUTH-SERVICE-WORKER-UNAVAILABLE",
+      unavailable: true,
+    };
+  }
+
+  // A deadline is retryable and distinct from a request that could not connect.
+  if (code === "request_timeout") {
+    return {
+      message: `The sign-in request took too long. Please ${retryAction}.`,
+      reference: "AUTH-REQUEST-TIMEOUT",
+      unavailable: true,
+    };
+  }
+
+  // An online fetch failure stays neutral because several local causes can block it.
+  if (message.includes("failed to fetch")) {
+    return {
+      message: `The sign-in request could not connect while this device was online. Close and reopen BibleQuest, then ${retryAction}.`,
+      reference: "AUTH-REQUEST-FETCH-FAILED",
+      unavailable: true,
+    };
+  }
+
+  return null;
+}
+
 /** Actionable messages for passwordless-email request failures. */
 export function emailRequestFailure(
   error: unknown,
   online = true,
 ): AuthRequestFailure {
   const code = errorCode(error);
-  const message = errorMessage(error);
   const status = errorShape(error).status;
 
   if (code === "native_account_beta_unavailable") {
@@ -135,17 +181,10 @@ export function emailRequestFailure(
       unavailable: true,
     };
   }
-  // The browser reports a working connection, so this is not the visitor's
-  // network. A request that dies locally is usually this app's own service
-  // worker declining it after an idle restart, which reopening clears. Saying
-  // "offline" here sent someone hunting their wifi for hours on 2026-08-15.
-  if (message.includes("failed to fetch") || code === "request_timeout") {
-    return {
-      message:
-        "Something on this device stopped the request. Close and reopen BibleQuest, then try again.",
-      reference: "AUTH-REQUEST-BLOCKED",
-      unavailable: true,
-    };
+  // Online browser blockers carry typed references for support and recovery.
+  const onlineFailure = onlineAuthRequestFailure(error, "try again");
+  if (onlineFailure) {
+    return onlineFailure;
   }
   if (code === "email_address_not_authorized") {
     return {
@@ -200,7 +239,6 @@ export function emailOtpFailure(
   online = true,
 ): AuthRequestFailure {
   const code = errorCode(error);
-  const message = errorMessage(error);
   const status = errorShape(error).status;
 
   if (code === "native_account_beta_unavailable") {
@@ -219,17 +257,10 @@ export function emailOtpFailure(
       unavailable: true,
     };
   }
-  // The browser reports a working connection, so this is not the visitor's
-  // network. A request that dies locally is usually this app's own service
-  // worker declining it after an idle restart, which reopening clears. Saying
-  // "offline" here sent someone hunting their wifi for hours on 2026-08-15.
-  if (message.includes("failed to fetch") || code === "request_timeout") {
-    return {
-      message:
-        "Something on this device stopped the request. Close and reopen BibleQuest, then enter the code again.",
-      reference: "AUTH-REQUEST-BLOCKED",
-      unavailable: true,
-    };
+  // Online browser blockers carry typed references for support and recovery.
+  const onlineFailure = onlineAuthRequestFailure(error, "enter the code again");
+  if (onlineFailure) {
+    return onlineFailure;
   }
   if (
     code === "otp_expired" ||
@@ -273,7 +304,6 @@ export function oauthRequestFailure(
   online = true,
 ): AuthRequestFailure {
   const code = errorCode(error);
-  const message = errorMessage(error);
   const providerName = provider === "apple" ? "Apple" : "Google";
   const providerReference = provider === "apple" ? "APPLE" : "GOOGLE";
   if (!online) {
@@ -284,17 +314,10 @@ export function oauthRequestFailure(
       unavailable: true,
     };
   }
-  // The browser reports a working connection, so this is not the visitor's
-  // network. A request that dies locally is usually this app's own service
-  // worker declining it after an idle restart, which reopening clears. Saying
-  // "offline" here sent someone hunting their wifi for hours on 2026-08-15.
-  if (message.includes("failed to fetch") || code === "request_timeout") {
-    return {
-      message:
-        "Something on this device stopped the request. Close and reopen BibleQuest, then try again.",
-      reference: "AUTH-REQUEST-BLOCKED",
-      unavailable: true,
-    };
+  // Online browser blockers carry typed references for support and recovery.
+  const onlineFailure = onlineAuthRequestFailure(error, "try again");
+  if (onlineFailure) {
+    return onlineFailure;
   }
   if (code === "provider_disabled" || code === "oauth_provider_not_supported") {
     return {

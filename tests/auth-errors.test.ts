@@ -67,27 +67,65 @@ describe("auth diagnostics", () => {
     );
   });
 
-  it("never blames the connection when the browser reports one", () => {
-    // A request that dies locally while the browser is online is usually this
-    // app's own service worker declining it, not the visitor's network.
-    // Reporting "offline" there sent someone hunting their wifi on 2026-08-15
-    // while sign-in had already succeeded at the provider.
-    for (const failure of [
-      emailRequestFailure(new TypeError("Failed to fetch"), true),
-      emailOtpFailure(new TypeError("Failed to fetch"), true),
-      emailRequestFailure({ code: "request_timeout" }, true),
-      emailOtpFailure({ code: "request_timeout" }, true),
-    ]) {
-      expect(failure.reference).toBe("AUTH-REQUEST-BLOCKED");
-      expect(failure.message).not.toMatch(/offline|reconnect/i);
-      // Local continuation stays safe either way.
-      expect(failure.unavailable).toBe(true);
-    }
+  it("keeps online auth blockers distinct on every sign-in surface", () => {
+    // Each typed cause needs its own support reference instead of collapsing
+    // into the old AUTH-REQUEST-BLOCKED bucket.
+    const surfaces = [
+      (error: unknown) => emailRequestFailure(error, true),
+      (error: unknown) => emailOtpFailure(error, true),
+      (error: unknown) => oauthRequestFailure(error, "apple", true),
+    ];
 
-    // A browser that actually reports no connection is still told the truth.
-    expect(emailOtpFailure(new TypeError("Failed to fetch"), false).reference).toBe(
-      "AUTH-NETWORK",
-    );
+    for (const mapFailure of surfaces) {
+      const timeout = mapFailure({ code: "request_timeout" });
+      const fetchFailure = mapFailure(new TypeError("Failed to fetch"));
+      const serviceWorker = mapFailure({
+        code: "web_auth_service_worker_unavailable",
+      });
+      const lock = mapFailure({ code: "web_auth_lock_unavailable" });
+
+      expect(timeout).toMatchObject({
+        reference: "AUTH-REQUEST-TIMEOUT",
+        unavailable: true,
+      });
+      expect(fetchFailure).toMatchObject({
+        reference: "AUTH-REQUEST-FETCH-FAILED",
+        unavailable: true,
+      });
+      expect(serviceWorker).toMatchObject({
+        reference: "AUTH-SERVICE-WORKER-UNAVAILABLE",
+        unavailable: true,
+      });
+      expect(lock).toMatchObject({
+        reference: "AUTH-TAB-BUSY",
+        unavailable: true,
+      });
+      expect(timeout.message).toMatch(/took too long/i);
+      expect(fetchFailure.message).toMatch(/could not connect/i);
+      expect(serviceWorker.message).toMatch(/sign-in helper/i);
+      expect(lock.message).toMatch(/another BibleQuest tab is busy/i);
+
+      for (const failure of [timeout, fetchFailure, serviceWorker, lock]) {
+        expect(failure.message).not.toMatch(/offline|reconnect/i);
+      }
+    }
+  });
+
+  it("keeps real offline failures on the network path", () => {
+    // Offline status wins even when the underlying error also has a typed
+    // browser or transport cause.
+    for (const error of [
+      new TypeError("Failed to fetch"),
+      { code: "request_timeout" },
+      { code: "web_auth_service_worker_unavailable" },
+      { code: "web_auth_lock_unavailable" },
+    ]) {
+      expect(emailRequestFailure(error, false).reference).toBe("AUTH-NETWORK");
+      expect(emailOtpFailure(error, false).reference).toBe("AUTH-NETWORK");
+      expect(oauthRequestFailure(error, "google", false).reference).toBe(
+        "AUTH-NETWORK",
+      );
+    }
   });
 
   it("does not blame the code for a failure that happened after it was accepted", () => {

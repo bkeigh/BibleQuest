@@ -14,6 +14,7 @@ import {
   stringFromBase64URL,
 } from "@supabase/ssr";
 import { withDeadline } from "@/lib/async/deadline";
+import { WEB_AUTH_INTERACTIVE_LOCK_TIMEOUT_MS } from "@/lib/auth/request-budget";
 import { supabasePublishableKey } from "./config";
 import {
   EXPECTED_ACCOUNT_USER_HEADER,
@@ -299,7 +300,7 @@ function revokeWebPrivateMemory(): void {
 
 /** Reports an account-boundary refusal without including credential material. */
 export class WebAuthUnavailableError extends Error {
-  readonly code = "web_auth_unavailable";
+  readonly code: string = "web_auth_unavailable";
 
   constructor() {
     super("Browser account access is unavailable.");
@@ -321,6 +322,8 @@ export class WebAuthUnavailableError extends Error {
  * the auth-js boundary below, need to look for it.
  */
 export class WebAuthLockUnavailableError extends WebAuthUnavailableError {
+  override readonly code = "web_auth_lock_unavailable";
+
   constructor() {
     super();
     this.name = "WebAuthLockUnavailableError";
@@ -440,6 +443,18 @@ export function withWebAccountOperationLock<T>(
   );
 }
 
+/** Gives a user-started account action a short, diagnosable cross-tab wait. */
+export function withInteractiveWebAccountOperationLock<T>(
+  operation: (handle: WebAccountOperationHandle) => Promise<T>,
+  existing?: WebAccountOperationHandle,
+): Promise<T> {
+  return withWebAccountOperationLock(
+    operation,
+    existing,
+    WEB_AUTH_INTERACTIVE_LOCK_TIMEOUT_MS,
+  );
+}
+
 /** Serializes one exact primary-storage comparison and mutation. */
 export function withWebAuthStorageLock<T>(
   operation: () => Promise<T>,
@@ -493,8 +508,18 @@ export async function requireCurrentWebAccountRealm(
     await requireWebAuthServiceWorkerAttestation();
     requireAccountOperation(handle);
     webAccountRealmAttested = true;
-  } catch {
+  } catch (error: unknown) {
     webAccountRealmAttested = false;
+    // Preserve the content-free worker code so an interactive caller can tell
+    // a failed safety check from an account-state refusal.
+    if (
+      error &&
+      typeof error === "object" &&
+      (error as { code?: unknown }).code ===
+        "web_auth_service_worker_unavailable"
+    ) {
+      throw error;
+    }
     throw new WebAuthUnavailableError();
   }
 }
@@ -1225,6 +1250,17 @@ function durableNeverOwnedGuestState(
   );
 }
 
+/** Accepts a durable guest only while no legacy credential has appeared. */
+function credentialFreeNeverOwnedGuestState(
+  storage: Pick<Storage, "getItem">,
+): boolean {
+  return (
+    durableNeverOwnedGuestState(storage) &&
+    webAuthStorageIsGenuinelyEmpty() &&
+    durableNeverOwnedGuestState(storage)
+  );
+}
+
 /** Proves every retained owner marker still belongs to the reviewed account. */
 function retainedOwnerMarkersMatch(
   storage: Pick<Storage, "getItem">,
@@ -1460,7 +1496,9 @@ export function webPrivateReadAllowed(
     return false;
   }
   if (authority.kind === "guest") {
-    return durableNeverOwnedGuestState(storage);
+    // Guest authority must close as soon as any legacy credential appears,
+    // including after the original no-attestation bootstrap has completed.
+    return credentialFreeNeverOwnedGuestState(storage);
   }
   if (!webAccountRealmAttested) return false;
   const state = readEnvelope(storage);
@@ -1513,11 +1551,10 @@ export function webPrivateNeverOwnedGuestProvenanceAllowed(): boolean {
   return Boolean(
     authority &&
       storage &&
-      webAccountRealmAttested &&
       activeAccountOperations.has(authority.handle) &&
       readPrivateWriteGeneration(storage) === authority.generation &&
       readWebPrivateNamespaceState(storage) === "legacy" &&
-      readEnvelope(storage).status === "missing" &&
+      webAuthStorageIsGenuinelyEmpty() &&
       !terminalPrivateWriteCleanup &&
       !activePrivateWriteReset &&
       !lockedLocalJourneyReset &&
@@ -1532,13 +1569,12 @@ export async function withNeverOwnedWebPrivateGuestProvenance(
 ): Promise<boolean> {
   requireAccountOperation(handle);
   if (neverOwnedGuestProvenance) throw new WebAuthUnavailableError();
-  await requireCurrentWebAccountRealm(handle);
   const generation = await withWebAuthStorageLock(async () => {
     requireAccountOperation(handle);
     const storage = localStorageSurface();
     if (
       !storage ||
-      readEnvelope(storage).status !== "missing" ||
+      !webAuthStorageIsGenuinelyEmpty() ||
       readWebPrivateNamespaceState(storage) !== "legacy" ||
       terminalPrivateWriteCleanup ||
       activePrivateWriteReset ||
@@ -1561,9 +1597,7 @@ export async function withNeverOwnedWebPrivateGuestProvenance(
       return Boolean(
         storage &&
           readPrivateWriteGeneration(storage) === generation &&
-          durableNeverOwnedGuestState(storage) &&
-          scrubLegacyWebAuthCookies() &&
-          durableNeverOwnedGuestState(storage),
+          credentialFreeNeverOwnedGuestState(storage),
       );
     });
     if (!complete) return false;
@@ -1747,9 +1781,7 @@ export async function adoptCurrentWebPrivateWriteGeneration(
         const storage = localStorageSurface();
         return Boolean(
           storage &&
-            durableNeverOwnedGuestState(storage) &&
-            scrubLegacyWebAuthCookies() &&
-            durableNeverOwnedGuestState(storage),
+            credentialFreeNeverOwnedGuestState(storage),
         );
       }).catch(() => false);
     }
@@ -1781,7 +1813,7 @@ export async function adoptCurrentWebPrivateWriteGeneration(
           ) &&
           readRaw(storage, WEB_V2_GUEST_PROVENANCE_STORAGE_KEY).status ===
             "missing"
-        : durableNeverOwnedGuestState(storage);
+        : credentialFreeNeverOwnedGuestState(storage);
       if (!stateMatches) return null;
       const existing = readRaw(storage, WEB_PRIVATE_WRITE_GENERATION_KEY);
       if (existing.status === "unavailable") return null;
@@ -1846,9 +1878,7 @@ export async function adoptCurrentWebPrivateWriteGeneration(
         return Boolean(
           storage &&
             readPrivateWriteGeneration(storage) === generation &&
-            durableNeverOwnedGuestState(storage) &&
-            scrubLegacyWebAuthCookies() &&
-            durableNeverOwnedGuestState(storage),
+            credentialFreeNeverOwnedGuestState(storage),
         );
       }))
     ) {
