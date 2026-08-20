@@ -14,6 +14,7 @@ import {
   type ConsoleInsightRange,
   type ConsoleInsights,
 } from "./insights";
+import { getConsoleAccess } from "./auth.server";
 import { findConsoleAccountByEmail } from "./plus-grants.server";
 
 export type ConsoleDataStatus = "live" | "setup_required" | "degraded";
@@ -175,6 +176,8 @@ export async function loadConsoleOverview(): Promise<ConsoleOverview> {
     },
     content,
   };
+  const access = await getConsoleAccess();
+  if (access.state !== "authorized") return fallback;
   const admin = adminClient();
   if (!admin) return fallback;
 
@@ -292,6 +295,10 @@ export async function loadConsoleInsights(
   rangeDays: ConsoleInsightRange,
 ): Promise<ConsoleInsightsResult> {
   const fallback = emptyConsoleInsights(rangeDays);
+  const access = await getConsoleAccess();
+  if (access.state !== "authorized") {
+    return { source: SETUP_SOURCE, insights: fallback };
+  }
   const admin = adminClient();
   if (!admin) return { source: SETUP_SOURCE, insights: fallback };
 
@@ -334,6 +341,10 @@ export async function loadConsoleInsights(
 export async function loadConsoleAccounts(
   query = "",
 ): Promise<ConsoleAccountsResult> {
+  const access = await getConsoleAccess();
+  if (access.state !== "authorized") {
+    return { source: SETUP_SOURCE, accounts: [] };
+  }
   const admin = adminClient();
   if (!admin) return { source: SETUP_SOURCE, accounts: [] };
 
@@ -462,6 +473,15 @@ export async function loadConsoleAccounts(
 
 /** Loads recent billing posture without card, address, or full provider IDs. */
 export async function loadConsoleBilling(): Promise<ConsoleBillingResult> {
+  const access = await getConsoleAccess();
+  if (access.state !== "authorized") {
+    return {
+      source: SETUP_SOURCE,
+      subscriptions: [],
+      supportPayments: [],
+      webhooks: [],
+    };
+  }
   const admin = adminClient();
   if (!admin) {
     return {
@@ -524,6 +544,10 @@ export async function loadConsoleBilling(): Promise<ConsoleBillingResult> {
 
 /** Loads the complete flag registry through the server-only operator boundary. */
 export async function loadConsoleFlags(): Promise<ConsoleFlagsResult> {
+  const access = await getConsoleAccess();
+  if (access.state !== "authorized") {
+    return { source: SETUP_SOURCE, flags: [] };
+  }
   const admin = adminClient();
   if (!admin) return { source: SETUP_SOURCE, flags: [] };
 
