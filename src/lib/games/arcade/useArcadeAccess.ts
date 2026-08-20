@@ -45,12 +45,14 @@ async function checkoutUrl(response: Response): Promise<string | null> {
 /** Coordinates the server-authoritative arcade products for one signed-in user. */
 export function useArcadeAccess() {
   const session = useSession();
+  // Seal entitlement reads and consumable writes with the checkout boundary.
+  const commerceAvailable = webCommerceAvailable();
   const [status, setStatus] = useState<StoredArcadeStatus>(EMPTY_STATUS);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(commerceAvailable);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (session.loading || !session.user) return;
+    if (!commerceAvailable || session.loading || !session.user) return;
     try {
       const response = await authenticatedApiFetch(
         session.user.id,
@@ -77,17 +79,17 @@ export function useArcadeAccess() {
     } finally {
       setLoading(false);
     }
-  }, [session.loading, session.user]);
+  }, [commerceAvailable, session.loading, session.user]);
 
   useEffect(() => {
-    if (session.loading || !session.user) return;
+    if (!commerceAvailable || session.loading || !session.user) return;
     const timer = window.setTimeout(() => void refresh(), 0);
     return () => window.clearTimeout(timer);
-  }, [refresh, session.loading, session.user]);
+  }, [commerceAvailable, refresh, session.loading, session.user]);
 
   const startCheckout = useCallback(
     async (product: ArcadeProductId) => {
-      if (!webCommerceAvailable() || !session.user) return false;
+      if (!commerceAvailable || !session.user) return false;
       try {
         const response = await authenticatedApiFetch(
           session.user.id,
@@ -108,12 +110,12 @@ export function useArcadeAccess() {
         return false;
       }
     },
-    [session.user],
+    [commerceAvailable, session.user],
   );
 
   const consumeQuestionSkip = useCallback(
     async (chapterId: string) => {
-      if (!session.user) return false;
+      if (!commerceAvailable || !session.user) return false;
       try {
         const response = await authenticatedApiFetch(
           session.user.id,
@@ -147,17 +149,21 @@ export function useArcadeAccess() {
         return false;
       }
     },
-    [session.user],
+    [commerceAvailable, session.user],
   );
 
   const visible =
-    status.subjectKey === session.user?.id ? status : EMPTY_STATUS;
+    commerceAvailable && status.subjectKey === session.user?.id
+      ? status
+      : EMPTY_STATUS;
 
   return {
     ...visible,
-    loading: session.loading || (Boolean(session.user) && loading),
+    loading:
+      commerceAvailable &&
+      (session.loading || (Boolean(session.user) && loading)),
     signedIn: Boolean(session.user),
-    error,
+    error: commerceAvailable ? error : null,
     refresh,
     startCheckout,
     consumeQuestionSkip,
