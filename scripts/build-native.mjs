@@ -792,7 +792,7 @@ function verifyNoPrivilegedSupabaseCredentials() {
   log("verified native output contains no privileged Supabase credential");
 }
 
-/** Keeps the deterministic guest artifact completely account-free. */
+/** Keeps the deterministic guest artifact free of Supabase client config. */
 function verifyGuestSupabaseAbsence() {
   if (!releaseBuild) return;
   for (const file of generatedFiles(path.join(stage, "out"))) {
@@ -804,7 +804,7 @@ function verifyGuestSupabaseAbsence() {
       fail("guest release output contains Supabase client configuration.");
     }
   }
-  log("verified guest release output remains account-free");
+  log("verified guest release output contains no Supabase client config");
 }
 
 const GUEST_FORBIDDEN_ACCOUNT_MARKERS = [
@@ -814,7 +814,7 @@ const GUEST_FORBIDDEN_ACCOUNT_MARKERS = [
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
 ];
 
-/** Enforces the release runbook's literal guest account-marker boundary. */
+/** Rejects the four explicit guest marker literals checked by this build. */
 function verifyGuestAccountMarkersAbsent() {
   if (!releaseBuild) return;
   for (const file of generatedFiles(path.join(stage, "out"))) {
@@ -832,7 +832,7 @@ function verifyGuestAccountMarkersAbsent() {
       );
     }
   }
-  log("verified guest release output contains no account markers");
+  log("verified guest release output contains none of four scanned markers");
 }
 
 /** Fails if a release artifact retains a disposable or protected host. */
