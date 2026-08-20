@@ -42,12 +42,36 @@ two-user, anonymous, migration-history, and rollback procedure is in
 
 ## Keys
 
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — publishable, safe in the browser.
-- `SUPABASE_SERVICE_ROLE_KEY` — **server/admin only.** It bypasses RLS and must
-  never appear in client code, public env vars, the browser bundle, analytics,
-  or logs. Use it only in server routes / server actions.
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — the modern `sb_publishable_...`
+  browser key. It is public by design, so every private table still needs
+  correct RLS. Do not replace it with a secret or a legacy JWT.
+- `SUPABASE_SECRET_KEY` — the modern `sb_secret_...` server key. Treat it as
+  full database authority: it must never appear in client code, public env
+  vars, the browser bundle, analytics, or logs. Use it only in sealed server
+  routes and server actions.
+- Modern publishable and secret keys belong in the `apikey` header. A modern
+  secret key is not a JWT and must not be copied into `Authorization: Bearer`.
+  That header carries a user's access JWT, or a legacy `service_role` JWT only
+  in an explicitly reviewed compatibility path.
+- Correcting `SUPABASE_SECRET_KEY` in Vercel does not repair an existing
+  deployment. Create a fresh Vercel rebuild with the corrected environment,
+  verify that new deployment, and only then promote it.
 - Never commit real keys. `.gitignore` excludes `.env*`; only `.env.example`
   (placeholders) is committed.
+
+## Agent command guardrails
+
+The checked-in [`.claude/settings.json`](.claude/settings.json) denies the exact
+Supabase and Vercel MCP write tools used for production migrations, arbitrary
+SQL, project pausing, and deployments. It also blocks direct and common wrapped
+spellings of `supabase db push` and `vercel promote`, `redeploy`, and `alias`
+commands.
+
+The Bash rules are a helpful tripwire, not a complete security boundary. They
+match command text, so shell variables, renamed programs, scripts, or another
+client can evade them. An unattended agent must not receive production
+credentials or production deployment authority. Brendan performs approved
+production changes manually after reviewing the exact target and command.
 
 ## Guest mode (V1)
 

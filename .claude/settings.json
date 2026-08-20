@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "mcp__supabase__apply_migration",
+      "mcp__supabase__execute_sql",
+      "mcp__supabase__pause_project",
+      "mcp__vercel__deploy_to_vercel",
+      "Bash(*supabase db push *)",
+      "Bash(*supabase * db push *)",
+      "Bash(*vercel promote *)",
+      "Bash(*vercel * promote *)",
+      "Bash(*vercel redeploy *)",
+      "Bash(*vercel * redeploy *)",
+      "Bash(*vercel alias *)",
+      "Bash(*vercel * alias *)"
+    ]
+  }
+}
