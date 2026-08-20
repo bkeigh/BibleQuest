@@ -13,7 +13,7 @@ import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
 import { recordServerFailure } from "@/lib/observability/server-failures";
 import {
   distributedPoliciesFromWindows,
-  guardDistributedRequest,
+  guardGuestBibleReadDistributedRequest,
 } from "@/lib/security/distributed-rate-limit.server";
 
 export const dynamic = "force-dynamic";
@@ -31,8 +31,8 @@ export async function GET(request: Request) {
   );
   if (blocked) return blocked;
 
-  // Claims the same quotas across every serverless instance before provider work.
-  const distributedBlocked = await guardDistributedRequest(
+  // Uses shared quotas when healthy and the local window on dependency failure.
+  const distributedBlocked = await guardGuestBibleReadDistributedRequest(
     request,
     "bible-translations",
     distributedPoliciesFromWindows(TRANSLATION_RATE_LIMITS),
