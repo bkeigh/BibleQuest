@@ -50,6 +50,10 @@ const builderSource = readFileSync(
   path.join(repositoryRoot, "scripts/build-native.mjs"),
   "utf8",
 );
+const nativeAccountMarkerSource = readFileSync(
+  path.join(repositoryRoot, "src/lib/sync/native-account-markers.mjs"),
+  "utf8",
+);
 const reviewedSupabaseOrigin =
   "https://abcdefghijklmnopqrst.supabase.co";
 const reviewedPublishableKey =
@@ -119,9 +123,14 @@ function runBuilder(
   temporaryRoots.push(root);
   mkdirSync(path.join(root, "scripts"), { recursive: true });
   mkdirSync(path.join(root, "config"), { recursive: true });
+  mkdirSync(path.join(root, "src/lib/sync"), { recursive: true });
   writeFileSync(
     path.join(root, "scripts/build-native.mjs"),
     instrumentedBuilder(),
+  );
+  writeFileSync(
+    path.join(root, "src/lib/sync/native-account-markers.mjs"),
+    nativeAccountMarkerSource,
   );
   writeFileSync(
     path.join(root, "config/ios-account-beta.json"),

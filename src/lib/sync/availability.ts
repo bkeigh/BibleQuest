@@ -8,6 +8,7 @@ import {
   NATIVE_ACCOUNT_BETA_ENABLED,
   accountSyncAvailable,
 } from "./containment";
+import { NATIVE_ACCOUNT_BETA_AVAILABILITY_RPC } from "./native-account-markers.mjs";
 import {
   ACCOUNT_AVAILABILITY_DEADLINE_MS,
   NATIVE_ACCOUNT_BETA_HEADER,
@@ -67,7 +68,7 @@ function availabilityEndpoint(origin: string): URL {
   ) {
     throw new NativeAccountBetaUnavailableError();
   }
-  return new URL("/rest/v1/rpc/native_account_beta_availability", url);
+  return new URL(`/rest/v1/rpc/${NATIVE_ACCOUNT_BETA_AVAILABILITY_RPC}`, url);
 }
 
 /** Consume at most the tiny fixed RPC body, including chunked responses. */

@@ -1,3 +1,7 @@
+import {
+  NATIVE_ACCOUNT_BETA_UNAVAILABLE_CODE,
+} from "@/lib/sync/native-account-markers.mjs";
+
 /**
  * Small, privacy-safe auth diagnostics for UI surfaces and callback redirects.
  * Raw provider messages can contain implementation details, so the app maps
@@ -165,7 +169,7 @@ export function emailRequestFailure(
   const code = errorCode(error);
   const status = errorShape(error).status;
 
-  if (code === "native_account_beta_unavailable") {
+  if (code === NATIVE_ACCOUNT_BETA_UNAVAILABLE_CODE) {
     return {
       message:
         "Account sign-in is temporarily unavailable. Your journey remains safe on this device.",
@@ -241,7 +245,7 @@ export function emailOtpFailure(
   const code = errorCode(error);
   const status = errorShape(error).status;
 
-  if (code === "native_account_beta_unavailable") {
+  if (code === NATIVE_ACCOUNT_BETA_UNAVAILABLE_CODE) {
     return {
       message:
         "Account sign-in is temporarily unavailable. Keep this screen open and try again later.",

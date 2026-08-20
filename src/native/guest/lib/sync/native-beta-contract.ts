@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { NATIVE_ACCOUNT_BETA_UNAVAILABLE_CODE } from "./native-account-markers.mjs";
 
 export {
   NATIVE_ACCOUNT_BETA_CONTRACT,
@@ -7,10 +8,11 @@ export {
 } from "./native-beta-headers";
 
 export const ACCOUNT_AVAILABILITY_DEADLINE_MS = 12_000;
+export { NATIVE_ACCOUNT_BETA_UNAVAILABLE_CODE } from "./native-account-markers.mjs";
 
 /** Reports the same bounded error without exposing provider details. */
 export class NativeAccountBetaUnavailableError extends Error {
-  readonly code = "native_account_beta_unavailable";
+  readonly code = NATIVE_ACCOUNT_BETA_UNAVAILABLE_CODE;
 
   constructor() {
     super("Native account access is temporarily unavailable.");

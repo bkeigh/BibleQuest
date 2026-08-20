@@ -25,6 +25,9 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  GUEST_FORBIDDEN_NATIVE_ACCOUNT_MARKERS,
+} from "../src/lib/sync/native-account-markers.mjs";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const stage = path.join(repo, ".native");
@@ -542,6 +545,10 @@ const GUEST_ACCOUNT_CONTAINMENT_REPLACEMENTS = [
     "src/lib/supabase/config.ts",
   ],
   [
+    "src/native/guest/lib/sync/native-account-markers.mjs",
+    "src/lib/sync/native-account-markers.mjs",
+  ],
+  [
     "src/native/guest/lib/sync/native-beta-headers.ts",
     "src/lib/sync/native-beta-headers.ts",
   ],
@@ -807,20 +814,13 @@ function verifyGuestSupabaseAbsence() {
   log("verified guest release output contains no Supabase client config");
 }
 
-const GUEST_FORBIDDEN_ACCOUNT_MARKERS = [
-  "x-biblequest-native-account-beta",
-  "biblequest_native_account_beta_v1",
-  "native_account_beta_availability",
-  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-];
-
-/** Rejects the four explicit guest marker literals checked by this build. */
+/** Rejects every marker named by the canonical native account contract. */
 function verifyGuestAccountMarkersAbsent() {
   if (!releaseBuild) return;
   for (const file of generatedFiles(path.join(stage, "out"))) {
     const contents = readFileSync(file, "utf8");
     if (
-      GUEST_FORBIDDEN_ACCOUNT_MARKERS.some((marker) =>
+      GUEST_FORBIDDEN_NATIVE_ACCOUNT_MARKERS.some((marker) =>
         contents.includes(marker),
       )
     ) {
@@ -832,7 +832,9 @@ function verifyGuestAccountMarkersAbsent() {
       );
     }
   }
-  log("verified guest release output contains none of four scanned markers");
+  log(
+    `verified guest release output contains none of ${GUEST_FORBIDDEN_NATIVE_ACCOUNT_MARKERS.length} contract markers`,
+  );
 }
 
 /** Fails if a release artifact retains a disposable or protected host. */

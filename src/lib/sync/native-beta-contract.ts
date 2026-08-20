@@ -2,6 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { isNativeTarget } from "@/lib/platform/target";
 import { NATIVE_ACCOUNT_BETA_ENABLED } from "./containment";
 import { withSyncRequestDeadline } from "./request";
+import {
+  NATIVE_ACCOUNT_BETA_AVAILABILITY_RPC,
+  NATIVE_ACCOUNT_BETA_UNAVAILABLE_CODE,
+} from "./native-account-markers.mjs";
 import { NATIVE_ACCOUNT_BETA_CONTRACT } from "./native-beta-headers";
 
 export {
@@ -10,10 +14,11 @@ export {
   NATIVE_ACCOUNT_BETA_HEADER_VALUE,
 } from "./native-beta-headers";
 export const ACCOUNT_AVAILABILITY_DEADLINE_MS = 12_000;
+export { NATIVE_ACCOUNT_BETA_UNAVAILABLE_CODE } from "./native-account-markers.mjs";
 
 /** Reports a bounded failure without exposing provider details or identifiers. */
 export class NativeAccountBetaUnavailableError extends Error {
-  readonly code = "native_account_beta_unavailable";
+  readonly code = NATIVE_ACCOUNT_BETA_UNAVAILABLE_CODE;
 
   constructor() {
     super("Native account access is temporarily unavailable.");
@@ -43,7 +48,7 @@ export async function assertNativeAccountBetaAvailability(
 ): Promise<void> {
   if (!isNativeTarget() || !NATIVE_ACCOUNT_BETA_ENABLED) return;
   const result = await withSyncRequestDeadline(
-    client.rpc("native_account_beta_availability"),
+    client.rpc(NATIVE_ACCOUNT_BETA_AVAILABILITY_RPC),
     "Native account availability",
   );
   if (
