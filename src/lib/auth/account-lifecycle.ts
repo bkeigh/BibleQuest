@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  NATIVE_ACCOUNT_BETA_UNAVAILABLE_CODE,
+} from "@/lib/sync/native-account-markers.mjs";
+
 const MAX_USER_ID_LENGTH = 128;
 
 export interface AccountLifecycleHandle {
@@ -13,7 +17,7 @@ const listeners = new Set<() => void>();
 
 /** Content-free refusal used while an account-destructive operation is active. */
 export class AccountLifecycleBusyError extends Error {
-  readonly code = "native_account_beta_unavailable";
+  readonly code = NATIVE_ACCOUNT_BETA_UNAVAILABLE_CODE;
 
   constructor() {
     super("Account access is temporarily unavailable.");

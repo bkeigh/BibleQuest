@@ -7,6 +7,7 @@ import {
   type ConsoleAuditEntry,
   type ConsoleAuditOutcome,
 } from "./audit";
+import { getConsoleAccess } from "./auth.server";
 import type { ConsoleDataSource } from "./data.server";
 
 interface ConsoleAuditActor {
@@ -63,6 +64,17 @@ export async function appendConsoleAuditLog(
 export async function loadConsoleAuditLogs(): Promise<ConsoleAuditResult> {
   const generatedAt = new Date().toISOString();
   try {
+    const access = await getConsoleAccess();
+    if (access.state !== "authorized") {
+      return {
+        source: {
+          status: "setup_required",
+          label: "Authorize an operator session to load audit records.",
+        },
+        entries: [],
+        generatedAt,
+      };
+    }
     const admin = createAdminSupabase();
     const { data, error } = await admin
       .from("console_audit_logs")

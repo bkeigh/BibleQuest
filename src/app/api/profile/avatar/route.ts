@@ -36,6 +36,11 @@ import {
   ACCOUNT_DELETION_CLEANUP_HEADER_VALUE,
   EXPECTED_ACCOUNT_USER_HEADER,
 } from "@/lib/sync/native-beta-headers";
+import {
+  AVATAR_UPDATED_AT_HEADER,
+  AVATAR_VERSION_HEADER,
+  requireAccountWireHeader,
+} from "@/lib/sync/native-account-markers.mjs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -171,8 +176,8 @@ function avatarResponse(
     headers: {
       ...PRIVATE_IMAGE_HEADERS,
       "Content-Length": String(bytes.byteLength),
-      "X-BibleQuest-Avatar-Version": version,
-      "X-BibleQuest-Avatar-Updated-At": updatedAt,
+      [requireAccountWireHeader(AVATAR_VERSION_HEADER)]: version,
+      [requireAccountWireHeader(AVATAR_UPDATED_AT_HEADER)]: updatedAt,
     },
   });
 }

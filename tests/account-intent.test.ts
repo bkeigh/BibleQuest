@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { initialAccountIntent } from "@/lib/auth/account-intent";
+import {
+  accountAccessDescription,
+  initialAccountIntent,
+} from "@/lib/auth/account-intent";
 import { isStandaloneWebApp } from "@/lib/pwa/install-guidance";
 
 /** Builds the browser signals used by the account-entry decision. */
@@ -24,6 +27,18 @@ describe("account entry intent", () => {
     );
     expect(initialAccountIntent(isStandaloneWebApp(appWindow(false)))).toBe(
       "create",
+    );
+  });
+
+  it("describes only the sign-in methods offered on each platform", () => {
+    expect(accountAccessDescription("signin", true)).toBe(
+      "Use the email account connected to BibleQuest. We’ll restore its saved journey before opening the app.",
+    );
+    expect(accountAccessDescription("signin", false)).toBe(
+      "Use the email, Apple, or Google account connected to BibleQuest. We’ll restore its saved journey before opening the app.",
+    );
+    expect(accountAccessDescription("create", true)).toContain(
+      "A free account syncs",
     );
   });
 

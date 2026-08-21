@@ -26,13 +26,8 @@ import {
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const RESERVED_ACCOUNT_HEADERS = [
-  "authorization",
-  EXPECTED_ACCOUNT_USER_HEADER,
-  NATIVE_ACCOUNT_BETA_HEADER,
-  ACCOUNT_DELETION_CLEANUP_HEADER,
-  WEB_AUTH_PROTOCOL_HEADER,
-] as const;
+const RESERVED_ACCOUNT_HEADERS = ["authorization"] as const;
+const BIBLEQUEST_AUTHORITY_HEADER_PREFIX = "x-biblequest-";
 
 /** Restricts client API requests to BibleQuest's internal API namespace. */
 export function validatedApiPath(path: string): string {
@@ -175,6 +170,12 @@ function publicApiFetch(
 function publicHeaders(source?: HeadersInit): Headers {
   const headers = new Headers(source);
   for (const reserved of RESERVED_ACCOUNT_HEADERS) headers.delete(reserved);
+  // Drop current and future internal authority before trusted code adds its own.
+  for (const name of [...headers.keys()]) {
+    if (name.startsWith(BIBLEQUEST_AUTHORITY_HEADER_PREFIX)) {
+      headers.delete(name);
+    }
+  }
   return headers;
 }
 

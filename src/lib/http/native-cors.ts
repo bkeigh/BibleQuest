@@ -6,6 +6,11 @@ import {
   EXPECTED_ACCOUNT_USER_HEADER,
   NATIVE_ACCOUNT_BETA_HEADER,
 } from "@/lib/sync/native-beta-headers";
+import {
+  AVATAR_UPDATED_AT_HEADER,
+  AVATAR_VERSION_HEADER,
+  requireAccountWireHeader,
+} from "@/lib/sync/native-account-markers.mjs";
 
 /**
  * CORS decoration for the one reviewed native origin.
@@ -30,16 +35,19 @@ import {
  */
 
 /**
- * `/api/billing/plans` sets `Cache-Control: public, max-age=300` — the one
- * shared-cacheable API response — while `next.config.ts` blankets `/api/:path*`
- * with `private, no-store`. Which one a given cache honors is unresolved, and
- * stamping CORS on a possibly shared-cacheable response is a poisoning hazard,
- * so the route is excluded rather than guessed about.
+ * `/api/billing/plans` stays outside the native CORS surface because the iOS
+ * account replacement has no native pricing or acquisition. The route itself
+ * is private/no-store, so this exclusion now describes product scope rather
+ * than relying on conflicting cache instructions.
  */
 const EXCLUDED_API_PATH = "/api/billing/plans";
 
-const EXPOSED_RESPONSE_HEADERS =
-  "X-BibleQuest-Avatar-Version, X-BibleQuest-Avatar-Updated-At";
+const EXPOSED_RESPONSE_HEADERS = [
+  AVATAR_VERSION_HEADER,
+  AVATAR_UPDATED_AT_HEADER,
+]
+  .map(requireAccountWireHeader)
+  .join(", ");
 // Match only the bearer, subject, beta, and deletion markers emitted by the
 // reviewed native account transport; no arbitrary client header is reflected.
 const ALLOWED_REQUEST_HEADERS = [

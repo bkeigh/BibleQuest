@@ -9,6 +9,7 @@ export const CLIENT_SIGNAL_OUTCOMES = ["success", "failure"] as const;
 export const CLIENT_SIGNAL_CATEGORIES = [
   "ok",
   "offline",
+  "network",
   "timeout",
   "auth",
   "permission",
@@ -167,6 +168,9 @@ export function classifyOperationalError(
   const status = typeof shape.status === "number" ? shape.status : 0;
 
   if (name === "aborterror" || code === "request_timeout") return "timeout";
+  // Preserve content-free browser-auth causes for support without raw detail.
+  if (code === "web_auth_service_worker_unavailable") return "worker";
+  if (code === "web_auth_lock_unavailable") return "conflict";
   if (status === 429 || code.includes("rate_limit")) return "rate_limited";
   if (status === 401 || code.includes("jwt") || code.includes("session")) {
     return "auth";
@@ -191,7 +195,7 @@ export function classifyOperationalError(
     message.includes("failed to fetch") ||
     message.includes("networkerror")
   ) {
-    return "offline";
+    return "network";
   }
   return "unknown";
 }

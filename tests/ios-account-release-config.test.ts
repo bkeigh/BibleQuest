@@ -40,6 +40,21 @@ const builderSource = readFileSync(
   path.join(repositoryRoot, "scripts/build-native.mjs"),
   "utf8",
 );
+const nativeAccountMarkerSource = readFileSync(
+  path.join(repositoryRoot, "src/lib/sync/native-account-markers.mjs"),
+  "utf8",
+);
+const guestAccountArtifactContractSource = readFileSync(
+  path.join(
+    repositoryRoot,
+    "src/lib/sync/guest-account-artifact-contract.mjs",
+  ),
+  "utf8",
+);
+const guestReleaseOverlaySource = readFileSync(
+  path.join(repositoryRoot, "src/lib/sync/guest-release-overlays.mjs"),
+  "utf8",
+);
 const fixtureKey = "sb_publishable_account_release_fixture_1234567890";
 const fixtureFingerprint = createHash("sha256")
   .update(fixtureKey)
@@ -98,9 +113,22 @@ function runBuilder(
   temporaryRoots.push(root);
   mkdirSync(path.join(root, "scripts"), { recursive: true });
   mkdirSync(path.join(root, "config"), { recursive: true });
+  mkdirSync(path.join(root, "src/lib/sync"), { recursive: true });
   writeFileSync(
     path.join(root, "scripts/build-native.mjs"),
     instrumentedBuilder(),
+  );
+  writeFileSync(
+    path.join(root, "src/lib/sync/native-account-markers.mjs"),
+    nativeAccountMarkerSource,
+  );
+  writeFileSync(
+    path.join(root, "src/lib/sync/guest-account-artifact-contract.mjs"),
+    guestAccountArtifactContractSource,
+  );
+  writeFileSync(
+    path.join(root, "src/lib/sync/guest-release-overlays.mjs"),
+    guestReleaseOverlaySource,
   );
   writeFileSync(
     path.join(root, "config/ios-account-release.json"),

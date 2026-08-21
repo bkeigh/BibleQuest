@@ -154,6 +154,26 @@ describe("privacy-safe observability contract", () => {
     }
   });
 
+  it("keeps typed browser auth blockers visible in safe categories", () => {
+    // The UI references are distinct, and the content-free signal should keep
+    // the same useful split without recording raw error text.
+    expect(
+      classifyOperationalError(
+        { code: "web_auth_service_worker_unavailable" },
+        true,
+      ),
+    ).toBe("worker");
+    expect(
+      classifyOperationalError({ code: "web_auth_lock_unavailable" }, true),
+    ).toBe("conflict");
+    expect(
+      classifyOperationalError(new TypeError("Failed to fetch"), true),
+    ).toBe("network");
+    expect(
+      classifyOperationalError(new TypeError("Failed to fetch"), false),
+    ).toBe("offline");
+  });
+
   it("names a row the server refused instead of calling it unknown", () => {
     // A journey that can never sync used to report "unknown" and retry forever
     // behind "sync will retry soon". On 2026-08-15 one ready quest raised 22023

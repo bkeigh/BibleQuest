@@ -25,6 +25,7 @@ import {
   installVerifiedWebSession,
   readWebAuthState,
   requireCurrentWebAccountRealm,
+  withInteractiveWebAccountOperationLock,
   withWebAccountOperationLock,
   type WebAccountOperationHandle,
   type WebSessionInstallResult,
@@ -84,7 +85,7 @@ interface InstallationResolution {
 let authAttemptGeneration = 0;
 
 /** Requests one code off-storage after the web realm and empty slot are proved. */
-export function requestIsolatedEmailOtp(
+export async function requestIsolatedEmailOtp(
   email: string,
   shouldCreateUser: boolean,
   requestClient?: OtpRequestClient,
@@ -95,12 +96,14 @@ export function requestIsolatedEmailOtp(
       options: { shouldCreateUser },
     });
   if (isNativeTarget()) return request();
-  return withWebAccountOperationLock(async (handle) => {
+  await withInteractiveWebAccountOperationLock(async (handle) => {
     await requireCurrentWebAccountRealm(handle);
     const state = await readWebAuthState(handle);
     if (state.status !== "missing") throw new WebAuthUnavailableError();
-    return request();
   });
+  // Requesting a code is storage-free, so the network must not keep every
+  // other tab behind the account lock if the provider goes silent.
+  return request();
 }
 
 /** Requires a fresh document when an ambiguous install cannot be reconciled. */
@@ -270,7 +273,7 @@ export async function verifyAndInstallEmailOtp(
 ): Promise<EmailOtpAttemptResult> {
   // Consume a web code only after this v28 realm and every live peer attest.
   if (!isNativeTarget()) {
-    await withWebAccountOperationLock((handle) =>
+    await withInteractiveWebAccountOperationLock((handle) =>
       requireCurrentWebAccountRealm(handle),
     );
   }

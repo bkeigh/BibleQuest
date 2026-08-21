@@ -20,16 +20,18 @@ import {
   validateAvatarFile,
 } from "@/lib/avatar/validation";
 import {
-  withWebPrivateRemovalGuard,
-  webPrivateStorageReadAllowed,
-  withWebPrivateWriteGuard,
-} from "@/lib/storage/web-private-write";
+  withDevicePrivateRemovalGuard as withWebPrivateRemovalGuard,
+  devicePrivateStorageReadAllowed as webPrivateStorageReadAllowed,
+  withDevicePrivateWriteGuard as withWebPrivateWriteGuard,
+} from "@/lib/storage/device-private-write";
 import {
-  LEGACY_AVATAR_DATABASE_NAME,
-  WEB_V2_AVATAR_DATABASE_NAME,
-  selectedWebPrivateAvatarDatabase,
-} from "@/lib/storage/web-private-namespace";
-import { webPrivateWriteGuardIsCurrent } from "@/lib/supabase/web-auth-storage";
+  DEVICE_AVATAR_DATABASE_NAME as LEGACY_AVATAR_DATABASE_NAME,
+  PROTECTED_AVATAR_DATABASE_NAME as WEB_V2_AVATAR_DATABASE_NAME,
+  selectDevicePrivateAvatarDatabase as selectedWebPrivateAvatarDatabase,
+} from "@/lib/storage/device-private-storage";
+import {
+  devicePrivateWriteGuardIsCurrent as webPrivateWriteGuardIsCurrent,
+} from "@/lib/storage/device-private-write";
 
 const STORE = "images";
 const LEGACY_KEY = "pfp";

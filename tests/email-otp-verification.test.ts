@@ -19,6 +19,7 @@ import {
   verifyAndInstallEmailOtp,
 } from "@/lib/auth/email-otp-verification";
 import { emailOtpFailure } from "@/lib/auth/errors";
+import { withWebAccountOperationLock } from "@/lib/supabase/web-auth-storage";
 
 const USER_A = "10000000-0000-4000-8000-000000000001";
 const USER_B = "20000000-0000-4000-8000-000000000002";
@@ -98,6 +99,29 @@ describe("isolated email OTP verification", () => {
 
     expect(signInWithOtp).not.toHaveBeenCalled();
     expect(localStorage.getItem("biblequest:web-auth:v2")).toBe(primary);
+  });
+
+  it("releases the account lock before a code request waits on the network", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_PLATFORM", "web");
+    localStorage.clear();
+    const request = deferred<
+      Awaited<ReturnType<SupabaseClient["auth"]["signInWithOtp"]>>
+    >();
+    const signInWithOtp = vi.fn(() => request.promise);
+
+    const pending = requestIsolatedEmailOtp(EMAIL_A, false, {
+      auth: { signInWithOtp },
+    });
+    await vi.waitFor(() => expect(signInWithOtp).toHaveBeenCalledOnce());
+
+    const laterOperation = vi.fn(async () => "acquired");
+    await expect(
+      withWebAccountOperationLock(laterOperation),
+    ).resolves.toBe("acquired");
+    expect(laterOperation).toHaveBeenCalledOnce();
+
+    request.resolve({ data: { user: null, session: null }, error: null });
+    await expect(pending).resolves.toMatchObject({ error: null });
   });
 
   it("keeps B installed after A times out and resolves late", async () => {

@@ -1,13 +1,13 @@
 import {
-  removeWebPrivateStorageItem,
-  setWebPrivateStorageItem,
-  webPrivateStorageReadAllowed,
-} from "@/lib/storage/web-private-write";
+  removeDevicePrivateStorageItem as removeWebPrivateStorageItem,
+  setDevicePrivateStorageItem as setWebPrivateStorageItem,
+  devicePrivateStorageReadAllowed as webPrivateStorageReadAllowed,
+} from "@/lib/storage/device-private-write";
 import {
-  LEGACY_SEVEN_DAYS_TUTORIAL_STORAGE_KEY,
-  WEB_V2_SEVEN_DAYS_TUTORIAL_STORAGE_KEY,
-  selectedWebPrivateStorageKey,
-} from "@/lib/storage/web-private-namespace";
+  DEVICE_SEVEN_DAYS_TUTORIAL_STORAGE_KEY as LEGACY_SEVEN_DAYS_TUTORIAL_STORAGE_KEY,
+  PROTECTED_SEVEN_DAYS_TUTORIAL_STORAGE_KEY as WEB_V2_SEVEN_DAYS_TUTORIAL_STORAGE_KEY,
+  selectDevicePrivateStorageKey as selectedWebPrivateStorageKey,
+} from "@/lib/storage/device-private-storage";
 
 /** The tutorial record is separate from game progress so it can evolve safely. */
 export const SEVEN_DAYS_TUTORIAL_STORAGE_KEY =

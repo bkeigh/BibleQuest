@@ -10,6 +10,7 @@ import {
   NavigatorLockAcquireTimeoutError,
   type Session,
 } from "@supabase/supabase-js";
+import { WEB_AUTH_INTERACTIVE_LOCK_TIMEOUT_MS } from "@/lib/auth/request-budget";
 
 const mocks = vi.hoisted(() => ({
   commitOwner: vi.fn(),
@@ -86,13 +87,16 @@ import {
   subscribeWebAuthStorageChanges,
   webPrivateActiveResetCommitAllowed,
   webPrivateLegacyGuestRecoveryAllowed,
+  webPrivateNeverOwnedGuestProvenanceAllowed,
   webPrivateReadAllowed,
   webPrivateRemovalGuardIsCurrent,
   webPrivateWriteGuardIsCurrent,
   withActiveWebPrivateWriteReset,
   withLegacyWebPrivateGuestRecovery,
   withLockedLocalJourneyPrivateReset,
+  withNeverOwnedWebPrivateGuestProvenance,
   withTerminalWebPrivateWriteCleanup,
+  withInteractiveWebAccountOperationLock,
   withWebPrivateLegacyAbsenceAudit,
   withWebAccountOperationLock,
   withWebAuthStorageLock,
@@ -327,6 +331,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -540,6 +545,8 @@ describe("strict v2 primary storage", () => {
   });
 
   it("resumes a durable guest clear but refuses keep during that phase", async () => {
+    // Guest authority now proves that the browser has no legacy auth cookie.
+    vi.stubGlobal("document", new CookieJar());
     localStorage.setItem(
       WEB_PRIVATE_GUEST_CLEAR_JOURNAL_KEY,
       WEB_PRIVATE_GUEST_CLEAR_IN_PROGRESS,
@@ -828,6 +835,8 @@ describe("terminal operations", () => {
   });
 
   it("reopens a signed-out owned journey only after reviewed purge and owner clear", async () => {
+    // The reviewed purge may reopen guest mode only with an empty cookie jar.
+    vi.stubGlobal("document", new CookieJar());
     const a = session(USER_A, "lineage-a");
     await expect(install(a)).resolves.toBe("installed");
     localStorage.setItem(LAST_SYNC_USER_STORAGE_KEY, USER_A);
@@ -1093,7 +1102,105 @@ describe("legacy migration", () => {
   });
 });
 
+describe("credential-free guest provenance", () => {
+  /** Writes only the content-free marker after the helper grants its narrow guard. */
+  const establishGuest = async () => {
+    if (!webPrivateNeverOwnedGuestProvenanceAllowed()) return false;
+    localStorage.setItem(
+      LEGACY_GUEST_PROVENANCE_STORAGE_KEY,
+      WEB_PRIVATE_NEVER_OWNED_VALUE,
+    );
+    return webPrivateNeverOwnedGuestProvenanceAllowed();
+  };
+
+  it("establishes a genuinely empty guest without worker attestation", async () => {
+    const jar = new CookieJar();
+    vi.stubGlobal("document", jar);
+    mocks.requireAttestation.mockRejectedValueOnce(new Error("must not run"));
+
+    await expect(
+      withWebAccountOperationLock((handle) =>
+        withNeverOwnedWebPrivateGuestProvenance(handle, establishGuest),
+      ),
+    ).resolves.toBe(true);
+
+    expect(mocks.requireAttestation).not.toHaveBeenCalled();
+    expect(localStorage.getItem(LEGACY_GUEST_PROVENANCE_STORAGE_KEY)).toBe(
+      WEB_PRIVATE_NEVER_OWNED_VALUE,
+    );
+    expect(webPrivateReadAllowed()).toBe(true);
+  });
+
+  it("fails closed without deleting legacy auth that appears mid-bootstrap", async () => {
+    const jar = new CookieJar();
+    const retained = session(USER_A, "lineage-a");
+    vi.stubGlobal("document", jar);
+
+    const established = await withWebAccountOperationLock((handle) =>
+      withNeverOwnedWebPrivateGuestProvenance(handle, async () => {
+        if (!webPrivateNeverOwnedGuestProvenanceAllowed()) return false;
+        localStorage.setItem(
+          LEGACY_GUEST_PROVENANCE_STORAGE_KEY,
+          WEB_PRIVATE_NEVER_OWNED_VALUE,
+        );
+        jar.install(retained);
+        return true;
+      }),
+    );
+
+    expect(established).toBe(false);
+    expect(
+      [...jar.values.keys()].some((name) =>
+        isChunkLike(name, "sb-fixture-auth-token"),
+      ),
+    ).toBe(true);
+    expect(mocks.requireAttestation).not.toHaveBeenCalled();
+  });
+
+  it("never scrubs late legacy auth while re-adopting an existing guest", async () => {
+    const jar = new CookieJar();
+    vi.stubGlobal("document", jar);
+    await expect(
+      withWebAccountOperationLock((handle) =>
+        withNeverOwnedWebPrivateGuestProvenance(handle, establishGuest),
+      ),
+    ).resolves.toBe(true);
+    jar.install(session(USER_A, "lineage-a"));
+
+    // A late credential must revoke the already-adopted guest immediately,
+    // even though cookies do not emit the localStorage change event.
+    expect(webPrivateReadAllowed()).toBe(false);
+
+    await expect(
+      withWebAccountOperationLock((handle) =>
+        adoptCurrentWebPrivateWriteGeneration(handle, null),
+      ),
+    ).resolves.toBe(false);
+
+    expect(
+      [...jar.values.keys()].some((name) =>
+        isChunkLike(name, "sb-fixture-auth-token"),
+      ),
+    ).toBe(true);
+  });
+});
+
 describe("locks and content-free notification", () => {
+  it("preserves the worker attestation reason for interactive callers", async () => {
+    // The sign-in form needs this bounded code to avoid relabeling a worker
+    // failure as a generic account refusal.
+    const attestationFailure = Object.assign(new Error("fixture"), {
+      code: "web_auth_service_worker_unavailable",
+    });
+    mocks.requireAttestation.mockRejectedValueOnce(attestationFailure);
+
+    const failure = await withWebAccountOperationLock(
+      requireCurrentWebAccountRealm,
+    ).catch((error: unknown) => error);
+
+    expect(failure).toBe(attestationFailure);
+  });
+
   it("keeps guest storage untouched when a real browser lacks Web Locks", async () => {
     localStorage.setItem("guest-fixture", "kept");
     const browserDocument = {};
@@ -1111,6 +1218,46 @@ describe("locks and content-free notification", () => {
     );
     expect(callback).not.toHaveBeenCalled();
     expect(localStorage.getItem("guest-fixture")).toBe("kept");
+  });
+
+  it("bounds an interactive wait behind another browser tab", async () => {
+    vi.useFakeTimers();
+    const browserDocument = {};
+    vi.stubGlobal("document", browserDocument);
+    vi.stubGlobal("window", {
+      ...window,
+      document: browserDocument,
+      localStorage,
+    });
+    const callback = vi.fn(async () => undefined);
+    vi.stubGlobal("navigator", {
+      onLine: true,
+      locks: {
+        // Model a held lock that settles only when the caller aborts its wait.
+        request: (
+          _name: string,
+          options: { signal?: AbortSignal },
+        ) =>
+          new Promise((_resolve, reject) => {
+            options.signal?.addEventListener("abort", () =>
+              reject(new DOMException("Aborted", "AbortError")),
+            );
+          }),
+      },
+    });
+
+    let failure: unknown = null;
+    const result = withInteractiveWebAccountOperationLock(callback).catch(
+      (error: unknown) => {
+        failure = error;
+      },
+    );
+    await vi.advanceTimersByTimeAsync(WEB_AUTH_INTERACTIVE_LOCK_TIMEOUT_MS);
+    await result;
+
+    expect(callback).not.toHaveBeenCalled();
+    expect(failure).toBeInstanceOf(WebAuthLockUnavailableError);
+    expect(failure).toMatchObject({ code: "web_auth_lock_unavailable" });
   });
 
   /**

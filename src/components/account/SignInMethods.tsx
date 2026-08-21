@@ -26,6 +26,7 @@ import {
   ACCOUNT_SYNC_CONTAINMENT_NOTICE,
 } from "@/lib/sync/containment";
 import { withDeadline } from "@/lib/async/deadline";
+import { AUTH_REQUEST_DEADLINE_MS } from "@/lib/auth/request-budget";
 import { isNativeTarget } from "@/lib/platform/target";
 import { requireNativeAccountBetaAvailability } from "@/lib/sync/availability";
 import { requireAccountLifecycleIdle } from "@/lib/auth/account-lifecycle";
@@ -41,7 +42,7 @@ import {
 import {
   readWebAuthState,
   requireCurrentWebAccountRealm,
-  withWebAccountOperationLock,
+  withInteractiveWebAccountOperationLock,
 } from "@/lib/supabase/web-auth-storage";
 
 type EmailStatus = "idle" | "sending" | "requested";
@@ -52,7 +53,6 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const EMAIL_OTP = /^\d{6,8}$/;
 /** Supabase's default per-address passwordless-email window is 60 seconds. */
 const RESEND_COOLDOWN_SECONDS = 60;
-const AUTH_REQUEST_DEADLINE_MS = 12_000;
 
 /** Only explicit enrollment may let Supabase create a new email identity. */
 export function shouldCreateAccount(intent: "create" | "signin"): boolean {
@@ -294,7 +294,7 @@ export function SignInMethods({
         });
       const guardedRequest = nativeTarget
         ? request()
-        : withWebAccountOperationLock(async (handle) => {
+        : withInteractiveWebAccountOperationLock(async (handle) => {
             await requireCurrentWebAccountRealm(handle);
             const state = await readWebAuthState(handle);
             if (state.status !== "missing") {

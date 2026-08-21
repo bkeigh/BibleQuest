@@ -25,6 +25,14 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  findGuestAccountArtifactViolation,
+  GUEST_FORBIDDEN_ACCOUNT_ARTIFACT_LITERALS,
+} from "../src/lib/sync/guest-account-artifact-contract.mjs";
+import {
+  GUEST_RELEASE_OVERLAYS,
+  GUEST_RELEASE_PROVENANCE_CONTRACT,
+} from "../src/lib/sync/guest-release-overlays.mjs";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const stage = path.join(repo, ".native");
@@ -71,6 +79,10 @@ if (
  */
 function pinReleaseEnvironment() {
   if (!releaseBuild) return;
+  // Start from an empty public namespace so a future endpoint cannot leak in.
+  for (const key of Object.keys(process.env)) {
+    if (key.startsWith("NEXT_PUBLIC_")) delete process.env[key];
+  }
   const values = {
     NEXT_PUBLIC_APP_PLATFORM: "native",
     NEXT_PUBLIC_APP_URL: RELEASE_ORIGIN,
@@ -98,6 +110,13 @@ function pinReleaseEnvironment() {
   };
   for (const [key, value] of Object.entries(values)) {
     process.env[key] = value;
+  }
+  const installedPublicKeys = Object.keys(process.env)
+    .filter((key) => key.startsWith("NEXT_PUBLIC_"))
+    .sort();
+  const reviewedPublicKeys = Object.keys(values).sort();
+  if (installedPublicKeys.join("\n") !== reviewedPublicKeys.join("\n")) {
+    fail("release builds must contain only the reviewed public environment.");
   }
 }
 
@@ -702,6 +721,15 @@ function pruneServerSurfaces() {
   writeFileSync(path.join(stage, "next.config.ts"), NATIVE_NEXT_CONFIG);
 }
 
+/** Replaces account modules with audited fail-closed guest implementations. */
+function stageGuestAccountContainment() {
+  if (!releaseBuild) return;
+  for (const [source, destination] of GUEST_RELEASE_OVERLAYS) {
+    cpSync(path.join(stage, source), path.join(stage, destination));
+  }
+  log("staged fail-closed guest account modules");
+}
+
 function build() {
   log("running next build with output:\"export\"");
   execFileSync(
@@ -764,7 +792,7 @@ function verifyNoPrivilegedSupabaseCredentials() {
   log("verified native output contains no privileged Supabase credential");
 }
 
-/** Keeps the deterministic guest artifact completely account-free. */
+/** Keeps the deterministic guest artifact free of Supabase client config. */
 function verifyGuestSupabaseAbsence() {
   if (!releaseBuild) return;
   for (const file of generatedFiles(path.join(stage, "out"))) {
@@ -776,7 +804,27 @@ function verifyGuestSupabaseAbsence() {
       fail("guest release output contains Supabase client configuration.");
     }
   }
-  log("verified guest release output remains account-free");
+  log("verified guest release output contains no Supabase client config");
+}
+
+/** Rejects executable customer-auth, remote-sync, and remote-avatar markers. */
+function verifyGuestAccountMarkersAbsent() {
+  if (!releaseBuild) return;
+  for (const file of generatedFiles(path.join(stage, "out"))) {
+    const contents = readFileSync(file, "utf8");
+    const violation = findGuestAccountArtifactViolation(contents);
+    if (violation) {
+      fail(
+        `guest release output contains forbidden account machinery (${violation}) in ${path.relative(
+          path.join(stage, "out"),
+          file,
+        )}`,
+      );
+    }
+  }
+  log(
+    `verified guest release output contains none of ${GUEST_FORBIDDEN_ACCOUNT_ARTIFACT_LITERALS.length} reviewed operational markers`,
+  );
 }
 
 /** Fails if a release artifact retains a disposable or protected host. */
@@ -951,6 +999,21 @@ function publish() {
   log(`wrote ${path.relative(repo, output)}/`);
 }
 
+/** Records that the complete release path staged every reviewed guest overlay. */
+function writeGuestReleaseProvenance() {
+  if (!releaseBuild) return;
+  const record = {
+    contract: GUEST_RELEASE_PROVENANCE_CONTRACT,
+    mode: "release",
+    overlayCount: GUEST_RELEASE_OVERLAYS.length,
+  };
+  writeFileSync(
+    path.join(stage, "guest-release-provenance.json"),
+    `${JSON.stringify(record, null, 2)}\n`,
+  );
+  log("recorded guest release provenance");
+}
+
 pinReleaseEnvironment();
 pinAccountBetaEnvironment();
 pinAccountReleaseEnvironment();
@@ -965,12 +1028,15 @@ const mode = releaseBuild
 log(`mode=${mode} target=native hostedOrigin=${origin}`);
 stageTree();
 pruneServerSurfaces();
+stageGuestAccountContainment();
 build();
 verifyCommerceRoutesPruned();
 verifyNoPrivilegedSupabaseCredentials();
 verifyGuestSupabaseAbsence();
+verifyGuestAccountMarkersAbsent();
 verifyReleaseOrigin();
 verifyAccountReleaseTarget();
 verifyAccountBetaOrigin();
 publish();
+writeGuestReleaseProvenance();
 log("done — run `pnpm exec cap sync ios` to copy it into the app");

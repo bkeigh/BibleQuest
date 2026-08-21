@@ -9,6 +9,10 @@ import {
   accountSyncAvailable,
 } from "./containment";
 import {
+  NATIVE_ACCOUNT_BETA_AVAILABILITY_RPC,
+  requireAccountWireHeader,
+} from "./native-account-markers.mjs";
+import {
   ACCOUNT_AVAILABILITY_DEADLINE_MS,
   NATIVE_ACCOUNT_BETA_HEADER,
   NATIVE_ACCOUNT_BETA_HEADER_VALUE,
@@ -67,7 +71,7 @@ function availabilityEndpoint(origin: string): URL {
   ) {
     throw new NativeAccountBetaUnavailableError();
   }
-  return new URL("/rest/v1/rpc/native_account_beta_availability", url);
+  return new URL(`/rest/v1/rpc/${NATIVE_ACCOUNT_BETA_AVAILABILITY_RPC}`, url);
 }
 
 /** Consume at most the tiny fixed RPC body, including chunked responses. */
@@ -131,7 +135,8 @@ export async function fetchNativeAccountBetaAvailability(
           headers: {
             apikey: key,
             "content-type": "application/json",
-            [NATIVE_ACCOUNT_BETA_HEADER]: NATIVE_ACCOUNT_BETA_HEADER_VALUE,
+            [requireAccountWireHeader(NATIVE_ACCOUNT_BETA_HEADER)]:
+              NATIVE_ACCOUNT_BETA_HEADER_VALUE,
           },
           body: "{}",
         },

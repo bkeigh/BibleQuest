@@ -10,21 +10,21 @@ import {
 } from "./types";
 import { parseRhythmState } from "./validation";
 import {
-  captureWebPrivateStorageReadLease,
-  removeWebPrivateStorageItem,
-  webPrivateStorageReadAllowed,
-  webPrivateStorageReadLeaseIsCurrent,
-  withWebPrivateWriteGuard,
-} from "@/lib/storage/web-private-write";
+  captureDevicePrivateStorageReadLease as captureWebPrivateStorageReadLease,
+  removeDevicePrivateStorageItem as removeWebPrivateStorageItem,
+  devicePrivateStorageReadAllowed as webPrivateStorageReadAllowed,
+  devicePrivateStorageReadLeaseIsCurrent as webPrivateStorageReadLeaseIsCurrent,
+  withDevicePrivateWriteGuard as withWebPrivateWriteGuard,
+} from "@/lib/storage/device-private-write";
 import {
-  LEGACY_RHYTHM_STORAGE_KEY,
-  WEB_V2_RHYTHM_STORAGE_KEY,
-  selectedWebPrivateStorageKey,
-} from "@/lib/storage/web-private-namespace";
+  DEVICE_RHYTHM_STORAGE_KEY as LEGACY_RHYTHM_STORAGE_KEY,
+  PROTECTED_RHYTHM_STORAGE_KEY as WEB_V2_RHYTHM_STORAGE_KEY,
+  selectDevicePrivateStorageKey as selectedWebPrivateStorageKey,
+} from "@/lib/storage/device-private-storage";
 import {
-  registerWebPrivateMemoryReset,
-  type WebPrivateReadLease,
-} from "@/lib/supabase/web-auth-storage";
+  registerDevicePrivateMemoryReset as registerWebPrivateMemoryReset,
+  type DevicePrivateReadLease as WebPrivateReadLease,
+} from "@/lib/storage/device-private-write";
 
 export const RHYTHM_STORAGE_KEY = LEGACY_RHYTHM_STORAGE_KEY;
 

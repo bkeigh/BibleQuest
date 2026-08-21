@@ -2,11 +2,10 @@
 
 /**
  * Small auth adapter shared by client components. It presents configured,
- * loading, and user state consistently while deduplicating sign-in analytics
- * across the several mounted consumers and open browser tabs.
+ * loading, and user state consistently while sharing one auth runtime across
+ * mounted consumers. Sign-in analytics remain deduplicated across browser tabs.
  */
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
 import {
   createClient,
@@ -204,6 +203,130 @@ interface SessionState {
     | "clearing-local-journey";
 }
 
+interface SharedSessionSnapshot {
+  user: User | null;
+  sessionLoading: boolean;
+  recovery: SessionState["recovery"];
+}
+
+interface SharedSessionRuntime {
+  key: string;
+  cleanup: () => void;
+}
+
+// Every hook consumer reads the same immutable session snapshot.
+const sessionSnapshotListeners = new Set<() => void>();
+const verifiedUserId = { current: null as string | null };
+let retainedSessionConsumers = 0;
+let sharedSessionRuntime: SharedSessionRuntime | null = null;
+let deferredSessionCleanupRevision = 0;
+
+/** Creates the fail-closed snapshot used before and after a shared runtime. */
+function initialSharedSessionSnapshot(): SharedSessionSnapshot {
+  return {
+    user: null,
+    sessionLoading: isNativeTarget()
+      ? accountSyncAvailable(isSupabaseConfigured())
+      : true,
+    recovery: "none",
+  };
+}
+
+let sharedSessionSnapshot = initialSharedSessionSnapshot();
+
+/** Publishes one changed field to every mounted session consumer. */
+function updateSharedSessionSnapshot(
+  patch: Partial<SharedSessionSnapshot>,
+): void {
+  const next = { ...sharedSessionSnapshot, ...patch };
+  if (
+    next.user === sharedSessionSnapshot.user &&
+    next.sessionLoading === sharedSessionSnapshot.sessionLoading &&
+    next.recovery === sharedSessionSnapshot.recovery
+  ) {
+    return;
+  }
+  sharedSessionSnapshot = next;
+  sessionSnapshotListeners.forEach((listener) => listener());
+}
+
+/** Updates the shared verified user. */
+function setUser(user: User | null): void {
+  updateSharedSessionSnapshot({ user });
+}
+
+/** Updates the shared provisional-loading veil. */
+function setSessionLoading(sessionLoading: boolean): void {
+  updateSharedSessionSnapshot({ sessionLoading });
+}
+
+/** Updates the shared signed-out recovery surface. */
+function setRecovery(recovery: SessionState["recovery"]): void {
+  updateSharedSessionSnapshot({ recovery });
+}
+
+/** Subscribes a hook consumer to the shared immutable snapshot. */
+function subscribeSessionSnapshot(listener: () => void): () => void {
+  sessionSnapshotListeners.add(listener);
+  return () => sessionSnapshotListeners.delete(listener);
+}
+
+/** Returns the current shared snapshot to React. */
+function getSessionSnapshot(): SharedSessionSnapshot {
+  return sharedSessionSnapshot;
+}
+
+/** Identifies the lifecycle inputs that require a new auth runtime. */
+function sessionRuntimeKey(
+  configured: boolean,
+  lifecycleActive: boolean,
+  lifecycleRevision: number,
+): string {
+  return `${configured ? 1 : 0}:${lifecycleActive ? 1 : 0}:${lifecycleRevision}`;
+}
+
+/** Starts one runtime and defers final cleanup across Strict Mode remounts. */
+function retainSharedSessionRuntime(
+  key: string,
+  start: () => void | (() => void),
+): () => void {
+  retainedSessionConsumers += 1;
+  deferredSessionCleanupRevision += 1;
+
+  if (!sharedSessionRuntime || sharedSessionRuntime.key !== key) {
+    sharedSessionRuntime?.cleanup();
+    const cleanup = start();
+    sharedSessionRuntime = {
+      key,
+      cleanup: cleanup ?? (() => undefined),
+    };
+  }
+
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    retainedSessionConsumers -= 1;
+    if (retainedSessionConsumers !== 0) return;
+
+    const cleanupRevision = ++deferredSessionCleanupRevision;
+    void Promise.resolve().then(() => {
+      if (
+        retainedSessionConsumers !== 0 ||
+        cleanupRevision !== deferredSessionCleanupRevision
+      ) {
+        return;
+      }
+      const runtime = sharedSessionRuntime;
+      sharedSessionRuntime = null;
+      runtime?.cleanup();
+      verifiedUserId.current = null;
+      sharedSessionSnapshot = initialSharedSessionSnapshot();
+      sessionSnapshotListeners.forEach((listener) => listener());
+    });
+  };
+}
+
 export type WebAuthBootstrapDecision =
   | { action: "accept-active"; session: Session }
   | { action: "signed-out" }
@@ -291,15 +414,14 @@ export function useSession(): SessionState {
     accountLifecycleSnapshot,
   );
   const lifecycleActive = accountLifecycleIsActive();
-  const pathname = usePathname();
-  const [user, setUser] = useState<User | null>(null);
-  const [sessionLoading, setSessionLoading] = useState(
-    isNativeTarget() ? accountSyncAvailable(isSupabaseConfigured()) : true,
+  const session = useSyncExternalStore(
+    subscribeSessionSnapshot,
+    getSessionSnapshot,
+    getSessionSnapshot,
   );
-  const [recovery, setRecovery] = useState<SessionState["recovery"]>("none");
-  const verifiedUserId = useRef<string | null>(null);
 
-  useEffect(() => {
+  /** Builds the single auth owner retained by all mounted hook consumers. */
+  const startSessionRuntime = useCallback(() => {
     if (lifecycleActive) {
       verifiedUserId.current = null;
       void suspendExistingNativeAuthClient();
@@ -836,6 +958,26 @@ export function useSession(): SessionState {
         if (!active || read !== authStorageRead) return;
         if (await reconcileTerminalState(state)) return;
 
+        // A proven-empty guest has no credentialed request for the worker to
+        // protect. Keep legacy-cookie and ambiguous storage on the attested
+        // migration path below.
+        if (
+          state.status === "missing" &&
+          webAuthStorageIsGenuinelyEmpty()
+        ) {
+          if (guestClearRecoveryIsPending()) {
+            showClearingLocalJourney();
+            return;
+          }
+          const recovery = decideMissingWebAuthRecovery(
+            readLocalJourneyOwner(),
+          );
+          if (recovery === "guest") await acceptFreshGuest();
+          else if (recovery === "locked") showLockedLocalJourney();
+          else closeAccount();
+          return;
+        }
+
         try {
           await requireCurrentWebAccountRealm(webOperation);
         } catch {
@@ -988,12 +1130,22 @@ export function useSession(): SessionState {
       unsubscribeAuthStorage();
       sub.subscription.unsubscribe();
     };
-  }, [configured, lifecycleActive, lifecycleRevision, pathname]);
+  }, [configured, lifecycleActive]);
+
+  useEffect(
+    () =>
+      retainSharedSessionRuntime(
+        sessionRuntimeKey(configured, lifecycleActive, lifecycleRevision),
+        startSessionRuntime,
+      ),
+    [configured, lifecycleActive, lifecycleRevision, startSessionRuntime],
+  );
 
   return {
-    user: configured && !lifecycleActive ? user : null,
-    loading: availability.loading || lifecycleActive || sessionLoading,
+    user: configured && !lifecycleActive ? session.user : null,
+    loading:
+      availability.loading || lifecycleActive || session.sessionLoading,
     configured,
-    recovery: !lifecycleActive ? recovery : "none",
+    recovery: !lifecycleActive ? session.recovery : "none",
   };
 }

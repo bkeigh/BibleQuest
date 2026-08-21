@@ -1,6 +1,17 @@
 # iOS account replacement release
 
-**Current decision:** `HOLD — READY FOR OWNER-GATED DRAFT REVIEW`
+**Current decision (updated 2026-08-20):**
+`HOLD — LOCAL SOURCE REVIEW ONLY; NO FROZEN RELEASE CANDIDATE`
+
+> **Current-state correction.** Production is recorded at `main`
+> `9680ff7399ece7be7dd921ee3092839e5a5a73da`, schema contract `0038`, with
+> migrations `0037` and `0038` already shipped and native account availability
+> off. Section 5 items 1–9 are preserved only as the history that produced that
+> state. **Do not replay their migration, merge, deployment, backup, or rollback
+> steps.** Remaining work starts with a new frozen-SHA source/artifact pass,
+> then section 5 items 10–12 and the device matrix in section 6. Brendan alone
+> approves or performs every external action, and must re-confirm the recorded
+> Production state before the first one.
 
 This runbook governs the first public BibleQuest iOS replacement that adds
 email-code accounts and Production-backed journey sync. It is separate from the
@@ -39,16 +50,15 @@ is a hard stop.
 
 | Field | Required value | Current preparation evidence | Status |
 | --- | --- | --- | --- |
-| Release branch | `codex/production-account-release` until reviewed; merge target `main` | Clean local branch based directly on `origin/main` | PREPARED LOCALLY |
+| Release branch | `main` at freeze; proposed fixes reviewed separately first | Cached and remotely rechecked `origin/main` at `9680ff7399ece7be7dd921ee3092839e5a5a73da` on 2026-08-20 | OPEN — NO FROZEN CANDIDATE |
 | Immutable release SHA | `[FULL 40-CHAR PUSHED SHA]` | Record after the final documentation/control commit | OPEN |
 | Production project | `iacnjqnssovaaojswjoh` | Pinned by the target manifest and guarded migration script | PASS FOR SOURCE |
 | Native target | Exact reviewed Production origin plus matching modern publishable-key fingerprint | [`config/ios-account-release.json`](../config/ios-account-release.json) | PASS FOR SOURCE |
-| Migration | `20260812010000_native_account_availability.sql` only | Guarded by [`reconcile-production-native-availability.mjs`](../scripts/reconcile-production-native-availability.mjs) | PASS FOR DRY-RUN SOURCE |
-| Migration source SHA-256 | `a3223eb14f18d304cd9984c410c74172a2ec04a11cea41ca11d9e491d2fa0fd8` | Recheck from the frozen SHA | PREPARED LOCALLY |
-| Guarded packet SHA-256 | `46616284292eb4ee6e51bde6790000775d214b1788ed70a46094321f5f2b013c` | Recheck from the frozen SHA | PREPARED LOCALLY |
-| Backup | Completed physical backup younger than 30 hours at apply time | Last observed `2026-08-12T07:55:32.177Z`; this is not reusable sign-off | RECHECK REQUIRED |
+| Migration posture | `0037_native_account_beta_availability.sql` and `0038_web_account_deletion_hardening.sql` are recorded as already shipped | 2026-08-20 production audit; Brendan must re-confirm before the staffed window | RECORDED COMPLETE — RECONFIRM |
+| New migration / guarded packet | None in the remaining iOS release scope | Any new database change reopens the migration, backup, compatibility, and approval gates | NOT APPLICABLE UNLESS SCOPE CHANGES |
+| Backup | No database write is part of the remaining local preparation | A current approved backup becomes mandatory again if the scope adds any Production database mutation | NOT APPLICABLE UNLESS SCOPE CHANGES |
 | Existing public binary | Version 1.0, build 13, commit `5359dbf15fa6d1d9d2205644adb668d6361eabd0` | Exact archived IPA SHA-256 `01c2600c577b79b27f07ef6ff773b4c6985dad36cbb0d2dc9c493398fe403c91` | PASS FOR IDENTITY |
-| Web rollback | `[IMMUTABLE DEPLOYMENT ID / SHA]` | Current health reports rollback SHA `cb0d857361cbd32a876580cf428903209456611f` | VERIFY ELIGIBILITY |
+| Web rollback | `[IMMUTABLE DEPLOYMENT ID / FULL SHA]` | Resolve from current approved health and compatibility evidence at freeze; do not reuse an older hard-coded target | OPEN |
 | Replacement build | `[VERSION / BUILD / ARCHIVE SHA-256 / COMMIT]` | Must be produced after every gate below passes | OPEN |
 
 The build 13 inspection found no Production Supabase host, legacy anonymous
@@ -155,10 +165,15 @@ pnpm ios:account-release:prepare
 Simulator and unsigned builds do not prove signing, Keychain, reinstall,
 notification, TestFlight, or physical-device lifecycle behavior.
 
-## 5. Ordered external mutations
+## 5. Historical prerequisites and remaining external actions
 
 Each numbered item requires approval for that exact mutation immediately before
 execution. Approval of one item is not approval of the next.
+
+**Items 1–9 are a historical record and must not be executed again.** They
+describe the already-completed web/schema rollout that preceded the current
+`9680ff7` / `0038` / availability-off state. Current owner execution begins at
+item 10 only after section 4 is rerun against one clean, pushed, frozen SHA.
 
 1. **Preview isolation or cleanup.** Prove the project reference behind every
    overlapping branch Preview. Detach/delete only an unsafe or superseded

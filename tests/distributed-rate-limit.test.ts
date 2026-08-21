@@ -36,11 +36,11 @@ describe("distributed provider rate limits", () => {
     expect(firstClaim.p_bucket_hash).not.toContain("user-a");
   });
 
-  it("names what the database refused with, and never the credential", async () => {
+  it("records a fixed refusal reason without provider text or identifiers", async () => {
     // Production answered 503 on every rate-limited route with nothing but
     // reason "dependency" — a revoked key, a missing grant and an outage all
-    // looked identical. PostgREST hands back a code and a message and no
-    // credential, so both belong in the log.
+    // looked identical. Classify the refusal without copying PostgREST text,
+    // which is not a safe place to assume identifiers can never appear.
     vi.stubEnv("BIBLEQUEST_RATE_LIMIT_SECRET", "r".repeat(48));
     const logged: string[] = [];
     vi.spyOn(console, "error").mockImplementation(
@@ -48,7 +48,11 @@ describe("distributed provider rate limits", () => {
     );
     const rpc = vi.fn().mockResolvedValue({
       data: null,
-      error: { code: "42501", message: "permission denied for function" },
+      error: {
+        code: "42501",
+        message:
+          "permission denied for ada@example.test at 198.51.100.42 with secret-token",
+      },
     });
     const admin = { rpc } as unknown as SupabaseClient;
 
@@ -60,13 +64,22 @@ describe("distributed provider rate limits", () => {
 
     const line = logged.find((l) => l.includes("rate_limit_claim_refusal"));
     expect(line, "the refusal must describe itself").toBeDefined();
-    expect(line).toContain("42501");
-    expect(line).toContain("permission denied for function");
-    expect(line).toContain("ai-shepherd");
-    // The bucket hash is derived from the identity and the secret; neither
-    // the secret nor the raw identity may ride along in the log.
-    expect(line).not.toContain("user-a");
-    expect(line).not.toContain("r".repeat(48));
+    expect(JSON.parse(line ?? "{}")).toEqual({
+      kind: "rate_limit_claim_refusal",
+      reason: "permission",
+    });
+    // The log is rebuilt from fixed values instead of copying dependency text.
+    for (const privateValue of [
+      "42501",
+      "ada@example.test",
+      "198.51.100.42",
+      "secret-token",
+      "ai-shepherd",
+      "user-a",
+      "r".repeat(48),
+    ]) {
+      expect(line).not.toContain(privateValue);
+    }
   });
 
   it("stops after a denied window and preserves its retry interval", async () => {

@@ -7,6 +7,7 @@ import type {
   GrantOperatorPlusInput,
   RevokeOperatorPlusInput,
 } from "./plus-grants";
+import { getConsoleAccess } from "./auth.server";
 
 const MAX_AUTH_DIRECTORY_PAGES = 20;
 const AUTH_DIRECTORY_PAGE_SIZE = 100;
@@ -15,6 +16,8 @@ const AUTH_DIRECTORY_PAGE_SIZE = 100;
 export async function findConsoleAccountByEmail(
   email: string,
 ): Promise<User | null> {
+  const access = await getConsoleAccess();
+  if (access.state !== "authorized") return null;
   const admin = createAdminSupabase();
   for (let page = 1; page <= MAX_AUTH_DIRECTORY_PAGES; page += 1) {
     const { data, error } = await admin.auth.admin.listUsers({
@@ -36,6 +39,8 @@ export async function consoleAccountIdentityMatches(
   userId: string,
   email: string,
 ): Promise<boolean> {
+  const access = await getConsoleAccess();
+  if (access.state !== "authorized") return false;
   const admin = createAdminSupabase();
   const { data, error } = await admin.auth.admin.getUserById(userId);
   return (

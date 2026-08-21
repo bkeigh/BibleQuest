@@ -1,6 +1,11 @@
 import { privateError } from "@/lib/http/request";
 import { recordServerFailure } from "@/lib/observability/server-failures";
 import { stripeBillingAvailability } from "@/lib/billing/config.server";
+import { guardProviderRequest } from "@/lib/bible/provider-request-guard";
+import {
+  distributedPoliciesFromWindows,
+  guardDistributedRequest,
+} from "@/lib/security/distributed-rate-limit.server";
 import {
   createStripe,
   retrieveBillingPlans,
@@ -9,13 +14,25 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/** Returns current Stripe-authored prices only when purchases are test-enabled. */
-export async function GET() {
+const PLANS_RATE_LIMITS = [
+  { limit: 30, windowMs: 60_000 },
+  { limit: 180, windowMs: 60 * 60_000 },
+] as const;
+
+/** Returns current Stripe prices only after both public request guards pass. */
+export async function GET(request: Request) {
+  const blocked = guardProviderRequest(
+    request,
+    "billing-plans",
+    PLANS_RATE_LIMITS,
+  );
+  if (blocked) return blocked;
+
   const configuration = stripeBillingAvailability();
   if (configuration.status === "coming-soon") {
     return Response.json(
       { availability: "coming-soon", purchasesEnabled: false, plans: [] },
-      { headers: { "Cache-Control": "public, max-age=300" } },
+      { headers: { "Cache-Control": "private, no-store" } },
     );
   }
   if (configuration.status !== "configured") {
@@ -29,9 +46,17 @@ export async function GET() {
         purchasesEnabled: false,
         plans: [],
       },
-      { headers: { "Cache-Control": "public, max-age=300" } },
+      { headers: { "Cache-Control": "private, no-store" } },
     );
   }
+
+  // Fail closed before Stripe when the shared abuse-control claim is unavailable.
+  const distributedBlocked = await guardDistributedRequest(
+    request,
+    "billing-plans",
+    distributedPoliciesFromWindows(PLANS_RATE_LIMITS),
+  );
+  if (distributedBlocked) return distributedBlocked;
 
   try {
     const catalog = await retrieveBillingPlans(
@@ -61,7 +86,7 @@ export async function GET() {
           },
         ],
       },
-      { headers: { "Cache-Control": "public, max-age=300" } },
+      { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
     recordServerFailure("billing", "plans", error);

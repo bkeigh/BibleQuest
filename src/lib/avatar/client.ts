@@ -9,6 +9,11 @@ import {
   authenticatedApiFetch,
 } from "@/lib/platform/api";
 import type { WebAccountOperationHandle } from "@/lib/supabase/web-auth-storage";
+import {
+  AVATAR_UPDATED_AT_HEADER,
+  AVATAR_VERSION_HEADER,
+  requireAccountWireHeader,
+} from "@/lib/sync/native-account-markers.mjs";
 
 export interface RemoteAvatar {
   blob: Blob;
@@ -32,8 +37,12 @@ export interface DeleteRemoteAvatarOptions {
 }
 
 function remoteAvatarFromResponse(response: Response): Promise<RemoteAvatar> {
-  const version = response.headers.get("x-biblequest-avatar-version");
-  const updatedAt = response.headers.get("x-biblequest-avatar-updated-at");
+  const version = response.headers.get(
+    requireAccountWireHeader(AVATAR_VERSION_HEADER),
+  );
+  const updatedAt = response.headers.get(
+    requireAccountWireHeader(AVATAR_UPDATED_AT_HEADER),
+  );
   const contentType = response.headers.get("content-type");
   if (
     !response.ok ||

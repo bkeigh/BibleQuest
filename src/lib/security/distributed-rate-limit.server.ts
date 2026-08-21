@@ -2,7 +2,10 @@ import "server-only";
 
 import { createHmac } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { recordServerFailure } from "@/lib/observability/server-failures";
+import {
+  classifyServerFailure,
+  recordServerFailure,
+} from "@/lib/observability/server-failures";
 import { createAdminSupabase } from "@/lib/supabase/admin.server";
 
 export interface DistributedRateLimitPolicy {
@@ -24,6 +27,19 @@ interface RateLimitClaim {
   allowed: boolean;
   retryAfter: number;
 }
+
+/** Names the only anonymous read-only routes allowed to use local fallback. */
+export type GuestBibleReadScope =
+  | "bible-chapter"
+  | "bible-passage"
+  | "bible-translations";
+
+/** Enforces the guest-read allowlist at runtime as well as compile time. */
+const GUEST_BIBLE_READ_SCOPES = new Set<GuestBibleReadScope>([
+  "bible-chapter",
+  "bible-passage",
+  "bible-translations",
+]);
 
 /** Separates "this deployment is misconfigured" from "the claim store failed". */
 export class DistributedRateLimitError extends Error {
@@ -95,6 +111,16 @@ function privateRateResponse(error: string, status: number, retryAfter?: number)
   );
 }
 
+/** Records a database refusal using fixed values instead of provider text. */
+function recordDistributedClaimRefusal(error: unknown): void {
+  console.error(
+    JSON.stringify({
+      kind: "rate_limit_claim_refusal",
+      reason: classifyServerFailure(error),
+    }),
+  );
+}
+
 // Claims each window through one service-only, atomic Postgres function.
 export async function claimDistributedRateLimits(
   admin: SupabaseClient,
@@ -105,33 +131,55 @@ export async function claimDistributedRateLimits(
   const opaqueBucket = bucketHash(identity);
   let retryAfter = 1;
   for (const policy of policies) {
-    const { data, error } = await admin.rpc("claim_provider_rate_limit", {
-      p_scope: scope,
-      p_bucket_hash: opaqueBucket,
-      p_limit: policy.limit,
-      p_window_seconds: policy.windowSeconds,
-    });
-    if (error) {
-      // Name what the database actually said. "dependency" alone is how this
-      // failure looked in production for an unknown length of time: a 503 on
-      // every rate-limited route, with nothing to distinguish a revoked key
-      // from a missing grant from an outage. PostgREST error payloads carry a
-      // code, a message and no credential, so record them bounded.
-      console.error(
-        JSON.stringify({
-          kind: "rate_limit_claim_refusal",
-          scope,
-          code: typeof error.code === "string" ? error.code : "",
-          message: String(error.message ?? "").slice(0, 200),
-        }),
-      );
+    try {
+      const { data, error } = await admin.rpc("claim_provider_rate_limit", {
+        p_scope: scope,
+        p_bucket_hash: opaqueBucket,
+        p_limit: policy.limit,
+        p_window_seconds: policy.windowSeconds,
+      });
+      if (error) {
+        // Any RPC refusal means the shared claim dependency did not answer,
+        // including the invalid-admin-key outage this fallback must survive.
+        // PostgreSQL 22023 instead names our own malformed claim contract and
+        // must remain fail-closed rather than borrowing the local fallback.
+        recordDistributedClaimRefusal(error);
+        const reason =
+          typeof error.code === "string" && error.code === "22023"
+            ? "invalid"
+            : "dependency";
+        throw new DistributedRateLimitError(reason);
+      }
+      const claim = parseClaim(data);
+      retryAfter = Math.max(retryAfter, claim.retryAfter);
+      if (!claim.allowed) {
+        return { allowed: false, retryAfter: claim.retryAfter };
+      }
+    } catch (error) {
+      // Network rejection is a dependency failure; reviewed claim errors keep
+      // their narrower reason so invalid data can never trigger the fallback.
+      if (error instanceof DistributedRateLimitError) throw error;
       throw new DistributedRateLimitError("dependency");
     }
-    const claim = parseClaim(data);
-    retryAfter = Math.max(retryAfter, claim.retryAfter);
-    if (!claim.allowed) return { allowed: false, retryAfter: claim.retryAfter };
   }
   return { allowed: true, retryAfter };
+}
+
+/** Returns the shared-limit response while allowing typed failures to escape. */
+async function distributedRateLimitResponse(
+  request: Request,
+  scope: string,
+  policies: readonly DistributedRateLimitPolicy[],
+  accountId?: string,
+): Promise<Response | null> {
+  const claim = await claimDistributedRateLimits(
+    createAdminSupabase(),
+    scope,
+    accountId ? `account:${accountId}` : trustedRequestIdentity(request),
+    policies,
+  );
+  if (claim.allowed) return null;
+  return privateRateResponse("rate_limited", 429, claim.retryAfter);
 }
 
 /** Fails closed when the shared claim is unavailable or the bucket is exhausted. */
@@ -142,18 +190,46 @@ export async function guardDistributedRequest(
   accountId?: string,
 ): Promise<Response | null> {
   try {
-    const claim = await claimDistributedRateLimits(
-      createAdminSupabase(),
+    return await distributedRateLimitResponse(
+      request,
       scope,
-      accountId ? `account:${accountId}` : trustedRequestIdentity(request),
       policies,
+      accountId,
     );
-    if (claim.allowed) return null;
-    return privateRateResponse("rate_limited", 429, claim.retryAfter);
   } catch (error) {
     // Failing closed without a signal makes a missing rate-limit secret look
     // exactly like a database outage, so record the bounded reason.
     recordServerFailure("rate_limit", "claim", error);
+    return privateRateResponse("rate_limit_unavailable", 503);
+  }
+}
+
+/**
+ * Lets a validated guest Bible GET use its already-applied local limit only
+ * when the shared limiter's dependency fails. Every other failure stays closed.
+ */
+export async function guardGuestBibleReadDistributedRequest(
+  request: Request,
+  scope: GuestBibleReadScope,
+  policies: readonly DistributedRateLimitPolicy[],
+): Promise<Response | null> {
+  if (request.method !== "GET" || !GUEST_BIBLE_READ_SCOPES.has(scope)) {
+    const error = new DistributedRateLimitError("configuration");
+    recordServerFailure("rate_limit", "claim", error);
+    return privateRateResponse("rate_limit_unavailable", 503);
+  }
+
+  try {
+    return await distributedRateLimitResponse(request, scope, policies);
+  } catch (error) {
+    // The route has already consumed its bounded local window before this call.
+    recordServerFailure("rate_limit", "claim", error);
+    if (
+      error instanceof DistributedRateLimitError &&
+      error.reason === "dependency"
+    ) {
+      return null;
+    }
     return privateRateResponse("rate_limit_unavailable", 503);
   }
 }

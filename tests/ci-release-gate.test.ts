@@ -14,6 +14,17 @@ function jobBlock(jobId: string): string {
   return nextJob === -1 ? rest : rest.slice(0, nextJob);
 }
 
+/** Returns one named step block from a previously selected CI job. */
+function stepBlock(job: string, stepName: string): string {
+  const marker = `      - name: ${stepName}\n`;
+  const start = job.indexOf(marker);
+  expect(start, `missing CI step ${stepName}`).toBeGreaterThanOrEqual(0);
+
+  const rest = job.slice(start + marker.length);
+  const nextStep = rest.search(/^      - name:/m);
+  return nextStep === -1 ? rest : rest.slice(0, nextStep);
+}
+
 describe("protected CI release gate", () => {
   it("keeps Quality closed until every in-repository release lane succeeds", () => {
     const sourceQuality = jobBlock("source-quality");
@@ -39,5 +50,18 @@ describe("protected CI release gate", () => {
     expect(WORKFLOW.indexOf("  quality:\n")).toBeGreaterThan(
       WORKFLOW.indexOf("  dependency-risk:\n"),
     );
+  });
+
+  // Keeps browser setup away from slow operating-system mirrors and bounds downloads.
+  it("fails a stalled Chromium install before the browser job is cancelled", () => {
+    const browserSmoke = jobBlock("browser-smoke");
+    const chromiumInstall = stepBlock(browserSmoke, "Install Chromium runtime");
+
+    expect(browserSmoke).toContain("    timeout-minutes: 25");
+    expect(chromiumInstall).toContain("        timeout-minutes: 5");
+    expect(chromiumInstall).toContain(
+      "        run: pnpm exec playwright install chromium",
+    );
+    expect(chromiumInstall).not.toContain("--with-deps");
   });
 });

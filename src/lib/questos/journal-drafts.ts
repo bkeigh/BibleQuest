@@ -17,18 +17,18 @@ import {
   type SetStateAction,
 } from "react";
 import {
-  removeWebPrivateStorageItem,
-  webPrivateStorageReadAllowed,
-  withWebPrivateRemovalGuard,
-  withWebPrivateWriteGuard,
-} from "@/lib/storage/web-private-write";
+  removeDevicePrivateStorageItem as removeWebPrivateStorageItem,
+  devicePrivateStorageReadAllowed as webPrivateStorageReadAllowed,
+  withDevicePrivateRemovalGuard as withWebPrivateRemovalGuard,
+  withDevicePrivateWriteGuard as withWebPrivateWriteGuard,
+} from "@/lib/storage/device-private-write";
 import {
-  LEGACY_JOURNAL_DRAFT_STORAGE_PREFIX,
-  LEGACY_JOURNAL_DRAFTS_CLEARED_STORAGE_KEY,
-  WEB_V2_JOURNAL_DRAFT_STORAGE_PREFIX,
-  WEB_V2_JOURNAL_DRAFTS_CLEARED_STORAGE_KEY,
-  selectedWebPrivateStorageKey,
-} from "@/lib/storage/web-private-namespace";
+  DEVICE_JOURNAL_DRAFT_PREFIX as LEGACY_JOURNAL_DRAFT_STORAGE_PREFIX,
+  DEVICE_JOURNAL_DRAFTS_CLEARED_KEY as LEGACY_JOURNAL_DRAFTS_CLEARED_STORAGE_KEY,
+  PROTECTED_JOURNAL_DRAFT_PREFIX as WEB_V2_JOURNAL_DRAFT_STORAGE_PREFIX,
+  PROTECTED_JOURNAL_DRAFTS_CLEARED_KEY as WEB_V2_JOURNAL_DRAFTS_CLEARED_STORAGE_KEY,
+  selectDevicePrivateStorageKey as selectedWebPrivateStorageKey,
+} from "@/lib/storage/device-private-storage";
 
 export type JournalDraftKind = "prayer" | "reflection";
 export type JournalDraftField = string | number | boolean | null | undefined;
