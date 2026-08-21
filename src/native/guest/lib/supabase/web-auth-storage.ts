@@ -229,6 +229,14 @@ export function withWebAccountOperationLock<T>(
   return Promise.reject(new WebAuthUnavailableError());
 }
 
+/** Refuses interactive account work without running its callback. */
+export function withInteractiveWebAccountOperationLock<T>(
+  operation: (handle: WebAccountOperationHandle) => Promise<T>,
+  existing?: WebAccountOperationHandle,
+): Promise<T> {
+  return withWebAccountOperationLock(operation, existing);
+}
+
 /** Serializes guest-local storage work without creating account authority. */
 export function withWebAuthStorageLock<T>(
   operation: () => Promise<T>,

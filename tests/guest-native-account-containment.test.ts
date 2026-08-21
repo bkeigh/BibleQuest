@@ -47,6 +47,7 @@ import {
   reviewedWebPrivateWriteRemovalAllowed,
   webPrivateRemovalGuardIsCurrent,
   webPrivateWriteGuardIsCurrent,
+  withInteractiveWebAccountOperationLock,
   withWebAccountOperationLock,
   withWebAuthStorageLock,
 } from "@/native/guest/lib/supabase/web-auth-storage";
@@ -278,6 +279,9 @@ describe("guest native account modules", () => {
     await expect(withWebAuthStorageLock(localCallback)).resolves.toBe(true);
     await expect(
       withWebAccountOperationLock(accountCallback),
+    ).rejects.toMatchObject({ code: "unavailable" });
+    await expect(
+      withInteractiveWebAccountOperationLock(accountCallback),
     ).rejects.toMatchObject({ code: "unavailable" });
     expect(accountCallback).not.toHaveBeenCalled();
     expect(await readWebAuthState()).toEqual({ status: "unavailable" });
