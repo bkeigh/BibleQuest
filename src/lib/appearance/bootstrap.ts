@@ -5,8 +5,8 @@ import {
   MIN_GLASS_OPACITY,
 } from "./glass-opacity";
 import {
-  LEGACY_QUEST_JOURNEY_STORAGE_KEY,
-} from "@/lib/storage/web-private-namespace";
+  DEVICE_JOURNEY_STORAGE_KEY as LEGACY_QUEST_JOURNEY_STORAGE_KEY,
+} from "@/lib/storage/device-private-storage";
 import { isNativeTarget } from "@/lib/platform/target";
 
 /**

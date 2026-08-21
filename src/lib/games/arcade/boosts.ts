@@ -1,13 +1,13 @@
 import {
-  removeWebPrivateStorageItem,
-  setWebPrivateStorageItem,
-  webPrivateStorageReadAllowed,
-} from "@/lib/storage/web-private-write";
+  removeDevicePrivateStorageItem as removeWebPrivateStorageItem,
+  setDevicePrivateStorageItem as setWebPrivateStorageItem,
+  devicePrivateStorageReadAllowed as webPrivateStorageReadAllowed,
+} from "@/lib/storage/device-private-write";
 import {
-  LEGACY_ARCADE_BOOST_STORAGE_KEY,
-  WEB_V2_ARCADE_BOOST_STORAGE_KEY,
-  selectedWebPrivateStorageKey,
-} from "@/lib/storage/web-private-namespace";
+  DEVICE_ARCADE_BOOST_STORAGE_KEY as LEGACY_ARCADE_BOOST_STORAGE_KEY,
+  PROTECTED_ARCADE_BOOST_STORAGE_KEY as WEB_V2_ARCADE_BOOST_STORAGE_KEY,
+  selectDevicePrivateStorageKey as selectedWebPrivateStorageKey,
+} from "@/lib/storage/device-private-storage";
 
 /**
  * Board helps a reader can hold and spend.

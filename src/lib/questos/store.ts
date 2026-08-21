@@ -31,19 +31,19 @@ import { track, setAnalyticsConsent } from "@/lib/analytics/events";
 import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
 import { isNativeTarget } from "@/lib/platform/target";
 import {
-  beginWebPrivateWrite,
-  registerWebPrivateMemoryReset,
-  webPrivateInstallingReadAllowed,
-  webPrivateReadAllowed,
-  webPrivateWriteGuardIsCurrent,
-  withWebAuthStorageLock,
-  type WebAccountOperationHandle,
-} from "@/lib/supabase/web-auth-storage";
+  beginDevicePrivateWrite as beginWebPrivateWrite,
+  registerDevicePrivateMemoryReset as registerWebPrivateMemoryReset,
+  devicePrivateInstallingReadAllowed as webPrivateInstallingReadAllowed,
+  devicePrivateReadAllowed as webPrivateReadAllowed,
+  devicePrivateWriteGuardIsCurrent as webPrivateWriteGuardIsCurrent,
+  withDevicePrivateStorageLock as withWebAuthStorageLock,
+  type DevicePrivateOperationHandle as WebAccountOperationHandle,
+} from "@/lib/storage/device-private-write";
 import {
-  LEGACY_QUEST_JOURNEY_STORAGE_KEY,
-  WEB_V2_QUEST_JOURNEY_STORAGE_KEY,
-  selectedWebPrivateStorageKey,
-} from "@/lib/storage/web-private-namespace";
+  DEVICE_JOURNEY_STORAGE_KEY as LEGACY_QUEST_JOURNEY_STORAGE_KEY,
+  PROTECTED_JOURNEY_STORAGE_KEY as WEB_V2_QUEST_JOURNEY_STORAGE_KEY,
+  selectDevicePrivateStorageKey as selectedWebPrivateStorageKey,
+} from "@/lib/storage/device-private-storage";
 import {
   DEFAULT_SETTINGS,
   MEANINGFUL_JOURNEY_EVENT_TYPES,

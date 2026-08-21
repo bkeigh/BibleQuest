@@ -15,8 +15,17 @@ describe("iOS App Store release configuration", () => {
 
     expect(scripts.scripts["build:native:release"]).toContain("--release");
     expect(scripts.scripts["ios:release:prepare"]).toBe(
-      "node scripts/select-ios-privacy-manifest.mjs --guest && pnpm build:native:release && pnpm exec cap sync ios",
+      "node scripts/select-ios-privacy-manifest.mjs --guest && pnpm build:native:release && pnpm exec cap sync ios && node scripts/verify-guest-ios-payload.mjs",
     );
+    const verifier = source("scripts/verify-guest-ios-payload.mjs");
+    expect(verifier).toContain("findGuestAccountArtifactViolation");
+    expect(verifier).toContain("GUEST_RELEASE_OVERLAYS");
+    expect(verifier).toContain("guest-release-provenance.json");
+    expect(verifier).toContain('path.join(repo, ".native/out")');
+    expect(verifier).toContain("PrivacyInfo.guest.xcprivacy");
+    expect(verifier).toContain("cordova_plugins.js");
+    expect(verifier).toContain("no emitted web account machinery");
+    expect(verifier).toContain("native Swift is outside this web-payload check");
     expect(builder).toContain(
       'const RELEASE_ORIGIN = "https://www.biblequest.co"',
     );

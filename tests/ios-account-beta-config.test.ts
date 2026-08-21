@@ -38,6 +38,7 @@ interface CapturedEnvironment {
   plausibleDomain?: string;
   plausibleHost?: string;
   stripePublishableKey?: string;
+  unknownPublicValue?: string;
 }
 
 interface BuilderRun {
@@ -52,6 +53,17 @@ const builderSource = readFileSync(
 );
 const nativeAccountMarkerSource = readFileSync(
   path.join(repositoryRoot, "src/lib/sync/native-account-markers.mjs"),
+  "utf8",
+);
+const guestAccountArtifactContractSource = readFileSync(
+  path.join(
+    repositoryRoot,
+    "src/lib/sync/guest-account-artifact-contract.mjs",
+  ),
+  "utf8",
+);
+const guestReleaseOverlaySource = readFileSync(
+  path.join(repositoryRoot, "src/lib/sync/guest-release-overlays.mjs"),
   "utf8",
 );
 const reviewedSupabaseOrigin =
@@ -102,6 +114,7 @@ function instrumentedBuilder(): string {
     "  plausibleDomain: process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN,",
     "  plausibleHost: process.env.NEXT_PUBLIC_PLAUSIBLE_HOST,",
     "  stripePublishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,",
+    "  unknownPublicValue: process.env.NEXT_PUBLIC_FUTURE_ACCOUNT_ENDPOINT,",
     "};",
     'process.stdout.write(JSON.stringify(capturedEnvironment) + "\\n");',
     "process.exit(0);",
@@ -133,6 +146,14 @@ function runBuilder(
     nativeAccountMarkerSource,
   );
   writeFileSync(
+    path.join(root, "src/lib/sync/guest-account-artifact-contract.mjs"),
+    guestAccountArtifactContractSource,
+  );
+  writeFileSync(
+    path.join(root, "src/lib/sync/guest-release-overlays.mjs"),
+    guestReleaseOverlaySource,
+  );
+  writeFileSync(
     path.join(root, "config/ios-account-beta.json"),
     `${JSON.stringify(manifest, null, 2)}\n`,
   );
@@ -157,6 +178,7 @@ function runBuilder(
       "NEXT_PUBLIC_NATIVE_COMMERCE_ENABLED=true",
       "NEXT_PUBLIC_ANALYTICS_ENABLED=true",
       "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_poison",
+      "NEXT_PUBLIC_FUTURE_ACCOUNT_ENDPOINT=https://future.example",
       "",
     ].join("\n"),
   );
@@ -179,6 +201,7 @@ function runBuilder(
     NEXT_PUBLIC_PLAUSIBLE_DOMAIN: "analytics.example",
     NEXT_PUBLIC_PLAUSIBLE_HOST: "https://analytics.example",
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_live_poison",
+    NEXT_PUBLIC_FUTURE_ACCOUNT_ENDPOINT: "https://future.example",
   };
   delete environment.BIBLEQUEST_IOS_ACCOUNT_BETA_PUBLISHABLE_KEY;
 
@@ -221,7 +244,7 @@ describe("deterministic iOS account-beta preparation", () => {
       "node --env-file-if-exists=.env.local scripts/build-native.mjs --release",
     );
     expect(scripts["ios:release:prepare"]).toBe(
-      "node scripts/select-ios-privacy-manifest.mjs --guest && pnpm build:native:release && pnpm exec cap sync ios",
+      "node scripts/select-ios-privacy-manifest.mjs --guest && pnpm build:native:release && pnpm exec cap sync ios && node scripts/verify-guest-ios-payload.mjs",
     );
     expect(scripts["build:native:account-beta"]).toBe(
       "node --env-file-if-exists=.env.account-beta.local scripts/build-native.mjs --account-beta",
@@ -234,7 +257,9 @@ describe("deterministic iOS account-beta preparation", () => {
       envFile: ".env.local",
       mode: "--release",
     });
-    expect(capturedEnvironment(result)).toMatchObject({
+    const releaseEnvironment = capturedEnvironment(result);
+    expect(releaseEnvironment).not.toHaveProperty("unknownPublicValue");
+    expect(releaseEnvironment).toMatchObject({
       mode: "release",
       appPlatform: "native",
       appUrl: "https://www.biblequest.co",

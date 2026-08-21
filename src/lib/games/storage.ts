@@ -5,21 +5,21 @@ import type {
   TimelineProgress,
 } from "./types";
 import {
-  captureWebPrivateStorageReadLease,
-  removeWebPrivateStorageItem,
-  webPrivateStorageReadAllowed,
-  webPrivateStorageReadLeaseIsCurrent,
-  withWebPrivateWriteGuard,
-} from "@/lib/storage/web-private-write";
+  captureDevicePrivateStorageReadLease as captureWebPrivateStorageReadLease,
+  removeDevicePrivateStorageItem as removeWebPrivateStorageItem,
+  devicePrivateStorageReadAllowed as webPrivateStorageReadAllowed,
+  devicePrivateStorageReadLeaseIsCurrent as webPrivateStorageReadLeaseIsCurrent,
+  withDevicePrivateWriteGuard as withWebPrivateWriteGuard,
+} from "@/lib/storage/device-private-write";
 import {
-  LEGACY_GAME_STORAGE_KEY,
-  WEB_V2_GAME_STORAGE_KEY,
-  selectedWebPrivateStorageKey,
-} from "@/lib/storage/web-private-namespace";
+  DEVICE_GAME_STORAGE_KEY as LEGACY_GAME_STORAGE_KEY,
+  PROTECTED_GAME_STORAGE_KEY as WEB_V2_GAME_STORAGE_KEY,
+  selectDevicePrivateStorageKey as selectedWebPrivateStorageKey,
+} from "@/lib/storage/device-private-storage";
 import {
-  registerWebPrivateMemoryReset,
-  type WebPrivateReadLease,
-} from "@/lib/supabase/web-auth-storage";
+  registerDevicePrivateMemoryReset as registerWebPrivateMemoryReset,
+  type DevicePrivateReadLease as WebPrivateReadLease,
+} from "@/lib/storage/device-private-write";
 
 export const GAME_STORAGE_KEY = LEGACY_GAME_STORAGE_KEY;
 export const GAME_STORAGE_VERSION = 2;

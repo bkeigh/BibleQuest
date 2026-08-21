@@ -33,6 +33,10 @@ import {
   NATIVE_ACCOUNT_BETA_HEADER_VALUE,
 } from "@/lib/sync/native-beta-headers";
 import {
+  ACCOUNT_SYNC_GENERATION_HEADER,
+  requireAccountWireHeader,
+} from "@/lib/sync/native-account-markers.mjs";
+import {
   WEB_AUTH_PROTOCOL_HEADER,
   WEB_AUTH_PROTOCOL_VERSION,
 } from "./web-auth-protocol";
@@ -206,14 +210,20 @@ async function accountAccessToken(expectedUserId: string): Promise<string> {
 /** Marks only native beta requests with the separate native contract. */
 function nativeAccountBetaHeaders(): Record<string, string> {
   return isNativeTarget() && NATIVE_ACCOUNT_BETA_ENABLED
-    ? { [NATIVE_ACCOUNT_BETA_HEADER]: NATIVE_ACCOUNT_BETA_HEADER_VALUE }
+    ? {
+        [requireAccountWireHeader(NATIVE_ACCOUNT_BETA_HEADER)]:
+          NATIVE_ACCOUNT_BETA_HEADER_VALUE,
+      }
     : {};
 }
 
 /** Marks only browser-owned customer auth, never native or console clients. */
 function webAuthProtocolHeaders(): Record<string, string> {
   return !isNativeTarget()
-    ? { [WEB_AUTH_PROTOCOL_HEADER]: WEB_AUTH_PROTOCOL_VERSION }
+    ? {
+        [requireAccountWireHeader(WEB_AUTH_PROTOCOL_HEADER)]:
+          WEB_AUTH_PROTOCOL_VERSION,
+      }
     : {};
 }
 
@@ -239,7 +249,8 @@ export function createSyncControlClient(expectedUserId: string) {
       accessToken: () => accountAccessToken(expectedUserId),
       global: {
         headers: {
-          [EXPECTED_ACCOUNT_USER_HEADER]: expectedUserId,
+          [requireAccountWireHeader(EXPECTED_ACCOUNT_USER_HEADER)]:
+            expectedUserId,
           ...webAuthProtocolHeaders(),
           ...nativeAccountBetaHeaders(),
         },
@@ -274,8 +285,10 @@ export function createSyncClient(expectedUserId: string, generation: number) {
       accessToken: () => accountAccessToken(expectedUserId),
       global: {
         headers: {
-          [EXPECTED_ACCOUNT_USER_HEADER]: expectedUserId,
-          "x-biblequest-sync-generation": String(generation),
+          [requireAccountWireHeader(EXPECTED_ACCOUNT_USER_HEADER)]:
+            expectedUserId,
+          [requireAccountWireHeader(ACCOUNT_SYNC_GENERATION_HEADER)]:
+            String(generation),
           ...webAuthProtocolHeaders(),
           ...nativeAccountBetaHeaders(),
         },

@@ -8,7 +8,10 @@ import {
   NATIVE_ACCOUNT_BETA_ENABLED,
   accountSyncAvailable,
 } from "./containment";
-import { NATIVE_ACCOUNT_BETA_AVAILABILITY_RPC } from "./native-account-markers.mjs";
+import {
+  NATIVE_ACCOUNT_BETA_AVAILABILITY_RPC,
+  requireAccountWireHeader,
+} from "./native-account-markers.mjs";
 import {
   ACCOUNT_AVAILABILITY_DEADLINE_MS,
   NATIVE_ACCOUNT_BETA_HEADER,
@@ -132,7 +135,8 @@ export async function fetchNativeAccountBetaAvailability(
           headers: {
             apikey: key,
             "content-type": "application/json",
-            [NATIVE_ACCOUNT_BETA_HEADER]: NATIVE_ACCOUNT_BETA_HEADER_VALUE,
+            [requireAccountWireHeader(NATIVE_ACCOUNT_BETA_HEADER)]:
+              NATIVE_ACCOUNT_BETA_HEADER_VALUE,
           },
           body: "{}",
         },

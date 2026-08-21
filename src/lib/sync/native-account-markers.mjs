@@ -4,6 +4,10 @@ const ACTIVE_NATIVE_ACCOUNT_MARKERS = Object.freeze({
   betaHeader: "x-biblequest-native-account-beta",
   expectedUserHeader: "x-biblequest-expected-user",
   deletionCleanupHeader: "x-biblequest-account-deletion-cleanup",
+  syncGenerationHeader: "x-biblequest-sync-generation",
+  webAuthHeader: "x-biblequest-web-auth",
+  avatarVersionHeader: "X-BibleQuest-Avatar-Version",
+  avatarUpdatedAtHeader: "X-BibleQuest-Avatar-Updated-At",
   availabilityRpc: "native_account_beta_availability",
   unavailableCode: "native_account_beta_unavailable",
 });
@@ -22,6 +26,14 @@ export const EXPECTED_ACCOUNT_USER_HEADER =
   ACTIVE_NATIVE_ACCOUNT_MARKERS.expectedUserHeader;
 export const ACCOUNT_DELETION_CLEANUP_HEADER =
   ACTIVE_NATIVE_ACCOUNT_MARKERS.deletionCleanupHeader;
+export const ACCOUNT_SYNC_GENERATION_HEADER =
+  ACTIVE_NATIVE_ACCOUNT_MARKERS.syncGenerationHeader;
+export const WEB_AUTH_PROTOCOL_HEADER =
+  ACTIVE_NATIVE_ACCOUNT_MARKERS.webAuthHeader;
+export const AVATAR_VERSION_HEADER =
+  ACTIVE_NATIVE_ACCOUNT_MARKERS.avatarVersionHeader;
+export const AVATAR_UPDATED_AT_HEADER =
+  ACTIVE_NATIVE_ACCOUNT_MARKERS.avatarUpdatedAtHeader;
 export const NATIVE_ACCOUNT_BETA_AVAILABILITY_RPC =
   ACTIVE_NATIVE_ACCOUNT_MARKERS.availabilityRpc;
 export const NATIVE_ACCOUNT_BETA_UNAVAILABLE_CODE =
@@ -32,3 +44,11 @@ export const GUEST_FORBIDDEN_NATIVE_ACCOUNT_MARKERS = Object.freeze([
   ...Object.values(ACTIVE_NATIVE_ACCOUNT_MARKERS),
   ...RETIRED_NATIVE_ACCOUNT_MARKERS,
 ]);
+
+/** Rejects an unavailable staged header before an object can accept an empty key. */
+export function requireAccountWireHeader(header) {
+  if (typeof header !== "string" || header.length === 0) {
+    throw new Error("Account wire header is unavailable.");
+  }
+  return header;
+}

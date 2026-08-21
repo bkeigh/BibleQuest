@@ -1,0 +1,109 @@
+/** Names the proof record written only after a complete guest release build. */
+export const GUEST_RELEASE_PROVENANCE_CONTRACT =
+  "biblequest_guest_release_provenance_v1";
+
+/** Lists every reviewed guest source copied over its canonical staged path. */
+export const GUEST_RELEASE_OVERLAYS = Object.freeze(
+  [
+    ["src/native/guest/lib/supabase/config.ts", "src/lib/supabase/config.ts"],
+    [
+      "src/native/guest/lib/sync/native-account-markers.mjs",
+      "src/lib/sync/native-account-markers.mjs",
+    ],
+    [
+      "src/native/guest/lib/sync/native-beta-headers.ts",
+      "src/lib/sync/native-beta-headers.ts",
+    ],
+    [
+      "src/native/guest/lib/sync/native-beta-contract.ts",
+      "src/lib/sync/native-beta-contract.ts",
+    ],
+    [
+      "src/native/guest/lib/sync/availability.ts",
+      "src/lib/sync/availability.ts",
+    ],
+    [
+      "src/native/guest/lib/supabase/useSession.ts",
+      "src/lib/supabase/useSession.ts",
+    ],
+    [
+      "src/native/guest/lib/supabase/web-auth-storage.ts",
+      "src/lib/supabase/web-auth-storage.ts",
+    ],
+    [
+      "src/native/guest/lib/storage/web-private-namespace.ts",
+      "src/lib/storage/web-private-namespace.ts",
+    ],
+    ["src/native/guest/lib/platform/api.ts", "src/lib/platform/api.ts"],
+    [
+      "src/native/guest/lib/platform/purchases.ts",
+      "src/lib/platform/purchases.ts",
+    ],
+    ["src/native/guest/lib/billing/usePlus.ts", "src/lib/billing/usePlus.ts"],
+    [
+      "src/native/guest/lib/games/arcade/useArcadeAccess.ts",
+      "src/lib/games/arcade/useArcadeAccess.ts",
+    ],
+    [
+      "src/native/guest/lib/native/journey-backup.ts",
+      "src/lib/native/journey-backup.ts",
+    ],
+    [
+      "src/native/guest/lib/auth/onboarding-resume.ts",
+      "src/lib/auth/onboarding-resume.ts",
+    ],
+    [
+      "src/native/guest/lib/analytics/events.ts",
+      "src/lib/analytics/events.ts",
+    ],
+    ["src/native/guest/lib/questos/purge.ts", "src/lib/questos/purge.ts"],
+    [
+      "src/native/guest/lib/storage/device-private-storage.ts",
+      "src/lib/storage/device-private-storage.ts",
+    ],
+    [
+      "src/native/guest/lib/storage/device-private-write.ts",
+      "src/lib/storage/device-private-write.ts",
+    ],
+    [
+      "src/native/guest/components/account/AccountScreen.tsx",
+      "src/components/account/AccountScreen.tsx",
+    ],
+    [
+      "src/native/guest/components/account/AccountPrompt.tsx",
+      "src/components/account/AccountPrompt.tsx",
+    ],
+    [
+      "src/native/guest/components/account/SignInMethods.tsx",
+      "src/components/account/SignInMethods.tsx",
+    ],
+    [
+      "src/native/guest/components/app-shell/AvatarSyncManager.tsx",
+      "src/components/app-shell/AvatarSyncManager.tsx",
+    ],
+    [
+      "src/native/guest/components/app-shell/AccountGate.tsx",
+      "src/components/app-shell/AccountGate.tsx",
+    ],
+    [
+      "src/native/guest/components/app-shell/NativeJourneyGuard.tsx",
+      "src/components/app-shell/NativeJourneyGuard.tsx",
+    ],
+    [
+      "src/native/guest/components/app-shell/ServiceWorkerRegistrar.tsx",
+      "src/components/app-shell/ServiceWorkerRegistrar.tsx",
+    ],
+    [
+      "src/native/guest/components/app-shell/SyncManager.tsx",
+      "src/components/app-shell/SyncManager.tsx",
+    ],
+    [
+      "src/native/guest/components/onboarding/OnboardingGate.tsx",
+      "src/components/onboarding/OnboardingGate.tsx",
+    ],
+    [
+      "src/native/guest/components/settings/SettingsScreen.tsx",
+      "src/components/settings/SettingsScreen.tsx",
+    ],
+  ].map((pair) => Object.freeze(pair)),
+);

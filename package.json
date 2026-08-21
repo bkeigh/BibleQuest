@@ -13,7 +13,7 @@
     "build:native:release": "node --env-file-if-exists=.env.local scripts/build-native.mjs --release",
     "build:native:account-beta": "node --env-file-if-exists=.env.account-beta.local scripts/build-native.mjs --account-beta",
     "build:native:account-release": "node --env-file-if-exists=.env.account-release.local scripts/build-native.mjs --account-release",
-    "ios:release:prepare": "node scripts/select-ios-privacy-manifest.mjs --guest && pnpm build:native:release && pnpm exec cap sync ios",
+    "ios:release:prepare": "node scripts/select-ios-privacy-manifest.mjs --guest && pnpm build:native:release && pnpm exec cap sync ios && node scripts/verify-guest-ios-payload.mjs",
     "ios:account-beta:prepare": "node scripts/select-ios-privacy-manifest.mjs --account-sync && pnpm build:native:account-beta && pnpm exec cap sync ios",
     "ios:account-release:prepare": "node scripts/select-ios-privacy-manifest.mjs --account-sync && pnpm build:native:account-release && pnpm exec cap sync ios",
     "build:ios-splash": "node scripts/build-ios-splash.mjs",

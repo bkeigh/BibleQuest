@@ -26,6 +26,7 @@ import {
   NATIVE_ACCOUNT_BETA_HEADER,
   NATIVE_ACCOUNT_BETA_HEADER_VALUE,
 } from "@/lib/sync/native-beta-headers";
+import { requireAccountWireHeader } from "@/lib/sync/native-account-markers.mjs";
 
 type AuthenticatedContext = {
   supabase: SupabaseClient;
@@ -60,16 +61,22 @@ function databaseBoundaryHeaders(
   const webProtocol = request.headers.get(WEB_AUTH_PROTOCOL_HEADER);
   return {
     ...(expected && UUID.test(expected)
-      ? { [EXPECTED_ACCOUNT_USER_HEADER]: expected }
+      ? { [requireAccountWireHeader(EXPECTED_ACCOUNT_USER_HEADER)]: expected }
       : {}),
     ...(cleanup === ACCOUNT_DELETION_CLEANUP_HEADER_VALUE
-      ? { [ACCOUNT_DELETION_CLEANUP_HEADER]: cleanup }
+      ? {
+          [requireAccountWireHeader(ACCOUNT_DELETION_CLEANUP_HEADER)]:
+            cleanup,
+        }
       : {}),
     ...(!native && webProtocol === WEB_AUTH_PROTOCOL_VERSION
-      ? { [WEB_AUTH_PROTOCOL_HEADER]: webProtocol }
+      ? { [requireAccountWireHeader(WEB_AUTH_PROTOCOL_HEADER)]: webProtocol }
       : {}),
     ...(native
-      ? { [NATIVE_ACCOUNT_BETA_HEADER]: NATIVE_ACCOUNT_BETA_HEADER_VALUE }
+      ? {
+          [requireAccountWireHeader(NATIVE_ACCOUNT_BETA_HEADER)]:
+            NATIVE_ACCOUNT_BETA_HEADER_VALUE,
+        }
       : {}),
   };
 }

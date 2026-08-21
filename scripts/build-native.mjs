@@ -26,8 +26,13 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  GUEST_FORBIDDEN_NATIVE_ACCOUNT_MARKERS,
-} from "../src/lib/sync/native-account-markers.mjs";
+  findGuestAccountArtifactViolation,
+  GUEST_FORBIDDEN_ACCOUNT_ARTIFACT_LITERALS,
+} from "../src/lib/sync/guest-account-artifact-contract.mjs";
+import {
+  GUEST_RELEASE_OVERLAYS,
+  GUEST_RELEASE_PROVENANCE_CONTRACT,
+} from "../src/lib/sync/guest-release-overlays.mjs";
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const stage = path.join(repo, ".native");
@@ -74,6 +79,10 @@ if (
  */
 function pinReleaseEnvironment() {
   if (!releaseBuild) return;
+  // Start from an empty public namespace so a future endpoint cannot leak in.
+  for (const key of Object.keys(process.env)) {
+    if (key.startsWith("NEXT_PUBLIC_")) delete process.env[key];
+  }
   const values = {
     NEXT_PUBLIC_APP_PLATFORM: "native",
     NEXT_PUBLIC_APP_URL: RELEASE_ORIGIN,
@@ -101,6 +110,13 @@ function pinReleaseEnvironment() {
   };
   for (const [key, value] of Object.entries(values)) {
     process.env[key] = value;
+  }
+  const installedPublicKeys = Object.keys(process.env)
+    .filter((key) => key.startsWith("NEXT_PUBLIC_"))
+    .sort();
+  const reviewedPublicKeys = Object.keys(values).sort();
+  if (installedPublicKeys.join("\n") !== reviewedPublicKeys.join("\n")) {
+    fail("release builds must contain only the reviewed public environment.");
   }
 }
 
@@ -539,29 +555,6 @@ const REMOVE = [
   ],
 ];
 
-const GUEST_ACCOUNT_CONTAINMENT_REPLACEMENTS = [
-  [
-    "src/native/guest/lib/supabase/config.ts",
-    "src/lib/supabase/config.ts",
-  ],
-  [
-    "src/native/guest/lib/sync/native-account-markers.mjs",
-    "src/lib/sync/native-account-markers.mjs",
-  ],
-  [
-    "src/native/guest/lib/sync/native-beta-headers.ts",
-    "src/lib/sync/native-beta-headers.ts",
-  ],
-  [
-    "src/native/guest/lib/sync/native-beta-contract.ts",
-    "src/lib/sync/native-beta-contract.ts",
-  ],
-  [
-    "src/native/guest/lib/sync/availability.ts",
-    "src/lib/sync/availability.ts",
-  ],
-];
-
 /**
  * `/` is served by the marketing group, which is removed above. Without a root
  * page the export emits no out/index.html and the WebView loads a blank screen
@@ -731,7 +724,7 @@ function pruneServerSurfaces() {
 /** Replaces account modules with audited fail-closed guest implementations. */
 function stageGuestAccountContainment() {
   if (!releaseBuild) return;
-  for (const [source, destination] of GUEST_ACCOUNT_CONTAINMENT_REPLACEMENTS) {
+  for (const [source, destination] of GUEST_RELEASE_OVERLAYS) {
     cpSync(path.join(stage, source), path.join(stage, destination));
   }
   log("staged fail-closed guest account modules");
@@ -814,18 +807,15 @@ function verifyGuestSupabaseAbsence() {
   log("verified guest release output contains no Supabase client config");
 }
 
-/** Rejects every marker named by the canonical native account contract. */
+/** Rejects executable customer-auth, remote-sync, and remote-avatar markers. */
 function verifyGuestAccountMarkersAbsent() {
   if (!releaseBuild) return;
   for (const file of generatedFiles(path.join(stage, "out"))) {
     const contents = readFileSync(file, "utf8");
-    if (
-      GUEST_FORBIDDEN_NATIVE_ACCOUNT_MARKERS.some((marker) =>
-        contents.includes(marker),
-      )
-    ) {
+    const violation = findGuestAccountArtifactViolation(contents);
+    if (violation) {
       fail(
-        `guest release output contains a forbidden account marker in ${path.relative(
+        `guest release output contains forbidden account machinery (${violation}) in ${path.relative(
           path.join(stage, "out"),
           file,
         )}`,
@@ -833,7 +823,7 @@ function verifyGuestAccountMarkersAbsent() {
     }
   }
   log(
-    `verified guest release output contains none of ${GUEST_FORBIDDEN_NATIVE_ACCOUNT_MARKERS.length} contract markers`,
+    `verified guest release output contains none of ${GUEST_FORBIDDEN_ACCOUNT_ARTIFACT_LITERALS.length} reviewed operational markers`,
   );
 }
 
@@ -1009,6 +999,21 @@ function publish() {
   log(`wrote ${path.relative(repo, output)}/`);
 }
 
+/** Records that the complete release path staged every reviewed guest overlay. */
+function writeGuestReleaseProvenance() {
+  if (!releaseBuild) return;
+  const record = {
+    contract: GUEST_RELEASE_PROVENANCE_CONTRACT,
+    mode: "release",
+    overlayCount: GUEST_RELEASE_OVERLAYS.length,
+  };
+  writeFileSync(
+    path.join(stage, "guest-release-provenance.json"),
+    `${JSON.stringify(record, null, 2)}\n`,
+  );
+  log("recorded guest release provenance");
+}
+
 pinReleaseEnvironment();
 pinAccountBetaEnvironment();
 pinAccountReleaseEnvironment();
@@ -1033,4 +1038,5 @@ verifyReleaseOrigin();
 verifyAccountReleaseTarget();
 verifyAccountBetaOrigin();
 publish();
+writeGuestReleaseProvenance();
 log("done — run `pnpm exec cap sync ios` to copy it into the app");

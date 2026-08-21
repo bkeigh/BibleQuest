@@ -19,6 +19,7 @@ import { supabasePublishableKey } from "./config";
 import {
   EXPECTED_ACCOUNT_USER_HEADER,
 } from "@/lib/sync/native-beta-headers";
+import { requireAccountWireHeader } from "@/lib/sync/native-account-markers.mjs";
 import {
   WEB_AUTH_PROTOCOL_HEADER,
   WEB_AUTH_PROTOCOL_VERSION,
@@ -831,8 +832,10 @@ async function verifyParsedSession(
   isolatedVerifierSequence += 1;
   try {
     const verificationHeaders = {
-      [EXPECTED_ACCOUNT_USER_HEADER]: candidate.credential.userId,
-      [WEB_AUTH_PROTOCOL_HEADER]: WEB_AUTH_PROTOCOL_VERSION,
+      [requireAccountWireHeader(EXPECTED_ACCOUNT_USER_HEADER)]:
+        candidate.credential.userId,
+      [requireAccountWireHeader(WEB_AUTH_PROTOCOL_HEADER)]:
+        WEB_AUTH_PROTOCOL_VERSION,
     };
     // Two clients, not one. supabase-js replaces `client.auth` with a Proxy
     // whose get trap THROWS whenever the `accessToken` option is set, so a
@@ -931,8 +934,10 @@ export async function refreshRetainedDeletingWebSession(
         },
         global: {
           headers: {
-            [EXPECTED_ACCOUNT_USER_HEADER]: retained.credential.userId,
-            [WEB_AUTH_PROTOCOL_HEADER]: WEB_AUTH_PROTOCOL_VERSION,
+            [requireAccountWireHeader(EXPECTED_ACCOUNT_USER_HEADER)]:
+              retained.credential.userId,
+            [requireAccountWireHeader(WEB_AUTH_PROTOCOL_HEADER)]:
+              WEB_AUTH_PROTOCOL_VERSION,
           },
         },
       }),
@@ -3372,7 +3377,8 @@ export async function completeVerifiedWebOAuth(
       },
       global: {
         headers: {
-          [WEB_AUTH_PROTOCOL_HEADER]: WEB_AUTH_PROTOCOL_VERSION,
+          [requireAccountWireHeader(WEB_AUTH_PROTOCOL_HEADER)]:
+            WEB_AUTH_PROTOCOL_VERSION,
         },
       },
     }),

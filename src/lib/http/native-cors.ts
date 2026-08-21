@@ -6,6 +6,11 @@ import {
   EXPECTED_ACCOUNT_USER_HEADER,
   NATIVE_ACCOUNT_BETA_HEADER,
 } from "@/lib/sync/native-beta-headers";
+import {
+  AVATAR_UPDATED_AT_HEADER,
+  AVATAR_VERSION_HEADER,
+  requireAccountWireHeader,
+} from "@/lib/sync/native-account-markers.mjs";
 
 /**
  * CORS decoration for the one reviewed native origin.
@@ -37,8 +42,12 @@ import {
  */
 const EXCLUDED_API_PATH = "/api/billing/plans";
 
-const EXPOSED_RESPONSE_HEADERS =
-  "X-BibleQuest-Avatar-Version, X-BibleQuest-Avatar-Updated-At";
+const EXPOSED_RESPONSE_HEADERS = [
+  AVATAR_VERSION_HEADER,
+  AVATAR_UPDATED_AT_HEADER,
+]
+  .map(requireAccountWireHeader)
+  .join(", ");
 // Match only the bearer, subject, beta, and deletion markers emitted by the
 // reviewed native account transport; no arbitrary client header is reflected.
 const ALLOWED_REQUEST_HEADERS = [
