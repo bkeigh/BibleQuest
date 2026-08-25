@@ -167,7 +167,7 @@ export function InstallPrompt() {
           className="fixed inset-x-4 bottom-[calc(var(--app-bottom-nav-height,5rem)+1rem)] z-40 isolate mx-auto max-w-md rounded-[var(--radius-card-lg)] border border-gold-500/30 bg-paper p-4 paper-shadow-lg ring-1 ring-white/40"
         >
           <div className="flex items-start gap-3 pe-10">
-            <ArtIcon name="chapel" size={64} />
+            <ArtIcon name="chapel" size={48} />
             <div className="min-w-0 flex-1">
               <p className="text-[1rem] text-graphite">
                 Use BibleQuest like an app

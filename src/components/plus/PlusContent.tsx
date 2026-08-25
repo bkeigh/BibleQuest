@@ -69,7 +69,7 @@ export function PlusContent({ compact = false }: { compact?: boolean }) {
       <PaperCard variant="atmospheric" padding="lg" className="relative overflow-hidden">
         <div className="flex items-center gap-3">
           <span className="flex shrink-0 items-center justify-center">
-            <ArtIcon name="crown" size={68} />
+            <ArtIcon name="crown" size={52} />
           </span>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-gold-500/45 bg-gold-500/15 px-3 py-1 text-[0.75rem] text-gilt">
             <IconSparkle size={14} /> BibleQuest Plus

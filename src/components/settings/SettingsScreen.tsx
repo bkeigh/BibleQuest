@@ -1451,12 +1451,14 @@ function SettingsInner() {
       <PageContainer className="pb-8">
         <SectionTitle>{t.settings.profile}</SectionTitle>
         <PaperCard variant="paper" padding="md">
-          <div className="flex items-center gap-4 max-[360px]:flex-col max-[360px]:items-stretch sm:gap-5">
+          {/* Profile stays one compact horizontal row, including on narrow
+              phones, so Settings owns identity without turning it into a hero. */}
+          <div className="flex items-center gap-3 sm:gap-4">
             <Avatar
               name={profile?.displayName}
               marker={profileAvatarMarker(profile)}
-              size="lg"
-              className="ring-1 ring-paper/70 shadow-[0_8px_24px_rgb(18_33_27_/_0.12)] max-[360px]:self-center"
+              size="md"
+              className="ring-1 ring-paper/70 shadow-[0_6px_18px_rgb(18_33_27_/_0.1)]"
             />
             <div className="min-w-0 flex-1">
               {editingName ? (

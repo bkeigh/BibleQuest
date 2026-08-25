@@ -216,7 +216,7 @@ function QuestDetailInner({ quest }: { quest: QuestTemplate }) {
             <span className="shrink-0">
               <ArtIcon
                 name={CATEGORY_ART[quest.category] ?? "leaf"}
-                size={92}
+                size={72}
               />
             </span>
             <span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-ash">

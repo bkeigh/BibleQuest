@@ -41,51 +41,56 @@ export function ArtIcon({
   const asset = ART_SPRITES[name];
   if (!asset) return null;
 
-  // Normalize perceived subject size without altering tree or candle growth.
+  // Normalize perceived subject size inside a stable box so differently
+  // cropped paintings never shift the text or controls beside them.
   const renderedSize = Math.round(size * (ART_VISUAL_WEIGHT[name] ?? 1));
-  const box = { width: renderedSize, height: renderedSize };
+  const layoutBox = { width: size, height: size };
+  const artworkBox = { width: renderedSize, height: renderedSize };
 
-  // Render a source while preserving the shared layout and accessibility role.
-  const frame = (
-    src: string,
-    motionClass?: string,
-    announced = true,
-  ) => (
+  // Render each source as decorative content because the stable outer frame
+  // owns the optional accessible name for both still and animated artwork.
+  const frame = (src: string, motionClass?: string) => (
     // eslint-disable-next-line @next/next/no-img-element -- local transparent art is already optimized for its exact use
     <img
       src={src}
       width={asset.nativeWidth}
       height={asset.nativeHeight}
-      style={box}
-      alt={announced ? (title ?? "") : ""}
-      role={announced && title ? "img" : "presentation"}
-      aria-hidden={announced && title ? undefined : true}
+      style={artworkBox}
+      alt=""
+      role="presentation"
+      aria-hidden="true"
       draggable={false}
       decoding="async"
-      data-art-name={name}
       className={cn(
-        "artwork-2-5d block shrink-0 object-contain",
+        "artwork-2-5d block max-w-none shrink-0 object-contain",
         motionClass,
-        className,
       )}
     />
   );
 
-  // Pair moving and still candle sources so either reduced-motion control wins.
-  if (animate && asset.animatedSrc) {
-    return (
-      <span
-        className="contents"
-        role={title ? "img" : undefined}
-        aria-label={title || undefined}
-      >
-        {frame(asset.animatedSrc, "art-in-motion", false)}
-        {frame(asset.src, "art-at-rest", false)}
-      </span>
-    );
-  }
-
-  return frame(asset.src);
+  return (
+    <span
+      style={layoutBox}
+      className={cn(
+        "relative flex shrink-0 items-center justify-center overflow-visible",
+        className,
+      )}
+      role={title ? "img" : undefined}
+      aria-label={title || undefined}
+      aria-hidden={title ? undefined : true}
+      data-art-name={name}
+    >
+      {/* Pair candle sources so the global reduced-motion rule can choose one. */}
+      {animate && asset.animatedSrc ? (
+        <>
+          {frame(asset.animatedSrc, "art-in-motion")}
+          {frame(asset.src, "art-at-rest")}
+        </>
+      ) : (
+        frame(asset.src)
+      )}
+    </span>
+  );
 }
 
 // Map every quest category to one distinct illustrated symbol.

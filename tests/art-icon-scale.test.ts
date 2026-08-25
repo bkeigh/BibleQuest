@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { globSync } from "node:fs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ART_ICON } from "@/components/design-system/ArtIcon";
+import { ART_ICON, ArtIcon } from "@/components/design-system/ArtIcon";
 import { ART_VISUAL_WEIGHT } from "@/components/design-system/art-assets";
 
 const SOURCES = globSync("src/**/*.tsx");
@@ -41,6 +43,21 @@ describe("2.5D art scale", () => {
   it("measures optical size in both directions", () => {
     expect(ART_VISUAL_WEIGHT.links).toBeGreaterThan(1.2);
     expect(ART_VISUAL_WEIGHT["open-book"]).toBeLessThan(1);
+  });
+
+  it("keeps optical weighting inside one stable layout box", () => {
+    const links = renderToStaticMarkup(
+      createElement(ArtIcon, { name: "links", size: 40 }),
+    );
+    const book = renderToStaticMarkup(
+      createElement(ArtIcon, { name: "open-book", size: 40 }),
+    );
+
+    // Both components reserve 40px even though their visible artwork differs.
+    expect(links).toContain('style="width:40px;height:40px"');
+    expect(book).toContain('style="width:40px;height:40px"');
+    expect(links).toContain('style="width:50px;height:50px"');
+    expect(book).toContain('style="width:35px;height:35px"');
   });
 
   it("offers a monotonic role-based size ladder", () => {

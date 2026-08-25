@@ -30,7 +30,7 @@ export function NewsletterLink({ className }: NewsletterLinkProps) {
         className="ambient absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gold-300/20 blur-2xl [animation:var(--animate-twinkle)]"
       />
       <span className="relative flex shrink-0 items-center justify-center">
-        <ArtIcon name="scroll" size={68} />
+        <ArtIcon name="scroll" size={52} />
       </span>
       <span className="relative min-w-0 flex-1">
         <span className="block font-display text-[1.125rem] leading-tight">

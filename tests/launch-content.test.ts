@@ -8,7 +8,7 @@ import { QUEST_CATEGORIES } from "@/lib/questos/types";
 import { createReviewedQuestProvider } from "@/lib/quest-generation/provider";
 
 describe("launch content catalog", () => {
-  it("keeps the Home verse entry beneath the account surface and the mobile nav scroll-stable", () => {
+  it("keeps the Home verse beneath a compact welcome and the mobile nav scroll-stable", () => {
     const home = readFileSync(
       path.join(process.cwd(), "src/components/home/HomeScreen.tsx"),
       "utf8",
@@ -30,12 +30,26 @@ describe("launch content catalog", () => {
       "utf8",
     );
 
-    const accountSurface = home.indexOf("Personal welcome");
+    const welcomeSurface = home.indexOf("Compact personal welcome");
     const verseEntry = home.indexOf("<TodaysVerseLink />");
     const questSection = home.indexOf('<section id="quests"');
-    expect(accountSurface).toBeGreaterThan(-1);
-    expect(verseEntry).toBeGreaterThan(accountSurface);
+    expect(welcomeSurface).toBeGreaterThan(-1);
+    expect(verseEntry).toBeGreaterThan(welcomeSurface);
     expect(questSection).toBeGreaterThan(verseEntry);
+    expect(home).toContain('href="/app/settings"');
+    expect(home).toContain("aria-label={t.home.openSettings}");
+    expect(home).not.toContain("data-today-profile-card");
+    expect(home).not.toContain("Your profile");
+    expect(home).not.toContain('name="people"');
+    expect(home).not.toContain("useSession");
+
+    // Primary destinations use the approved art library; small utility
+    // controls remain crisp vectors where a painting would reduce clarity.
+    expect(bottomNav).toContain("data-primary-nav-art");
+    for (const sprite of ["sun", "map", "open-book", "hands", "tree"]) {
+      expect(bottomNav).toContain(`sprite: "${sprite}"`);
+    }
+    expect(bottomNav).toContain("<ArtIcon name={sprite}");
 
     // Mobile Safari is sensitive to fixed + blur + transform composition.
     // Keep the base bar opaque and reserve blur for larger viewports.

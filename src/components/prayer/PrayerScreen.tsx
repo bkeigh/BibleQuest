@@ -448,7 +448,7 @@ function PrayerCard({ prayer }: { prayer: Prayer }) {
     <PaperCard as="article" variant="paper" padding="md">
       <div className="flex items-start gap-3">
         <span className="mt-0.5 shrink-0">
-          <ArtIcon name={icon} size={80} />
+          <ArtIcon name={icon} size={48} />
         </span>
         <div className="min-w-0 flex-1">
           {prayer.title && (

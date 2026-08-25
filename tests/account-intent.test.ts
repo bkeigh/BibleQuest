@@ -47,15 +47,23 @@ describe("account entry intent", () => {
       path.join(process.cwd(), "src/components/account/AccountScreen.tsx"),
       "utf8",
     );
+    const picker = readFileSync(
+      path.join(
+        process.cwd(),
+        "src/components/account/AccountIntentPicker.tsx",
+      ),
+      "utf8",
+    );
 
     expect(account).toContain(
       "initialAccountIntent(isStandaloneWebApp())",
     );
-    expect(account).toContain("aria-pressed={selected}");
-    expect(account).toContain("onClick={() => setIntent(option)}");
+    expect(picker).toContain("aria-pressed={selected}");
+    expect(picker).toContain("onClick={() => onIntentChange(option.intent)}");
+    expect(account).toContain("<AccountIntentPicker");
     expect(account).toContain("key={intent}");
     expect(account.indexOf("if (user)")).toBeLessThan(
-      account.indexOf('aria-label="Choose account access"'),
+      account.indexOf("<AccountIntentPicker"),
     );
   });
 });

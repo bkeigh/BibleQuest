@@ -8,26 +8,24 @@ import { useStrings } from "@/lib/i18n";
 import { en } from "@/lib/i18n/en";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 import {
-  IconHome,
-  IconQuest,
-  IconBible,
-  IconPrayer,
-  IconJourney,
-} from "@/components/design-system/icons";
+  ArtIcon,
+  type ArtSpriteName,
+} from "@/components/design-system/ArtIcon";
 
 interface NavItem {
   href: string;
   key: "home" | "quests" | "bible" | "prayer" | "journey";
-  Icon: typeof IconHome;
+  sprite: ArtSpriteName;
   exact?: boolean;
 }
 
+// Primary destinations use the reviewed 2.5D art instead of generic symbols.
 const ITEMS: NavItem[] = [
-  { href: "/app", key: "home", Icon: IconHome, exact: true },
-  { href: "/app/quests", key: "quests", Icon: IconQuest },
-  { href: "/app/bible", key: "bible", Icon: IconBible },
-  { href: "/app/prayer", key: "prayer", Icon: IconPrayer },
-  { href: "/app/journey", key: "journey", Icon: IconJourney },
+  { href: "/app", key: "home", sprite: "sun", exact: true },
+  { href: "/app/quests", key: "quests", sprite: "map" },
+  { href: "/app/bible", key: "bible", sprite: "open-book" },
+  { href: "/app/prayer", key: "prayer", sprite: "hands" },
+  { href: "/app/journey", key: "journey", sprite: "tree" },
 ];
 
 export function BottomNav() {
@@ -94,7 +92,7 @@ export function BottomNav() {
       className="app-glass-nav fixed inset-x-0 bottom-0 z-40 border-t border-mist bg-parchment pb-safe sm:bg-parchment/90 sm:backdrop-blur-md"
     >
       <ul className="mx-auto flex max-w-lg items-stretch justify-around px-2">
-        {ITEMS.map(({ href, key, Icon, exact }) => {
+        {ITEMS.map(({ href, key, sprite, exact }) => {
           const label = t.nav[key];
           const active = exact
             ? pathname === href
@@ -124,7 +122,7 @@ export function BottomNav() {
                   });
                 }}
                 className={cn(
-                  "relative flex min-h-[44px] flex-col items-center gap-1 px-1 pt-2.5 pb-2 text-[0.6875rem] transition-colors duration-300",
+                  "group relative flex min-h-[44px] flex-col items-center gap-1 px-1 pt-2 pb-1.5 text-[0.6875rem] transition-colors duration-300",
                   active ? "text-accent" : "text-ash hover:text-charcoal"
                 )}
               >
@@ -137,7 +135,18 @@ export function BottomNav() {
                     active ? "opacity-100" : "opacity-0"
                   )}
                 />
-                <Icon size={23} strokeWidth={active ? 1.9 : 1.6} />
+                <span
+                  aria-hidden="true"
+                  data-primary-nav-art={sprite}
+                  className={cn(
+                    "flex h-8 w-10 items-center justify-center rounded-full transition-all duration-300",
+                    active
+                      ? "scale-105 bg-accent-surface/75 opacity-100"
+                      : "opacity-70 group-hover:scale-105 group-hover:opacity-100",
+                  )}
+                >
+                  <ArtIcon name={sprite} size={27} />
+                </span>
                 <span className={cn(active && "font-medium")}>{label}</span>
               </Link>
             </li>

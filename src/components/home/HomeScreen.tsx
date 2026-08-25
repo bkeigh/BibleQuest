@@ -125,8 +125,8 @@ function HomeInner() {
       </div>
 
       <PageContainer className="relative pt-safe-gap-4">
-        {/* Personal welcome — one framed devotional surface with today's
-            candle, echoing a bookplate rather than a dashboard header. */}
+        {/* Compact personal welcome — profile editing stays in Settings while
+            today's candle remains visible without adding another card row. */}
         <header
           data-paper-variant="paper"
           data-plus-nameplate={isPlus ? "active" : "free"}
@@ -218,7 +218,7 @@ function HomeInner() {
         </header>
 
         <div className="space-y-7 pb-7">
-          {/* Scripture stays directly beneath the personal account surface,
+          {/* Scripture stays directly beneath the personal welcome,
               while the compact treatment leaves quests as Home's main work. */}
           <TodaysVerseLink />
 
@@ -246,14 +246,14 @@ function HomeInner() {
                 padding="md"
                 className="flex min-h-24 items-center gap-4"
               >
-                <span className="flex shrink-0 items-center justify-center">
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center">
                   <ArtIcon
                     name={
                       featuredQuest
                         ? CATEGORY_ART[featuredQuest.category] ?? "scroll"
                         : "scroll"
                     }
-                    size={80}
+                    size={56}
                   />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -428,7 +428,7 @@ function TodaysVerseLink() {
           className="ambient absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gold-300/15 blur-2xl [animation:var(--animate-twinkle)]"
         />
         <span className="relative flex shrink-0 items-center justify-center">
-          <ArtIcon name="open-book" size={68} />
+          <ArtIcon name="open-book" size={52} />
         </span>
         <span className="relative min-w-0 flex-1">
           <span className="block font-display text-[1.125rem] leading-tight">
@@ -463,7 +463,7 @@ function ShepherdCallout({
         {/* Its own character, the same one the floating launcher uses. */}
         <ArtIcon
           name="myshepherd"
-          size={68}
+          size={52}
           className="[filter:drop-shadow(0_2px_4px_rgb(15_40_54/0.35))]"
         />
       </span>
@@ -527,11 +527,11 @@ function QuickActionTile({
         interactive
         variant="paper"
         padding="sm"
-        className="flex h-full min-h-[7rem] flex-col items-center justify-center gap-2.5 text-center sm:min-h-[7.75rem]"
+        className="flex h-full min-h-[6.5rem] flex-col items-center justify-center gap-2 text-center sm:min-h-[7rem]"
       >
         {/* The artwork lifts gently while the card keeps a stable touch target. */}
         <span className="flex shrink-0 items-center justify-center transition-transform duration-300 group-hover:-translate-y-0.5">
-          <ArtIcon name={sprite} size={68} animate={animate} />
+          <ArtIcon name={sprite} size={52} animate={animate} />
         </span>
         <span className="text-[0.75rem] font-medium leading-snug text-graphite min-[390px]:text-[0.8125rem] sm:text-small">
           {title}
