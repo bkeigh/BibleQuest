@@ -50,7 +50,7 @@ is a hard stop.
 
 | Field | Required value | Current preparation evidence | Status |
 | --- | --- | --- | --- |
-| Release branch | `main` at freeze; proposed fixes reviewed separately first | Cached and remotely rechecked `origin/main` at `9680ff7399ece7be7dd921ee3092839e5a5a73da` on 2026-08-20 | OPEN — NO FROZEN CANDIDATE |
+| Release branch | `main` at freeze; proposed fixes reviewed separately first | Remotely rechecked `origin/main` at `cc959fd038ae86ca5d9d1ce125f93efd9c462148` on 2026-08-26; the local candidate remains a separate unpushed branch | OPEN — NO FROZEN CANDIDATE |
 | Immutable release SHA | `[FULL 40-CHAR PUSHED SHA]` | Record after the final documentation/control commit | OPEN |
 | Production project | `iacnjqnssovaaojswjoh` | Pinned by the target manifest and guarded migration script | PASS FOR SOURCE |
 | Native target | Exact reviewed Production origin plus matching modern publishable-key fingerprint | [`config/ios-account-release.json`](../config/ios-account-release.json) | PASS FOR SOURCE |
@@ -144,6 +144,18 @@ pnpm ios:release:prepare
 pnpm ios:account-release:prepare
 ```
 
+Xcode Cloud's post-build script must then pass the signed archive through the
+same exact-artifact command. Replace the placeholders with the frozen `main`
+SHA and the actual Cloud build number; Build 41 is the planned candidate:
+
+```bash
+node scripts/verify-ios-release-app.mjs \
+  --app "<ARCHIVE>/Products/Applications/App.app" \
+  --profile account-release \
+  --expected-build 41 \
+  --expected-source "<FULL_FROZEN_MAIN_SHA>"
+```
+
 - [ ] Guest output contains no Supabase target, key, account marker, analytics,
       or commerce configuration and embeds the guest privacy manifest.
 - [ ] Account output contains exactly the reviewed Production origin and modern
@@ -158,6 +170,10 @@ pnpm ios:account-release:prepare
 - [ ] The final Xcode archive is built from the frozen SHA, signed for the
       intended distribution path, scanned after archive/export, and recorded by
       version, build, commit, and SHA-256.
+- [ ] `native-release-identity.json` names the exact frozen SHA and account
+      profile, and `verify-ios-release-app.mjs` passes without
+      `--allow-unsigned`. Record its complete tree SHA-256 beside the exported
+      IPA/archive SHA-256.
 - [ ] Xcode Cloud's default workflow remains guest-only. An account replacement
       must use a separately reviewed workflow/profile; a merge to `main` alone
       must not silently upload an account-enabled binary.

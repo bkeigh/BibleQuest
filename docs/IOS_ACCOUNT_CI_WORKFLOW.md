@@ -24,12 +24,20 @@ memory:
   and exits.
 - The account path is reachable only from a workflow named exactly
   **`BibleQuest Account Release`**.
+- The account path also requires `CI_BRANCH=main`; a similarly named workflow
+  on a feature branch fails before it receives the release key.
 - That path additionally **fails closed** when the reviewed publishable key is
   absent, rather than building something unpinned.
+- The clean checkout's full Git SHA is embedded into
+  `native-release-identity.json` before Xcode changes the bundle build number.
+- `ci_post_xcodebuild.sh` scans the signed archived `.app` and fails the Cloud
+  build if version, build, source SHA, profile, signature, privacy manifest,
+  Production target, plugin set, content boundary, or entitlements drift.
 
-`tests/ios-release-config.test.ts` pins all three, including that the guest
-branch terminates — without its `exit 0` an unnamed workflow would fall through
-and build accounts anyway.
+`tests/ios-release-config.test.ts` and
+`tests/ios-release-app-verifier.test.ts` pin these boundaries, including that
+the guest branch terminates — without its `exit 0` an unnamed workflow would
+fall through and build accounts anyway.
 
 ## What you set up in App Store Connect
 
@@ -42,9 +50,9 @@ and build accounts anyway.
 
    The name is the gate. A typo silently produces a guest build, which is the
    safe direction but will look like the account code vanished.
-3. **Start Conditions** — use a manual start, or a branch condition on the
-   release branch. Do **not** attach it to `main` on every push; that is the
-   thing §4 forbids.
+3. **Start Conditions** — use a manual start on `main`. Do **not** attach it to
+   every push; the exact workflow must be deliberately selected after the
+   reviewed candidate reaches `main`.
 4. **Environment** → add a variable:
 
    | Name | Value | Secret |
@@ -72,21 +80,22 @@ Both belong to the release owner and neither is checked by CI:
 
 ## Verifying you got the right binary
 
-An account build contains the Production Supabase origin; a guest build contains
-no Supabase target at all. After the archive exists:
+Xcode Cloud runs this gate automatically after archiving. Run it again after
+downloading/extracting the exact artifact, using the immutable `main` SHA and
+actual build number:
 
 ```bash
-grep -rl "iacnjqnssovaaojswjoh" "<App.app>/public" | head -3
+node scripts/verify-ios-release-app.mjs \
+  --app "<App.app>" \
+  --profile account-release \
+  --expected-build 41 \
+  --expected-source "<FULL_FROZEN_MAIN_SHA>"
 ```
 
-Output means account. Silence means guest, whatever the workflow was called.
-
-Also confirm the privacy manifest is the account one — the build asserts this,
-but it is worth seeing:
-
-```bash
-cmp "<App.app>/PrivacyInfo.xcprivacy" ios/compliance/PrivacyInfo.account-sync.xcprivacy
-```
+The command reveals no key. It validates the key only by its reviewed SHA-256
+and emits the signed app's file count and deterministic tree SHA-256 for the
+release record. Separately hash the downloaded `.ipa` or archive as a byte
+artifact; a tree digest is not a substitute for that file hash.
 
 ## What still cannot be produced this way
 

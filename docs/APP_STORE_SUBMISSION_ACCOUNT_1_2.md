@@ -244,6 +244,10 @@ Do not upload Generate-a-quest or MyShepherd posters for this release.
       account privacy manifest, content/media inventory, third-party notices,
       and absence of staging/preview, privileged keys, analytics, remote push,
       and native commerce.
+- [ ] Xcode Cloud and the downloaded artifact both pass
+      `scripts/verify-ios-release-app.mjs` for the frozen `main` SHA without
+      `--allow-unsigned`; record its tree SHA-256 and the separate archive/IPA
+      file SHA-256.
 - [ ] Exact Build 41 passes the two-account/two-iPhone beta, offline/conflict,
       returning-session, deletion, old-client, first-five-minute,
       VoiceOver/Dynamic Type/contrast/reduced-motion, and device-size matrices.

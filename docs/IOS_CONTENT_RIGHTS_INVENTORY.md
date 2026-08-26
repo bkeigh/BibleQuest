@@ -18,6 +18,9 @@ native export and fails if the retained set drifts. The allowlist currently has
 **81 files**: 64 manifest-controlled 2.5D files and 17 other native-route files.
 The account build no longer carries the dormant Apple/Google web sign-in marks,
 unused game art, wallpaper thumbnails, or unused wallpaper posters.
+`scripts/verify-ios-content-rights.mjs` verifies the generated native payload;
+`scripts/verify-ios-release-app.mjs` repeats the byte comparisons inside the
+extracted archived `.app` and includes the result in its exact tree digest.
 
 The final Build 41 comparison must also include these Xcode/build-produced
 surfaces, which are not under `public/`:

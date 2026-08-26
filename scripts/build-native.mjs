@@ -56,6 +56,7 @@ const ACCOUNT_RELEASE_ENV_PATH = path.join(
   repo,
   ".env.account-release.local",
 );
+const RELEASE_IDENTITY_CONTRACT = "biblequest_ios_release_identity_v1";
 const buildArguments = process.argv.slice(2);
 const releaseBuild = buildArguments[0] === "--release";
 const accountBetaBuild = buildArguments[0] === "--account-beta";
@@ -1020,6 +1021,43 @@ function publish() {
   log(`wrote ${path.relative(repo, output)}/`);
 }
 
+/** Pins the native payload to the checked-out commit that supplied its source. */
+function resolveNativeSourceSha() {
+  let checkedOutSha;
+  try {
+    checkedOutSha = execFileSync("git", ["rev-parse", "--verify", "HEAD"], {
+      cwd: repo,
+      encoding: "utf8",
+    }).trim();
+  } catch {
+    fail("the native build source commit cannot be resolved");
+  }
+  if (!/^[a-f0-9]{40}$/.test(checkedOutSha)) {
+    fail("the native build source commit is not a full Git SHA");
+  }
+  const suppliedSha = process.env.BIBLEQUEST_SOURCE_SHA?.trim();
+  if (suppliedSha && suppliedSha.toLowerCase() !== checkedOutSha) {
+    fail("BIBLEQUEST_SOURCE_SHA does not match the checked-out commit");
+  }
+  process.env.BIBLEQUEST_SOURCE_SHA = checkedOutSha;
+  return checkedOutSha;
+}
+
+/** Writes a content-free identity that survives Xcode archive and export. */
+function writeNativeReleaseIdentity(sourceSha, profile, hostedOrigin) {
+  const record = {
+    contract: RELEASE_IDENTITY_CONTRACT,
+    profile,
+    sourceSha,
+    hostedOrigin,
+  };
+  writeFileSync(
+    path.join(stage, "out/native-release-identity.json"),
+    `${JSON.stringify(record, null, 2)}\n`,
+  );
+  log(`embedded native source identity ${sourceSha}`);
+}
+
 /** Records that the complete release path staged every reviewed guest overlay. */
 function writeGuestReleaseProvenance() {
   if (!releaseBuild) return;
@@ -1048,10 +1086,12 @@ const mode = releaseBuild
       : "custom";
 log(`mode=${mode} target=native hostedOrigin=${origin}`);
 stageTree();
+const nativeSourceSha = resolveNativeSourceSha();
 pruneNativePublicMedia();
 pruneServerSurfaces();
 stageGuestAccountContainment();
 build();
+writeNativeReleaseIdentity(nativeSourceSha, mode, origin);
 verifyCommerceRoutesPruned();
 verifyNoPrivilegedSupabaseCredentials();
 verifyGuestSupabaseAbsence();
