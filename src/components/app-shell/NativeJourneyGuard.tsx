@@ -89,16 +89,18 @@ export function NativeJourneyGuard({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     if (!nativeTarget) return;
-    /** Refreshes Dynamic Type after a user changes it outside the app. */
+    /** Applies one fresh native scale regardless of WebView visibility. */
     const syncTextZoom = () => {
-      if (document.visibilityState === "visible") {
-        void syncNativePreferredTextZoom().catch(() => undefined);
-      }
+      void syncNativePreferredTextZoom().catch(() => undefined);
     };
-    document.addEventListener("visibilitychange", syncTextZoom);
+    /** Refreshes after the app returns from iOS Settings. */
+    const syncVisibleTextZoom = () => {
+      if (document.visibilityState === "visible") syncTextZoom();
+    };
+    document.addEventListener("visibilitychange", syncVisibleTextZoom);
     window.addEventListener(NATIVE_TEXT_SIZE_CHANGE_EVENT, syncTextZoom);
     return () => {
-      document.removeEventListener("visibilitychange", syncTextZoom);
+      document.removeEventListener("visibilitychange", syncVisibleTextZoom);
       window.removeEventListener(NATIVE_TEXT_SIZE_CHANGE_EVENT, syncTextZoom);
     };
   }, [nativeTarget]);
