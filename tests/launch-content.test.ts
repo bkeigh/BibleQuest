@@ -43,13 +43,22 @@ describe("launch content catalog", () => {
     expect(home).not.toContain('name="people"');
     expect(home).not.toContain("useSession");
 
-    // Primary destinations use the approved art library; small utility
-    // controls remain crisp vectors where a painting would reduce clarity.
-    expect(bottomNav).toContain("data-primary-nav-art");
-    for (const sprite of ["sun", "map", "open-book", "hands", "tree"]) {
-      expect(bottomNav).toContain(`sprite: "${sprite}"`);
+    // Primary navigation stays crisp and system-like while 2.5D artwork
+    // remains available to the app's feature and content surfaces.
+    for (const icon of [
+      "IconHome",
+      "IconQuest",
+      "IconBible",
+      "IconPrayer",
+      "IconJourney",
+    ]) {
+      expect(bottomNav).toContain(`Icon: ${icon}`);
     }
-    expect(bottomNav).toContain("<ArtIcon name={sprite}");
+    expect(bottomNav).toContain("native-primary-bottom-nav");
+    expect(bottomNav).toContain(
+      "bottom-[max(0.5rem,env(safe-area-inset-bottom))]",
+    );
+    expect(bottomNav).toContain("<Icon size={23}");
 
     // Mobile Safari is sensitive to fixed + blur + transform composition.
     // Keep the base bar opaque and reserve blur for larger viewports.

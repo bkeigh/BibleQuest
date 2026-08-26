@@ -715,6 +715,16 @@ html.theme-dark .wallpaper-scrim {
     -webkit-backdrop-filter: blur(20px) saturate(1.34);
     backdrop-filter: blur(20px) saturate(1.34);
   }
+  /* Native navigation adopts iOS 26's floating silhouette while keeping the
+     warm Paper palette and the existing compositor-safe 20px blur ceiling. */
+  html.glass-surfaces [data-app-shell] .app-glass-nav.native-primary-bottom-nav {
+    border-color: color-mix(in srgb, var(--color-paper) 72%, var(--color-mist)) !important;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.54),
+      inset 0 -1px 0 rgb(255 255 255 / 0.12),
+      0 10px 30px rgb(18 33 27 / 0.16),
+      0 2px 8px rgb(18 33 27 / 0.08);
+  }
   html.theme-dark.glass-surfaces [data-app-shell] .app-glass-surface:not([data-paper-variant="outlined"]) {
     background-color: color-mix(in srgb, var(--color-paper) var(--glass-dark-surface-opacity), transparent) !important;
     border-color: color-mix(in srgb, var(--color-paper) 72%, var(--color-mist)) !important;
@@ -732,6 +742,14 @@ html.theme-dark .wallpaper-scrim {
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 0.08),
       0 -12px 36px rgb(0 0 0 / 0.24);
+  }
+  html.theme-dark.glass-surfaces [data-app-shell] .app-glass-nav.native-primary-bottom-nav {
+    border-color: color-mix(in srgb, var(--color-paper) 68%, var(--color-mist)) !important;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.13),
+      inset 0 -1px 0 rgb(255 255 255 / 0.04),
+      0 12px 32px rgb(0 0 0 / 0.3),
+      0 2px 8px rgb(0 0 0 / 0.18);
   }
 }
 

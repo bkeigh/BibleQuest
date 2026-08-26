@@ -8,24 +8,28 @@ import { useStrings } from "@/lib/i18n";
 import { en } from "@/lib/i18n/en";
 import { useShouldReduceMotion } from "@/lib/use-reduced-motion";
 import {
-  ArtIcon,
-  type ArtSpriteName,
-} from "@/components/design-system/ArtIcon";
+  IconBible,
+  IconHome,
+  IconJourney,
+  IconPrayer,
+  IconQuest,
+} from "@/components/design-system/icons";
+import { isNativeTarget } from "@/lib/platform/target";
 
 interface NavItem {
   href: string;
   key: "home" | "quests" | "bible" | "prayer" | "journey";
-  sprite: ArtSpriteName;
+  Icon: typeof IconHome;
   exact?: boolean;
 }
 
-// Primary destinations use the reviewed 2.5D art instead of generic symbols.
+// Navigation uses quiet system-like symbols; 2.5D art stays in app content.
 const ITEMS: NavItem[] = [
-  { href: "/app", key: "home", sprite: "sun", exact: true },
-  { href: "/app/quests", key: "quests", sprite: "map" },
-  { href: "/app/bible", key: "bible", sprite: "open-book" },
-  { href: "/app/prayer", key: "prayer", sprite: "hands" },
-  { href: "/app/journey", key: "journey", sprite: "tree" },
+  { href: "/app", key: "home", Icon: IconHome, exact: true },
+  { href: "/app/quests", key: "quests", Icon: IconQuest },
+  { href: "/app/bible", key: "bible", Icon: IconBible },
+  { href: "/app/prayer", key: "prayer", Icon: IconPrayer },
+  { href: "/app/journey", key: "journey", Icon: IconJourney },
 ];
 
 export function BottomNav() {
@@ -33,6 +37,7 @@ export function BottomNav() {
   const navRef = useRef<HTMLElement>(null);
   const strings = useStrings();
   const shouldReduceMotion = useShouldReduceMotion();
+  const nativeTarget = isNativeTarget();
   // The server renders English (no persisted language on the server), so
   // first client paint must match it — swap to the chosen language only
   // after hydration to avoid a text mismatch on every load.
@@ -52,18 +57,23 @@ export function BottomNav() {
       return;
     }
 
-    // Floating UI anchors to the rendered nav, including device safe area.
+    // Floating UI clears the rendered nav and its gap above the screen edge.
     const publishHeight = () => {
+      const rect = nav.getBoundingClientRect();
       document.documentElement.style.setProperty(
         "--app-bottom-nav-height",
-        `${nav.getBoundingClientRect().height}px`,
+        `${Math.max(rect.height, window.innerHeight - rect.top)}px`,
       );
     };
     publishHeight();
     const observer = new ResizeObserver(publishHeight);
     observer.observe(nav);
+    window.addEventListener("resize", publishHeight);
+    window.visualViewport?.addEventListener("resize", publishHeight);
     return () => {
       observer.disconnect();
+      window.removeEventListener("resize", publishHeight);
+      window.visualViewport?.removeEventListener("resize", publishHeight);
       document.documentElement.style.removeProperty(
         "--app-bottom-nav-height",
       );
@@ -89,10 +99,20 @@ export function BottomNav() {
       ref={navRef}
       aria-label="Primary"
       data-app-bottom-nav
-      className="primary-bottom-nav app-glass-nav fixed inset-x-0 bottom-0 z-40 border-t border-mist bg-parchment pb-safe sm:bg-parchment/90 sm:backdrop-blur-md"
+      className={cn(
+        "primary-bottom-nav app-glass-nav fixed z-40",
+        nativeTarget
+          ? "native-primary-bottom-nav inset-x-3 bottom-[max(0.5rem,env(safe-area-inset-bottom))] mx-auto max-w-lg overflow-hidden rounded-[2rem] border border-mist bg-parchment/92 paper-shadow-lg"
+          : "inset-x-0 bottom-0 border-t border-mist bg-parchment pb-safe sm:bg-parchment/90 sm:backdrop-blur-md",
+      )}
     >
-      <ul className="primary-nav-list mx-auto flex max-w-lg items-stretch justify-around px-2">
-        {ITEMS.map(({ href, key, sprite, exact }) => {
+      <ul
+        className={cn(
+          "primary-nav-list mx-auto flex max-w-lg items-stretch justify-around px-2",
+          nativeTarget && "py-1",
+        )}
+      >
+        {ITEMS.map(({ href, key, Icon, exact }) => {
           const label = t.nav[key];
           const active = exact
             ? pathname === href
@@ -123,30 +143,23 @@ export function BottomNav() {
                   });
                 }}
                 className={cn(
-                  "primary-nav-link group relative flex min-h-[44px] flex-col items-center gap-1 px-1 pt-2 pb-1.5 text-[0.6875rem] transition-colors duration-300",
+                  "primary-nav-link group relative flex min-h-[44px] flex-col items-center justify-center gap-0.5 rounded-[1.35rem] px-1 py-1.5 text-[0.6875rem] transition-[color,background-color,transform] duration-300",
+                  nativeTarget && active && "bg-accent-surface/60",
                   active ? "text-accent" : "text-ash hover:text-charcoal"
                 )}
               >
-                {/* Crisp active indicator: a hard-edged bar flush with
-                    the top hairline — deliberately unrounded. */}
-                <span
-                  aria-hidden
-                  className={cn(
-                    "absolute top-0 h-[3px] w-5 bg-accent transition-opacity duration-300",
-                    active ? "opacity-100" : "opacity-0"
-                  )}
-                />
+                {/* The selected tab relies on tint and a quiet grouped fill,
+                    matching modern iOS chrome without competing app art. */}
                 <span
                   aria-hidden="true"
-                  data-primary-nav-art={sprite}
                   className={cn(
-                    "flex h-8 w-10 items-center justify-center rounded-full transition-all duration-300",
+                    "flex h-7 w-10 items-center justify-center rounded-full transition-transform duration-300",
                     active
-                      ? "scale-105 bg-accent-surface/75 opacity-100"
-                      : "opacity-70 group-hover:scale-105 group-hover:opacity-100",
+                      ? "scale-105"
+                      : "opacity-80 group-hover:scale-105 group-hover:opacity-100",
                   )}
                 >
-                  <ArtIcon name={sprite} size={27} />
+                  <Icon size={23} strokeWidth={active ? 2 : 1.65} />
                 </span>
                 <span
                   className={cn(
