@@ -46,14 +46,14 @@ describe("iOS App Store release configuration", () => {
     );
   });
 
-  it("locks version 1.0 to the iPhone device family", () => {
+  it("locks version 1.2 to the iPhone device family", () => {
     const project = source("ios/App/App.xcodeproj/project.pbxproj");
     const plist = source("ios/App/App/Info.plist");
 
     expect(project.match(/CURRENT_PROJECT_VERSION = 4;/g)).toHaveLength(2);
     expect(project.match(/TARGETED_DEVICE_FAMILY = 1;/g)).toHaveLength(2);
     expect(project).not.toContain('TARGETED_DEVICE_FAMILY = "1,2";');
-    expect(project.match(/MARKETING_VERSION = 1\.0;/g)).toHaveLength(2);
+    expect(project.match(/MARKETING_VERSION = 1\.2;/g)).toHaveLength(2);
     expect(project.match(/PRODUCT_BUNDLE_IDENTIFIER = co\.biblequest\.app;/g)).toHaveLength(2);
     expect(plist).toMatch(
       /<key>CFBundleVersion<\/key>\s*<string>\$\(CURRENT_PROJECT_VERSION\)<\/string>/,
