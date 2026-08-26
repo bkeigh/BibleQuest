@@ -53,13 +53,13 @@ is a hard stop.
 
 | Field | Required value | Current preparation evidence | Status |
 | --- | --- | --- | --- |
-| Release branch | `main` at freeze; proposed fixes reviewed separately first | Remotely rechecked `origin/main` at `cc959fd038ae86ca5d9d1ce125f93efd9c462148` on 2026-08-26; the local candidate remains a separate unpushed branch | OPEN — NO FROZEN CANDIDATE |
+| Release branch | `main` at freeze; proposed fixes reviewed separately first | Candidate `b19b970fcf639e0a3def9f9bfaf65ac54a142b2c` is pushed on `codex/testflight-ui-refresh` in draft PR #130; `origin/main` remains `cc959fd038ae86ca5d9d1ce125f93efd9c462148` | OPEN — REVIEW/MAIN FREEZE REQUIRED |
 | Immutable release SHA | `[FULL 40-CHAR PUSHED SHA]` | Record after the final documentation/control commit | OPEN |
 | Production project | `iacnjqnssovaaojswjoh` | Pinned by the target manifest and guarded migration script | PASS FOR SOURCE |
 | Native target | Exact reviewed Production origin plus matching modern publishable-key fingerprint | [`config/ios-account-release.json`](../config/ios-account-release.json) | PASS FOR SOURCE |
-| Migration posture | `0037_native_account_beta_availability.sql` and `0038_web_account_deletion_hardening.sql` are recorded as already shipped; `0039_bound_provider_rate_limit_retention.sql` is pending | 2026-08-20 production audit for `0037`/`0038`; guarded `0039` dry run and live contract must be re-confirmed | OPEN — 0039 PENDING |
-| New migration / guarded packet | Exact `20260826010000_bound_provider_rate_limit_retention.sql` packet only | `pnpm check:production-provider-rate-limits`; pinned manifest/source/guards/history | OPEN — OWNER APPROVAL REQUIRED |
-| Backup | Completed physical Production backup under 30 hours immediately before any `0039` apply | Guarded script must report only the sanitized backup timestamp | OPEN — REQUIRED BEFORE DATABASE WRITE |
+| Migration posture | `0037_native_account_beta_availability.sql` and `0038_web_account_deletion_hardening.sql` are recorded as already shipped; `0039_bound_provider_rate_limit_retention.sql` is pending | The 2026-08-26 guarded dry run matched exact Production history and proposed only `20260826010000_bound_provider_rate_limit_retention.sql` | OPEN — 0039 PENDING |
+| New migration / guarded packet | Exact `20260826010000_bound_provider_rate_limit_retention.sql` packet only | `pnpm check:production-provider-rate-limits` passed with pinned manifest/source/guards/history; no apply occurred | OPEN — OWNER APPROVAL REQUIRED |
+| Backup | Completed physical Production backup under 30 hours immediately before any `0039` apply | Dry run observed a completed physical backup at `2026-08-26T08:00:07.897Z`; freshness must be rechecked at approval/apply time | PASS AT DRY RUN — RECHECK BEFORE WRITE |
 | Existing public binary | Version 1.0, build 13, commit `5359dbf15fa6d1d9d2205644adb668d6361eabd0` | Exact archived IPA SHA-256 `01c2600c577b79b27f07ef6ff773b4c6985dad36cbb0d2dc9c493398fe403c91` | PASS FOR IDENTITY |
 | Web rollback | `[IMMUTABLE DEPLOYMENT ID / FULL SHA]` | Resolve from current approved health and compatibility evidence at freeze; do not reuse an older hard-coded target | OPEN |
 | Replacement build | `[VERSION / BUILD / ARCHIVE SHA-256 / COMMIT]` | Must be produced after every gate below passes | OPEN |
