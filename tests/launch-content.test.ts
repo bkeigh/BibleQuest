@@ -123,7 +123,9 @@ describe("launch content catalog", () => {
     expect(home).toContain("whitespace-nowrap");
     expect(home).toContain('className="@max-[8rem]:hidden">✦</span>');
     expect(home).toContain('"@container min-w-0 flex-1"');
-    expect(home).toContain('className="max-[340px]:w-12"');
+    expect(home).toMatch(
+      /className="[^"]*home-hero-streak[^"]*max-\[340px\]:w-12/,
+    );
     expect(home).toContain("plus-nameplate");
     expect(home).toContain("home-hero-surface");
     expect(home).toContain("border-[#9f6a1f]/75");

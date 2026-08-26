@@ -20,6 +20,7 @@ import {
   restoreJourneyIfEvicted,
   startJourneyBackup,
 } from "@/lib/native/journey-backup";
+import { syncNativePreferredTextZoom } from "@/lib/native/accessibility";
 import { isNativeTarget } from "@/lib/platform/target";
 import { clearLegacyNativeAuthStorage } from "@/lib/supabase/native-auth-storage";
 import { AppLoadingScreen } from "@/components/app-shell/AppLoadingScreen";
@@ -38,8 +39,8 @@ export function NativeJourneyGuard({ children }: { children: React.ReactNode }) 
     let cancelled = false;
 
     /**
-     * Hide after restore when JavaScript is healthy. Capacitor's three-second
-     * auto-hide remains the bounded fallback if this bundle never executes.
+     * Hide after restore when JavaScript is healthy. Capacitor's 60-second
+     * fallback is reserved for a bundle that never executes at all.
      */
     const hideSplash = async () => {
       try {
@@ -62,6 +63,10 @@ export function NativeJourneyGuard({ children }: { children: React.ReactNode }) 
         // repaired primary must reach the live store before children mount.
         await useQuestOS.persist.rehydrate();
         if (cancelled) return;
+        // Apply Dynamic Type before either onboarding or the signed-in app can
+        // appear, while the native launch screen still covers initialization.
+        await syncNativePreferredTextZoom().catch(() => null);
+        if (cancelled) return;
         // Started only after the restore decision, so the mirror can never be
         // overwritten with the empty state we were about to repair.
         stopBackup = startJourneyBackup();
@@ -77,6 +82,18 @@ export function NativeJourneyGuard({ children }: { children: React.ReactNode }) 
       cancelled = true;
       stopBackup?.();
     };
+  }, [nativeTarget]);
+
+  useEffect(() => {
+    if (!nativeTarget) return;
+    /** Refreshes Dynamic Type after a user changes it outside the app. */
+    const syncTextZoom = () => {
+      if (document.visibilityState === "visible") {
+        void syncNativePreferredTextZoom().catch(() => undefined);
+      }
+    };
+    document.addEventListener("visibilitychange", syncTextZoom);
+    return () => document.removeEventListener("visibilitychange", syncTextZoom);
   }, [nativeTarget]);
 
   // Match the native launch screen if its bounded auto-hide wins the race.

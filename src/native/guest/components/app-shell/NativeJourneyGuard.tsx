@@ -6,6 +6,7 @@ import {
   restoreJourneyIfEvicted,
   startJourneyBackup,
 } from "@/lib/native/journey-backup";
+import { syncNativePreferredTextZoom } from "@/lib/native/accessibility";
 import { isNativeTarget } from "@/lib/platform/target";
 import { AppLoadingScreen } from "@/components/app-shell/AppLoadingScreen";
 
@@ -21,7 +22,7 @@ export function NativeJourneyGuard({ children }: { children: React.ReactNode }) 
     let stopBackup: (() => void) | null = null;
     let cancelled = false;
 
-    /** Hides the launch picture after the restore decision finishes. */
+    /** Hides the launch picture after the bounded restore decision finishes. */
     const hideSplash = async () => {
       try {
         const { SplashScreen } = await import("@capacitor/splash-screen");
@@ -41,6 +42,10 @@ export function NativeJourneyGuard({ children }: { children: React.ReactNode }) 
         }
         await useQuestOS.persist.rehydrate();
         if (cancelled) return;
+        // Apply Dynamic Type before either onboarding or the guest app can
+        // appear, while the native launch screen still covers initialization.
+        await syncNativePreferredTextZoom().catch(() => null);
+        if (cancelled) return;
         stopBackup = startJourneyBackup();
         setStatus("ready");
       } catch {
@@ -54,6 +59,18 @@ export function NativeJourneyGuard({ children }: { children: React.ReactNode }) 
       cancelled = true;
       stopBackup?.();
     };
+  }, [nativeTarget]);
+
+  useEffect(() => {
+    if (!nativeTarget) return;
+    /** Refreshes Dynamic Type after a user changes it outside the app. */
+    const syncTextZoom = () => {
+      if (document.visibilityState === "visible") {
+        void syncNativePreferredTextZoom().catch(() => undefined);
+      }
+    };
+    document.addEventListener("visibilitychange", syncTextZoom);
+    return () => document.removeEventListener("visibilitychange", syncTextZoom);
   }, [nativeTarget]);
 
   if (status === "pending") return <AppLoadingScreen />;

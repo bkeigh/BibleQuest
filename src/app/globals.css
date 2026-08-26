@@ -414,6 +414,77 @@ html.text-large .verse-text-lead {
   line-height: 1.8;
 }
 
+/* iOS accessibility categories can more than triple rendered text without
+   changing the CSS viewport. These layouts trade decoration for readable,
+   non-overlapping controls while preserving every destination and label. */
+html.system-accessibility-text .home-hero-layout {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+}
+html.system-accessibility-text .home-hero-avatar-art {
+  width: 4.5rem !important;
+  height: 4.5rem !important;
+}
+html.system-accessibility-text .home-hero-name {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+html.system-accessibility-text .home-hero-streak {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: 100% !important;
+  min-width: 0 !important;
+  flex-direction: row;
+  justify-content: center;
+  gap: 0.5rem;
+}
+html.system-accessibility-text .home-hero-streak > span:first-child {
+  height: 3.5rem;
+}
+html.system-accessibility-text .home-hero-streak > span:last-child {
+  font-size: calc(0.875rem * var(--native-text-zoom-inverse, 1)) !important;
+}
+html.system-accessibility-text .home-todays-verse {
+  flex-direction: column;
+  align-items: stretch;
+  text-align: center;
+}
+html.system-accessibility-text .home-todays-verse-art {
+  align-self: center;
+}
+html.system-accessibility-text .home-todays-verse-copy {
+  width: 100%;
+}
+html.system-accessibility-text .home-todays-verse-arrow {
+  align-self: flex-end;
+}
+html.system-accessibility-text .verse-card-kicker {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Fixed tab-bar chrome is capped at a readable 13px under extreme Dynamic
+   Type. Page content still follows the full system scale; this prevents five
+   primary destinations from clipping beyond the device viewport. */
+html.system-accessibility-text .primary-bottom-nav {
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+}
+html.system-accessibility-text .primary-nav-list {
+  padding-inline: 0.25rem;
+}
+html.system-accessibility-text .primary-nav-link {
+  min-height: 3.75rem;
+  gap: 0.125rem;
+  padding-inline: 0;
+  font-size: calc(0.8125rem * var(--native-text-zoom-inverse, 1)) !important;
+}
+html.system-accessibility-text .primary-nav-label {
+  line-height: 1.1;
+}
+
 /* ---- Bold text (accessibility): a gentle weight lift, not a shout. ---- */
 html.text-bold body,
 html.system-bold-text body {

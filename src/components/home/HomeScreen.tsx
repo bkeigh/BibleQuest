@@ -144,17 +144,17 @@ function HomeInner() {
               className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-[#fff6c7]/20 blur-2xl"
             />
           )}
-          <div className="relative z-10 grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 max-[430px]:gap-2 max-[340px]:gap-1.5 sm:gap-4">
+          <div className="home-hero-layout relative z-10 grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 max-[430px]:gap-2 max-[340px]:gap-1.5 sm:gap-4">
             <Link
               href="/app/settings"
               aria-label={t.home.openSettings}
-              className="relative shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="home-hero-avatar-link relative shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <Avatar
                 name={profile?.displayName}
                 marker={profileAvatarMarker(profile)}
                 size="lg"
-                className="ring-1 ring-paper/70 shadow-[0_8px_24px_rgb(18_33_27_/_0.14)] max-[430px]:h-[4.5rem] max-[430px]:w-[4.5rem] max-[340px]:h-16 max-[340px]:w-16"
+                className="home-hero-avatar-art ring-1 ring-paper/70 shadow-[0_8px_24px_rgb(18_33_27_/_0.14)] max-[430px]:h-[4.5rem] max-[430px]:w-[4.5rem] max-[340px]:h-16 max-[340px]:w-16"
               />
               <span
                 aria-hidden="true"
@@ -212,7 +212,7 @@ function HomeInner() {
               streak={streak}
               dayKey={dayKey}
               tone={isPlus ? "gold" : "default"}
-              className="max-[340px]:w-12"
+              className="home-hero-streak max-[340px]:w-12"
             />
           </div>
         </header>
@@ -421,16 +421,16 @@ function TodaysVerseLink() {
     <motion.div variants={riseIn} initial="hidden" animate="visible">
       <Link
         href="/app/bible"
-        className="group relative isolate flex min-h-20 items-center gap-3 overflow-hidden rounded-[var(--radius-card)] border border-evergreen-600 bg-evergreen-700 px-4 py-4 text-[#fdfbf3] paper-shadow-lg transition-all duration-300 [transition-timing-function:var(--ease-gentle)] hover:-translate-y-0.5 hover:bg-evergreen-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0"
+        className="home-todays-verse group relative isolate flex min-h-20 items-center gap-3 overflow-hidden rounded-[var(--radius-card)] border border-evergreen-600 bg-evergreen-700 px-4 py-4 text-[#fdfbf3] paper-shadow-lg transition-all duration-300 [transition-timing-function:var(--ease-gentle)] hover:-translate-y-0.5 hover:bg-evergreen-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0"
       >
         <span
           aria-hidden="true"
           className="ambient absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gold-300/15 blur-2xl [animation:var(--animate-twinkle)]"
         />
-        <span className="relative flex shrink-0 items-center justify-center">
+        <span className="home-todays-verse-art relative flex shrink-0 items-center justify-center">
           <ArtIcon name="open-book" size={52} />
         </span>
-        <span className="relative min-w-0 flex-1">
+        <span className="home-todays-verse-copy relative min-w-0 flex-1">
           <span className="block font-display text-[1.125rem] leading-tight">
             View Today&apos;s Verse
           </span>
@@ -438,7 +438,7 @@ function TodaysVerseLink() {
             A quiet word is waiting in the Bible.
           </span>
         </span>
-        <IconArrowRight className="relative shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
+        <IconArrowRight className="home-todays-verse-arrow relative shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
       </Link>
     </motion.div>
   );

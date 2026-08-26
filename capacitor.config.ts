@@ -61,11 +61,12 @@ const config: CapacitorConfig = {
     SplashScreen: {
       // The splash is hidden explicitly once the journey restore settles, so
       // it covers the repair rather than revealing an empty journey that then
-      // pops back. `launchAutoHide` stays on as a bounded backstop: if that
-      // effect never runs — a JS bundle failure, a thrown module-scope error —
-      // the app must not be stranded on the splash forever with no way out.
+      // pops back. A clean iOS simulator needed 41 seconds to reach its first
+      // meaningful WebKit paint, so the native catastrophic fallback must be
+      // comfortably longer than that measured cold-start interval. Healthy
+      // launches still hide this immediately from NativeJourneyGuard.
       launchAutoHide: true,
-      launchShowDuration: 3000,
+      launchShowDuration: 60_000,
       backgroundColor: "#faf6ec",
       // Keep startup focused on the reviewed artwork, with no native spinner
       // competing with the matching in-app restore screen.

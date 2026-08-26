@@ -89,9 +89,9 @@ export function BottomNav() {
       ref={navRef}
       aria-label="Primary"
       data-app-bottom-nav
-      className="app-glass-nav fixed inset-x-0 bottom-0 z-40 border-t border-mist bg-parchment pb-safe sm:bg-parchment/90 sm:backdrop-blur-md"
+      className="primary-bottom-nav app-glass-nav fixed inset-x-0 bottom-0 z-40 border-t border-mist bg-parchment pb-safe sm:bg-parchment/90 sm:backdrop-blur-md"
     >
-      <ul className="mx-auto flex max-w-lg items-stretch justify-around px-2">
+      <ul className="primary-nav-list mx-auto flex max-w-lg items-stretch justify-around px-2">
         {ITEMS.map(({ href, key, sprite, exact }) => {
           const label = t.nav[key];
           const active = exact
@@ -101,6 +101,7 @@ export function BottomNav() {
             <li key={href} className="flex-1">
               <Link
                 href={href}
+                aria-label={label}
                 aria-current={active ? "page" : undefined}
                 onClick={(event) => {
                   // A second tap on the current tab mirrors native tab bars.
@@ -122,7 +123,7 @@ export function BottomNav() {
                   });
                 }}
                 className={cn(
-                  "group relative flex min-h-[44px] flex-col items-center gap-1 px-1 pt-2 pb-1.5 text-[0.6875rem] transition-colors duration-300",
+                  "primary-nav-link group relative flex min-h-[44px] flex-col items-center gap-1 px-1 pt-2 pb-1.5 text-[0.6875rem] transition-colors duration-300",
                   active ? "text-accent" : "text-ash hover:text-charcoal"
                 )}
               >
@@ -147,7 +148,14 @@ export function BottomNav() {
                 >
                   <ArtIcon name={sprite} size={27} />
                 </span>
-                <span className={cn(active && "font-medium")}>{label}</span>
+                <span
+                  className={cn(
+                    "primary-nav-label whitespace-nowrap leading-tight",
+                    active && "font-medium",
+                  )}
+                >
+                  {label}
+                </span>
               </Link>
             </li>
           );

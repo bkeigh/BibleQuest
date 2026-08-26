@@ -135,7 +135,7 @@ export function VerseCard({
       <div className="pointer-events-none absolute -right-3 -top-2 opacity-30">
         <IconLeaf className="text-olive-300" size={preview ? 64 : 52} />
       </div>
-      <div className="flex items-center justify-between gap-1.5 min-[380px]:gap-3">
+      <div className="verse-card-kicker flex items-center justify-between gap-1.5 min-[380px]:gap-3">
         <h2
           className={`font-art-label leading-tight uppercase tracking-[0.05em] text-accent ${
             preview

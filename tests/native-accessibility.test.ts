@@ -1,5 +1,9 @@
+// @vitest-environment jsdom
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  MAX_NATIVE_TEXT_ZOOM,
+  NATIVE_ACCESSIBILITY_TEXT_ZOOM_THRESHOLD,
   normalizePreferredTextZoom,
   syncNativePreferredTextZoom,
 } from "@/lib/native/accessibility";
@@ -12,12 +16,17 @@ const PLATFORM = "NEXT_PUBLIC_APP_PLATFORM";
 
 afterEach(() => {
   delete process.env[PLATFORM];
+  document.documentElement.classList.remove("system-accessibility-text");
+  document.documentElement.style.removeProperty(
+    "--native-text-zoom-inverse",
+  );
 });
 
 describe("native accessibility bridge", () => {
-  it("preserves valid Dynamic Type scales and bounds invalid extremes", () => {
+  it("preserves readable Dynamic Type scales and caps fixed-layout zoom", () => {
     expect(normalizePreferredTextZoom(1.35)).toBe(1.35);
-    expect(normalizePreferredTextZoom(9)).toBe(3.5);
+    expect(normalizePreferredTextZoom(3.1)).toBe(MAX_NATIVE_TEXT_ZOOM);
+    expect(normalizePreferredTextZoom(9)).toBe(MAX_NATIVE_TEXT_ZOOM);
     expect(normalizePreferredTextZoom(0.1)).toBe(0.5);
     expect(normalizePreferredTextZoom(Number.NaN)).toBe(1);
   });
@@ -33,6 +42,32 @@ describe("native accessibility bridge", () => {
 
     expect(value).toBe(1.7);
     expect(set).toHaveBeenCalledWith({ value: 1.7 });
+    expect(
+      document.documentElement.classList.contains(
+        "system-accessibility-text",
+      ),
+    ).toBe(true);
+    expect(
+      document.documentElement.style.getPropertyValue(
+        "--native-text-zoom-inverse",
+      ),
+    ).toBe(String(1 / 1.7));
+  });
+
+  it("keeps standard Dynamic Type out of accessibility-only layouts", async () => {
+    process.env[PLATFORM] = "native";
+    const requested = NATIVE_ACCESSIBILITY_TEXT_ZOOM_THRESHOLD - 0.01;
+
+    await syncNativePreferredTextZoom({
+      getPreferred: vi.fn().mockResolvedValue({ value: requested }),
+      set: vi.fn().mockResolvedValue(undefined),
+    });
+
+    expect(
+      document.documentElement.classList.contains(
+        "system-accessibility-text",
+      ),
+    ).toBe(false);
   });
 
   it("does not touch a native adapter in a web build", async () => {

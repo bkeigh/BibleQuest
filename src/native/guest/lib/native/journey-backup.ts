@@ -1,9 +1,11 @@
 "use client";
 
 import { isNativeTarget } from "@/lib/platform/target";
+import { withDeadline } from "@/lib/async/deadline";
 
 /** Matches the one device-local Zustand journey key. */
 export const JOURNEY_STORAGE_KEY = "biblequest:v1";
+export const NATIVE_JOURNEY_READ_DEADLINE_MS = 12_000;
 
 const BACKUP_FILE = "journey-backup.json";
 const WRITE_DEBOUNCE_MS = 1_500;
@@ -135,11 +137,17 @@ export async function readJourneyBackup(): Promise<string | null> {
   const fs = await loadFilesystem();
   if (!fs) return null;
   try {
-    const file = await fs.Filesystem.readFile({
-      path: BACKUP_FILE,
-      directory: fs.Directory.Data,
-      encoding: fs.Encoding.UTF8,
-    });
+    // A wedged plugin read has no side effects, so it can be bounded without
+    // allowing a late completion to mutate the guest journey.
+    const file = await withDeadline(
+      fs.Filesystem.readFile({
+        path: BACKUP_FILE,
+        directory: fs.Directory.Data,
+        encoding: fs.Encoding.UTF8,
+      }),
+      NATIVE_JOURNEY_READ_DEADLINE_MS,
+      "Native journey restore",
+    );
     const data = typeof file.data === "string" ? file.data : null;
     return validJourney(data) ? data : null;
   } catch {
