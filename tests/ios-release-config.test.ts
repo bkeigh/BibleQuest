@@ -15,7 +15,7 @@ describe("iOS App Store release configuration", () => {
 
     expect(scripts.scripts["build:native:release"]).toContain("--release");
     expect(scripts.scripts["ios:release:prepare"]).toBe(
-      "node scripts/select-ios-privacy-manifest.mjs --guest && pnpm build:native:release && pnpm exec cap sync ios && node scripts/verify-guest-ios-payload.mjs",
+      "node scripts/select-ios-privacy-manifest.mjs --guest && pnpm build:native:release && pnpm exec cap sync ios && node scripts/verify-guest-ios-payload.mjs && node scripts/verify-ios-content-rights.mjs",
     );
     const verifier = source("scripts/verify-guest-ios-payload.mjs");
     expect(verifier).toContain("findGuestAccountArtifactViolation");

@@ -51,6 +51,10 @@ const builderSource = readFileSync(
   path.join(repositoryRoot, "scripts/build-native.mjs"),
   "utf8",
 );
+const nativeMediaSource = readFileSync(
+  path.join(repositoryRoot, "scripts/lib/native-media.mjs"),
+  "utf8",
+);
 const nativeAccountMarkerSource = readFileSync(
   path.join(repositoryRoot, "src/lib/sync/native-account-markers.mjs"),
   "utf8",
@@ -134,13 +138,14 @@ function runBuilder(
 ): BuilderRun {
   const root = mkdtempSync(path.join(tmpdir(), "biblequest-ios-beta-"));
   temporaryRoots.push(root);
-  mkdirSync(path.join(root, "scripts"), { recursive: true });
+  mkdirSync(path.join(root, "scripts/lib"), { recursive: true });
   mkdirSync(path.join(root, "config"), { recursive: true });
   mkdirSync(path.join(root, "src/lib/sync"), { recursive: true });
   writeFileSync(
     path.join(root, "scripts/build-native.mjs"),
     instrumentedBuilder(),
   );
+  writeFileSync(path.join(root, "scripts/lib/native-media.mjs"), nativeMediaSource);
   writeFileSync(
     path.join(root, "src/lib/sync/native-account-markers.mjs"),
     nativeAccountMarkerSource,
@@ -244,7 +249,7 @@ describe("deterministic iOS account-beta preparation", () => {
       "node --env-file-if-exists=.env.local scripts/build-native.mjs --release",
     );
     expect(scripts["ios:release:prepare"]).toBe(
-      "node scripts/select-ios-privacy-manifest.mjs --guest && pnpm build:native:release && pnpm exec cap sync ios && node scripts/verify-guest-ios-payload.mjs",
+      "node scripts/select-ios-privacy-manifest.mjs --guest && pnpm build:native:release && pnpm exec cap sync ios && node scripts/verify-guest-ios-payload.mjs && node scripts/verify-ios-content-rights.mjs",
     );
     expect(scripts["build:native:account-beta"]).toBe(
       "node --env-file-if-exists=.env.account-beta.local scripts/build-native.mjs --account-beta",

@@ -13,7 +13,10 @@ import { cleanVerseText } from "@/lib/utils/scripture";
 import type { VerseBookmark } from "@/lib/questos/types";
 import { usePreferredBiblePassage } from "@/lib/bible/use-preferred-scripture";
 import { ApiBibleViewTracker } from "@/components/bible/ApiBibleViewTracker";
-import { LOCAL_WEB_TRANSLATION_KEY } from "@/lib/bible/translations";
+import {
+  htmlLanguageTag,
+  LOCAL_WEB_TRANSLATION_KEY,
+} from "@/lib/bible/translations";
 import { chapterHref } from "@/lib/bible/links";
 
 function SavedVerseCard({
@@ -55,7 +58,7 @@ function SavedVerseCard({
         <blockquote
           className="verse-text"
           dir={resolved.effectiveTranslation.direction}
-          lang={resolved.effectiveTranslation.languageId}
+          lang={htmlLanguageTag(resolved.effectiveTranslation.languageId)}
         >
           “{cleanVerseText(resolved.text)}”
         </blockquote>
@@ -92,7 +95,7 @@ function SavedVerseCard({
             <p
               className="mt-2 text-caption leading-relaxed text-ash"
               dir={resolved.effectiveTranslation.direction}
-              lang={resolved.effectiveTranslation.languageId}
+              lang={htmlLanguageTag(resolved.effectiveTranslation.languageId)}
             >
               {resolved.effectiveTranslation.copyright}
             </p>

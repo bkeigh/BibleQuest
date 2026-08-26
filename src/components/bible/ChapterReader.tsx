@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils/cn";
 import { ApiBibleViewTracker } from "@/components/bible/ApiBibleViewTracker";
 import { usePreferredBibleChapter } from "@/lib/bible/use-preferred-scripture";
 import {
+  htmlLanguageTag,
   isRedistributableBibleTranslation,
   LOCAL_WEB_TRANSLATION_KEY,
 } from "@/lib/bible/translations";
@@ -340,7 +341,7 @@ function ReaderInner({
           ) : (
             <span
               dir={resolved.effectiveTranslation.direction}
-              lang={resolved.effectiveTranslation.languageId}
+              lang={htmlLanguageTag(resolved.effectiveTranslation.languageId)}
             >
               {resolved.effectiveTranslation.name}
             </span>
@@ -371,7 +372,7 @@ function ReaderInner({
         className="measure-reading mx-auto mt-7 sm:mt-9"
         role="group"
         dir={resolved.effectiveTranslation.direction}
-        lang={resolved.effectiveTranslation.languageId}
+        lang={htmlLanguageTag(resolved.effectiveTranslation.languageId)}
         aria-busy={resolved.loading}
         aria-label={`${content.bookName} ${content.chapter} verses`}
         aria-describedby={instructionsId}
@@ -460,7 +461,7 @@ function ReaderInner({
                 <span
                   className="verse-text"
                   dir={resolved.effectiveTranslation.direction}
-                  lang={resolved.effectiveTranslation.languageId}
+                  lang={htmlLanguageTag(resolved.effectiveTranslation.languageId)}
                 >
                   {text || "This verse is presented in this edition’s notes."}{" "}
                 </span>
@@ -611,7 +612,7 @@ function ReaderInner({
           <p
             className="-mt-4 pb-8 text-caption leading-relaxed text-ash"
             dir={resolved.effectiveTranslation.direction}
-            lang={resolved.effectiveTranslation.languageId}
+            lang={htmlLanguageTag(resolved.effectiveTranslation.languageId)}
           >
             {resolved.effectiveTranslation.copyright}
             {resolved.effectiveTranslation.licenseUrl && (

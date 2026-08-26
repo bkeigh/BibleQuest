@@ -2,7 +2,10 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { resolveSharedVerse } from "@/lib/bible/shared-verse";
-import { translationMetadata } from "@/lib/bible/translations";
+import {
+  htmlLanguageTag,
+  translationMetadata,
+} from "@/lib/bible/translations";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleLink } from "@/components/design-system/GentleButton";
 import { ArtIcon } from "@/components/design-system/ArtIcon";
@@ -93,7 +96,7 @@ export default async function SharedVersePage({
         <blockquote
           className="verse-text verse-text-lead"
           dir={shared.translation.direction}
-          lang={shared.translation.languageId}
+          lang={htmlLanguageTag(shared.translation.languageId)}
         >
           “{shared.text}”
         </blockquote>
@@ -101,7 +104,7 @@ export default async function SharedVersePage({
           — {shared.reference} <span className="text-fog">·</span>{" "}
           <span
             dir={shared.translation.direction}
-            lang={shared.translation.languageId}
+            lang={htmlLanguageTag(shared.translation.languageId)}
           >
             {shared.translation.name}
           </span>

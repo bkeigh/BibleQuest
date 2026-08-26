@@ -21,6 +21,7 @@ import { ApiBibleViewTracker } from "@/components/bible/ApiBibleViewTracker";
 import { usePreferredBiblePassage } from "@/lib/bible/use-preferred-scripture";
 import { chapterHref } from "@/lib/bible/links";
 import {
+  htmlLanguageTag,
   isRedistributableBibleTranslation,
   LOCAL_WEB_TRANSLATION_KEY,
 } from "@/lib/bible/translations";
@@ -182,7 +183,7 @@ export function VerseCard({
           <div>
             <blockquote
               dir={resolved.effectiveTranslation.direction}
-              lang={resolved.effectiveTranslation.languageId}
+              lang={htmlLanguageTag(resolved.effectiveTranslation.languageId)}
               className={
                 preview
                   ? "verse-text mt-2.5"
@@ -201,7 +202,7 @@ export function VerseCard({
               — {verse.reference} <span className="text-fog">·</span>{" "}
               <span
                 dir={resolved.effectiveTranslation.direction}
-                lang={resolved.effectiveTranslation.languageId}
+                lang={htmlLanguageTag(resolved.effectiveTranslation.languageId)}
               >
                 {resolved.effectiveTranslation.name}
               </span>

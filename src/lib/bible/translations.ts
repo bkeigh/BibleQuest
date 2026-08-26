@@ -52,6 +52,17 @@ export interface BibleTranslation {
   featured?: boolean;
 }
 
+/** Converts provider ISO language identifiers into canonical HTML language tags. */
+export function htmlLanguageTag(languageId: string): string {
+  const candidate = languageId.trim().replaceAll("_", "-");
+  if (!candidate || candidate.length > 35) return "und";
+  try {
+    return new Intl.Locale(candidate).toString();
+  } catch {
+    return "und";
+  }
+}
+
 export const WEB_TRANSLATION: BibleTranslation = {
   key: LOCAL_WEB_TRANSLATION_KEY,
   name: "World English Bible",

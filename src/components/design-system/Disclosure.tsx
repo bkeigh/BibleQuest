@@ -38,9 +38,9 @@ const VARIANTS: Record<
     trigger: "px-4 py-2",
     content: "px-4 pb-3",
   },
-  /** Exact MyShepherd blue for prominent AI-assisted surfaces. */
+  /** WCAG-AA MyShepherd blue for prominent AI-assisted surfaces. */
   blue: {
-    root: "rounded-[var(--radius-card)] border border-[#3F7EA3] bg-[#3F7EA3] paper-shadow",
+    root: "rounded-[var(--radius-card)] border border-[#3D789C] bg-[#3D789C] paper-shadow",
     trigger: "px-4 py-2.5",
     content: "px-4 pb-4",
   },

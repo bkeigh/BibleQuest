@@ -554,8 +554,10 @@ function JourneyScreenInner() {
             </span>
           </div>
 
+          {/* The rail itself takes focus so keyboard users can scroll it with arrows. */}
           <ol
-            className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-1 pb-3 [scrollbar-width:thin]"
+            tabIndex={0}
+            className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain rounded-[var(--radius-button)] px-1 pb-3 [scrollbar-width:thin] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             aria-label="Milestone highlights"
           >
             {milestoneHighlights.map((view) => (

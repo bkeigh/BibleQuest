@@ -38,6 +38,7 @@ import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
 import {
   FEATURED_TRANSLATIONS,
   featuredBibleTranslationOptions,
+  htmlLanguageTag,
   translationMetadata,
   translationPreferenceLabel,
   type BibleTranslation,
@@ -560,13 +561,16 @@ function TranslationRow({
             <span
               className="text-[0.8125rem] text-charcoal"
               dir={translation.direction}
-              lang={translation.languageId}
+              lang={htmlLanguageTag(translation.languageId)}
             >
               {translation.name}
             </span>
           </span>
           <span className="mt-0.5 block text-caption text-ash">
-            <span dir={translation.direction} lang={translation.languageId}>
+            <span
+              dir={translation.direction}
+              lang={htmlLanguageTag(translation.languageId)}
+            >
               {translation.languageNameLocal}
             </span>{" "}
             · {status}
@@ -1380,6 +1384,15 @@ function SettingsInner() {
                   className="block py-3 text-charcoal hover:text-accent"
                 >
                   Privacy Policy
+                </Link>
+              </li>
+              <li>
+                {/* Keeps redistributed font notices reachable from the app. */}
+                <Link
+                  href={buildPublicHref("/THIRD_PARTY_NOTICES.txt")}
+                  className="block py-3 text-charcoal hover:text-accent"
+                >
+                  Third-party notices
                 </Link>
               </li>
               <li>

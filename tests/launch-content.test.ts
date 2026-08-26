@@ -191,7 +191,7 @@ describe("launch content catalog", () => {
       "utf8",
     );
 
-    expect(disclosure).toContain("bg-[#3F7EA3]");
+    expect(disclosure).toContain("bg-[#3D789C]");
     // The home callout carries the blue in `.app-glass-shepherd` now rather
     // than an inline style, because an inline background out-ranks the glass
     // rule that has to tint it. Same colour, one level further out.
