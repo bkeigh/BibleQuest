@@ -75,11 +75,16 @@ describe("production provider rate-limit migration", () => {
     );
     expect(BEFORE).toContain("biblequest_provider_rate_limit_v2");
     expect(MIGRATION.toString("utf8")).toContain("interval '48 hours'");
+    expect(MIGRATION.toString("utf8")).toContain("cron.schedule");
+    expect(MIGRATION.toString("utf8")).toContain(
+      "biblequest-provider-rate-limit-retention-v1",
+    );
     expect(MIGRATION.toString("utf8")).toContain(
       "biblequest_provider_rate_limit_v3",
     );
     expect(AFTER).toContain("biblequest_provider_rate_limit_v3");
     expect(AFTER).toContain("migration-stale-probe");
+    expect(AFTER).toContain("production provider retention schedule is invalid");
     expect(AFTER).toContain("claim_provider_rate_limit");
     expect(AFTER).toContain("relforcerowsecurity");
     expect(AFTER).toContain("service_role");

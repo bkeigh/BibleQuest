@@ -140,8 +140,9 @@ Tracking remains **No** and `NSPrivacyTrackingDomains` remains empty.
 ### Privacy gates that block publication
 
 - Apply and postflight `0039_bound_provider_rate_limit_retention.sql` through
-  the guarded Production lane. It deletes dormant opaque buckets after 48 hours
-  and removes the existing stale rows; until it is applied, account availability
+  the guarded Production lane. Its hourly database job deletes dormant opaque
+  buckets after 48 hours and no later than the next run, while the migration
+  removes existing stale rows; until it is applied, account availability
   remains off.
 - The active Vercel team reported the Hobby plan and zero configured Log Drains
   on 2026-08-26; current Vercel documentation sets Hobby runtime-log retention

@@ -5,7 +5,7 @@ grant usage on schema extensions to public;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(16);
+select plan(17);
 
 select is(
   public.provider_rate_limit_contract(),
@@ -17,6 +17,18 @@ select has_index(
   'provider_rate_limit_windows',
   'provider_rate_limit_windows_updated_at_idx',
   'provider rate-limit cleanup has an updated-at index'
+);
+select is(
+  (
+    select count(*)::integer
+    from cron.job
+    where jobname = 'biblequest-provider-rate-limit-retention-v1'
+      and schedule = '17 * * * *'
+      and active
+      and command like '%provider_rate_limit_windows%interval ''48 hours''%'
+  ),
+  1,
+  'an active hourly job bounds dormant provider bucket retention'
 );
 select ok(
   (

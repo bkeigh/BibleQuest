@@ -3,6 +3,7 @@ do $biblequest_provider_rate_retention_postflight$
 declare
   probe jsonb;
   stale_rows integer;
+  scheduled_jobs integer;
   row_security boolean;
   force_row_security boolean;
 begin
@@ -63,6 +64,21 @@ begin
   where scope = 'migration-stale-probe';
   if stale_rows is distinct from 0 then
     raise exception 'production provider rate-limit retention is invalid';
+  end if;
+
+  -- Requires one active hourly purge with the exact reviewed deletion command.
+  select count(*)::integer
+  into scheduled_jobs
+  from cron.job
+  where jobname = 'biblequest-provider-rate-limit-retention-v1'
+    and schedule = '17 * * * *'
+    and active
+    and command = $command$
+    delete from public.provider_rate_limit_windows
+    where updated_at < pg_catalog.clock_timestamp() - interval '48 hours';
+  $command$;
+  if scheduled_jobs is distinct from 1 then
+    raise exception 'production provider retention schedule is invalid';
   end if;
 
   delete from public.provider_rate_limit_windows

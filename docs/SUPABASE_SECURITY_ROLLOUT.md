@@ -49,7 +49,7 @@ The repository timeline is:
 | 2026-07-28 | Sync resource hardening | Adds `0029`: a one-MiB cap on every generation-bound row and removes direct Data API access to trigger helpers. |
 | 2026-07-28 | Operator Plus grants | Adds `0030`: sealed manual entitlement history, atomic grant/revoke RPCs, and append-only operator auditing. |
 | 2026-08-14 | Web account-deletion Storage hardening | Adds `0038`: a durable owner deletion latch, serialized avatar uploads, final owner-folder proof, and a fixed readiness contract. `0037` remains a separate native-beta migration. |
-| 2026-08-26 | Provider bucket retention | Adds `0039`: an indexed 48-hour cleanup boundary for opaque provider rate-limit buckets and advances the readiness contract to v3. |
+| 2026-08-26 | Provider bucket retention | Adds `0039`: an indexed hourly cleanup job for opaque provider rate-limit buckets dormant beyond 48 hours, and advances the readiness contract to v3. |
 
 If a database recorded an old `0002`, `0003`, or `0004` before the renames,
 the later filenames do not change those recorded versions. Conversely, a
@@ -211,8 +211,9 @@ PL/pgSQL variable collision in that claim before the application release;
 forward-only migration `0035` corrects the function and advances its readiness
 identity to `biblequest_provider_rate_limit_v2`. The application HMACs account
 or trusted network identifiers before the database call, so no raw identifier
-is stored. Migration `0039` adds an `updated_at` index, removes dormant buckets
-after 48 hours, and advances the readiness identity to
+is stored. Migration `0039` adds an `updated_at` index, schedules an hourly job
+that removes buckets dormant beyond 48 hours, keeps the same cleanup in each
+claim, and advances the readiness identity to
 `biblequest_provider_rate_limit_v3`. Run the exact 38-entry manifest, history,
 checksum, backup, and one-packet `0039` preflight with:
 

@@ -8,6 +8,18 @@ create index provider_rate_limit_windows_updated_at_idx
 delete from public.provider_rate_limit_windows
 where updated_at < pg_catalog.clock_timestamp() - interval '48 hours';
 
+-- Runs the same purge hourly so retention stays bounded without future traffic.
+create extension if not exists pg_cron;
+
+select cron.schedule(
+  'biblequest-provider-rate-limit-retention-v1',
+  '17 * * * *',
+  $cron$
+    delete from public.provider_rate_limit_windows
+    where updated_at < pg_catalog.clock_timestamp() - interval '48 hours';
+  $cron$
+);
+
 -- Claims one fixed window and opportunistically removes every dormant bucket.
 create or replace function public.claim_provider_rate_limit(
   p_scope text,

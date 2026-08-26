@@ -68,11 +68,13 @@ Measured in Production on 2026-08-15: **34 rows, oldest `2026-08-03`, newest
 `2026-08-14`.**
 
 Migration `0039_bound_provider_rate_limit_retention.sql` fixes the measured
-retention defect: every claim removes buckets dormant for more than 48 hours,
-an `updated_at` index bounds the cleanup, and the v3 database contract plus
-pgTAP/Production postflight prove the behavior. The migration also removes
-already-stale rows when applied. **Production must pass the guarded 0039 apply
-and postflight before account availability or App Privacy publication.**
+retention defect: an hourly Supabase Cron job deletes buckets dormant for more
+than 48 hours, so deletion occurs no later than the next hourly run; each claim
+also performs the same cleanup. An `updated_at` index bounds the work, and the
+v3 database contract plus pgTAP/Production postflight prove the schedule and
+behavior. The migration also removes already-stale rows when applied.
+**Production must pass the guarded 0039 apply and postflight before account
+availability or App Privacy publication.**
 
 The active Vercel team was read through the authenticated Vercel API on
 2026-08-26 and reported the **Hobby** plan and **zero configured Log Drains**.

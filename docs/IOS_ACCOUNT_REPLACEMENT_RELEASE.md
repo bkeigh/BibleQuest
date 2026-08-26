@@ -31,8 +31,9 @@ The replacement is deliberately narrow:
   controlled native account boundary that defaults off;
 - standalone migration `0038_web_account_deletion_hardening.sql` must complete
   the web Storage/deletion safety phase first without enabling native accounts;
-- migration `0039_bound_provider_rate_limit_retention.sql` must bound dormant
-  opaque provider buckets to 48 hours before the privacy answers are approved;
+- migration `0039_bound_provider_rate_limit_retention.sql` must schedule the
+  hourly purge of opaque provider buckets dormant beyond 48 hours before the
+  privacy answers are approved;
 - email numeric-code accounts, account deletion, and reviewed journey sync are
   in scope;
 - native commerce, Plus acquisition, social OAuth, analytics, APNs, and remote
@@ -53,7 +54,7 @@ is a hard stop.
 
 | Field | Required value | Current preparation evidence | Status |
 | --- | --- | --- | --- |
-| Release branch | `main` at freeze; proposed fixes reviewed separately first | Candidate `b19b970fcf639e0a3def9f9bfaf65ac54a142b2c` is pushed on `codex/testflight-ui-refresh` in draft PR #130; `origin/main` remains `cc959fd038ae86ca5d9d1ce125f93efd9c462148` | OPEN — REVIEW/MAIN FREEZE REQUIRED |
+| Release branch | `main` at freeze; proposed fixes reviewed separately first | `codex/testflight-ui-refresh` is pushed in draft PR #130; record its exact reviewed head after protected CI, then freeze `main` separately | OPEN — REVIEW/MAIN FREEZE REQUIRED |
 | Immutable release SHA | `[FULL 40-CHAR PUSHED SHA]` | Record after the final documentation/control commit | OPEN |
 | Production project | `iacnjqnssovaaojswjoh` | Pinned by the target manifest and guarded migration script | PASS FOR SOURCE |
 | Native target | Exact reviewed Production origin plus matching modern publishable-key fingerprint | [`config/ios-account-release.json`](../config/ios-account-release.json) | PASS FOR SOURCE |

@@ -13,11 +13,11 @@ import { spawnSync } from "node:child_process";
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const PROJECT_REF = "iacnjqnssovaaojswjoh";
 const EXPECTED_MANIFEST_SHA256 =
-  "d4a48366ec908ac9a57aa5b6a521c82ecaeb4a4e09d696bc0bb545125056cb36";
+  "fe35b3a284ae4f446586619c24704dc31a99c4a346ab69728c14baa0068d6017";
 const PACKET_BEFORE_SHA256 =
-  "d88ff95ddeb65f0154244c5c3941ef7d48af40d593e1b56eed9892bfa81f3c8c";
+  "d16f581dc70be7a46677e6244a9945d6270c29be4f1c7ecf18ca76b4c761c086";
 const PACKET_AFTER_SHA256 =
-  "081b46e3d626b75097e9b61249246b1484f23d49ace44949bad2cc310514ca9f";
+  "7f6607b46581d9298d78bb219c56d8f41b469b9db4c23e4db3ce61379657807d";
 const APPLY_CONFIRMATION = `apply 20260826010000 to ${PROJECT_REF}`;
 const MAX_BACKUP_AGE_MS = 30 * 60 * 60 * 1000;
 const PACKET = {
@@ -25,7 +25,7 @@ const PACKET = {
   name: "bound_provider_rate_limit_retention",
   source: "0039_bound_provider_rate_limit_retention.sql",
   sourceSha:
-    "2f6ae432b06cb6deee4cfa2cb903c0a972c2c21b026fcfeec2273563cd8124dd",
+    "ee2b8db0a9f6c5eecce243a9b96358bf66424fb3794c16469d84b29542819581",
 };
 const PACKET_FILENAME = `${PACKET.version}_${PACKET.name}.sql`;
 
