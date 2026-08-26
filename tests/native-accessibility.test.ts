@@ -70,6 +70,21 @@ describe("native accessibility bridge", () => {
     ).toBe(false);
   });
 
+  it("uses an uncached native notification scale for live changes", async () => {
+    process.env[PLATFORM] = "native";
+    const getPreferred = vi.fn();
+    const set = vi.fn().mockResolvedValue(undefined);
+
+    const value = await syncNativePreferredTextZoom(
+      { getPreferred, set },
+      3.1,
+    );
+
+    expect(value).toBe(MAX_NATIVE_TEXT_ZOOM);
+    expect(getPreferred).not.toHaveBeenCalled();
+    expect(set).toHaveBeenCalledWith({ value: MAX_NATIVE_TEXT_ZOOM });
+  });
+
   it("does not touch a native adapter in a web build", async () => {
     process.env[PLATFORM] = "web";
     const set = vi.fn();

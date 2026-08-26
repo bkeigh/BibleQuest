@@ -90,8 +90,16 @@ export function NativeJourneyGuard({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (!nativeTarget) return;
     /** Applies one fresh native scale regardless of WebView visibility. */
-    const syncTextZoom = () => {
-      void syncNativePreferredTextZoom().catch(() => undefined);
+    const syncTextZoom = (event?: Event) => {
+      // SceneDelegate supplies an uncached scale for live iOS changes; other
+      // triggers ask the plugin for the current preferred value.
+      const requested =
+        event instanceof CustomEvent && typeof event.detail === "number"
+          ? event.detail
+          : undefined;
+      void syncNativePreferredTextZoom(undefined, requested).catch(
+        () => undefined,
+      );
     };
     /** Refreshes after the app returns from iOS Settings. */
     const syncVisibleTextZoom = () => {

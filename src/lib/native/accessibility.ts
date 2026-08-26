@@ -28,6 +28,7 @@ export function normalizePreferredTextZoom(value: number): number {
 /** Applies iOS text sizing; the app's explicit Large setting layers on top. */
 export async function syncNativePreferredTextZoom(
   adapter?: TextZoomAdapter,
+  requestedValue?: number,
 ): Promise<number | null> {
   if (!isNativeTarget()) return null;
   let textZoom = adapter;
@@ -36,7 +37,7 @@ export async function syncNativePreferredTextZoom(
     if (!Capacitor.isNativePlatform()) return null;
     textZoom = (await import("@capacitor/text-zoom")).TextZoom;
   }
-  const requested = (await textZoom.getPreferred()).value;
+  const requested = requestedValue ?? (await textZoom.getPreferred()).value;
   const preferred = normalizePreferredTextZoom(requested);
   await textZoom.set({ value: preferred });
   if (typeof document !== "undefined") {

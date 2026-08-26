@@ -149,7 +149,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
           } else {
             apply();
           }
-          window.dispatchEvent(new Event('biblequest:native-text-size-change'));
         })();
         """
         bridgeViewController?.webView?.evaluateJavaScript(script)
@@ -168,8 +167,14 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     private func syncContentSizeCategory() {
-        let enabled = UIApplication.shared.preferredContentSizeCategory
-            .isAccessibilityCategory ? "true" : "false"
+        let category = UIApplication.shared.preferredContentSizeCategory
+        let enabled = category.isAccessibilityCategory ? "true" : "false"
+        // Compute against the explicit changed trait so UIFont's process-wide
+        // preferred-font cache cannot hold the previous accessibility scale.
+        let traits = UITraitCollection(preferredContentSizeCategory: category)
+        let preferredBodySize = UIFontMetrics(forTextStyle: .body)
+            .scaledValue(for: 17, compatibleWith: traits)
+        let requestedTextScale = preferredBodySize / 17
         let script = """
         (() => {
           const apply = () => document.documentElement.classList.toggle('system-accessibility-text', \(enabled));
@@ -178,6 +183,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
           } else {
             apply();
           }
+          window.dispatchEvent(new CustomEvent(
+            'biblequest:native-text-size-change',
+            { detail: \(requestedTextScale) }
+          ));
         })();
         """
         bridgeViewController?.webView?.evaluateJavaScript(script)

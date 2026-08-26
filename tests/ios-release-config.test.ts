@@ -111,11 +111,14 @@ describe("iOS App Store release configuration", () => {
     expect(scene).toContain("func sceneDidEnterBackground");
     expect(scene).toContain("showPrivacyCover()");
     expect(scene).toContain("UIAccessibility.isBoldTextEnabled");
-    expect(scene).toMatch(
-      /preferredContentSizeCategory\s*\.isAccessibilityCategory/,
-    );
+    expect(scene).toContain("category.isAccessibilityCategory");
     expect(scene).toContain("system-accessibility-text");
-    expect(scene).toContain("biblequest:native-text-size-change");
+    expect(scene).toMatch(
+      /private func syncContentSizeCategory\(\)[\s\S]*?biblequest:native-text-size-change/,
+    );
+    expect(scene).toContain("UITraitCollection(preferredContentSizeCategory:");
+    expect(scene).toContain("UIFontMetrics(forTextStyle: .body)");
+    expect(scene).toContain("new CustomEvent(");
     const swiftPrefix = scene.match(/authKeyPrefix = "([^"]+)"/)?.[1];
     const storagePrefix = authStorage.match(
       /AUTH_KEY_PREFIX = "([^"]+)"/,
