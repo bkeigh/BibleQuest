@@ -22,7 +22,7 @@ availability, or publish privacy answers solely because this draft exists.
 | Privacy Policy URL | `https://www.biblequest.co/privacy` | Verify live page and legal entity |
 | Support URL | `https://www.biblequest.co/contact` | Verify staffed inbox/contact |
 | Marketing URL | `https://www.biblequest.co` | Verify live page |
-| Copyright | `2026 Winterhill Media LLC` | HOLD until Studio/LLC and exclusive-rights evidence are accepted |
+| Copyright | `2026 Winterhill Media LLC` | HOLD until exclusive-rights evidence is accepted |
 | Release option | Manually release this version | Owner action |
 
 **Promotional text**
@@ -120,7 +120,7 @@ The exact signed binary must use
 `ios/compliance/PrivacyInfo.account-sync.xcprivacy`. App Store Connect must not
 retain the guest-build answer **No data collected**.
 
-Declare these seven types as **linked to the user**, **not used for tracking**,
+Declare these nine types as **linked to the user**, **not used for tracking**,
 purpose **App Functionality**:
 
 | Data type | Release purpose |
@@ -131,19 +131,26 @@ purpose **App Functionality**:
 | Sensitive Info | Religious or philosophical writing, including prayers and reflections |
 | Other User Content | Bookmarks, Journey, reading, quest, and settings content |
 | User ID | Supabase account identifier |
+| Device ID | Conservative classification of the opaque network-derived abuse-prevention bucket |
 | Product Interaction | Quest and reading progress that drives the user's Journey |
+| Other Diagnostic Data | Bounded Vercel request/runtime diagnostics |
 
 Tracking remains **No** and `NSPrivacyTrackingDomains` remains empty.
 
-### Privacy decisions that block publication
+### Privacy gates that block publication
 
-- Decide how to disclose the server-side SHA-256 derived from the request's
-  network address and its opportunistic/unbounded rate-limit retention. The
-  conservative draft is Identifiers → Device ID, App Functionality, linked
-  Yes, tracking No, but the owner/legal reviewer must choose and make the
-  privacy manifest agree.
-- Confirm Vercel request-log fields and retention for the active plan.
-- Obtain HelloAO's written logging/retention answer or disclose conservatively.
+- Apply and postflight `0039_bound_provider_rate_limit_retention.sql` through
+  the guarded Production lane. It deletes dormant opaque buckets after 48 hours
+  and removes the existing stale rows; until it is applied, account availability
+  remains off.
+- The active Vercel team reported the Hobby plan and zero configured Log Drains
+  on 2026-08-26; current Vercel documentation sets Hobby runtime-log retention
+  at one hour. Reconfirm both at final freeze. The project setting reports Web
+  Analytics enabled, but no Vercel Analytics package or live collector was
+  present; the signed archive scan remains authoritative.
+- HelloAO receives only server-to-server Scripture coordinates and Vercel
+  egress, with no forwarded user/network/account/private-content fields. Its
+  unpublished retention is covered conservatively by Product Interaction.
 - Inspect the signed Build 41 for unexpected diagnostic, analytics, advertising,
   commerce, push, or third-party SDK behavior.
 - Publish App Privacy only after the signed artifact, manifest, server flow,
@@ -182,10 +189,9 @@ this worksheet is not a substitute for the live questionnaire.
   because core art lacks per-file creator/assignment/tool evidence.
 - Launch only in the United States. KJV UK Crown rights remain outside scope;
   mainland China and EU availability remain outside scope.
-- Confirm whether Winterhill Studio is an authorized trade name. If yes, use
-  `Winterhill Media LLC d/b/a Winterhill Studio` consistently and retain the
-  registration evidence. If not, change public legal copy to Winterhill Media
-  LLC.
+- Public policy, terms, and publisher metadata now use
+  `Winterhill Media LLC`, matching the repository license and App Store seller;
+  the release no longer depends on an unproven Studio DBA.
 - Confirm whether Winterhill Media LLC alone owns the exclusive app rights
   before using the LLC alone in Apple's copyright field.
 

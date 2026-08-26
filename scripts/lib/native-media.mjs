@@ -5,9 +5,6 @@ const MEDIA_EXTENSION = /\.(?:gif|ico|jpe?g|png|svg|webp)$/i;
 
 // These public files are referenced by native routes outside the 2.5D registry.
 const NATIVE_PUBLIC_MEDIA = [
-  "public/art/scripture-games-coming-2.webp",
-  "public/art/scripture-games-today.webp",
-  "public/art/seven-days-match-poster.webp",
   "public/brand/bq-logo.svg",
   "public/icons/apple-touch-icon.png",
   "public/icons/favicon-48.png",

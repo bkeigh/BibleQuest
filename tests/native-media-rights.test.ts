@@ -12,7 +12,7 @@ describe("native media rights boundary", () => {
   it("keeps one finite, existing public-media allowlist", () => {
     const files = nativePublicMediaAllowlist(repositoryRoot);
 
-    expect(files).toHaveLength(81);
+    expect(files).toHaveLength(78);
     expect(new Set(files).size).toBe(files.length);
     expect(files.every(isPublicMediaPath)).toBe(true);
     expect(files.every((file) => existsSync(path.join(repositoryRoot, file)))).toBe(
@@ -46,6 +46,9 @@ describe("native media rights boundary", () => {
     expect(files).not.toContain("public/brand/apple-logo-white.png");
     expect(files).not.toContain("public/brand/google-g-2025.png");
     expect(files).not.toContain("public/art/scripture-games-coming-1.webp");
+    expect(files).not.toContain("public/art/scripture-games-coming-2.webp");
+    expect(files).not.toContain("public/art/scripture-games-today.webp");
+    expect(files).not.toContain("public/art/seven-days-match-poster.webp");
   });
 
   it("runs the pruning gate before the native export", () => {

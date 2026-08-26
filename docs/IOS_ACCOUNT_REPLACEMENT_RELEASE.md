@@ -6,10 +6,11 @@
 > **Current-state correction.** Production is recorded at `main`
 > `9680ff7399ece7be7dd921ee3092839e5a5a73da`, schema contract `0038`, with
 > migrations `0037` and `0038` already shipped and native account availability
-> off. Section 5 items 1–9 are preserved only as the history that produced that
+> off. Retention migration `0039` is a new pending prerequisite and has not been
+> applied by this packet. Section 5 items 1–9 are preserved only as the history that produced that
 > state. **Do not replay their migration, merge, deployment, backup, or rollback
 > steps.** Remaining work starts with a new frozen-SHA source/artifact pass,
-> then section 5 items 10–12 and the device matrix in section 6. Brendan alone
+> then section 5 item 9a, items 10–12, and the device matrix in section 6. Brendan alone
 > approves or performs every external action, and must re-confirm the recorded
 > Production state before the first one.
 
@@ -30,6 +31,8 @@ The replacement is deliberately narrow:
   controlled native account boundary that defaults off;
 - standalone migration `0038_web_account_deletion_hardening.sql` must complete
   the web Storage/deletion safety phase first without enabling native accounts;
+- migration `0039_bound_provider_rate_limit_retention.sql` must bound dormant
+  opaque provider buckets to 48 hours before the privacy answers are approved;
 - email numeric-code accounts, account deletion, and reviewed journey sync are
   in scope;
 - native commerce, Plus acquisition, social OAuth, analytics, APNs, and remote
@@ -54,9 +57,9 @@ is a hard stop.
 | Immutable release SHA | `[FULL 40-CHAR PUSHED SHA]` | Record after the final documentation/control commit | OPEN |
 | Production project | `iacnjqnssovaaojswjoh` | Pinned by the target manifest and guarded migration script | PASS FOR SOURCE |
 | Native target | Exact reviewed Production origin plus matching modern publishable-key fingerprint | [`config/ios-account-release.json`](../config/ios-account-release.json) | PASS FOR SOURCE |
-| Migration posture | `0037_native_account_beta_availability.sql` and `0038_web_account_deletion_hardening.sql` are recorded as already shipped | 2026-08-20 production audit; Brendan must re-confirm before the staffed window | RECORDED COMPLETE — RECONFIRM |
-| New migration / guarded packet | None in the remaining iOS release scope | Any new database change reopens the migration, backup, compatibility, and approval gates | NOT APPLICABLE UNLESS SCOPE CHANGES |
-| Backup | No database write is part of the remaining local preparation | A current approved backup becomes mandatory again if the scope adds any Production database mutation | NOT APPLICABLE UNLESS SCOPE CHANGES |
+| Migration posture | `0037_native_account_beta_availability.sql` and `0038_web_account_deletion_hardening.sql` are recorded as already shipped; `0039_bound_provider_rate_limit_retention.sql` is pending | 2026-08-20 production audit for `0037`/`0038`; guarded `0039` dry run and live contract must be re-confirmed | OPEN — 0039 PENDING |
+| New migration / guarded packet | Exact `20260826010000_bound_provider_rate_limit_retention.sql` packet only | `pnpm check:production-provider-rate-limits`; pinned manifest/source/guards/history | OPEN — OWNER APPROVAL REQUIRED |
+| Backup | Completed physical Production backup under 30 hours immediately before any `0039` apply | Guarded script must report only the sanitized backup timestamp | OPEN — REQUIRED BEFORE DATABASE WRITE |
 | Existing public binary | Version 1.0, build 13, commit `5359dbf15fa6d1d9d2205644adb668d6361eabd0` | Exact archived IPA SHA-256 `01c2600c577b79b27f07ef6ff773b4c6985dad36cbb0d2dc9c493398fe403c91` | PASS FOR IDENTITY |
 | Web rollback | `[IMMUTABLE DEPLOYMENT ID / FULL SHA]` | Resolve from current approved health and compatibility evidence at freeze; do not reuse an older hard-coded target | OPEN |
 | Replacement build | `[VERSION / BUILD / ARCHIVE SHA-256 / COMMIT]` | Must be produced after every gate below passes | OPEN |
@@ -189,7 +192,7 @@ execution. Approval of one item is not approval of the next.
 **Items 1–9 are a historical record and must not be executed again.** They
 describe the already-completed web/schema rollout that preceded the current
 `9680ff7` / `0038` / availability-off state. Current owner execution begins at
-item 10 only after section 4 is rerun against one clean, pushed, frozen SHA.
+item 9a only after section 4 is rerun against one clean, pushed, frozen SHA.
 
 1. **Preview isolation or cleanup.** Prove the project reference behind every
    overlapping branch Preview. Detach/delete only an unsafe or superseded
@@ -235,6 +238,15 @@ item 10 only after section 4 is rerun against one clean, pushed, frozen SHA.
    after-check, RLS/grant report, anonymous denials, web account smoke, and
    native-header denials. The availability RPC must report the fixed contract
    with `available:false`.
+9a. **Apply the retention-bounded provider packet.** Run
+   `pnpm check:production-provider-rate-limits`; require the exact reviewed
+   history, a completed physical backup under 30 hours, pinned hashes, and a
+   one-packet `0039` proposal. Obtain the database owner and rollback
+   authority's approval for that exact write, then apply only with
+   `BIBLEQUEST_PRODUCTION_MIGRATION_CONFIRM='apply 20260826010000 to iacnjqnssovaaojswjoh'`.
+   Rerun the guarded check, Production readiness, pgTAP contract, and sanitized
+   privacy evidence. Never substitute ordinary linked `db push`,
+   `--include-all`, migration repair, reset, or history editing.
 10. **Create the internal TestFlight build.** Confirm custom SMTP, exact provider
    and callback settings, the code-only template, resend limits, and in-app
    deletion before creating any tester account. Distribute only the exact

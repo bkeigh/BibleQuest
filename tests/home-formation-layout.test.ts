@@ -96,9 +96,9 @@ describe("Home formation layout", () => {
   });
 
   it("uses editorial artwork and display type for games", () => {
-    expect(card).toContain("/art/scripture-games-today.webp");
-    expect(card).toContain("/art/seven-days-match-poster.webp");
-    expect(card).toContain("/art/scripture-games-coming-2.webp");
+    expect(card).toContain("/wallpapers/galilee-be-still/poster.webp");
+    expect(card).toContain("/wallpapers/01-let-there-be-light/poster.webp");
+    expect(card).toContain("/wallpapers/the-sheltering-tree/poster.webp");
     // Card titles use the display face everywhere, including the guide card.
     expect(card).toContain('font-display text-[1.75rem]');
     expect(card).not.toContain("font-art-label text-[2rem]");

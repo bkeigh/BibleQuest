@@ -11,7 +11,8 @@ account-sync and deletion boundary `0016` through `0022`, sealed avatar/push
 and billing/support/console boundaries `0023` through `0027`, and lifetime
 Plus billing `0028`, user-row/trigger hardening `0029`, and sealed operator Plus
 grants `0030`; Stripe corrections `0031`–`0032`; guided progress `0033`;
-distributed provider limits `0034`–`0035`; and the sealed Arcade store `0036`.
+distributed provider limits `0034`–`0035`; the sealed Arcade store `0036`;
+and retention-bounded provider buckets `0039`.
 The native account beta remains isolated in `0037`, while the standalone web
 account-deletion Storage boundary is the forward-only `0038` migration. It is
 deliberately local/staging-first. Do not run any linked or remote command until
@@ -48,6 +49,7 @@ The repository timeline is:
 | 2026-07-28 | Sync resource hardening | Adds `0029`: a one-MiB cap on every generation-bound row and removes direct Data API access to trigger helpers. |
 | 2026-07-28 | Operator Plus grants | Adds `0030`: sealed manual entitlement history, atomic grant/revoke RPCs, and append-only operator auditing. |
 | 2026-08-14 | Web account-deletion Storage hardening | Adds `0038`: a durable owner deletion latch, serialized avatar uploads, final owner-folder proof, and a fixed readiness contract. `0037` remains a separate native-beta migration. |
+| 2026-08-26 | Provider bucket retention | Adds `0039`: an indexed 48-hour cleanup boundary for opaque provider rate-limit buckets and advances the readiness contract to v3. |
 
 If a database recorded an old `0002`, `0003`, or `0004` before the renames,
 the later filenames do not change those recorded versions. Conversely, a
@@ -201,7 +203,7 @@ the dry run, production readiness, the RLS report, and the two-user guided
 progress proof. Never substitute normal linked `db push`, `--include-all`, or
 migration repair.
 
-### Production 0034 and 0035 distributed provider-rate packets
+### Production 0034, 0035, and 0039 provider-rate packets
 
 Migration `0034` adds one forced-RLS operational bucket table and a service-only
 atomic claim for paid AI and support Checkout. Database CI then caught a
@@ -209,8 +211,10 @@ PL/pgSQL variable collision in that claim before the application release;
 forward-only migration `0035` corrects the function and advances its readiness
 identity to `biblequest_provider_rate_limit_v2`. The application HMACs account
 or trusted network identifiers before the database call, so no raw identifier
-is stored. Run the exact history, checksum, backup, and one-packet `0035`
-preflight with:
+is stored. Migration `0039` adds an `updated_at` index, removes dormant buckets
+after 48 hours, and advances the readiness identity to
+`biblequest_provider_rate_limit_v3`. Run the exact 38-entry manifest, history,
+checksum, backup, and one-packet `0039` preflight with:
 
 ```bash
 pnpm check:production-provider-rate-limits
@@ -219,7 +223,7 @@ pnpm check:production-provider-rate-limits
 Apply only the reviewed long-version packet with the pinned confirmation:
 
 ```bash
-BIBLEQUEST_PRODUCTION_MIGRATION_CONFIRM='apply 20260803170000 to iacnjqnssovaaojswjoh' \
+BIBLEQUEST_PRODUCTION_MIGRATION_CONFIRM='apply 20260826010000 to iacnjqnssovaaojswjoh' \
   node scripts/reconcile-production-provider-rate-limits.mjs --apply
 ```
 
@@ -358,6 +362,7 @@ Expected migration order:
 0036_arcade_store_purchases.sql
 0037_native_account_beta_availability.sql
 0038_web_account_deletion_hardening.sql
+0039_bound_provider_rate_limit_retention.sql
 ```
 
 Evidence must show all 45 expected tables with `rowsecurity = true`, only the

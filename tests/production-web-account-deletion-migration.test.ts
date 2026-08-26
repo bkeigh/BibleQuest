@@ -89,7 +89,7 @@ describe("production web account deletion hardening", () => {
     expect(SCRIPT).toContain(sha256(BEFORE));
     expect(SCRIPT).toContain(sha256(AFTER));
     expect(SCRIPT).toContain('version: "20260812005000"');
-    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(37);
+    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(38);
     expect(Number("20260812005000")).toBeLessThan(Number("20260812010000"));
   });
 

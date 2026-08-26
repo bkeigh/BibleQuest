@@ -293,7 +293,9 @@ describe("deterministic iOS Production account release", () => {
       "SensitiveInfo",
       "OtherUserContent",
       "UserID",
+      "DeviceID",
       "ProductInteraction",
+      "OtherDiagnosticData",
     ]) {
       expect(accountPrivacy).toContain(
         `NSPrivacyCollectedDataType${dataType}`,

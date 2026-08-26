@@ -163,9 +163,9 @@ const POSTURE_CONTRACTS = [
   },
   {
     rpc: "provider_rate_limit_contract",
-    contract: "biblequest_provider_rate_limit_v2",
-    migration: "0035",
-    label: "distributed provider rate-limit posture",
+    contract: "biblequest_provider_rate_limit_v3",
+    migration: "0039",
+    label: "retention-bounded provider rate-limit posture",
   },
   {
     rpc: "arcade_store_contract",
@@ -282,7 +282,7 @@ function safeHealthBody(value) {
     typeof candidate.canonical_origin_matches !== "boolean" ||
     !["configured", "guest-only", "invalid"].includes(candidate.auth_posture) ||
     !["configured", "disabled", "invalid"].includes(candidate.analytics_posture) ||
-    candidate.schema_contract !== "0038" ||
+    candidate.schema_contract !== "0039" ||
     candidate.content_contract !== "seed-manifest-v1" ||
     !/^biblequest-v\d{1,4}$/.test(candidate.service_worker_version) ||
     !["coming-soon", "test", "live", "invalid"].includes(

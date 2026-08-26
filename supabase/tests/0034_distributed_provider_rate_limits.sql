@@ -5,12 +5,18 @@ grant usage on schema extensions to public;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(14);
+select plan(16);
 
 select is(
   public.provider_rate_limit_contract(),
-  '{"ok": true, "contract": "biblequest_provider_rate_limit_v2"}'::jsonb,
-  'the corrected bounded provider rate-limit contract is ready'
+  '{"ok": true, "contract": "biblequest_provider_rate_limit_v3"}'::jsonb,
+  'the retention-bounded provider rate-limit contract is ready'
+);
+select has_index(
+  'public',
+  'provider_rate_limit_windows',
+  'provider_rate_limit_windows_updated_at_idx',
+  'provider rate-limit cleanup has an updated-at index'
 );
 select ok(
   (
@@ -65,6 +71,23 @@ select ok(
   'only the server service role can claim provider windows'
 );
 
+-- Seeds a dormant bucket so the next service claim must remove it.
+insert into public.provider_rate_limit_windows (
+  scope,
+  bucket_hash,
+  window_seconds,
+  window_started_at,
+  request_count,
+  updated_at
+) values (
+  'stale-test',
+  repeat('d', 64),
+  60,
+  pg_catalog.clock_timestamp() - interval '72 hours',
+  1,
+  pg_catalog.clock_timestamp() - interval '72 hours'
+);
+
 set local role service_role;
 select is(
   (
@@ -112,6 +135,16 @@ select is(
 );
 reset role;
 set role postgres;
+
+select is(
+  (
+    select count(*)::integer
+    from public.provider_rate_limit_windows
+    where scope = 'stale-test'
+  ),
+  0,
+  'a service claim removes buckets dormant for more than 48 hours'
+);
 
 select throws_ok(
   $sql$

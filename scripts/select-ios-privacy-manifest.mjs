@@ -28,6 +28,8 @@ if (
   mode === "--account-sync" &&
   (!contents.includes("NSPrivacyCollectedDataTypeEmailAddress") ||
     !contents.includes("NSPrivacyCollectedDataTypeOtherUserContent") ||
+    !contents.includes("NSPrivacyCollectedDataTypeDeviceID") ||
+    !contents.includes("NSPrivacyCollectedDataTypeOtherDiagnosticData") ||
     contents.includes("NSPrivacyCollectedDataTypePurchaseHistory"))
 ) {
   throw new Error("The selected account-sync privacy manifest is invalid.");

@@ -4,9 +4,9 @@ import { ArtIcon } from "@/components/design-system/ArtIcon";
 
 /** The scenes the arcade draws its cards on, shared by Home and the arcade. */
 export const ARCADE_ART = {
-  today: "/art/scripture-games-today.webp",
-  sevenDays: "/art/seven-days-match-poster.webp",
-  archive: "/art/scripture-games-coming-2.webp",
+  today: "/wallpapers/galilee-be-still/poster.webp",
+  sevenDays: "/wallpapers/01-let-there-be-light/poster.webp",
+  archive: "/wallpapers/the-sheltering-tree/poster.webp",
 } as const;
 
 /**

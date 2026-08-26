@@ -43,7 +43,7 @@ describe("staging migration reconciliation", () => {
     expect(SCRIPT).toContain('const PACKET_VERSION = "20260729190000";');
     expect(SCRIPT).toContain(sha256(frozenManifest()));
     expect(SCRIPT).toContain(sha256(PACKET));
-    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(37);
+    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(38);
   });
 
   it("fails closed on target, manifest, schema, history, and proposal drift", () => {

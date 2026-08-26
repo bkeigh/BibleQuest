@@ -5,15 +5,16 @@ collects different things, and the answers must match the exact binary being
 submitted. This is a draft to check against that binary, not a substitute for
 the owner's review.
 
-Everything under "Established" was read out of the source, the privacy
-manifest, or Production. Everything under "Open" genuinely is not settled, and
-guessing at it is how an app gets rejected or, worse, ships a false statement.
+Everything under "Established" was read out of source, the privacy manifest,
+the active Vercel project, or Production. The remaining gates require the
+reviewed migration and exact signed artifact; they must not be guessed through.
 
 ## Established — declare these
 
 The account privacy manifest
 ([`ios/compliance/PrivacyInfo.account-sync.xcprivacy`](../ios/compliance/PrivacyInfo.account-sync.xcprivacy))
-declares seven types. Every one is **linked to the user**, none is used for
+declares nine types. Every one is conservatively marked **linked to the user**,
+none is used for
 **tracking**, and all are for **App Functionality**. The App Store answers must
 agree item for item.
 
@@ -25,7 +26,9 @@ agree item for item.
 | Sensitive Info | Religious or philosophical writing — prayers and reflections | Yes | No |
 | Other User Content | Bookmarks, Journey, reading, quest and settings content | Yes | No |
 | User ID | The Supabase account identifier | Yes | No |
+| Device ID | Conservative classification of the opaque HMAC bucket derived from a network address for abuse prevention | Yes | No |
 | Product Interaction | Quest and reading progress that drives the journey | Yes | No |
+| Other Diagnostic Data | Bounded Vercel request/runtime diagnostics used for reliability and abuse response | Yes | No |
 
 Two things worth stating plainly in the review notes, because both are unusual
 and both are true:
@@ -48,49 +51,69 @@ Production analytics posture before submission.
 The manifest additionally declares the `FileTimestamp` API under reason
 `C617.1`, for the durable local journey mirror inside the app's own container.
 
-## The unresolved gap between the manifest and observed data flow
+## Network and provider evidence
 
-The manifest declares neither **Device ID** nor **Diagnostics**. The checked-in
-source can prove the rate-limit flow below, but it cannot prove what Vercel or
-the Scripture provider logs or how long they retain it. Those questions must be
-resolved before submission.
+The manifest now declares **Device ID** and **Other Diagnostic Data** instead of
+depending on the least-disclosive interpretation of Apple's IP-address rules.
+This deliberately matches the conservative App Store worksheet.
 
 The app reads Scripture through `/api/bible/*`, which is rate limited. The
-limiter stores a SHA-256 keyed on `network:<first x-forwarded-for address>` in
-`public.provider_rate_limit_windows`. So a value **derived from the visitor's
-network address** is retained server-side whenever the app reads Scripture,
-including from iOS.
+limiter stores an HMAC-SHA-256 bucket keyed on
+`network:<first x-forwarded-for address>` in
+`public.provider_rate_limit_windows`. Raw network addresses do not enter that
+table or application logs. Authenticated routes bucket by an opaque account ID
+instead.
 
 Measured in Production on 2026-08-15: **34 rows, oldest `2026-08-03`, newest
 `2026-08-14`.**
 
-Retention is **opportunistic, not scheduled**. The claim function prunes
-expired windows for a bucket when that bucket is next claimed, so a bucket that
-stops being used is never cleaned up. Twelve-day-old rows were present.
+Migration `0039_bound_provider_rate_limit_retention.sql` fixes the measured
+retention defect: every claim removes buckets dormant for more than 48 hours,
+an `updated_at` index bounds the cleanup, and the v3 database contract plus
+pgTAP/Production postflight prove the behavior. The migration also removes
+already-stale rows when applied. **Production must pass the guarded 0039 apply
+and postflight before account availability or App Privacy publication.**
 
-Three defensible readings, and this is the owner's call with legal input:
+The active Vercel team was read through the authenticated Vercel API on
+2026-08-26 and reported the **Hobby** plan and **zero configured Log Drains**.
+Vercel's current
+[Runtime Logs documentation](https://vercel.com/docs/logs/runtime) states that
+Hobby runtime logs are retained for **one hour**. It documents request path,
+method, status, host, user agent, search parameters, region, request/session/
+trace IDs, function details, outgoing requests, and an IP-address plus user-
+agent match used by its "logs from your browser" filter. BibleQuest's bounded
+application log messages do not include private writing, contact data, tokens,
+raw network addresses, provider responses, or arbitrary error text.
 
-1. **Not disclosable.** It is a one-way hash of a network address, used only to
-   protect the service, never linked to an account and never used for tracking.
-2. **Disclose as Identifiers → Device ID**, purpose App Functionality, linked
-   No, tracking No — the conservative paperwork choice.
-3. **Fix the cause instead.** Give the table a scheduled purge and a stated
-   retention period, which makes the disclosure question smaller and is worth
-   doing regardless.
+The Vercel project setting reports Web Analytics enabled, but the repository
+has no Vercel Analytics package or collector, the inspected live HTML contains
+no Vercel Insights script, and the exact native-payload verifier rejects
+unexpected analytics hosts. Recheck the signed archive rather than treating
+the project setting alone as proof of collection or non-collection.
 
-Option 3 is the one that improves the product rather than only the paperwork.
-It is a migration, so it belongs to a reviewed release rather than being done
-casually.
+HelloAO is called only by BibleQuest's server adapter. The adapter sends the
+allowlisted edition ID, book ID, chapter number, and an `Accept` header; it does
+not forward the app request's network address, user agent, cookies,
+authorization, account ID, name, or private content. An uncached upstream
+request can therefore reveal the requested Scripture coordinates and Vercel
+egress, but not a BibleQuest user identity. Because HelloAO does not publish a
+logging/retention commitment, the worksheet retains **Product Interaction** as
+linked/app-functionality rather than relying on that provider to discard it.
 
-## Open — the owner must resolve these before publishing
+Apple's current [App Privacy details](https://developer.apple.com/app-store/app-privacy-details/)
+say stored IP addresses must be classified according to use and that data kept
+only long enough to service a request is not collected. The nine-type worksheet
+is intentionally more conservative than that minimum.
 
-None of these provider facts is answerable from the checked-in codebase:
+## Remaining release gates
 
-- **Retention for the rate-limit records.** Currently unbounded in practice, as
-  measured above. Either set one or disclose the collection.
-- **The Vercel request log plan** — which fields, and retained how long.
-- **HelloAO's written answer** on logging and retention. Without it, the
-  Scripture provider's behaviour is an assumption.
+- Apply and postflight 0039 through the guarded Production migration lane after
+  a fresh physical backup. Until then, the old unbounded rows remain a hard
+  stop for account availability.
+- Inspect the signed Build 41 and its generated privacy report for any data type
+  or SDK absent from this worksheet.
+- Publish the nine matching App Store answers only after the final manifest,
+  server flow, and signed artifact are approved together.
 
 ## Before publishing
 

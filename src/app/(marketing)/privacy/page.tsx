@@ -3,14 +3,14 @@ import {
   LEGAL_DOCUMENTS,
   LegalSummary,
 } from "@/components/legal/LegalSummary";
+import { LEGAL_ENTITY_NAME } from "@/lib/brand";
 import { marketingMetadata } from "@/lib/metadata";
 
 const policy = LEGAL_DOCUMENTS.privacy;
 
 export const metadata = marketingMetadata({
   title: "Privacy Policy",
-  description:
-    "How BibleQuest and Winterhill Studio collect, use, protect, retain, and delete account and app information.",
+  description: `How BibleQuest and ${LEGAL_ENTITY_NAME} collect, use, protect, retain, and delete account and app information.`,
   path: "/privacy",
 });
 

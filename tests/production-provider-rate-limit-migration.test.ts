@@ -13,7 +13,7 @@ const BEFORE = readFileSync(
     ROOT,
     "supabase",
     "production-migrations",
-    "20260803170000_fix_provider_rate_limit_claim_timestamp.before.sql",
+    "20260826010000_bound_provider_rate_limit_retention.before.sql",
   ),
   "utf8",
 );
@@ -22,7 +22,7 @@ const AFTER = readFileSync(
     ROOT,
     "supabase",
     "production-migrations",
-    "20260803170000_fix_provider_rate_limit_claim_timestamp.after.sql",
+    "20260826010000_bound_provider_rate_limit_retention.after.sql",
   ),
   "utf8",
 );
@@ -34,7 +34,7 @@ const MIGRATION = readFileSync(
     ROOT,
     "supabase",
     "migrations",
-    "0035_fix_provider_rate_limit_claim_timestamp.sql",
+    "0039_bound_provider_rate_limit_retention.sql",
   ),
 );
 const PACKAGE = JSON.parse(
@@ -46,23 +46,18 @@ function sha256(value: string | Buffer) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-/** Keep the production runner pinned through 0036 as later files append. */
-function frozenManifest() {
-  return `${MANIFEST.toString("utf8").trim().split("\n").slice(0, 35).join("\n")}\n`;
-}
-
 describe("production provider rate-limit migration", () => {
   it("pins the target, current manifest, source, and long-version packet", () => {
     expect(SCRIPT).toContain('const PROJECT_REF = "iacnjqnssovaaojswjoh";');
-    expect(SCRIPT).toContain(sha256(frozenManifest()));
+    expect(SCRIPT).toContain(sha256(MANIFEST));
     expect(SCRIPT).toContain(sha256(MIGRATION));
-    expect(SCRIPT).toContain('version: "20260803170000"');
-    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(37);
+    expect(SCRIPT).toContain('version: "20260826010000"');
+    expect(MANIFEST.toString("utf8").trim().split("\n")).toHaveLength(38);
   });
 
   it("requires exact history, a fresh backup, and a one-packet dry run", () => {
     expect(SCRIPT).toContain(
-      "Production migration history differs from the reviewed 0035 history",
+      "Production migration history differs from the reviewed 0039 history",
     );
     expect(SCRIPT).toContain("No completed physical production backup exists");
     expect(SCRIPT).toContain("Latest physical production backup is stale");
@@ -74,17 +69,17 @@ describe("production provider rate-limit migration", () => {
     expect(SCRIPT).not.toContain("--include-all");
   });
 
-  it("requires 0034 and proves the corrected service-only claim", () => {
+  it("requires v2 and proves service-only claims with bounded retention", () => {
     expect(BEFORE).toContain(
-      "production 0034 provider rate limit prerequisite is invalid",
+      "production provider rate-limit v2 prerequisite is invalid",
     );
-    expect(BEFORE).toContain("biblequest_provider_rate_limit_v1");
-    expect(MIGRATION.toString("utf8")).toContain("claim_time timestamptz");
+    expect(BEFORE).toContain("biblequest_provider_rate_limit_v2");
+    expect(MIGRATION.toString("utf8")).toContain("interval '48 hours'");
     expect(MIGRATION.toString("utf8")).toContain(
-      "biblequest_provider_rate_limit_v2",
+      "biblequest_provider_rate_limit_v3",
     );
-    expect(AFTER).toContain("biblequest_provider_rate_limit_v2");
-    expect(AFTER).toContain("migration-probe");
+    expect(AFTER).toContain("biblequest_provider_rate_limit_v3");
+    expect(AFTER).toContain("migration-stale-probe");
     expect(AFTER).toContain("claim_provider_rate_limit");
     expect(AFTER).toContain("relforcerowsecurity");
     expect(AFTER).toContain("service_role");

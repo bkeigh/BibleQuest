@@ -15,7 +15,7 @@ integrated a file; neither proves who created it or who owns its rights.
 `scripts/lib/native-media.mjs` is the executable public-picture allowlist.
 `scripts/build-native.mjs` now removes every other public picture before the
 native export and fails if the retained set drifts. The allowlist currently has
-**81 files**: 64 manifest-controlled 2.5D files and 17 other native-route files.
+**78 files**: 64 manifest-controlled 2.5D files and 14 other native-route files.
 The account build no longer carries the dormant Apple/Google web sign-in marks,
 unused game art, wallpaper thumbnails, or unused wallpaper posters.
 `scripts/verify-ios-content-rights.mjs` verifies the generated native payload;
@@ -40,24 +40,41 @@ No group may be approved by sampling only one file.
 
 | Row | Files | Creator | Source and creation date | Rights owner | License or assignment | Image/tool terms | Status |
 | --- | ---: | --- | --- | --- | --- | --- | --- |
-| A1 — 2.5D stills and candle loops | 64 | Not evidenced per file. Brendan Kenney is the 2026-08-03 Git integrator, not thereby the creator. | External `Assets-BibleQuest/2.5D` master library; runtime promotion is documented by `docs/ART_SYSTEM.md` and `public/art/2.5d/manifest.json`. Master creation dates are not evidenced in the repository. | `LICENSE` covers original BibleQuest assets jointly owned by Brendan Kenney and Winterhill Media LLC, but no record ties each master to that ownership statement. | No per-file assignment, employee-work record, or signed creator declaration is present. | The generator/editor and the terms in force on each creation date are not recorded. | **OPEN — hard stop** |
-| A2 — Scripture game art | 3 | Not evidenced per file. | `scripture-games-today.webp` and `scripture-games-coming-2.webp` entered Git on 2026-07-30; `seven-days-match-poster.webp` entered on 2026-08-03. Source masters and actual creation dates are not recorded. | Not evidenced beyond the conditional original-assets statement in `LICENSE`. | No per-file assignment or creator declaration is present. | The generator/editor and applicable terms are not recorded. | **OPEN — hard stop** |
-| A3 — onboarding wallpaper posters | 6 | BibleQuest art direction using OpenAI image generation; the human/operator and generating account owner must be confirmed. | Exact source concepts remain under `output/live-wallpapers/**/openai-imagegen-20260720-r01/`; creation date **2026-07-20**. The shipped WebPs are derived stills. | Current OpenAI terms assign output to the customer/user to the extent permitted by law, but the repository does not prove which person/entity held the generating account or owned every input/reference. | Founder declaration must confirm the account, authorized inputs/references, and transfer to the App Store seller. | [OpenAI Terms of Use](https://openai.com/policies/row-terms-of-use/) and, if the generating account was business/API, the [Services Agreement](https://openai.com/policies/services-agreement/); both leave input rights and output review with the user/customer. | **OPEN — hard stop** |
-| A4 — BibleQuest logo and Open Graph image | 2 | Not evidenced per file. | `bq-logo.svg` entered Git on 2026-07-09; `og.png` entered on 2026-07-07. Source/design records are absent. | Not evidenced beyond `LICENSE`. | No per-file assignment or creator declaration is present. | The design/generation tools and applicable commercial terms are not recorded. | **OPEN — hard stop** |
-| A5 — web/PWA icon derivatives | 6 | Deterministically composed by `scripts/build-app-icons.mjs` from App Icon layer `2.5d-BQ-book.png`; the layer creator is not evidenced. | Derived from the App Icon Composer source. Five PNGs are generated; `icon.svg` has separate source provenance that is not recorded. | Inherits the unresolved App Icon layer ownership; `icon.svg` is separately unresolved. | No per-source assignment or creator declaration is present. | Sharp and Xcode are processing tools, not a source of rights; any earlier image-generation terms remain unrecorded. | **OPEN — hard stop** |
-| A6 — App Icon Composer layers | 3 | Not evidenced per layer. | Added to Git on 2026-08-07. `01-let-there-be-light.png` derives from the wallpaper family; `2.5d-BQ-book.png` and `book-open.png` have no checked-in master/provenance record tying them to A1. | Not evidenced beyond `LICENSE`. | No per-layer assignment or creator declaration is present. | Xcode Icon Composer only composes the layers; original-generation/editing terms are not recorded. | **OPEN — hard stop** |
+| A1 — 2.5D stills and candle loops | 64 | The external master README records BibleQuest art direction through the built-in image-generation path; the operator/account owner still requires a signed declaration. | External `Assets-BibleQuest/2.5D` generation reports date all 58 stills to **2026-08-01** and document six derived loops. All 64 source masters exactly match the runtime manifest paths and aggregate to the evidence fingerprint below. | `LICENSE` covers original BibleQuest assets jointly owned by Brendan Kenney and Winterhill Media LLC, but a signed record must still connect the operator, account, authorized pixel-sprite references, and masters to those owners. | Founder declaration must confirm the operator/account, authorized inputs, ownership at creation, and Winterhill Media LLC's App Store distribution rights. | Built-in image generation is documented, but the applicable account and terms cannot be inferred from files alone. | **OPEN — declaration required** |
+| A2 — Scripture game art | 3 | Not required for Build 41. | The candidate now reuses reviewed A3 posters for all three game cards and the Seven Days scene. The exact native allowlist excludes `scripture-games-today.webp`, `scripture-games-coming-2.webp`, and `seven-days-match-poster.webp`. | Not applicable to the Build 41 binary. | Not applicable to the Build 41 binary. | Not applicable to the Build 41 binary. | **OUT OF SCOPE — verifier must prove absent** |
+| A3 — onboarding wallpaper posters | 6 | BibleQuest art direction using OpenAI image generation; the human/operator and generating account owner must be confirmed. | Exact source concepts remain under `output/live-wallpapers/**/openai-imagegen-20260720-r01/`; creation date **2026-07-20**. The shipped WebPs are derived stills and the source manifests are fingerprinted below. | Current OpenAI terms assign output to the customer/user to the extent permitted by law, but the repository does not prove which person/entity held the generating account or owned every input/reference. | Founder declaration must confirm the account, authorized inputs/references, and Winterhill Media LLC's distribution rights. | [OpenAI Terms of Use](https://openai.com/policies/row-terms-of-use/) and, if the generating account was business/API, the [Services Agreement](https://openai.com/policies/services-agreement/); both leave input rights and output review with the user/customer. | **OPEN — declaration required** |
+| A4 — BibleQuest logo and Open Graph image | 2 | The `.ai` metadata identifies Adobe Illustrator 30.6 and `AIRobin`, but files cannot establish the human designer or account owner. | `BQ-Logo-Board-1.ai` was created **2026-07-09 01:58:35 -04:00**. `assets/BQ-Logo-Vector-Cross.svg`, `public/brand/bq-logo.svg`, and the Icon Composer logo source are byte-identical. `og.png` is a deterministic derivative. | Not evidenced beyond `LICENSE`. | Founder declaration must identify the designer/account, authorized inputs, ownership at creation, and Winterhill Media LLC's distribution rights. | Illustrator metadata is evidence of the tool, not ownership or input rights. | **OPEN — declaration required** |
+| A5 — web/PWA icon derivatives | 6 | Deterministically produced from A4 and the active A6 layer. | Five PNGs are generated by `scripts/build-app-icons.mjs` from `2.5d-BQ-book.png`; `icon.svg` is generated by `scripts/build-icons.mjs` from the byte-identical A4 logo. | Inherits A4 and A6. | Inherits A4 and A6. | Sharp is only a deterministic processing tool. | **VERIFIED DERIVATION — inherits A4/A6** |
+| A6 — App Icon Composer layers | 3 | The active book layer has an external PSD and 2.5D-generation evidence; the operator/account owner still requires a signed declaration. | `2.5d-BQ-book.png` exactly matches the external master; its PSD metadata records Photoshop 27.8, creation on **2026-08-01**, and modification on **2026-08-07**. Icon Composer marks `01-let-there-be-light.png` and `book-open.png` hidden; only the book layer renders. | Not evidenced beyond `LICENSE`. | Founder declaration must confirm the operator/account, authorized inputs, ownership at creation, and Winterhill Media LLC's distribution rights. | Icon Composer and Photoshop compose/edit the source; applicable generation-account terms still require confirmation. | **OPEN — declaration required** |
 | A7 — launch images | 3 | Deterministic derivatives of `public/art/2.5d/book-open.webp`. | Generated by `scripts/build-ios-splash.mjs`; current files entered Git on 2026-08-13. | Inherits A1. | Inherits A1. | Sharp only resizes the unresolved A1 source. | **OPEN — hard stop** |
-| A8 — app/favicon export | 1 source plus generated copies | Not evidenced. | `src/app/favicon.ico` entered Git on 2026-07-07; source/design record absent. | Not evidenced beyond `LICENSE`. | No per-file assignment or creator declaration is present. | The design/generation tool and applicable terms are not recorded. | **OPEN — hard stop** |
+| A8 — app/favicon export | 1 source plus generated copies | Deterministically produced from A4. | `scripts/build-icons.mjs` generates `src/app/favicon.ico` from the byte-identical A4 logo source. | Inherits A4. | Inherits A4. | Sharp is only a deterministic processing tool. | **VERIFIED DERIVATION — inherits A4** |
 
 ### Required founder visual-rights declaration
 
-For A1, A2, A4, A5, A6, and A8, attach a dated declaration naming the actual
-creator/operator, source/master location, creation date or bounded date range,
-owner at creation, any transfer/assignment, every input/reference that carried
-third-party rights, and the tool/account terms that permitted commercial app
-distribution. For A3, add the generating OpenAI account owner and confirm that
-all prompts and reference images were authorized. Legal/owner review must then
-approve the US-only use of every row.
+Complete `docs/IOS_VISUAL_RIGHTS_DECLARATION.md` for A1, A3, A4, and A6. The
+declarant must name the actual creator/operator and account holder, confirm that
+every input/reference was owned or authorized, record ownership at creation and
+any assignment or license, and grant or confirm Winterhill Media LLC's right to
+distribute the material in the United States through the App Store. Legal/owner
+review must then approve the exact Build 41 binary.
+
+### Evidence fingerprints
+
+These hashes make the reviewed source records reproducible; they do not replace
+the required human ownership declaration.
+
+| Evidence | SHA-256 |
+| --- | --- |
+| External 2.5D README | `ebcc555aa37a6706a354a4cb44f18649b376262bc21c98170077665411b56e67` |
+| External 2.5D prompt specification | `69104b92e582524342c210071f4aad785473f337da0da1b6b98f3e55592e42d5` |
+| External 2.5D sacred/nature/tree reports | `4d92b7ddd9c1e45e4a03124624f31f31e55ecf9d200f92816d7c03cf924b9f80` / `3175ac72e84d358640806729d5d499e4250620f4d02a3a8d38d87ec609f3481b` / `9e3e813cc72947af2022f19903bb1959b0c94ee37d4db105cca2daed3e934e68` |
+| Aggregate of 64 external 2.5D source masters | `1e86842ca74f06b76a212d5cac0c4548ac8fd292f40406d650eb5fc24f9a9ed2` |
+| Runtime 2.5D manifest | `16dd5fb46b209318d02bf30a74959a3c162205df9dbc2da769021bdb57ef59df` |
+| Wallpaper v1 README / prompts / manifest | `762fea3b13a1575f0bdea8e2b863830c39749ef54f33de989024af0fe2744862` / `43e7455657e28fd112c6eda244732b3e29ba156c8e0d89f6fa2acac12595fa66` / `71cd661ffbe3b4e2e839c13fac70ac1e0d69e14e1bdd1fd987d3662942a5735b` |
+| Biblical wallpaper README / manifest | `e12dba2e42eef55107364365166693f5f6d26f3240e5dc697fd0f840da959647` / `1a62f52671c6e7fd6976620cdec668c9c8f175832096df07692c6b2067df3a9b` |
+| Byte-identical logo SVG source | `03e7a0164496686cd2a00e3c07462e737419bd49d26579c0f0e700db2598abd8` |
+| Illustrator logo board | `45de8b9d5530a9cd4b773a144a051fe07ffca675da93c27416899c967f14d941` |
+| Active App Icon book layer / external PSD | `2ed07b19bb61419dfcab95b6c8cd44e66d8c94e9289f7f2913819948ff7a4194` / `54b322cb8d7c368a51656b1cd3887b95510e9f2a9260156145df2b6aff130a26` |
 
 ## Fonts and notices
 
@@ -164,12 +181,9 @@ public/art/2.5d/tree.webp
 public/art/2.5d/wheat.webp
 ```
 
-## Appendix B — exact A2–A5 public files
+## Appendix B — exact A3–A5 public files
 
 ```text
-public/art/scripture-games-coming-2.webp
-public/art/scripture-games-today.webp
-public/art/seven-days-match-poster.webp
 public/brand/bq-logo.svg
 public/icons/apple-touch-icon.png
 public/icons/favicon-48.png
@@ -209,7 +223,7 @@ src/app/favicon.ico
 
 | Check | Named owner | UTC | Result/evidence |
 | --- | --- | --- | --- |
-| Every A1–A8 `OPEN` field resolved | `[NAME]` | `[UTC]` | `[RESTRICTED EVIDENCE LINK]` |
+| Every remaining `OPEN` field resolved | `[NAME]` | `[UTC]` | `[RESTRICTED EVIDENCE LINK]` |
 | Legal accepts every asset and Scripture row for United States distribution | `[NAME]` | `[UTC]` | `[EVIDENCE]` |
 | Signed Build 41 media/hashes exactly match this inventory | `[NAME]` | `[UTC]` | `[EVIDENCE]` |
 | Production translation catalog is unchanged and API.Bible remains off | `[NAME]` | `[UTC]` | `[EVIDENCE]` |
