@@ -36,12 +36,14 @@ and both are true:
   empty.
 
 The release profile pins analytics, payments configuration, native commerce,
-and remote push off. That configuration is not enough by itself: the frozen
-artifact still has to prove that no out-of-scope transport is executable. A
-2026-08-20 local preflight found that the account build could still reach the
-Arcade status and consume endpoints, so **do not claim “no native commerce”
-until that defect is fixed and the final payload is rescanned**. Brendan must
-also re-confirm the current Production analytics posture before submission.
+and remote push off. Current source closes the Arcade defect found on
+2026-08-20: signed-in native regression coverage proves that status, checkout,
+and consume make no request, Plus projections fail closed, and the native
+export prunes the store routes. The generated account bundle may still contain
+dormant web-commerce literals, so source coverage is not a signed-artifact
+pass. Inspect the frozen `.app` and exercise the exact TestFlight binary before
+claiming “no native commerce.” Brendan must also re-confirm the current
+Production analytics posture before submission.
 
 The manifest additionally declares the `FileTimestamp` API under reason
 `C617.1`, for the durable local journey mirror inside the app's own container.
