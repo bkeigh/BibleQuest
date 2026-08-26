@@ -6,7 +6,10 @@ import {
   restoreJourneyIfEvicted,
   startJourneyBackup,
 } from "@/lib/native/journey-backup";
-import { syncNativePreferredTextZoom } from "@/lib/native/accessibility";
+import {
+  NATIVE_TEXT_SIZE_CHANGE_EVENT,
+  syncNativePreferredTextZoom,
+} from "@/lib/native/accessibility";
 import { isNativeTarget } from "@/lib/platform/target";
 import { AppLoadingScreen } from "@/components/app-shell/AppLoadingScreen";
 
@@ -70,7 +73,11 @@ export function NativeJourneyGuard({ children }: { children: React.ReactNode }) 
       }
     };
     document.addEventListener("visibilitychange", syncTextZoom);
-    return () => document.removeEventListener("visibilitychange", syncTextZoom);
+    window.addEventListener(NATIVE_TEXT_SIZE_CHANGE_EVENT, syncTextZoom);
+    return () => {
+      document.removeEventListener("visibilitychange", syncTextZoom);
+      window.removeEventListener(NATIVE_TEXT_SIZE_CHANGE_EVENT, syncTextZoom);
+    };
   }, [nativeTarget]);
 
   if (status === "pending") return <AppLoadingScreen />;

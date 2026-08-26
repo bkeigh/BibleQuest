@@ -115,6 +115,7 @@ describe("iOS App Store release configuration", () => {
       /preferredContentSizeCategory\s*\.isAccessibilityCategory/,
     );
     expect(scene).toContain("system-accessibility-text");
+    expect(scene).toContain("biblequest:native-text-size-change");
     const swiftPrefix = scene.match(/authKeyPrefix = "([^"]+)"/)?.[1];
     const storagePrefix = authStorage.match(
       /AUTH_KEY_PREFIX = "([^"]+)"/,
@@ -156,6 +157,8 @@ describe("iOS App Store release configuration", () => {
     expect(startup).toContain("await useQuestOS.persist.rehydrate()");
     expect(startup).toContain("await syncNativePreferredTextZoom()");
     expect(guestGuard).toContain("await syncNativePreferredTextZoom()");
+    expect(startup).toContain("NATIVE_TEXT_SIZE_CHANGE_EVENT");
+    expect(guestGuard).toContain("NATIVE_TEXT_SIZE_CHANGE_EVENT");
     expect(startup.indexOf("await syncNativePreferredTextZoom()")).toBeLessThan(
       startup.indexOf("setStatus(\"ready\")"),
     );

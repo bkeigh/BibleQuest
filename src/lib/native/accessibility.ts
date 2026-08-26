@@ -11,6 +11,10 @@ export const MAX_NATIVE_TEXT_ZOOM = 2;
 /** Separates Apple's standard XXXL scale from accessibility categories. */
 export const NATIVE_ACCESSIBILITY_TEXT_ZOOM_THRESHOLD = 1.5;
 
+/** Lets SceneDelegate request a fresh TextZoom reading without reloading. */
+export const NATIVE_TEXT_SIZE_CHANGE_EVENT =
+  "biblequest:native-text-size-change";
+
 /**
  * Preserves WCAG's full 200% text enlargement without letting WebKit apply
  * iOS's 3.1x body multiplier to fixed tab-bar and card geometry. Native code

@@ -149,6 +149,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
           } else {
             apply();
           }
+          window.dispatchEvent(new Event('biblequest:native-text-size-change'));
         })();
         """
         bridgeViewController?.webView?.evaluateJavaScript(script)
