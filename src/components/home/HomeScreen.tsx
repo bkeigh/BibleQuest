@@ -28,7 +28,6 @@ import { PageContainer } from "@/components/app-shell/PageHeader";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { AccountPrompt } from "@/components/account/AccountPrompt";
 import { GrowthTree } from "@/components/journey/GrowthTree";
-import { SeasonalAtmosphere } from "@/components/design-system/SeasonalAtmosphere";
 import { CATEGORY_ART, ArtIcon } from "@/components/design-system/ArtIcon";
 import { Avatar } from "@/components/profile/Avatar";
 import { StreakCard } from "@/components/home/StreakCard";
@@ -120,10 +119,6 @@ function HomeInner() {
 
   return (
     <div className="relative">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-64 overflow-hidden">
-        <SeasonalAtmosphere density={7} />
-      </div>
-
       <PageContainer className="relative pt-safe-gap-4">
         {/* Compact personal welcome — profile editing stays in Settings while
             today's candle remains visible without adding another card row. */}
