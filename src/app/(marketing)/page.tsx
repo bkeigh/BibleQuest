@@ -7,7 +7,6 @@ import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { ArtMascot } from "@/components/design-system/ArtMascot";
 import { Disclosure, DisclosureGroup } from "@/components/design-system/Disclosure";
 import { IconArrowRight } from "@/components/design-system/icons";
-import { SeasonalAtmosphere } from "@/components/design-system/SeasonalAtmosphere";
 import { Reveal } from "@/components/marketing/Reveal";
 import { QuestDemo, PrayerDemo } from "@/components/marketing/Demos";
 import { MarketingGrowthLoop } from "@/components/marketing/MarketingGrowthLoop";
@@ -460,9 +459,6 @@ export default function LandingPage() {
 
       {/* Final CTA */}
       <section className="relative overflow-hidden border-t border-mist bg-linen">
-        <div className="pointer-events-none absolute inset-0">
-          <SeasonalAtmosphere density={10} />
-        </div>
         <div className="relative mx-auto max-w-2xl px-5 py-16 text-center sm:px-8 sm:py-20">
           <Reveal>
             <ArtIcon name="lantern" size={120} className="mx-auto" />
