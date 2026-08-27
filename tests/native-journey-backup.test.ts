@@ -154,6 +154,21 @@ describe("journey backup on native", () => {
     expect(await writeJourneyBackup()).toBe(false);
   });
 
+  it("fails closed instead of hanging when the filesystem bridge is silent", async () => {
+    vi.useFakeTimers();
+    readBarrier = new Promise<void>(() => undefined);
+    const {
+      NATIVE_JOURNEY_READ_DEADLINE_MS,
+      restoreJourneyIfEvicted,
+    } = await load();
+
+    const restoring = restoreJourneyIfEvicted();
+    await vi.advanceTimersByTimeAsync(NATIVE_JOURNEY_READ_DEADLINE_MS);
+
+    await expect(restoring).resolves.toBe("failed");
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
   it("refuses to restore a corrupt mirror over an empty primary", async () => {
     const { restoreJourneyIfEvicted } = await load();
     disk.set("journey-backup.json", "{ truncated");

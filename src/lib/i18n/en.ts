@@ -4,7 +4,7 @@ import type { UIStrings } from "./types";
 export const en: UIStrings = {
   meta: { code: "en", endonym: "English", english: "English", dir: "ltr" },
   nav: {
-    home: "Home",
+    home: "Today",
     quests: "Quests",
     bible: "Bible",
     prayer: "Prayers",

@@ -8,7 +8,7 @@ import { QUEST_CATEGORIES } from "@/lib/questos/types";
 import { createReviewedQuestProvider } from "@/lib/quest-generation/provider";
 
 describe("launch content catalog", () => {
-  it("keeps the Home verse entry beneath the account surface and the mobile nav scroll-stable", () => {
+  it("keeps the Home verse beneath a compact welcome and the mobile nav scroll-stable", () => {
     const home = readFileSync(
       path.join(process.cwd(), "src/components/home/HomeScreen.tsx"),
       "utf8",
@@ -30,12 +30,35 @@ describe("launch content catalog", () => {
       "utf8",
     );
 
-    const accountSurface = home.indexOf("Personal welcome");
+    const welcomeSurface = home.indexOf("Compact personal welcome");
     const verseEntry = home.indexOf("<TodaysVerseLink />");
     const questSection = home.indexOf('<section id="quests"');
-    expect(accountSurface).toBeGreaterThan(-1);
-    expect(verseEntry).toBeGreaterThan(accountSurface);
+    expect(welcomeSurface).toBeGreaterThan(-1);
+    expect(verseEntry).toBeGreaterThan(welcomeSurface);
     expect(questSection).toBeGreaterThan(verseEntry);
+    expect(home).toContain('href="/app/settings"');
+    expect(home).toContain("aria-label={t.home.openSettings}");
+    expect(home).not.toContain("data-today-profile-card");
+    expect(home).not.toContain("Your profile");
+    expect(home).not.toContain('name="people"');
+    expect(home).not.toContain("useSession");
+
+    // Primary navigation stays crisp and system-like while 2.5D artwork
+    // remains available to the app's feature and content surfaces.
+    for (const icon of [
+      "IconHome",
+      "IconQuest",
+      "IconBible",
+      "IconPrayer",
+      "IconJourney",
+    ]) {
+      expect(bottomNav).toContain(`Icon: ${icon}`);
+    }
+    expect(bottomNav).toContain("native-primary-bottom-nav");
+    expect(bottomNav).toContain(
+      "bottom-[max(0.5rem,env(safe-area-inset-bottom))]",
+    );
+    expect(bottomNav).toContain("<Icon size={23}");
 
     // Mobile Safari is sensitive to fixed + blur + transform composition.
     // Keep the base bar opaque and reserve blur for larger viewports.
@@ -109,7 +132,9 @@ describe("launch content catalog", () => {
     expect(home).toContain("whitespace-nowrap");
     expect(home).toContain('className="@max-[8rem]:hidden">✦</span>');
     expect(home).toContain('"@container min-w-0 flex-1"');
-    expect(home).toContain('className="max-[340px]:w-12"');
+    expect(home).toMatch(
+      /className="[^"]*home-hero-streak[^"]*max-\[340px\]:w-12/,
+    );
     expect(home).toContain("plus-nameplate");
     expect(home).toContain("home-hero-surface");
     expect(home).toContain("border-[#9f6a1f]/75");
@@ -177,7 +202,7 @@ describe("launch content catalog", () => {
       "utf8",
     );
 
-    expect(disclosure).toContain("bg-[#3F7EA3]");
+    expect(disclosure).toContain("bg-[#3D789C]");
     // The home callout carries the blue in `.app-glass-shepherd` now rather
     // than an inline style, because an inline background out-ranks the glass
     // rule that has to tint it. Same colour, one level further out.

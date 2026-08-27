@@ -45,6 +45,7 @@ const EXPECTED_MIGRATIONS = [
   "0036_arcade_store_purchases.sql",
   "0037_native_account_beta_availability.sql",
   "0038_web_account_deletion_hardening.sql",
+  "0039_bound_provider_rate_limit_retention.sql",
 ];
 
 /** Hash a migration exactly as the release manifest does. */

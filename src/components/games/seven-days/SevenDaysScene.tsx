@@ -4,7 +4,8 @@ import { useEffect } from "react";
 import Image from "next/image";
 
 /** Dedicated key art keeps the game recognizable on every level and card. */
-const SEVEN_DAYS_POSTER = "/art/seven-days-match-poster.webp";
+const SEVEN_DAYS_POSTER =
+  "/wallpapers/01-let-there-be-light/poster.webp";
 
 /**
  * The scene a level is played over.

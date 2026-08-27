@@ -30,6 +30,10 @@ import {
   GUEST_FORBIDDEN_ACCOUNT_ARTIFACT_LITERALS,
 } from "../src/lib/sync/guest-account-artifact-contract.mjs";
 import {
+  isPublicMediaPath,
+  nativePublicMediaAllowlist,
+} from "./lib/native-media.mjs";
+import {
   GUEST_RELEASE_OVERLAYS,
   GUEST_RELEASE_PROVENANCE_CONTRACT,
 } from "../src/lib/sync/guest-release-overlays.mjs";
@@ -52,6 +56,7 @@ const ACCOUNT_RELEASE_ENV_PATH = path.join(
   repo,
   ".env.account-release.local",
 );
+const RELEASE_IDENTITY_CONTRACT = "biblequest_ios_release_identity_v1";
 const buildArguments = process.argv.slice(2);
 const releaseBuild = buildArguments[0] === "--release";
 const accountBetaBuild = buildArguments[0] === "--account-beta";
@@ -685,12 +690,8 @@ function stageTree() {
       // the local Capacitor scheme and should not inflate the signed binary.
       "--exclude=/public/marketing/",
       "--exclude=/public/sw.js",
-      // 14 animated wallpaper loops, 67 MB — over half the bundle, and not one
-      // is reachable: Settings omits the wallpaper picker from native builds
-      // until a StoreKit path and native entitlement projection exist. The
-      // posters and thumbnails beside them are only 3 MB and ARE used —
-      // onboarding's step backgrounds reference poster.webp — so exclude the
-      // videos only, never the folder.
+      // Wallpaper videos are unreachable because native omits the Plus picker.
+      // The finite still-image set is enforced after staging below.
       "--exclude=/public/wallpapers/*/loop.mp4",
       `${repo}/`,
       `${stage}/`,
@@ -701,6 +702,27 @@ function stageTree() {
   // Symlinked rather than copied: it is the largest thing in the repo and the
   // staged build resolves through it identically.
   symlinkSync(path.join(repo, "node_modules"), path.join(stage, "node_modules"));
+}
+
+/** Removes every public picture that is not reachable from a native route. */
+function pruneNativePublicMedia() {
+  const allowed = new Set(nativePublicMediaAllowlist(stage));
+  let removed = 0;
+  for (const file of generatedFiles(path.join(stage, "public"))) {
+    const relative = path.relative(stage, file).split(path.sep).join("/");
+    if (isPublicMediaPath(relative) && !allowed.has(relative)) {
+      rmSync(file);
+      removed += 1;
+    }
+  }
+  const retained = generatedFiles(path.join(stage, "public"))
+    .map((file) => path.relative(stage, file).split(path.sep).join("/"))
+    .filter(isPublicMediaPath)
+    .sort();
+  if (retained.join("\n") !== [...allowed].sort().join("\n")) {
+    fail("the staged native media set does not match its reviewed allowlist.");
+  }
+  log(`retained ${retained.length} reviewed public media files; removed ${removed}`);
 }
 
 function pruneServerSurfaces() {
@@ -999,6 +1021,43 @@ function publish() {
   log(`wrote ${path.relative(repo, output)}/`);
 }
 
+/** Pins the native payload to the checked-out commit that supplied its source. */
+function resolveNativeSourceSha() {
+  let checkedOutSha;
+  try {
+    checkedOutSha = execFileSync("git", ["rev-parse", "--verify", "HEAD"], {
+      cwd: repo,
+      encoding: "utf8",
+    }).trim();
+  } catch {
+    fail("the native build source commit cannot be resolved");
+  }
+  if (!/^[a-f0-9]{40}$/.test(checkedOutSha)) {
+    fail("the native build source commit is not a full Git SHA");
+  }
+  const suppliedSha = process.env.BIBLEQUEST_SOURCE_SHA?.trim();
+  if (suppliedSha && suppliedSha.toLowerCase() !== checkedOutSha) {
+    fail("BIBLEQUEST_SOURCE_SHA does not match the checked-out commit");
+  }
+  process.env.BIBLEQUEST_SOURCE_SHA = checkedOutSha;
+  return checkedOutSha;
+}
+
+/** Writes a content-free identity that survives Xcode archive and export. */
+function writeNativeReleaseIdentity(sourceSha, profile, hostedOrigin) {
+  const record = {
+    contract: RELEASE_IDENTITY_CONTRACT,
+    profile,
+    sourceSha,
+    hostedOrigin,
+  };
+  writeFileSync(
+    path.join(stage, "out/native-release-identity.json"),
+    `${JSON.stringify(record, null, 2)}\n`,
+  );
+  log(`embedded native source identity ${sourceSha}`);
+}
+
 /** Records that the complete release path staged every reviewed guest overlay. */
 function writeGuestReleaseProvenance() {
   if (!releaseBuild) return;
@@ -1027,9 +1086,12 @@ const mode = releaseBuild
       : "custom";
 log(`mode=${mode} target=native hostedOrigin=${origin}`);
 stageTree();
+const nativeSourceSha = resolveNativeSourceSha();
+pruneNativePublicMedia();
 pruneServerSurfaces();
 stageGuestAccountContainment();
 build();
+writeNativeReleaseIdentity(nativeSourceSha, mode, origin);
 verifyCommerceRoutesPruned();
 verifyNoPrivilegedSupabaseCredentials();
 verifyGuestSupabaseAbsence();

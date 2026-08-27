@@ -8,6 +8,7 @@
  * owner stamp are committed and restored as one filesystem value.
  */
 import { isNativeTarget } from "@/lib/platform/target";
+import { withDeadline } from "@/lib/async/deadline";
 import { NATIVE_ACCOUNT_BETA_ENABLED } from "@/lib/sync/containment";
 import {
   LAST_SYNC_USER_STORAGE_KEY,
@@ -20,6 +21,7 @@ import {
 
 /** Must match the Zustand persist `name` in lib/questos/store.ts. */
 export const JOURNEY_STORAGE_KEY = "biblequest:v1";
+export const NATIVE_JOURNEY_READ_DEADLINE_MS = 12_000;
 
 const BACKUP_FILE = "journey-backup.json";
 const BACKUP_ENVELOPE_KIND = "biblequest-native-journey-backup";
@@ -179,11 +181,17 @@ async function readBackupRecord(): Promise<BackupRecord> {
   const fs = await loadFilesystem();
   if (!fs) return { status: "unavailable" };
   try {
-    const file = await fs.Filesystem.readFile({
-      path: BACKUP_FILE,
-      directory: fs.Directory.Data,
-      encoding: fs.Encoding.UTF8,
-    });
+    // A wedged plugin read has no side effects, so it can be bounded without
+    // allowing a late completion to mutate or expose journey state.
+    const file = await withDeadline(
+      fs.Filesystem.readFile({
+        path: BACKUP_FILE,
+        directory: fs.Directory.Data,
+        encoding: fs.Encoding.UTF8,
+      }),
+      NATIVE_JOURNEY_READ_DEADLINE_MS,
+      "Native journey restore",
+    );
     return parseBackupFile(typeof file.data === "string" ? file.data : null);
   } catch (error) {
     return error !== null &&

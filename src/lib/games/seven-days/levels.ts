@@ -50,8 +50,8 @@ const MASKS: readonly SevenDaysMask[] = [
   ["#######", "#######", "##...##", "##...##", "##...##", "#######", "#######"],
 ];
 
-/** Every level now shares the game's purpose-built poster. */
-const SCENE_ID = "seven-days-match-poster";
+/** Every level reuses the reviewed Let There Be Light creation scene. */
+const SCENE_ID = "01-let-there-be-light";
 
 function tilesForChapter(chapter: SevenDaysChapter): SevenDaysTileId[] {
   const all = [...SEVEN_DAYS_TILE_IDS];

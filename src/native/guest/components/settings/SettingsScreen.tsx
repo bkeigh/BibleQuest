@@ -38,6 +38,7 @@ import { DEFAULT_BIBLE_TRANSLATION_KEY } from "@/lib/bible/defaults";
 import {
   FEATURED_TRANSLATIONS,
   featuredBibleTranslationOptions,
+  htmlLanguageTag,
   translationMetadata,
   translationPreferenceLabel,
   type BibleTranslation,
@@ -560,13 +561,16 @@ function TranslationRow({
             <span
               className="text-[0.8125rem] text-charcoal"
               dir={translation.direction}
-              lang={translation.languageId}
+              lang={htmlLanguageTag(translation.languageId)}
             >
               {translation.name}
             </span>
           </span>
           <span className="mt-0.5 block text-caption text-ash">
-            <span dir={translation.direction} lang={translation.languageId}>
+            <span
+              dir={translation.direction}
+              lang={htmlLanguageTag(translation.languageId)}
+            >
               {translation.languageNameLocal}
             </span>{" "}
             · {status}
@@ -1047,12 +1051,14 @@ function SettingsInner() {
       <PageContainer className="pb-8">
         <SectionTitle>{strings.settings.profile}</SectionTitle>
         <PaperCard variant="paper" padding="md">
-          <div className="flex items-center gap-4 max-[360px]:flex-col max-[360px]:items-stretch sm:gap-5">
+          {/* Profile stays one compact horizontal row, including on narrow
+              phones, so Settings owns identity without turning it into a hero. */}
+          <div className="flex items-center gap-3 sm:gap-4">
             <Avatar
               name={profile?.displayName}
               marker={profileAvatarMarker(profile)}
-              size="lg"
-              className="ring-1 ring-paper/70 shadow-[0_8px_24px_rgb(18_33_27_/_0.12)] max-[360px]:self-center"
+              size="md"
+              className="ring-1 ring-paper/70 shadow-[0_6px_18px_rgb(18_33_27_/_0.1)]"
             />
             <div className="min-w-0 flex-1">
               {editingName ? (
@@ -1378,6 +1384,15 @@ function SettingsInner() {
                   className="block py-3 text-charcoal hover:text-accent"
                 >
                   Privacy Policy
+                </Link>
+              </li>
+              <li>
+                {/* Keeps redistributed font notices reachable from the app. */}
+                <Link
+                  href={buildPublicHref("/THIRD_PARTY_NOTICES.txt")}
+                  className="block py-3 text-charcoal hover:text-accent"
+                >
+                  Third-party notices
                 </Link>
               </li>
               <li>

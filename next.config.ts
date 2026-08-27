@@ -30,6 +30,7 @@ function releaseSha(value: string | undefined) {
 // Preserve the first validated build-provider identity inside the server
 // bundle so an invalid Vercel value cannot mask a valid GitHub commit.
 const buildReleaseSha =
+  releaseSha(process.env.BIBLEQUEST_SOURCE_SHA) ??
   releaseSha(process.env.VERCEL_GIT_COMMIT_SHA) ??
   releaseSha(process.env.GITHUB_SHA) ??
   "";

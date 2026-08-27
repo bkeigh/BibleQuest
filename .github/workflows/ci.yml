@@ -187,6 +187,8 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
       - name: Prepare the release bundle and native plugins
+        env:
+          BIBLEQUEST_SOURCE_SHA: ${{ github.sha }}
         run: pnpm ios:release:prepare
       - name: Validate Capacitor and Apple configuration
         run: |
@@ -204,6 +206,14 @@ jobs:
           -disableAutomaticPackageResolution
           CODE_SIGNING_ALLOWED=NO
           build
+      - name: Verify the exact unsigned simulator app
+        run: >-
+          node scripts/verify-ios-release-app.mjs
+          --app "$RUNNER_TEMP/BibleQuestDerivedData/Build/Products/Release-iphonesimulator/App.app"
+          --profile guest
+          --expected-build 4
+          --expected-source "$GITHUB_SHA"
+          --allow-unsigned
 
   browser-smoke:
     name: Browser smoke

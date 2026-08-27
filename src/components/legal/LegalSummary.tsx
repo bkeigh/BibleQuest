@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
 import { ACCOUNT_SYNC_CONTAINED } from "@/lib/sync/containment";
-import { SUPPORT_EMAIL, SUPPORT_EMAIL_HREF } from "@/lib/brand";
+import {
+  LEGAL_ENTITY_NAME,
+  SUPPORT_EMAIL,
+  SUPPORT_EMAIL_HREF,
+} from "@/lib/brand";
 
 export type LegalDocumentKind = "privacy" | "terms";
 
@@ -40,9 +44,8 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
   privacy: {
     eyebrow: "Privacy",
     title: "Privacy Policy",
-    effectiveDate: "August 13, 2026",
-    intro:
-      "BibleQuest is a product of Winterhill Studio. This policy explains what we collect, why we use it, and the choices you have.",
+    effectiveDate: "August 26, 2026",
+    intro: `BibleQuest is a product of ${LEGAL_ENTITY_NAME}. This policy explains what we collect, why we use it, and the choices you have.`,
     sections: [
       {
         title: "What this policy covers",
@@ -123,7 +126,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
         title: "Contact",
         body: (
           <>
-            Privacy questions and requests may be sent to Winterhill Studio at{" "}
+            Privacy questions and requests may be sent to {LEGAL_ENTITY_NAME} at{" "}
             <ContactLink />.
           </>
         ),
@@ -133,9 +136,8 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
   terms: {
     eyebrow: "Terms",
     title: "Terms of Use",
-    effectiveDate: "July 24, 2026",
-    intro:
-      "These Terms of Use are an agreement between you and Winterhill Studio for your use of BibleQuest.",
+    effectiveDate: "August 26, 2026",
+    intro: `These Terms of Use are an agreement between you and ${LEGAL_ENTITY_NAME} for your use of BibleQuest.`,
     sections: [
       {
         title: "Accepting these terms",
@@ -159,13 +161,11 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
       },
       {
         title: "Your content",
-        body:
-          "Your prayers, reflections, and other original writing remain yours. You give Winterhill Studio only the limited permission needed to host, process, sync, back up, and display that content back to you, and to secure and operate BibleQuest. This permission ends when the content is deleted from active systems, subject to temporary restricted backups and legal obligations. Private writing is not licensed for advertising or AI training.",
+        body: `Your prayers, reflections, and other original writing remain yours. You give ${LEGAL_ENTITY_NAME} only the limited permission needed to host, process, sync, back up, and display that content back to you, and to secure and operate BibleQuest. This permission ends when the content is deleted from active systems, subject to temporary restricted backups and legal obligations. Private writing is not licensed for advertising or AI training.`,
       },
       {
         title: "A personal-use license",
-        body:
-          "Winterhill Studio gives you a limited, personal, non-exclusive, non-transferable, revocable license to use BibleQuest as intended while these terms apply. BibleQuest’s design, software, original writing, artwork, trademarks, and other materials remain owned by Winterhill Studio or their licensors.",
+        body: `${LEGAL_ENTITY_NAME} gives you a limited, personal, non-exclusive, non-transferable, revocable license to use BibleQuest as intended while these terms apply. BibleQuest’s design, software, original writing, artwork, trademarks, and other materials remain owned by ${LEGAL_ENTITY_NAME} or its licensors.`,
       },
       {
         title: "Respectful and lawful use",
@@ -194,8 +194,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
       },
       {
         title: "Disclaimers and responsibility",
-        body:
-          "BibleQuest is provided on an “as is” and “as available” basis to the extent permitted by law. Winterhill Studio does not promise a particular spiritual, personal, or health outcome. To the extent permitted by law, Winterhill Studio is not responsible for indirect, incidental, special, consequential, or punitive losses, or losses caused by circumstances outside reasonable control. These limits do not apply where the law forbids them.",
+        body: `BibleQuest is provided on an “as is” and “as available” basis to the extent permitted by law. ${LEGAL_ENTITY_NAME} does not promise a particular spiritual, personal, or health outcome. To the extent permitted by law, ${LEGAL_ENTITY_NAME} is not responsible for indirect, incidental, special, consequential, or punitive losses, or losses caused by circumstances outside reasonable control. These limits do not apply where the law forbids them.`,
       },
       {
         title: "Questions and disputes",
@@ -218,7 +217,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
         title: "Contact",
         body: (
           <>
-            Questions about these terms may be sent to Winterhill Studio at{" "}
+            Questions about these terms may be sent to {LEGAL_ENTITY_NAME} at{" "}
             <ContactLink />.
           </>
         ),

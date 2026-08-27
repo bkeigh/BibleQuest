@@ -28,6 +28,18 @@ describe("UX pass guardrails", () => {
     "src/components/plus/SupportLink.tsx",
     "utf8",
   );
+  const settings = readFileSync(
+    "src/components/settings/SettingsScreen.tsx",
+    "utf8",
+  );
+  const guestNativeSettings = readFileSync(
+    "src/native/guest/components/settings/SettingsScreen.tsx",
+    "utf8",
+  );
+  const disclosure = readFileSync(
+    "src/components/design-system/Disclosure.tsx",
+    "utf8",
+  );
 
   it("never promises the reader something about credits", () => {
     // BibleQuest has no credit or quota concept; the old failure copy
@@ -103,6 +115,23 @@ describe("UX pass guardrails", () => {
     expect(supportLink).toContain('data-paper-variant="quiet"');
     expect(supportLink).toContain("app-glass-surface");
     expect(supportLink).not.toContain("bg-evergreen-700");
+  });
+
+  it("keeps profile identity compact and owned by Settings", () => {
+    // The narrow layout used to turn the avatar and name into a tall hero.
+    for (const source of [settings, guestNativeSettings]) {
+      expect(source).toContain('size="md"');
+      expect(source).toContain("flex items-center gap-3 sm:gap-4");
+      expect(source).not.toContain("max-[360px]:flex-col");
+    }
+  });
+
+  it("truncates setting summaries before they squeeze their labels", () => {
+    // A long rhythm summary once forced “My rhythm” onto two overlapping rows.
+    expect(disclosure).toContain("max-w-[46%] truncate text-right");
+    expect(disclosure).not.toContain(
+      '{rightSlot && <span className="shrink-0">',
+    );
   });
 
   it("wires InfoHint for assistive tech rather than styling alone", () => {

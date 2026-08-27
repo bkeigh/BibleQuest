@@ -149,7 +149,7 @@ export async function verifiedNativeDeletionUserId(
     // This deletion-only singleton is created after normal availability
     // suspension, so explicitly prevent it from refreshing while beta is off.
     try {
-      authClient.auth.stopAutoRefresh();
+      await authClient.auth.stopAutoRefresh();
     } catch {
       // The explicit deletion attempt still fails closed on any auth error.
     }

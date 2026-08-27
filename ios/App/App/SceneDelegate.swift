@@ -6,6 +6,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
     private weak var bridgeViewController: CAPBridgeViewController?
     private var boldTextObserver: NSObjectProtocol?
+    private var contentSizeObserver: NSObjectProtocol?
     private var privacyCover: UIView?
     private let authInstallMarker = "biblequest-native-auth-install-v1"
     private let authKeyPrefix = "biblequest_auth_"
@@ -26,6 +27,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         protectJourneyMirror()
         observeBoldText()
+        observeContentSizeCategory()
         SceneDelegateProxy.shared.scene(
             scene,
             willConnectTo: session,
@@ -85,6 +87,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         if let observer = boldTextObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+        if let observer = contentSizeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     // Covers private journal and prayer content before iOS snapshots the app.
@@ -98,6 +103,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func sceneDidBecomeActive(_ scene: UIScene) {
         syncBoldText()
+        syncContentSizeCategory()
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
@@ -143,6 +149,44 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
           } else {
             apply();
           }
+        })();
+        """
+        bridgeViewController?.webView?.evaluateJavaScript(script)
+    }
+
+    // Mirrors iOS accessibility text categories into responsive web layouts.
+    private func observeContentSizeCategory() {
+        contentSizeObserver = NotificationCenter.default.addObserver(
+            forName: UIContentSizeCategory.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.syncContentSizeCategory()
+        }
+        syncContentSizeCategory()
+    }
+
+    private func syncContentSizeCategory() {
+        let category = UIApplication.shared.preferredContentSizeCategory
+        let enabled = category.isAccessibilityCategory ? "true" : "false"
+        // Compute against the explicit changed trait so UIFont's process-wide
+        // preferred-font cache cannot hold the previous accessibility scale.
+        let traits = UITraitCollection(preferredContentSizeCategory: category)
+        let preferredBodySize = UIFontMetrics(forTextStyle: .body)
+            .scaledValue(for: 17, compatibleWith: traits)
+        let requestedTextScale = preferredBodySize / 17
+        let script = """
+        (() => {
+          const apply = () => document.documentElement.classList.toggle('system-accessibility-text', \(enabled));
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', apply, { once: true });
+          } else {
+            apply();
+          }
+          window.dispatchEvent(new CustomEvent(
+            'biblequest:native-text-size-change',
+            { detail: \(requestedTextScale) }
+          ));
         })();
         """
         bridgeViewController?.webView?.evaluateJavaScript(script)

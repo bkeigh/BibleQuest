@@ -21,6 +21,7 @@ import { ApiBibleViewTracker } from "@/components/bible/ApiBibleViewTracker";
 import { usePreferredBiblePassage } from "@/lib/bible/use-preferred-scripture";
 import { chapterHref } from "@/lib/bible/links";
 import {
+  htmlLanguageTag,
   isRedistributableBibleTranslation,
   LOCAL_WEB_TRANSLATION_KEY,
 } from "@/lib/bible/translations";
@@ -134,7 +135,7 @@ export function VerseCard({
       <div className="pointer-events-none absolute -right-3 -top-2 opacity-30">
         <IconLeaf className="text-olive-300" size={preview ? 64 : 52} />
       </div>
-      <div className="flex items-center justify-between gap-1.5 min-[380px]:gap-3">
+      <div className="verse-card-kicker flex items-center justify-between gap-1.5 min-[380px]:gap-3">
         <h2
           className={`font-art-label leading-tight uppercase tracking-[0.05em] text-accent ${
             preview
@@ -182,7 +183,7 @@ export function VerseCard({
           <div>
             <blockquote
               dir={resolved.effectiveTranslation.direction}
-              lang={resolved.effectiveTranslation.languageId}
+              lang={htmlLanguageTag(resolved.effectiveTranslation.languageId)}
               className={
                 preview
                   ? "verse-text mt-2.5"
@@ -201,7 +202,7 @@ export function VerseCard({
               — {verse.reference} <span className="text-fog">·</span>{" "}
               <span
                 dir={resolved.effectiveTranslation.direction}
-                lang={resolved.effectiveTranslation.languageId}
+                lang={htmlLanguageTag(resolved.effectiveTranslation.languageId)}
               >
                 {resolved.effectiveTranslation.name}
               </span>

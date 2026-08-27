@@ -181,7 +181,7 @@ function MilestoneHighlight({ view }: { view: MilestoneView }) {
               : "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-paper/85 ring-1 ring-mist/70"
           }
         >
-          <ArtIcon name={(milestone.iconKey as ArtSpriteName) ?? "star"} size={68} />
+          <ArtIcon name={(milestone.iconKey as ArtSpriteName) ?? "star"} size={36} />
         </span>
         <div className="min-w-0">
           <p className="font-art-label text-[0.875rem] leading-tight text-graphite">
@@ -225,7 +225,7 @@ function MilestoneListRow({ view }: { view: MilestoneView }) {
             : "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-paper"
         }
       >
-        <ArtIcon name={(milestone.iconKey as ArtSpriteName) ?? "star"} size={56} />
+        <ArtIcon name={(milestone.iconKey as ArtSpriteName) ?? "star"} size={32} />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
@@ -453,7 +453,7 @@ function JourneyScreenInner() {
                         key={type}
                         className="inline-flex min-h-9 items-center gap-2 rounded-full border border-mist bg-paper/80 px-3 text-caption text-charcoal"
                       >
-                        <ArtIcon name={facet.sprite} size={44} />
+                        <ArtIcon name={facet.sprite} size={28} />
                         {facet.label}
                       </span>
                     );
@@ -507,7 +507,7 @@ function JourneyScreenInner() {
                 >
                   <span className="flex items-start justify-between gap-2">
                     <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-surface">
-                      <ArtIcon name={facet.sprite} size={56} />
+                      <ArtIcon name={facet.sprite} size={32} />
                     </span>
                     <span
                       className={
@@ -554,8 +554,10 @@ function JourneyScreenInner() {
             </span>
           </div>
 
+          {/* The rail itself takes focus so keyboard users can scroll it with arrows. */}
           <ol
-            className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-1 pb-3 [scrollbar-width:thin]"
+            tabIndex={0}
+            className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain rounded-[var(--radius-button)] px-1 pb-3 [scrollbar-width:thin] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             aria-label="Milestone highlights"
           >
             {milestoneHighlights.map((view) => (
@@ -625,7 +627,7 @@ function JourneyScreenInner() {
                     {month.events.map((e) => (
                       <li key={e.id} className="relative ms-6 pb-6 last:pb-0">
                         <span className="absolute -start-[2.05rem] top-0 flex h-6 w-6 items-center justify-center rounded-full bg-parchment ring-1 ring-mist">
-                          <ArtIcon name={EVENT_SPRITE[e.type]} size={56} />
+                          <ArtIcon name={EVENT_SPRITE[e.type]} size={22} />
                         </span>
                         <p className="text-[0.9375rem] text-charcoal">{e.title}</p>
                         <p className="mt-0.5 text-[0.75rem] text-ash">
@@ -660,7 +662,7 @@ function JourneyScreenInner() {
             className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4"
           >
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent-surface">
-              <ArtIcon name="star" size={68} />
+              <ArtIcon name="star" size={40} />
             </span>
             <div className="min-w-0 flex-1">
               <h2 className="text-[1rem] font-medium text-graphite">Make the space yours</h2>

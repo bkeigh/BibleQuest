@@ -213,7 +213,7 @@ function BibleIndexInner() {
                   ? chapterHref(readingPosition.bookSlug, readingPosition.chapter)
                   : chapterHref("john", 1)
               }
-              icon={<ArtIcon name="bookmark" size={68} />}
+              icon={<ArtIcon name="bookmark" size={48} />}
               eyebrow={readingPosition ? "Continue" : "A place to begin"}
               title={
                 readingPosition

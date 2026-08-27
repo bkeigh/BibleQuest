@@ -5,6 +5,19 @@ set -euo pipefail
 repository_root="${CI_PRIMARY_REPOSITORY_PATH:?CI_PRIMARY_REPOSITORY_PATH is required}"
 cd "$repository_root"
 
+# Freeze and expose the exact checkout before any generated build-number change.
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "Xcode Cloud checkout contains tracked changes before preparation." >&2
+  exit 1
+fi
+cloud_source_sha="$(git rev-parse --verify HEAD)"
+if ! print -r -- "$cloud_source_sha" | grep -Eq '^[0-9a-f]{40}$'; then
+  echo "Xcode Cloud source identity is not a full Git SHA." >&2
+  exit 1
+fi
+export BIBLEQUEST_SOURCE_SHA="$cloud_source_sha"
+echo "Building immutable source SHA $BIBLEQUEST_SOURCE_SHA"
+
 # Match the locked toolchain used by package.json and the repository CI workflow.
 if ! brew list --versions node@24 >/dev/null 2>&1; then
   brew install node@24
@@ -45,6 +58,12 @@ if [[ "$current_workflow" != "$ACCOUNT_WORKFLOW_NAME" ]]; then
 fi
 
 echo "Workflow '$current_workflow': building the account replacement profile."
+
+# Public account replacements must be built only from the reviewed main branch.
+if [[ "${CI_BRANCH:-}" != "main" ]]; then
+  echo "The account replacement workflow requires CI_BRANCH=main." >&2
+  exit 1
+fi
 
 # build-native.mjs reads this from .env.account-release.local and refuses any
 # key whose SHA-256 does not match the reviewed target manifest. Supply it as a

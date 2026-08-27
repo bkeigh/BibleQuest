@@ -122,7 +122,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main
           id="app-main"
           tabIndex={-1}
-          className={cn("relative z-10 flex-1", !hidesBottomNav && "pb-28")}
+          className={cn(
+            "relative z-10 flex-1",
+            !hidesBottomNav &&
+              "pb-[calc(var(--app-bottom-nav-height,5rem)+1rem)]",
+          )}
         >
           {children}
         </main>

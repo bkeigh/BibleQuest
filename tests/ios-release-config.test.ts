@@ -15,7 +15,7 @@ describe("iOS App Store release configuration", () => {
 
     expect(scripts.scripts["build:native:release"]).toContain("--release");
     expect(scripts.scripts["ios:release:prepare"]).toBe(
-      "node scripts/select-ios-privacy-manifest.mjs --guest && pnpm build:native:release && pnpm exec cap sync ios && node scripts/verify-guest-ios-payload.mjs",
+      "node scripts/select-ios-privacy-manifest.mjs --guest && pnpm build:native:release && pnpm exec cap sync ios && node scripts/verify-guest-ios-payload.mjs && node scripts/verify-ios-content-rights.mjs",
     );
     const verifier = source("scripts/verify-guest-ios-payload.mjs");
     expect(verifier).toContain("findGuestAccountArtifactViolation");
@@ -46,14 +46,14 @@ describe("iOS App Store release configuration", () => {
     );
   });
 
-  it("locks version 1.0 to the iPhone device family", () => {
+  it("locks version 1.2 to the iPhone device family", () => {
     const project = source("ios/App/App.xcodeproj/project.pbxproj");
     const plist = source("ios/App/App/Info.plist");
 
     expect(project.match(/CURRENT_PROJECT_VERSION = 4;/g)).toHaveLength(2);
     expect(project.match(/TARGETED_DEVICE_FAMILY = 1;/g)).toHaveLength(2);
     expect(project).not.toContain('TARGETED_DEVICE_FAMILY = "1,2";');
-    expect(project.match(/MARKETING_VERSION = 1\.0;/g)).toHaveLength(2);
+    expect(project.match(/MARKETING_VERSION = 1\.2;/g)).toHaveLength(2);
     expect(project.match(/PRODUCT_BUNDLE_IDENTIFIER = co\.biblequest\.app;/g)).toHaveLength(2);
     expect(plist).toMatch(
       /<key>CFBundleVersion<\/key>\s*<string>\$\(CURRENT_PROJECT_VERSION\)<\/string>/,
@@ -111,6 +111,14 @@ describe("iOS App Store release configuration", () => {
     expect(scene).toContain("func sceneDidEnterBackground");
     expect(scene).toContain("showPrivacyCover()");
     expect(scene).toContain("UIAccessibility.isBoldTextEnabled");
+    expect(scene).toContain("category.isAccessibilityCategory");
+    expect(scene).toContain("system-accessibility-text");
+    expect(scene).toMatch(
+      /private func syncContentSizeCategory\(\)[\s\S]*?biblequest:native-text-size-change/,
+    );
+    expect(scene).toContain("UITraitCollection(preferredContentSizeCategory:");
+    expect(scene).toContain("UIFontMetrics(forTextStyle: .body)");
+    expect(scene).toContain("new CustomEvent(");
     const swiftPrefix = scene.match(/authKeyPrefix = "([^"]+)"/)?.[1];
     const storagePrefix = authStorage.match(
       /AUTH_KEY_PREFIX = "([^"]+)"/,
@@ -130,6 +138,7 @@ describe("iOS App Store release configuration", () => {
     expect(config).not.toContain('contentInset: "always"');
     expect(config).toContain('preferredContentMode: "mobile"');
     expect(config).toContain("LocalNotifications:");
+    expect(config).toContain("launchShowDuration: 60_000");
   });
 
   it("purges obsolete plaintext native auth on every app startup", () => {
@@ -138,10 +147,24 @@ describe("iOS App Store release configuration", () => {
     );
     const layout = source("src/app/layout.tsx");
     const storage = source("src/lib/supabase/native-auth-storage.ts");
+    const journeyStartup = source("src/lib/native/journey-backup.ts");
+    const guestStartup = source(
+      "src/native/guest/lib/native/journey-backup.ts",
+    );
+    const guestGuard = source(
+      "src/native/guest/components/app-shell/NativeJourneyGuard.tsx",
+    );
 
     expect(startup).toContain("clearLegacyNativeAuthStorage()");
     expect(startup).toContain("await restoreJourneyIfEvicted()");
     expect(startup).toContain("await useQuestOS.persist.rehydrate()");
+    expect(startup).toContain("await syncNativePreferredTextZoom()");
+    expect(guestGuard).toContain("await syncNativePreferredTextZoom()");
+    expect(startup).toContain("NATIVE_TEXT_SIZE_CHANGE_EVENT");
+    expect(guestGuard).toContain("NATIVE_TEXT_SIZE_CHANGE_EVENT");
+    expect(startup.indexOf("await syncNativePreferredTextZoom()")).toBeLessThan(
+      startup.indexOf("setStatus(\"ready\")"),
+    );
     expect(startup.indexOf("await restoreJourneyIfEvicted()")).toBeLessThan(
       startup.indexOf("startJourneyBackup()"),
     );
@@ -150,6 +173,8 @@ describe("iOS App Store release configuration", () => {
     );
     expect(storage).toContain('"biblequest:native-auth-cookies"');
     expect(storage).toContain("storage ?? window.localStorage");
+    expect(journeyStartup).toContain("NATIVE_JOURNEY_READ_DEADLINE_MS");
+    expect(guestStartup).toContain("NATIVE_JOURNEY_READ_DEADLINE_MS");
   });
 
   it("uses the reviewed open book across native and in-app startup", () => {
@@ -185,6 +210,22 @@ describe("iOS App Store release configuration", () => {
     expect(fallback).toContain('className="sr-only"');
     expect(nativeGuard).toContain("return <AppLoadingScreen />");
     expect(onboardingGate).toContain("return <AppLoadingScreen />");
+  });
+
+  it("reflows fixed home and Bible chrome for accessibility Dynamic Type", () => {
+    const styles = source("src/app/globals.css");
+    const verseCard = source("src/components/bible/VerseCard.tsx");
+
+    expect(styles).toContain(
+      "html.system-accessibility-text .primary-bottom-nav",
+    );
+    expect(styles).toContain(
+      "html.system-accessibility-text .home-hero-layout",
+    );
+    expect(styles).toContain(
+      "html.system-accessibility-text .verse-card-kicker",
+    );
+    expect(verseCard).toContain('className="verse-card-kicker');
   });
 
   it("prunes web-only workers and acquisition media from the native stage", () => {

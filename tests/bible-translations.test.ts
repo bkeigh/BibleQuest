@@ -14,6 +14,7 @@ import {
   WEB_TRANSLATION,
   bibleTranslationKey,
   featuredBibleTranslationOptions,
+  htmlLanguageTag,
   normalizeBibleTranslationKey,
   translationMetadata,
   translationPreferenceLabel,
@@ -22,6 +23,15 @@ import { DEFAULT_SETTINGS } from "@/lib/questos/types";
 import { rowsToSettings, settingsToRows } from "@/lib/sync/mapping";
 
 describe("Bible translation preference and licensing boundary", () => {
+  it("uses canonical HTML language tags without changing provider identifiers", () => {
+    expect(htmlLanguageTag("eng")).toBe("en");
+    expect(htmlLanguageTag("spa")).toBe("es");
+    expect(htmlLanguageTag("cmn")).toBe("zh");
+    expect(htmlLanguageTag("arb")).toBe("ar");
+    expect(htmlLanguageTag("not a language")).toBe("und");
+    expect(WEB_TRANSLATION.languageId).toBe("eng");
+  });
+
   it("stores keyless KJV as the preferred default while keeping WEB bundled offline", () => {
     expect(DEFAULT_BIBLE_TRANSLATION_KEY).toBe("kjv");
     expect(DEFAULT_SETTINGS.preferredBibleTranslation).toBe("kjv");

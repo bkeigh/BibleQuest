@@ -23,6 +23,7 @@ import {
   initialAccountIntent,
   type AccountIntent,
 } from "@/lib/auth/account-intent";
+import { AccountIntentPicker } from "./AccountIntentPicker";
 import { isStandaloneWebApp } from "@/lib/pwa/install-guidance";
 import {
   ACCOUNT_SYNC_CONTAINED,
@@ -255,30 +256,11 @@ function AccountInner() {
           ))}
         </ul>
 
-        <div
-          role="group"
-          aria-label="Choose account access"
-          className="mt-5 grid grid-cols-2 gap-2 rounded-[var(--radius-button)] bg-linen p-1"
-        >
-          {(["create", "signin"] as const).map((option) => {
-            const selected = intent === option;
-            return (
-              <button
-                key={option}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => setIntent(option)}
-                className={`min-h-11 rounded-[calc(var(--radius-button)-0.25rem)] px-3 text-small transition-colors ${
-                  selected
-                    ? "bg-paper font-medium text-accent shadow-sm"
-                    : "text-ash hover:text-charcoal"
-                }`}
-              >
-                {option === "create" ? "Create account" : "Sign in"}
-              </button>
-            );
-          })}
-        </div>
+        <AccountIntentPicker
+          intent={intent}
+          onIntentChange={setIntent}
+          className="mt-5"
+        />
 
         <div className="mt-4">
           <SignInMethods

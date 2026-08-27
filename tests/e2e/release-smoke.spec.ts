@@ -44,6 +44,9 @@ test("public marketing remains visible, private, and portfolio-frameable", async
 });
 
 test("onboarding exposes landmarks and denies framing", async ({ page }) => {
+  // Keep this landmark check on the true first-visit path even when parallel
+  // service-worker tests exercise legacy-browser recovery on the same origin.
+  await page.addInitScript(() => localStorage.clear());
   const response = await page.goto("/onboarding");
 
   expect(response?.status()).toBe(200);
@@ -80,14 +83,14 @@ test("Home starts compactly and profile changes follow cached routes", async ({
   await expect(
     page.getByRole("heading", { level: 1, name: "Fixture Person" }),
   ).toBeVisible();
-  const profileCard = page.locator("header[data-plus-nameplate]");
-  const profileCardBox = await profileCard.boundingBox();
-  expect(profileCardBox?.y).toBeLessThanOrEqual(20);
+  const welcomeCard = page.locator("header[data-plus-nameplate]");
+  const welcomeCardBox = await welcomeCard.boundingBox();
+  expect(welcomeCardBox?.y).toBeLessThanOrEqual(20);
   await page.getByRole("link", { name: "Settings" }).click();
   await page.getByRole("button", { name: "Edit" }).click();
   await page.getByLabel("Display name").fill("Updated Person");
   await page.getByRole("button", { name: "Save" }).click();
-  await page.getByRole("link", { name: "Home", exact: true }).click();
+  await page.getByRole("link", { name: "Today", exact: true }).click();
 
   await expect(
     page.getByRole("heading", { level: 1, name: "Updated Person" }),

@@ -125,8 +125,8 @@ function HomeInner() {
       </div>
 
       <PageContainer className="relative pt-safe-gap-4">
-        {/* Personal welcome — one framed devotional surface with today's
-            candle, echoing a bookplate rather than a dashboard header. */}
+        {/* Compact personal welcome — profile editing stays in Settings while
+            today's candle remains visible without adding another card row. */}
         <header
           data-paper-variant="paper"
           data-plus-nameplate={isPlus ? "active" : "free"}
@@ -144,17 +144,17 @@ function HomeInner() {
               className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-[#fff6c7]/20 blur-2xl"
             />
           )}
-          <div className="relative z-10 grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 max-[430px]:gap-2 max-[340px]:gap-1.5 sm:gap-4">
+          <div className="home-hero-layout relative z-10 grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 max-[430px]:gap-2 max-[340px]:gap-1.5 sm:gap-4">
             <Link
               href="/app/settings"
               aria-label={t.home.openSettings}
-              className="relative shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="home-hero-avatar-link relative shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <Avatar
                 name={profile?.displayName}
                 marker={profileAvatarMarker(profile)}
                 size="lg"
-                className="ring-1 ring-paper/70 shadow-[0_8px_24px_rgb(18_33_27_/_0.14)] max-[430px]:h-[4.5rem] max-[430px]:w-[4.5rem] max-[340px]:h-16 max-[340px]:w-16"
+                className="home-hero-avatar-art ring-1 ring-paper/70 shadow-[0_8px_24px_rgb(18_33_27_/_0.14)] max-[430px]:h-[4.5rem] max-[430px]:w-[4.5rem] max-[340px]:h-16 max-[340px]:w-16"
               />
               <span
                 aria-hidden="true"
@@ -212,13 +212,13 @@ function HomeInner() {
               streak={streak}
               dayKey={dayKey}
               tone={isPlus ? "gold" : "default"}
-              className="max-[340px]:w-12"
+              className="home-hero-streak max-[340px]:w-12"
             />
           </div>
         </header>
 
         <div className="space-y-7 pb-7">
-          {/* Scripture stays directly beneath the personal account surface,
+          {/* Scripture stays directly beneath the personal welcome,
               while the compact treatment leaves quests as Home's main work. */}
           <TodaysVerseLink />
 
@@ -246,14 +246,14 @@ function HomeInner() {
                 padding="md"
                 className="flex min-h-24 items-center gap-4"
               >
-                <span className="flex shrink-0 items-center justify-center">
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center">
                   <ArtIcon
                     name={
                       featuredQuest
                         ? CATEGORY_ART[featuredQuest.category] ?? "scroll"
                         : "scroll"
                     }
-                    size={80}
+                    size={56}
                   />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -421,16 +421,16 @@ function TodaysVerseLink() {
     <motion.div variants={riseIn} initial="hidden" animate="visible">
       <Link
         href="/app/bible"
-        className="group relative isolate flex min-h-20 items-center gap-3 overflow-hidden rounded-[var(--radius-card)] border border-evergreen-600 bg-evergreen-700 px-4 py-4 text-[#fdfbf3] paper-shadow-lg transition-all duration-300 [transition-timing-function:var(--ease-gentle)] hover:-translate-y-0.5 hover:bg-evergreen-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0"
+        className="home-todays-verse group relative isolate flex min-h-20 items-center gap-3 overflow-hidden rounded-[var(--radius-card)] border border-evergreen-600 bg-evergreen-700 px-4 py-4 text-[#fdfbf3] paper-shadow-lg transition-all duration-300 [transition-timing-function:var(--ease-gentle)] hover:-translate-y-0.5 hover:bg-evergreen-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0"
       >
         <span
           aria-hidden="true"
           className="ambient absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gold-300/15 blur-2xl [animation:var(--animate-twinkle)]"
         />
-        <span className="relative flex shrink-0 items-center justify-center">
-          <ArtIcon name="open-book" size={68} />
+        <span className="home-todays-verse-art relative flex shrink-0 items-center justify-center">
+          <ArtIcon name="open-book" size={52} />
         </span>
-        <span className="relative min-w-0 flex-1">
+        <span className="home-todays-verse-copy relative min-w-0 flex-1">
           <span className="block font-display text-[1.125rem] leading-tight">
             View Today&apos;s Verse
           </span>
@@ -438,7 +438,7 @@ function TodaysVerseLink() {
             A quiet word is waiting in the Bible.
           </span>
         </span>
-        <IconArrowRight className="relative shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
+        <IconArrowRight className="home-todays-verse-arrow relative shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
       </Link>
     </motion.div>
   );
@@ -463,7 +463,7 @@ function ShepherdCallout({
         {/* Its own character, the same one the floating launcher uses. */}
         <ArtIcon
           name="myshepherd"
-          size={68}
+          size={52}
           className="[filter:drop-shadow(0_2px_4px_rgb(15_40_54/0.35))]"
         />
       </span>
@@ -527,11 +527,11 @@ function QuickActionTile({
         interactive
         variant="paper"
         padding="sm"
-        className="flex h-full min-h-[7rem] flex-col items-center justify-center gap-2.5 text-center sm:min-h-[7.75rem]"
+        className="flex h-full min-h-[6.5rem] flex-col items-center justify-center gap-2 text-center sm:min-h-[7rem]"
       >
         {/* The artwork lifts gently while the card keeps a stable touch target. */}
         <span className="flex shrink-0 items-center justify-center transition-transform duration-300 group-hover:-translate-y-0.5">
-          <ArtIcon name={sprite} size={68} animate={animate} />
+          <ArtIcon name={sprite} size={52} animate={animate} />
         </span>
         <span className="text-[0.75rem] font-medium leading-snug text-graphite min-[390px]:text-[0.8125rem] sm:text-small">
           {title}

@@ -4,9 +4,9 @@ import { ArtIcon } from "@/components/design-system/ArtIcon";
 
 /** The scenes the arcade draws its cards on, shared by Home and the arcade. */
 export const ARCADE_ART = {
-  today: "/art/scripture-games-today.webp",
-  sevenDays: "/art/seven-days-match-poster.webp",
-  archive: "/art/scripture-games-coming-2.webp",
+  today: "/wallpapers/galilee-be-still/poster.webp",
+  sevenDays: "/wallpapers/01-let-there-be-light/poster.webp",
+  archive: "/wallpapers/the-sheltering-tree/poster.webp",
 } as const;
 
 /**
@@ -71,8 +71,8 @@ export function ArcadeGameCard({
           <span className="relative flex h-16 w-16 shrink-0 items-center justify-center">
             <ArtIcon
               name={icon}
-              size={72}
-              // See SupportLink: the reset would cap this at the anchor's width.
+              size={56}
+              // The shared fixed frame preserves alignment across game art.
               className="absolute max-w-none [filter:drop-shadow(0_2px_5px_rgb(0_0_0/0.45))]"
             />
           </span>

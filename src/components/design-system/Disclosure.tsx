@@ -38,9 +38,9 @@ const VARIANTS: Record<
     trigger: "px-4 py-2",
     content: "px-4 pb-3",
   },
-  /** Exact MyShepherd blue for prominent AI-assisted surfaces. */
+  /** WCAG-AA MyShepherd blue for prominent AI-assisted surfaces. */
   blue: {
-    root: "rounded-[var(--radius-card)] border border-[#3F7EA3] bg-[#3F7EA3] paper-shadow",
+    root: "rounded-[var(--radius-card)] border border-[#3D789C] bg-[#3D789C] paper-shadow",
     trigger: "px-4 py-2.5",
     content: "px-4 pb-4",
   },
@@ -128,7 +128,13 @@ export function Disclosure({
         )}
       >
         <span className="min-w-0 flex-1">{label}</span>
-        {rightSlot && <span className="shrink-0">{rightSlot}</span>}
+        {/* Summaries truncate before they can squeeze a short setting label
+            into a broken stack on narrow phones. */}
+        {rightSlot && (
+          <span className="min-w-0 max-w-[46%] truncate text-right">
+            {rightSlot}
+          </span>
+        )}
         <IconChevronRight
           className={cn(
             "shrink-0 rotate-90 transition-transform duration-300 [transition-timing-function:var(--ease-gentle)]",

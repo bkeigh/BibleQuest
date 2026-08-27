@@ -301,6 +301,41 @@ describe("self-service account deletion", () => {
     expect(stopAutoRefresh).toHaveBeenCalledOnce();
   });
 
+  it("contains a rejected auto-refresh stop after native deletion verification", async () => {
+    process.env[PLATFORM] = "native";
+    process.env[ACCOUNT_SYNC] = "true";
+    process.env[ACCOUNT_BETA] = "true";
+    vi.resetModules();
+    const { verifiedNativeDeletionUserId } = await import(
+      "@/lib/auth/account-deletion"
+    );
+    const authClient = {
+      auth: {
+        getSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              access_token: "stable-token",
+              user: { id: USER_A },
+            },
+          },
+          error: null,
+        }),
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: USER_A } },
+          error: null,
+        }),
+        stopAutoRefresh: vi.fn().mockRejectedValue(
+          new Error("private refresh shutdown failure"),
+        ),
+      },
+    } as unknown as SupabaseClient;
+
+    await expect(verifiedNativeDeletionUserId(authClient)).resolves.toBe(
+      USER_A,
+    );
+    expect(authClient.auth.stopAutoRefresh).toHaveBeenCalledOnce();
+  });
+
   it("refuses disabled-beta deletion recovery after the credential changes", async () => {
     process.env[PLATFORM] = "native";
     process.env[ACCOUNT_SYNC] = "true";

@@ -3,14 +3,14 @@ import {
   LEGAL_DOCUMENTS,
   LegalSummary,
 } from "@/components/legal/LegalSummary";
+import { LEGAL_ENTITY_NAME } from "@/lib/brand";
 import { marketingMetadata } from "@/lib/metadata";
 
 const terms = LEGAL_DOCUMENTS.terms;
 
 export const metadata = marketingMetadata({
   title: "Terms of Use",
-  description:
-    "The plain-language terms that govern accounts, content, purchases, and use of BibleQuest by Winterhill Studio.",
+  description: `The plain-language terms that govern accounts, content, purchases, and use of BibleQuest by ${LEGAL_ENTITY_NAME}.`,
   path: "/terms",
 });
 

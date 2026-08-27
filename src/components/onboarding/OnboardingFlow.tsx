@@ -27,6 +27,7 @@ import {
 import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { WheelPicker } from "@/components/design-system/WheelPicker";
 import { SignInMethods } from "@/components/account/SignInMethods";
+import { AccountIntentPicker } from "@/components/account/AccountIntentPicker";
 import { QuestSlip } from "@/components/quests/QuestSlip";
 import {
   LEGAL_DOCUMENTS,
@@ -336,9 +337,9 @@ function OnboardingInner({
               {visibleStep === HOME_STEP && (
                 <StepGuide
                   mascot="lantern"
-                  eyebrow="Home"
+                  eyebrow="Today"
                   title="A calm place to begin each day"
-                  body="Your Home brings today’s verse, your quests, and a simple invitation to pray or reflect into one clear view."
+                  body="Today brings your daily verse, quests, and a simple invitation to pray or reflect into one clear view."
                   points={[
                     "A daily verse chosen for your journey",
                     "Your next faithful steps, easy to find",
@@ -516,14 +517,28 @@ function StepAccount({
       )}
 
       {accountEnabled ? (
-        <PaperCard variant="paper" padding="md" className="mt-5">
-          <SignInMethods
-            source="onboarding"
-            nextPath="/onboarding"
+        <>
+          <AccountIntentPicker
             intent={intent}
-            onUnavailable={() => setAuthUnavailable(true)}
+            onIntentChange={setIntent}
+            className="mt-5"
           />
-        </PaperCard>
+          <PaperCard variant="paper" padding="md" className="mt-3">
+            <SignInMethods
+              key={intent}
+              source="onboarding"
+              nextPath="/onboarding"
+              intent={intent}
+              onUnavailable={() => setAuthUnavailable(true)}
+            />
+          </PaperCard>
+          {intent === "signin" && (
+            <p className="mt-3 text-center text-caption leading-relaxed text-ash">
+              You’ll stay signed in securely on this device until you choose
+              Sign out.
+            </p>
+          )}
+        </>
       ) : (
         <PaperCard variant="linen" padding="md" className="mt-5 text-center">
           <p className="text-small leading-relaxed text-charcoal">
@@ -531,22 +546,6 @@ function StepAccount({
             device.
           </p>
         </PaperCard>
-      )}
-
-      {accountEnabled && (
-        <button
-          type="button"
-          className="mt-3 min-h-11 w-full text-small text-accent underline underline-offset-4"
-          onClick={() =>
-            setIntent((current) =>
-              current === "create" ? "signin" : "create",
-            )
-          }
-        >
-          {intent === "create"
-            ? "Already have an account? Sign in"
-            : "New to BibleQuest? Create an account"}
-        </button>
       )}
 
       {(authUnavailable || !accountEnabled) && (

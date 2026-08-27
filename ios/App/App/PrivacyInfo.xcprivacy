@@ -3,12 +3,12 @@
 <!--
 	Apple's privacy manifest for the account-sync profile.
 
-	The declarations cover the initial reviewed contract: account name and
-	email; religious or philosophical writing; prayer, reflection, bookmark,
-	Journey, reading, quest, and settings content; and the Supabase user ID.
-	Profile photos and the other declared data are linked to the signed-in
-	account for app functionality, never tracking. Payments, analytics, AI,
-	and remote push are disabled.
+	The declarations cover account name and email; religious or philosophical
+	writing; prayer, reflection, bookmark, Journey, reading, quest, and settings
+	content; the Supabase user ID; conservative network-derived device identity;
+	and bounded hosting diagnostics. Profile photos and the other declared data
+	are used for app functionality, never tracking. Payments, analytics, AI, and
+	remote push are disabled.
 
 	The filesystem plugin also reads timestamps for the durable local journey
 	mirror. Reason C617.1 covers files inside this app's container.
@@ -95,7 +95,31 @@
 		</dict>
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeDeviceID</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypeProductInteraction</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeOtherDiagnosticData</string>
 			<key>NSPrivacyCollectedDataTypeLinked</key>
 			<true/>
 			<key>NSPrivacyCollectedDataTypeTracking</key>

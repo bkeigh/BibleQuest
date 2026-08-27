@@ -93,11 +93,9 @@ There are no purchases or paid unlocks in this iOS build.
 Set **Sign-in required** to No. Provide current review contact name, email, and
 phone number. No demo account is needed for this build.
 
-Before pasting the copyright or submitting legal metadata, confirm whether
-“Winterhill Studio” is an authorized trade name/DBA of Winterhill Media LLC.
-The public Privacy Policy and Terms currently use the Studio name while the
-Apple developer team uses the LLC name. Align the public legal identity if that
-relationship is not already documented.
+Public policy, terms, and publisher metadata use `Winterhill Media LLC`, which
+matches the Apple developer team and repository license. Reconfirm that exact
+legal party and its content rights before pasting the copyright field.
 
 ## Privacy-answer worksheet
 
