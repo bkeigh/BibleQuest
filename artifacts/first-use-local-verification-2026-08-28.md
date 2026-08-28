@@ -9,7 +9,7 @@ PASS FOR LOCAL SOURCE REVIEW; NOT A SIGNED OR DEVICE-VERIFIED RELEASE CANDIDATE
 - Branch: `codex/first-use-release-candidate`
 - Starting source: `c3af44df5834a53736da671cfe5a51b9a7ae1475`
 - Recorded: `2026-08-28T05:15:26Z`
-- Scope: six-step onboarding, reviewed starter-quest allowlist, direct free-app entry, exact selected-quest handoff, post-value installation timing, opt-in MyShepherd launcher, and append-only Production native-availability reconciliation
+- Scope: six-step onboarding, reviewed starter-quest allowlist, direct free-app entry, exact selected-quest handoff, first-screen daily actions, post-value installation timing, opt-in MyShepherd launcher, safe-area-aware skip links, and append-only Production native-availability reconciliation
 
 ## Automated evidence
 
@@ -18,7 +18,7 @@ PASS FOR LOCAL SOURCE REVIEW; NOT A SIGNED OR DEVICE-VERIFIED RELEASE CANDIDATE
 | `pnpm install --frozen-lockfile` | PASS | Local dependency installation only |
 | `pnpm lint` | PASS | Static lint only |
 | `pnpm exec tsc --noEmit` | PASS | Type analysis only |
-| `pnpm test` | PASS — 213 files, 1,650 tests | Repeated after the selected-quest handoff adjustment |
+| `pnpm test` | PASS — 214 files, 1,652 tests | Repeated after the native skip-link safe-area adjustment |
 | Focused first-use, launch-content, and Home-formation tests | PASS — 32 tests | Source-contract and layout-order coverage, not a signed binary |
 | `pnpm test:e2e` | PASS — 10 browser journeys | Local fixture environment |
 | `pnpm test:headers` | PASS — production build and 2 header checks | Local fixture environment |
@@ -42,13 +42,19 @@ The same production-component preview measured Home’s action hierarchy before 
 
 A second local-only responsive pass inspected all six pages at 320×568 and the account page at 375×667. At 375×667, the primary action and both legal links were visible without scrolling. At 320×568, the primary action remained fully visible (`top=496.15`, `bottom=547.65`) with no horizontal overflow; the legal sentence continued below the fold through ordinary vertical scrolling. This pass exposed one transition defect: after scrolling the long Language/Bible page to Continue, the next illustrated page inherited the scroll offset and clipped its mascot. The candidate now resets both the onboarding container and document scroll on every step change. Replaying the narrow path produced `scrollY=0`, a visible mascot (`top=75`), and `scrollWidth=320` on the Daily rhythm and Practices pages, and `scrollY=0` on the First quest page.
 
-### Native simulator first screen
+### Native simulator first-use journey
 
 A clean iPhone 16 Pro simulator on iOS 18.6 installed the exact account-release artifact. With the production native-availability latch intentionally off, the first render showed the local-only posture without provider controls or credential collection. The first capture exposed a hierarchy problem: the only viable continuation was a subdued ghost action and nearby copy repeated the fallback message.
 
-The revised artifact uses one full-width evergreen “Continue on this device” control, removes the duplicate sentence, retains the accurate device-local/export explanation, and keeps Terms and Privacy visible above the home indicator. A terminate/relaunch produced the same layout. No account, credential, prayer, reflection, note, identifier, or private URL was used or captured. Both disposable simulator devices created for this check were removed afterward.
+The revised artifact uses one full-width evergreen “Continue on this device” control, removes the duplicate sentence, retains the accurate device-local/export explanation, and keeps Terms and Privacy visible above the home indicator.
 
-Computer Use could not click deeper because macOS was locked and automatic unlock correctly failed. Therefore this is PASS evidence for install, launch, relaunch, account-disabled posture, safe-area layout, and initial hierarchy only; it does not close interactive native onboarding, persistence, auth, physical-device, or accessibility gates.
+After the host became available, Full Keyboard Access exercised the exact unsigned Release artifact through Account, Name, Language/Bible, Daily rhythm, Practices, First quest, Home, and the exact “Read One Psalm Slowly” quest detail. The First quest action assigned the selected quest, Home placed Prayer/Bible/Reflection in the first viewport, “Open quest” reached that exact detail, the bottom Begin action sat clear of the fixed tab bar, and a terminate/relaunch returned to Home with onboarding complete, the local profile intact, and the starter quest still Ready.
+
+The walkthrough exposed one native-only accessibility defect: the focused Home “Skip to content” link appeared beneath the status/Dynamic Island area. Both application shells now position focused skip links with the top safe-area inset. The rebuilt account-release artifact embeds that exact CSS rule, passes the complete artifact verifier, and launched cleanly on a fresh iPhone 16 Pro / iOS 18.6 simulator through Language/Bible before the host locked again. Full Keyboard Access also revealed that its navigation visits all nineteen language-wheel radios; the flow remains operable, but condensing that traversal is a worthwhile accessibility-hardening follow-up.
+
+No account, credential, prayer, reflection, note, identifier, or private URL was used or captured. Every disposable simulator created for these checks was removed afterward.
+
+This is PASS evidence for local simulator install, launch, the complete local-only first-use path, exact quest handoff, and relaunch persistence. It does not substitute for signed-artifact, provider-auth, physical-device, VoiceOver, Dynamic Type, reduced-motion, or two-account isolation evidence.
 
 ## Read-only Production evidence
 

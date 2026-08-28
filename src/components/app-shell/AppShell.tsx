@@ -119,9 +119,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <LanguageApplier />
         <WallpaperBackdrop />
+        {/* Keep the keyboard-only escape hatch below a notched device's
+            status area when it becomes visible. */}
         <a
           href="#app-main"
-          className="sr-only z-50 rounded-[var(--radius-button)] bg-paper px-4 py-3 text-accent paper-shadow-lg focus:not-sr-only focus:fixed focus:start-4 focus:top-4"
+          className="sr-only z-50 rounded-[var(--radius-button)] bg-paper px-4 py-3 text-accent paper-shadow-lg focus:not-sr-only focus:fixed focus:start-4 focus:top-[max(1rem,calc(env(safe-area-inset-top)+0.5rem))]"
         >
           Skip to content
         </a>
