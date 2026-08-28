@@ -29,6 +29,7 @@ PASS FOR LOCAL SOURCE REVIEW; NOT A SIGNED OR DEVICE-VERIFIED RELEASE CANDIDATE
 | `pnpm check:supabase-browser-bundle` | PASS — one reviewed public target | Built with the guarded public account-release input; no key value recorded |
 | `pnpm audit --prod --audit-level high` | PASS — no known vulnerabilities | Registry state at command time |
 | `git diff --check` | PASS | Whitespace only |
+| Local Supabase / Docker status | OPEN — harness unavailable at `2026-08-28T06:45:08Z` | Both read-only status probes remained silent for 90 seconds and were interrupted; pgTAP, RLS, and concurrency checks were not claimed |
 | `pnpm ios:account-release:prepare` | PASS — 261 pages, reviewed public target, content-rights inventory, exact containing-commit identity | Local export, not an uploaded archive |
 | Unsigned Release iPhone `xcodebuild` | PASS — `BUILD SUCCEEDED` | Proves device-target compilation, not signing, TestFlight processing, or physical-device behavior |
 | Complete unsigned simulator artifact verifier | PASS — profile `account-release`, version `1.2`, build `4`, 2,853 files, exact containing-commit source identity | Uses the reviewed unsigned mode; signed archive verification remains open |
