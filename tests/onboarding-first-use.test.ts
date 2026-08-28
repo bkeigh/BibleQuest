@@ -73,11 +73,15 @@ describe("first-use onboarding", () => {
     );
 
     expect(source).toContain(
-      'variant={accountEnabled ? "ghost" : "primary"}',
+      'variant={accountEnabled && !accountLoading ? "ghost" : "primary"}',
     );
-    expect(source).toContain('size={accountEnabled ? "sm" : "lg"}');
+    expect(source).toContain(
+      'size={accountEnabled && !accountLoading ? "sm" : "lg"}',
+    );
     expect(source).toContain("{authUnavailable && accountEnabled && (");
-    expect(source).toContain("You can continue privately on");
+    expect(source).toContain("Checking secure account access…");
+    expect(source).toContain("You can continue on this");
+    expect(source).not.toContain("stays private on this device");
   });
 
   it("opens every guide page at the top after a longer step scrolls", () => {

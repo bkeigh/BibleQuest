@@ -96,7 +96,7 @@ function OnboardingInner({
   authFailure: AuthFailureReason | null;
 }) {
   const router = useRouter();
-  const { user, configured } = useSession();
+  const { user, configured, loading: accountLoading } = useSession();
   const completeOnboarding = useQuestOS((state) => state.completeOnboarding);
   const pickQuest = useQuestOS((state) => state.pickQuest);
   const markAccountNudgeShown = useQuestOS(
@@ -267,6 +267,7 @@ function OnboardingInner({
               {visibleStep === ACCOUNT_STEP && (
                 <StepAccount
                   accountEnabled={accountSyncAvailable(configured)}
+                  accountLoading={accountLoading}
                   authFailure={authFailure}
                   onContinue={continueWithoutAccount}
                   onOpenLegal={setLegalDocument}
@@ -398,11 +399,13 @@ function StepMascot({
 
 function StepAccount({
   accountEnabled,
+  accountLoading,
   authFailure,
   onContinue,
   onOpenLegal,
 }: {
   accountEnabled: boolean;
+  accountLoading: boolean;
   authFailure: AuthFailureReason | null;
   onContinue: () => void;
   onOpenLegal: (kind: LegalDocumentKind) => void;
@@ -425,15 +428,19 @@ function StepAccount({
           id={STEP_HEADING_ID}
           className="mt-1.5 font-display text-[1.75rem] leading-tight text-graphite outline-none"
         >
-          {!accountEnabled
+          {accountLoading
+            ? "Checking account access"
+            : !accountEnabled
             ? "Begin your journey"
             : intent === "create"
               ? "Create your free account"
               : "Welcome back"}
         </h1>
         <p className="mx-auto mt-2 max-w-sm text-small leading-relaxed text-charcoal">
-          {!accountEnabled
-            ? "Your BibleQuest journey stays private on this device and can be exported from Settings."
+          {accountLoading
+            ? "You can continue on this device now, or wait a moment for account options."
+            : !accountEnabled
+            ? "Your BibleQuest journey stays on this device and can be exported from Settings."
             : intent === "create"
               ? "Keep your journey with you across devices. Your private writing stays out of analytics."
               : "Sign in and we’ll restore your saved journey before opening the app."}
@@ -446,7 +453,13 @@ function StepAccount({
         </div>
       )}
 
-      {accountEnabled ? (
+      {accountLoading ? (
+        <PaperCard variant="linen" padding="md" className="mt-5 text-center">
+          <p role="status" className="text-small leading-relaxed text-charcoal">
+            Checking secure account access…
+          </p>
+        </PaperCard>
+      ) : accountEnabled ? (
         <>
           <AccountIntentPicker
             intent={intent}
@@ -472,8 +485,8 @@ function StepAccount({
       ) : (
         <PaperCard variant="linen" padding="md" className="mt-5 text-center">
           <p className="text-small leading-relaxed text-charcoal">
-            Account sign-in is unavailable here. You can continue privately on
-            this device.
+            Account sign-in is unavailable here. You can continue on this
+            device.
           </p>
         </PaperCard>
       )}
@@ -488,13 +501,15 @@ function StepAccount({
       {/* Local-only mode has one viable path, so it receives primary emphasis;
           the same action stays secondary when account choices are available. */}
       <GentleButton
-        variant={accountEnabled ? "ghost" : "primary"}
-        size={accountEnabled ? "sm" : "lg"}
+        variant={accountEnabled && !accountLoading ? "ghost" : "primary"}
+        size={accountEnabled && !accountLoading ? "sm" : "lg"}
         fullWidth
-        className={accountEnabled ? "mt-2 text-ash" : "mt-4"}
+        className={accountEnabled && !accountLoading ? "mt-2 text-ash" : "mt-4"}
         onClick={onContinue}
       >
-        {accountEnabled ? "Continue without an account" : "Continue on this device"}
+        {accountEnabled && !accountLoading
+          ? "Continue without an account"
+          : "Continue on this device"}
       </GentleButton>
       <div className="mt-3 text-center">
         <LegalLinks onOpen={onOpenLegal} />
