@@ -15,12 +15,12 @@ The native availability result is reduced to an account-enabled boolean and rend
 | None | The revised copy accurately describes a local continuation without claiming encryption, guaranteed security, or an active account connection. | `StepAccount` branches only on the existing `accountEnabled` posture and does not collect a field or call a transport. | Keep account availability and signed-in sync verification as separate release gates. |
 | None | Removing the duplicate fallback sentence changes presentation only; it does not weaken consent or legal access. | Terms and Privacy links remain directly below the primary action. | Recheck the exact native screen after export. |
 
-## Verification required
+## Verification completed
 
-- Focused onboarding and containment tests pass.
-- Exact account-release export and artifact verifier pass after the change is committed.
-- A clean native simulator shows the local-only action as the primary control with Terms and Privacy still visible.
-- Physical-device and account-enabled network/isolation checks remain open; simulator evidence must not be promoted to those gates.
+- Focused onboarding, containment, and native-commerce tests passed 24/24; the full Vitest suite passed 1,648/1,648.
+- The guarded account-release export and complete unsigned artifact verifier passed against the containing candidate commit.
+- A clean iPhone 16 Pro / iOS 18.6 simulator showed the local-only action as the primary control with Terms and Privacy still visible before and after relaunch.
+- Computer Use could not click farther because macOS was locked. Physical-device, interactive native continuation, and account-enabled network/isolation checks remain open; simulator evidence is not promoted to those gates.
 
 ## Residual risk and owner
 

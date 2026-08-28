@@ -8,7 +8,7 @@ PASS FOR LOCAL SOURCE REVIEW; NOT A SIGNED OR DEVICE-VERIFIED RELEASE CANDIDATE
 
 - Branch: `codex/first-use-release-candidate`
 - Starting source: `c3af44df5834a53736da671cfe5a51b9a7ae1475`
-- Recorded: `2026-08-28T03:59:00Z`
+- Recorded: `2026-08-28T04:19:00Z`
 - Scope: six-step onboarding, reviewed starter-quest allowlist, direct free-app entry, post-value installation timing, opt-in MyShepherd launcher, and append-only Production native-availability reconciliation
 
 ## Automated evidence
@@ -18,8 +18,8 @@ PASS FOR LOCAL SOURCE REVIEW; NOT A SIGNED OR DEVICE-VERIFIED RELEASE CANDIDATE
 | `pnpm install --frozen-lockfile` | PASS | Local dependency installation only |
 | `pnpm lint` | PASS | Static lint only |
 | `pnpm exec tsc --noEmit` | PASS | Type analysis only |
-| `pnpm test` | PASS — 213 files, 1,647 tests | Repeated after the final native-history checker adjustment |
-| Focused first-use, resume, native-commerce, launch-content, and Production reconciliation tests | PASS — 46 initial tests plus 28 post-fix tests | Source-contract and unit coverage, not a signed binary |
+| `pnpm test` | PASS — 213 files, 1,648 tests | Repeated after the native local-only action adjustment |
+| Focused first-use, containment, and native-commerce tests | PASS — 24 tests | Source-contract and unit coverage, not a signed binary |
 | `pnpm test:e2e` | PASS — 10 browser journeys | Local fixture environment |
 | `pnpm test:headers` | PASS — production build and 2 header checks | Local fixture environment |
 | `pnpm test:service-worker` | PASS — 31 tests | Local worker harness |
@@ -35,6 +35,14 @@ PASS FOR LOCAL SOURCE REVIEW; NOT A SIGNED OR DEVICE-VERIFIED RELEASE CANDIDATE
 At 390×844, a clean account moved through Account, Name, Language/Bible, Daily rhythm, Practices, and First quest. The language heading was clear, the first quest remained stable while the name changed, and Start opened `/app` directly with no Plus interstitial. No install prompt appeared before value.
 
 After completing “Notice Where Kindness Found You,” the completion and First Step milestone dialogs appeared in order. Thirteen seconds after they closed, the installation panel appeared; MyShepherd did not occupy the floating overlay slot. At 320×568, the language screen had no horizontal overflow (`innerWidth=320`, `scrollWidth=320`) and retained ordinary vertical scrolling.
+
+### Native simulator first screen
+
+A clean iPhone 16 Pro simulator on iOS 18.6 installed the exact account-release artifact. With the production native-availability latch intentionally off, the first render showed the local-only posture without provider controls or credential collection. The first capture exposed a hierarchy problem: the only viable continuation was a subdued ghost action and nearby copy repeated the fallback message.
+
+The revised artifact uses one full-width evergreen “Continue on this device” control, removes the duplicate sentence, retains the accurate device-local/export explanation, and keeps Terms and Privacy visible above the home indicator. A terminate/relaunch produced the same layout. No account, credential, prayer, reflection, note, identifier, or private URL was used or captured. Both disposable simulator devices created for this check were removed afterward.
+
+Computer Use could not click deeper because macOS was locked and automatic unlock correctly failed. Therefore this is PASS evidence for install, launch, relaunch, account-disabled posture, safe-area layout, and initial hierarchy only; it does not close interactive native onboarding, persistence, auth, physical-device, or accessibility gates.
 
 ## Read-only Production evidence
 
