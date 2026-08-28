@@ -1,7 +1,7 @@
 # BibleQuest 1.2 account release — App Store submission packet
 
-Status: **DRAFT COMPLETE — HOLD FOR SIGNED BUILD 41 AND OWNER GATES**
-Prepared: **2026-08-26**
+Status: **DRAFT COMPLETE — HOLD FOR NEXT SIGNED BUILD AND OWNER GATES**
+Prepared: **2026-08-27**
 Target: iPhone, United States only, Free, manual release
 
 This packet replaces the guest-only claims in `docs/APP_STORE_SUBMISSION.md`
@@ -57,7 +57,7 @@ BUILD A GENTLE RHYTHM
 Follow your Journey, revisit meaningful moments, and play Scripture-centered games without guilt, rankings, or pressure. Nothing withers while you are away.
 
 USE IT YOUR WAY
-Begin without an account, or create a free account with an emailed numeric code to carry supported progress, prayers, reflections, bookmarks, and settings across your devices. Account sync is protected by BibleQuest access controls but is not end-to-end encrypted. Settings includes export, clear-data, sign-out, and account-deletion controls.
+Begin without an account, or create a free account with Sign in with Apple or an emailed six-digit code to carry supported progress, prayers, reflections, bookmarks, and settings across your devices. Account sync is protected by BibleQuest access controls but is not end-to-end encrypted. Settings includes export, clear-data, sign-out, and account-deletion controls.
 
 BibleQuest does not replace church, clergy, community, counseling, medical care, or emergency help. It is a daily companion for Christians from every tradition and for people exploring faith.
 
@@ -67,7 +67,7 @@ The core experience is free. Version 1.2 contains no native purchase flow or pai
 ## What's New
 
 ```text
-A calmer first day and a clearer welcome back. Version 1.2 refreshes Today, account entry, Settings, and navigation artwork, with small readability, accessibility, and touch-target improvements throughout.
+A calmer first day and a clearer welcome back. Version 1.2 refreshes Today, Settings, and navigation, adds Sign in with Apple, and makes emailed six-digit codes easier to autofill or paste, with small readability, accessibility, and touch-target improvements throughout.
 ```
 
 This text must be rechecked after the physical first-five-minute study. Remove
@@ -83,7 +83,7 @@ without an account. The optional account path still must be reviewable.
 ```text
 BibleQuest 1.2 is a local-first Christian companion with an optional account. No sign-in is required to complete onboarding, read Scripture, write a device-local prayer or reflection, choose and complete a quest, or view Journey progress.
 
-Optional accounts use an emailed numeric code entered inside the iPhone app. This iOS build offers no Apple or Google social sign-in. Reviewers may choose Create account or Sign in, enter an email address they control, receive the code, and enter it in the app. No shared demo credential or portable sign-in link is required.
+Optional accounts support native Sign in with Apple and an emailed six-digit code entered inside the iPhone app. Reviewers may use Sign in with Apple, or choose Create account or Sign in, enter an email address they control, and select the code from the iPhone keyboard or paste it into the app. The sixth digit submits automatically. This native build does not offer Google sign-in. No shared demo credential or portable sign-in link is required.
 
 Supported journey data can sync to the user's protected BibleQuest account. Account sync is not end-to-end encrypted. Journal text is excluded from analytics and is never sent to AI. Settings includes export, Clear My Data, sign-out, and Delete account controls.
 
@@ -93,7 +93,9 @@ Native commerce, Plus acquisition, analytics, APNs, and remote push are disabled
 
 Suggested guest review path: complete onboarding → Today → open today's Scripture → choose and complete a quest → Prayer → write a synthetic entry → Journey → Settings → Privacy & data.
 
-Suggested account review path: Settings → Account → Create account or Sign in → receive and enter the emailed numeric code → close and reopen the app → confirm the signed-in journey restores → Settings → Account → Delete account.
+Suggested email-account review path: Settings → Account → Create account or Sign in → receive and autofill or paste the six-digit code → close and reopen the app → confirm the signed-in journey restores → Settings → Account → Delete account.
+
+Suggested Apple-account review path: Settings → Account → Sign in with Apple → complete the native Apple sheet → close and reopen the app → confirm the signed-in journey restores → Settings → Account → Delete account.
 
 About, Terms, Privacy Policy, support, Scripture source/license links, and third-party font notices are available from Settings. BibleQuest is not an emergency, counseling, medical, or pastoral service.
 ```
@@ -126,11 +128,11 @@ purpose **App Functionality**:
 | Data type | Release purpose |
 | --- | --- |
 | Name | Optional profile display name |
-| Email Address | Account identity and numeric-code delivery |
+| Email Address | Account identity, six-digit-code delivery, or an Apple private relay address |
 | Photos or Videos | Optional profile photo |
 | Sensitive Info | Religious or philosophical writing, including prayers and reflections |
 | Other User Content | Bookmarks, Journey, reading, quest, and settings content |
-| User ID | Supabase account identifier |
+| User ID | Supabase account identifier and linked authentication-provider identity |
 | Device ID | Conservative classification of the opaque network-derived abuse-prevention bucket |
 | Product Interaction | Quest and reading progress that drives the user's Journey |
 | Other Diagnostic Data | Bounded Vercel request/runtime diagnostics |
@@ -152,7 +154,7 @@ Tracking remains **No** and `NSPrivacyTrackingDomains` remains empty.
 - HelloAO receives only server-to-server Scripture coordinates and Vercel
   egress, with no forwarded user/network/account/private-content fields. Its
   unpublished retention is covered conservatively by Product Interaction.
-- Inspect the signed Build 41 for unexpected diagnostic, analytics, advertising,
+- Inspect the next signed replacement build for unexpected diagnostic, analytics, advertising,
   commerce, push, or third-party SDK behavior.
 - Publish App Privacy only after the signed artifact, manifest, server flow,
   and App Store answers tell one accepted story.
@@ -205,7 +207,7 @@ this worksheet is not a substitute for the live questionnaire.
 | Advertising identifier/tracking | No | Privacy manifest and binary inspection |
 | In-app purchases | None in Version 1.2 | Native commerce pin, pruned routes, signed-artifact test |
 | Remote push | No | APNs/remote-push configuration absent; local reminders only |
-| Account deletion | Available in app | Must pass exact Build 41 physical-device test |
+| Account deletion | Available in app | Must pass exact signed-build physical-device test |
 
 ## Exact-binary screenshot packet
 
@@ -213,7 +215,7 @@ The five existing 1290 × 2796 opaque PNGs are **not reusable**: they show the
 Version 1.0 guest UI, use “Home” instead of “Today,” and include a device-only
 journal claim that is incomplete for an account build.
 
-Capture from the signed Build 41 after the comprehension/accessibility window,
+Capture from the next signed replacement build after the comprehension/accessibility window,
 using only synthetic content and the final App Store appearance:
 
 | Order | Screen and benefit | Required privacy/content check |
@@ -245,8 +247,8 @@ Do not upload Generate-a-quest or MyShepherd posters for this release.
       approved branch is merged to a clean `main`.
 - [ ] Full 40-character immutable `main` SHA is recorded.
 - [ ] Only the `BibleQuest Account Release` Xcode Cloud workflow runs from that
-      SHA and produces Build 41.
-- [ ] Signed `.app` proves Version 1.2, Build 41, bundle ID
+      SHA; record the actual Xcode Cloud build number.
+- [ ] Signed `.app` proves Version 1.2, the recorded build number, bundle ID
       `co.biblequest.app`, exact Production host/public-key fingerprint,
       account privacy manifest, content/media inventory, third-party notices,
       and absence of staging/preview, privileged keys, analytics, remote push,
@@ -255,7 +257,7 @@ Do not upload Generate-a-quest or MyShepherd posters for this release.
       `scripts/verify-ios-release-app.mjs` for the frozen `main` SHA without
       `--allow-unsigned`; record its tree SHA-256 and the separate archive/IPA
       file SHA-256.
-- [ ] Exact Build 41 passes the two-account/two-iPhone beta, offline/conflict,
+- [ ] The exact signed build passes the two-account/two-iPhone beta, offline/conflict,
       returning-session, deletion, old-client, first-five-minute,
       VoiceOver/Dynamic Type/contrast/reduced-motion, and device-size matrices.
 - [ ] Exact screenshots are captured and approved.
@@ -274,7 +276,7 @@ T+0/+5/+15/+30/+60 launch watch in the operative release runbook.
 | Field | Value/evidence | Status |
 | --- | --- | --- |
 | Final `main` SHA | `[FULL SHA]` | OPEN |
-| Xcode Cloud workflow/build | `[WORKFLOW URL / BUILD 41]` | OPEN |
+| Xcode Cloud workflow/build | `[WORKFLOW URL / ACTUAL BUILD NUMBER]` | OPEN |
 | Signed artifact hash | `[SHA-256]` | OPEN |
 | Physical-device evidence | `[RESTRICTED LINK]` | OPEN |
 | Screenshot packet | `[PATH / HASH LIST]` | OPEN |

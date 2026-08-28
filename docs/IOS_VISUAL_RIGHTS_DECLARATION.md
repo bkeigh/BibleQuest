@@ -1,11 +1,16 @@
-# Build 41 visual-rights declaration
+# Version 1.2 replacement-build visual-rights declaration
 
 Status: **UNSIGNED — App Store content-rights gate remains NO-GO**
 
 This declaration covers only the exact visual groups A1, A3, A4, and A6 in
-`docs/IOS_CONTENT_RIGHTS_INVENTORY.md` for BibleQuest iOS Version 1.2 Build 41,
-United States distribution. A signed copy and its restricted evidence link must
-be recorded in the release packet. Do not replace unknown facts with guesses.
+`docs/IOS_CONTENT_RIGHTS_INVENTORY.md` for the exact BibleQuest iOS Version 1.2
+replacement build recorded below, for United States distribution. A signed
+copy and its restricted evidence link must be recorded in the release packet.
+Do not replace unknown facts with guesses.
+
+- Xcode Cloud build number: `[ACTUAL BUILD NUMBER]`
+- Frozen source SHA: `[FULL 40-CHAR SHA]`
+- Signed artifact SHA-256: `[SHA-256]`
 
 ## Declarant
 
@@ -42,7 +47,7 @@ Initial each true statement and complete every blank:
 
 The source concepts are dated 2026-07-20 under
 `output/live-wallpapers/**/openai-imagegen-20260720-r01/`. Only the six poster
-stills listed in the inventory ship in Build 41.
+stills listed in the inventory ship in the recorded replacement build.
 
 - `[INITIALS]` I personally operated, or directly supervised the operator of,
   the OpenAI image-generation account used for these concepts.

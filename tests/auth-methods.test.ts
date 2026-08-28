@@ -56,14 +56,14 @@ describe("production sign-in methods", () => {
     expect(signInMarkup).toContain("Sign in with Google");
   });
 
-  it("offers email code only on native until audited OAuth deep links exist", () => {
+  it("offers native Apple sign-in without exposing an unaudited Google flow", () => {
     process.env.NEXT_PUBLIC_APP_PLATFORM = "native";
     try {
       const markup = renderToStaticMarkup(
         createElement(SignInMethods, { source: "account" }),
       );
       expect(markup).toContain("Email me a sign-in code");
-      expect(markup).not.toContain("Sign in with Apple");
+      expect(markup).toContain("Sign in with Apple");
       expect(markup).not.toContain("Sign in with Google");
     } finally {
       delete process.env.NEXT_PUBLIC_APP_PLATFORM;
@@ -75,11 +75,11 @@ describe("production sign-in methods", () => {
     expect(shouldCreateAccount("signin")).toBe(false);
   });
 
-  it("normalizes current Supabase email-code lengths", () => {
+  it("normalizes exactly six digits for paste and iOS code autofill", () => {
     expect(normalizeEmailOtp(" 12-34 56 ")).toBe("123456");
-    expect(normalizeEmailOtp("123456789")).toBe("12345678");
+    expect(normalizeEmailOtp("123456789")).toBe("123456");
     expect(isEmailOtpReady("123456")).toBe(true);
-    expect(isEmailOtpReady("12345678")).toBe(true);
+    expect(isEmailOtpReady("12345678")).toBe(false);
     expect(isEmailOtpReady("12345")).toBe(false);
     expect(isEmailOtpReady("12345a")).toBe(false);
   });

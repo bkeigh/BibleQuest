@@ -132,6 +132,46 @@ function LoadingVeil() {
   return <AppLoadingScreen />;
 }
 
+/** Offers a bounded retry without mounting or revealing account-owned data. */
+function NativeSessionRecovery() {
+  const [retrying, setRetrying] = useState(false);
+
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-parchment px-5">
+      <div className="w-full max-w-sm">
+        <PaperCard variant="paper" padding="lg">
+          <ArtMascot name="lantern" size={176} className="mb-4" />
+          <h1 className="font-display text-[1.375rem] leading-snug text-graphite">
+            Let’s finish signing you in
+          </h1>
+          <p role="alert" className="mt-2 text-small leading-relaxed text-charcoal">
+            Your account is still private and nothing was replaced. BibleQuest
+            couldn’t finish checking the saved sign-in just now.
+          </p>
+          <GentleButton
+            variant="primary"
+            size="md"
+            fullWidth
+            className="mt-5"
+            disabled={retrying}
+            aria-busy={retrying}
+            onClick={() => {
+              setRetrying(true);
+              window.location.reload();
+            }}
+          >
+            {retrying ? "Checking…" : "Try again"}
+          </GentleButton>
+          <p className="mt-3 text-caption leading-relaxed text-ash">
+            If you’re offline, reconnect first. You won’t need another email
+            code when the saved sign-in can be verified.
+          </p>
+        </PaperCard>
+      </div>
+    </div>
+  );
+}
+
 /** Keeps provisional auth private while offering a bounded cutover retry. */
 function InstallingAccountRecovery() {
   const [working, setWorking] = useState(false);
@@ -583,6 +623,7 @@ function AccountRestoreBoundary({
 }) {
   const { user, loading, configured, recovery } = useSession();
   if (recovery === "installing") return <InstallingAccountRecovery />;
+  if (recovery === "session-unavailable") return <NativeSessionRecovery />;
   if (recovery === "locked-local-journey") {
     return <LockedLocalJourneyRecovery />;
   }

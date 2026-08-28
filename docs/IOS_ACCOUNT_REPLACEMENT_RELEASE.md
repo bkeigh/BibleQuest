@@ -1,6 +1,6 @@
 # iOS account replacement release
 
-**Current decision (updated 2026-08-20):**
+**Current decision (updated 2026-08-27):**
 `HOLD — LOCAL SOURCE REVIEW ONLY; NO FROZEN RELEASE CANDIDATE`
 
 > **Current-state correction.** Production is recorded at `main`
@@ -13,6 +13,15 @@
 > then section 5 item 9a, items 10–12, and the device matrix in section 6. Brendan alone
 > approves or performs every external action, and must re-confirm the recorded
 > Production state before the first one.
+
+> **2026-08-27 authentication amendment.** Build 43 exposed an infinite
+> post-code loading failure and is not an approved replacement candidate. The
+> next candidate adds bounded Keychain-session recovery, exactly six-digit
+> email codes with iOS one-time-code autofill and normalized paste, and native
+> Sign in with Apple. Google sign-in remains excluded from native. These source
+> changes do not authorize Apple Developer capability changes, Production Auth
+> configuration, the native availability flag, or a new Xcode Cloud build;
+> each external activation remains a separate reviewed gate.
 
 This runbook governs the first public BibleQuest iOS replacement that adds
 email-code accounts and Production-backed journey sync. It is separate from the
@@ -34,10 +43,10 @@ The replacement is deliberately narrow:
 - migration `0039_bound_provider_rate_limit_retention.sql` must schedule the
   hourly purge of opaque provider buckets dormant beyond 48 hours before the
   privacy answers are approved;
-- email numeric-code accounts, account deletion, and reviewed journey sync are
-  in scope;
-- native commerce, Plus acquisition, social OAuth, analytics, APNs, and remote
-  reminders remain out of scope; and
+- exactly six-digit email-code accounts, native Sign in with Apple, account
+  deletion, and reviewed journey sync are in scope;
+- Google sign-in, native commerce, Plus acquisition, analytics, APNs, and
+  remote reminders remain out of scope; and
 - legacy `anon`, legacy `service_role`, and the legacy JWT secret remain enabled
   and unchanged for old-client compatibility. Retiring them is a separate task.
 
@@ -54,7 +63,7 @@ is a hard stop.
 
 | Field | Required value | Current preparation evidence | Status |
 | --- | --- | --- | --- |
-| Release branch | `main` at freeze; proposed fixes reviewed separately first | `codex/testflight-ui-refresh` is pushed in draft PR #130; record its exact reviewed head after protected CI, then freeze `main` separately | OPEN — REVIEW/MAIN FREEZE REQUIRED |
+| Release branch | `main` at freeze; proposed fixes reviewed separately first | Record the authentication-fix PR's exact reviewed head after protected CI, then freeze `main` separately | OPEN — REVIEW/MAIN FREEZE REQUIRED |
 | Immutable release SHA | `[FULL 40-CHAR PUSHED SHA]` | Record after the final documentation/control commit | OPEN |
 | Production project | `iacnjqnssovaaojswjoh` | Pinned by the target manifest and guarded migration script | PASS FOR SOURCE |
 | Native target | Exact reviewed Production origin plus matching modern publishable-key fingerprint | [`config/ios-account-release.json`](../config/ios-account-release.json) | PASS FOR SOURCE |
@@ -150,13 +159,13 @@ pnpm ios:account-release:prepare
 
 Xcode Cloud's post-build script must then pass the signed archive through the
 same exact-artifact command. Replace the placeholders with the frozen `main`
-SHA and the actual Cloud build number; Build 41 is the planned candidate:
+SHA and the actual Cloud build number:
 
 ```bash
 node scripts/verify-ios-release-app.mjs \
   --app "<ARCHIVE>/Products/Applications/App.app" \
   --profile account-release \
-  --expected-build 41 \
+  --expected-build "<ACTUAL_CLOUD_BUILD_NUMBER>" \
   --expected-source "<FULL_FROZEN_MAIN_SHA>"
 ```
 
@@ -248,10 +257,11 @@ item 9a only after section 4 is rerun against one clean, pushed, frozen SHA.
    Rerun the guarded check, Production readiness, pgTAP contract, and sanitized
    privacy evidence. Never substitute ordinary linked `db push`,
    `--include-all`, migration repair, reset, or history editing.
-10. **Create the internal TestFlight build.** Confirm custom SMTP, exact provider
-   and callback settings, the code-only template, resend limits, and in-app
-   deletion before creating any tester account. Distribute only the exact
-   scanned replacement build to the approved internal cohort.
+10. **Create the internal TestFlight build.** Confirm custom SMTP, exactly
+   six-digit OTP configuration, exact provider/client-ID and callback settings,
+   Apple private-relay sender posture, the code-only template, resend limits,
+   and in-app deletion before creating any tester account. Distribute only the
+   exact scanned replacement build to the approved internal cohort.
 11. **Open a staffed native test window.** Enable only the native availability
    flag. Do not alter legacy keys or unrelated Production flags. Disable it at
    the end of the window and verify installed clients stop auth, refresh, pull,
@@ -285,8 +295,13 @@ coverage may supplement layout checks only.
 
 - [ ] Disabled availability on fresh launch keeps guest Scripture and journey
       usable with no auth, session refresh, pull, or write.
-- [ ] New and returning numeric-code sign-in works with the exact code-only
-      template; no social OAuth control appears.
+- [ ] New and returning email sign-in works with the exact six-digit code-only
+      template, keyboard autofill, normalized paste, sixth-digit submission,
+      bounded recovery, and force-quit/restore.
+- [ ] Native Sign in with Apple works for a new account and a returning account;
+      the same verified address links only through Supabase's reviewed identity
+      behavior, while Apple private relay and account A/B tests remain isolated.
+- [ ] Google sign-in does not appear in the native build.
 - [ ] One owner restores on two devices without losing device-only reminders,
       drafts, game state, or Rhythm state.
 - [ ] A-to-B and B-to-A reads and writes are denied for every owned relation,

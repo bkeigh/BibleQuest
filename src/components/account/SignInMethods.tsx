@@ -44,13 +44,18 @@ import {
   requireCurrentWebAccountRealm,
   withInteractiveWebAccountOperationLock,
 } from "@/lib/supabase/web-auth-storage";
+import {
+  nativeAppleInstallationNeedsReload,
+  nativeAppleSignInWasCancelled,
+  signInWithNativeApple,
+} from "@/lib/auth/native-apple-sign-in";
 
 type EmailStatus = "idle" | "sending" | "requested";
 type OAuthProvider = "apple" | "google";
 
 // A quick client-side affordance. Supabase remains the source of truth.
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const EMAIL_OTP = /^\d{6,8}$/;
+const EMAIL_OTP = /^\d{6}$/;
 /** Supabase's default per-address passwordless-email window is 60 seconds. */
 const RESEND_COOLDOWN_SECONDS = 60;
 
@@ -59,12 +64,12 @@ export function shouldCreateAccount(intent: "create" | "signin"): boolean {
   return intent === "create";
 }
 
-/** Keeps pasted email codes numeric and within Supabase's supported range. */
+/** Keeps pasted email codes numeric and at the configured six-digit length. */
 export function normalizeEmailOtp(value: string): string {
-  return value.replace(/\D/g, "").slice(0, 8);
+  return value.replace(/\D/g, "").slice(0, 6);
 }
 
-/** Accepts current hosted and local Supabase email-code lengths. */
+/** Accepts only the six-digit code configured for BibleQuest email auth. */
 export function isEmailOtpReady(value: string): boolean {
   return EMAIL_OTP.test(value);
 }
@@ -207,10 +212,17 @@ export function SignInMethods({
   /** Verifies off-storage, then installs only the still-current email session. */
   async function verifyEmailCode(submittedCode = emailOtp) {
     const code = normalizeEmailOtp(submittedCode);
-    if (!isEmailOtpReady(code) || verifyingOtp || activeOtpAttempt.current) {
+    if (
+      !isEmailOtpReady(code) ||
+      verificationInFlight.current ||
+      activeOtpAttempt.current
+    ) {
       return;
     }
 
+    // Claim the attempt synchronously so paste, autofill, and the sixth key
+    // cannot dispatch duplicate verification requests before React rerenders.
+    verificationInFlight.current = true;
     setError(null);
     setVerifyingOtp(true);
     let attempt: EmailOtpAttempt | null = null;
@@ -220,7 +232,6 @@ export function SignInMethods({
       requireAccountLifecycleIdle(lifecycle);
       attempt = beginEmailOtpAttempt(requestedEmailRef.current);
       activeOtpAttempt.current = attempt;
-      verificationInFlight.current = true;
       const result = await verifyAndInstallEmailOtp(
         attempt,
         code,
@@ -286,6 +297,23 @@ export function SignInMethods({
     setOauthPending(provider);
     track("sign_in_started", { method: provider, source });
     try {
+      if (nativeTarget) {
+        if (provider !== "apple") {
+          throw new Error("This sign-in method is unavailable in the app.");
+        }
+        await requireNativeAccountBetaAvailability();
+        await signInWithNativeApple();
+        reportClientSignal({
+          surface: "auth",
+          stage: "request_oauth",
+          outcome: "success",
+          category: "ok",
+        });
+        setOauthPending(null);
+        onSignedIn?.();
+        return;
+      }
+
       const lifecycle = requireAccountLifecycleIdle();
       const request = () =>
         createClient().auth.signInWithOAuth({
@@ -320,6 +348,14 @@ export function SignInMethods({
       }
       // On success the browser navigates away; pending intentionally remains.
     } catch (requestError) {
+      if (nativeAppleSignInWasCancelled(requestError)) {
+        setOauthPending(null);
+        return;
+      }
+      if (nativeAppleInstallationNeedsReload(requestError)) {
+        window.location.reload();
+        return;
+      }
       reportClientSignal({
         surface: "auth",
         stage: "request_oauth",
@@ -380,18 +416,16 @@ export function SignInMethods({
             enterKeyHint="done"
             autoComplete="one-time-code"
             pattern="[0-9]*"
+            maxLength={6}
+            autoFocus
             value={emailOtp}
             onChange={(event) => {
               const next = normalizeEmailOtp(event.target.value);
               setEmailOtp(next);
               setError(null);
-              // A paste or an iOS one-time-code autofill arrives as a whole
-              // code in a single change, so submit it instead of asking for a
-              // tap the person has already effectively made. Typing advances
-              // one digit at a time and still lands on the button, which keeps
-              // longer local-Supabase codes from submitting at six digits.
+              // The sixth typed digit and iOS one-time-code autofill both
+              // complete the same exact code, so neither needs another tap.
               if (
-                next.length - emailOtp.length > 1 &&
                 isEmailOtpReady(next) &&
                 !verifyingOtp &&
                 !resending
@@ -399,7 +433,20 @@ export function SignInMethods({
                 void verifyEmailCode(next);
               }
             }}
-            placeholder="Enter the code"
+            onPaste={(event) => {
+              // WebKit can deliver formatted clipboard text without a useful
+              // change event, so normalize and submit the paste explicitly.
+              event.preventDefault();
+              const next = normalizeEmailOtp(
+                event.clipboardData.getData("text"),
+              );
+              setEmailOtp(next);
+              setError(null);
+              if (isEmailOtpReady(next) && !verifyingOtp && !resending) {
+                void verifyEmailCode(next);
+              }
+            }}
+            placeholder="000000"
             aria-invalid={Boolean(error)}
             aria-describedby={error ? "signin-error" : "pwa-code-help"}
             className="w-full rounded-[var(--radius-button)] border border-mist bg-linen px-3.5 py-2.5 text-center font-mono text-[1.25rem] tracking-[0.22em] text-graphite outline-none focus:border-accent/50"
@@ -408,8 +455,9 @@ export function SignInMethods({
             id="pwa-code-help"
             className="mt-2 text-center text-caption leading-relaxed text-ash"
           >
-            Using the Home Screen app? Stay here and enter the code instead of
-            opening the email link in Safari.
+            Paste the six-digit code, or choose it above the iPhone keyboard
+            when it appears. Stay here instead of opening the email link in
+            Safari.
           </p>
           <GentleButton
             type="submit"
@@ -458,16 +506,13 @@ export function SignInMethods({
           </GentleButton>
         </div>
 
-        {!nativeTarget && (
-          <>
-            <Divider />
-            <OAuthButtons
-              pending={oauthPending}
-              disabled={Boolean(oauthPending) || resending || verifyingOtp}
-              onSelect={oauth}
-            />
-          </>
-        )}
+        <Divider />
+        <OAuthButtons
+          providers={nativeTarget ? ["apple"] : ["apple", "google"]}
+          pending={oauthPending}
+          disabled={Boolean(oauthPending) || resending || verifyingOtp}
+          onSelect={oauth}
+        />
       </div>
     );
   }
@@ -521,16 +566,13 @@ export function SignInMethods({
         </GentleButton>
       </form>
 
-      {!nativeTarget && (
-        <>
-          <Divider />
-          <OAuthButtons
-            pending={oauthPending}
-            disabled={Boolean(oauthPending) || emailStatus === "sending"}
-            onSelect={oauth}
-          />
-        </>
-      )}
+      <Divider />
+      <OAuthButtons
+        providers={nativeTarget ? ["apple"] : ["apple", "google"]}
+        pending={oauthPending}
+        disabled={Boolean(oauthPending) || emailStatus === "sending"}
+        onSelect={oauth}
+      />
 
       {error && <FailureNotice failure={error} />}
     </>
@@ -539,17 +581,19 @@ export function SignInMethods({
 
 /** Keeps Apple and Google behavior aligned across both email states. */
 function OAuthButtons({
+  providers,
   pending,
   disabled,
   onSelect,
 }: {
+  providers: readonly OAuthProvider[];
   pending: OAuthProvider | null;
   disabled: boolean;
   onSelect: (provider: OAuthProvider) => Promise<void>;
 }) {
   return (
     <div className="space-y-2">
-      {(["apple", "google"] as const).map((provider) => {
+      {providers.map((provider) => {
         const providerName = provider === "apple" ? "Apple" : "Google";
         const label =
           pending === provider
@@ -570,8 +614,8 @@ function OAuthButtons({
             aria-busy={pending === provider}
             data-provider-button={provider}
           >
-            <span>{pending === provider ? "Opening" : "Sign in with"}</span>
             {provider === "apple" ? <AppleMark /> : <GoogleMark />}
+            <span>{pending === provider ? "Opening" : "Sign in with"}</span>
           </GentleButton>
         );
       })}

@@ -21,14 +21,23 @@ agree item for item.
 | App Store data type | Why the app collects it | Linked | Tracking |
 | --- | --- | --- | --- |
 | Name | Profile display name | Yes | No |
-| Email Address | Account identity and the sign-in code | Yes | No |
+| Email Address | Account identity, six-digit-code delivery, or an Apple private relay address | Yes | No |
 | Photos or Videos | Optional profile photo | Yes | No |
 | Sensitive Info | Religious or philosophical writing — prayers and reflections | Yes | No |
 | Other User Content | Bookmarks, Journey, reading, quest and settings content | Yes | No |
-| User ID | The Supabase account identifier | Yes | No |
+| User ID | The Supabase account identifier and linked authentication-provider identity | Yes | No |
 | Device ID | Conservative classification of the opaque HMAC bucket derived from a network address for abuse prevention | Yes | No |
 | Product Interaction | Quest and reading progress that drives the journey | Yes | No |
 | Other Diagnostic Data | Bounded Vercel request/runtime diagnostics used for reliability and abuse response | Yes | No |
+
+Sign in with Apple does not add a new App Privacy category beyond this
+worksheet. Apple may provide the account's chosen address or a private relay
+address, which remains covered by **Email Address**. Supabase stores the linked
+provider identity as part of the account, which remains covered by **User ID**.
+The native app sends Apple's identity token and a one-use nonce only to the
+isolated Supabase authentication exchange, does not log or send either value to
+analytics, and does not retain either after the exchange. The resulting
+Supabase session is stored in the iPhone Keychain.
 
 Two things worth stating plainly in the review notes, because both are unusual
 and both are true:
@@ -112,8 +121,13 @@ is intentionally more conservative than that minimum.
 - Apply and postflight 0039 through the guarded Production migration lane after
   a fresh physical backup. Until then, the old unbounded rows remain a hard
   stop for account availability.
-- Inspect the signed Build 41 and its generated privacy report for any data type
-  or SDK absent from this worksheet.
+- Inspect the next signed replacement build and its generated privacy report
+  for any data type or SDK absent from this worksheet.
+- In the staffed two-account device matrix, verify same-address automatic
+  identity linking, Apple private-relay isolation, Apple-account A/B row
+  isolation, returning-session restore, and deletion of every linked identity.
+  Use synthetic accounts and retain no email, Apple identifier, token, user ID,
+  or private content in release evidence.
 - Publish the nine matching App Store answers only after the final manifest,
   server flow, and signed artifact are approved together.
 

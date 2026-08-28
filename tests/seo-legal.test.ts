@@ -74,7 +74,7 @@ describe("launch legal documents", () => {
   it("uses final document names and an effective date", () => {
     expect(LEGAL_DOCUMENTS.privacy.title).toBe("Privacy Policy");
     expect(LEGAL_DOCUMENTS.terms.title).toBe("Terms of Use");
-    expect(LEGAL_DOCUMENTS.privacy.effectiveDate).toBe("August 26, 2026");
+    expect(LEGAL_DOCUMENTS.privacy.effectiveDate).toBe("August 27, 2026");
     expect(LEGAL_DOCUMENTS.terms.effectiveDate).toBe("August 26, 2026");
   });
 
@@ -89,6 +89,7 @@ describe("launch legal documents", () => {
     expect(privacySections).toEqual(
       expect.arrayContaining([
         "How long information is kept",
+        "Signing in with Apple",
         "Your choices and rights",
         "Deleting app data or an account",
         "Children and teens",
