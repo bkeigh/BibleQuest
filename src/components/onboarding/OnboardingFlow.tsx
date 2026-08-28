@@ -619,22 +619,24 @@ function StepLanguage({
             name, and a live region here would double-announce per scroll. */}
         <p
           aria-hidden="true"
-          className="mt-2 min-h-[1.0625rem] text-caption text-ash"
+          className="mt-2 min-h-[1.0625rem] text-center text-caption text-ash"
         >
           {selectedLanguage && selectedLanguage.english !== selectedLanguage.endonym
-            ? selectedLanguage.english
+            ? `${selectedLanguage.english} · `
             : ""}
+          Swipe or scroll to choose
         </p>
       </fieldset>
 
-      <fieldset className="mt-4 min-w-0 text-start">
-        <legend className="font-art-label text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
+      {/* Centers the complete edition choice as one balanced visual group. */}
+      <fieldset className="mt-4 min-w-0 text-center">
+        <legend className="w-full text-center font-art-label text-[0.875rem] uppercase tracking-[0.06em] text-gilt">
           The Bible<span className="sr-only"> edition</span>
         </legend>
         {/* Chips, not rows. Three identical 🇺🇸🇬🇧 pairs stacked over three
             English abbreviations was the same redundancy again; the caption
             below carries the full name and language instead. */}
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-2 flex flex-wrap justify-center gap-2">
           {editions.map(({ translation, disabled }) => {
             const checked = bibleTranslation === translation.key;
             return (
@@ -667,7 +669,10 @@ function StepLanguage({
             );
           })}
         </div>
-        <p aria-hidden="true" className="mt-2 text-caption text-ash">
+        <p
+          aria-hidden="true"
+          className="mx-auto mt-2 max-w-sm text-center text-caption text-ash"
+        >
           {selectedEdition
             ? `${selectedEdition.name} · ${selectedEdition.languageNameLocal}`
             : ""}

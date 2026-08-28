@@ -4,8 +4,8 @@
  * An iOS-style drum picker that is really a radio group.
  *
  * The onboarding language step listed nineteen options in a tall scrolling
- * box. A drum shows the same options in three rows, which is what the owner
- * meant by "the slide mechanic when users are asked to put in their age".
+ * box. A drum shows the same options in five compact rows, like Apple's date
+ * and age pickers, while short phones fall back to three rows.
  *
  * The important decision is what this ISN'T: no custom widget, no ARIA
  * listbox, no synthetic focus management. It is `<input type="radio">` per
@@ -94,11 +94,35 @@ export function WheelPicker({
       userDriven.current = true;
     };
 
+    /** Gives each visible row the shallow cylindrical depth of an iOS wheel. */
+    function updatePresentation(el: HTMLDivElement, height: number) {
+      const centerIndex = el.scrollTop / height;
+      el.querySelectorAll<HTMLElement>("[data-wheel-row]").forEach(
+        (row, index) => {
+          const distance = Math.max(-2.5, Math.min(2.5, index - centerIndex));
+          const depth = Math.abs(distance);
+          row.style.setProperty(
+            "--wheel-tilt",
+            reduceMotion ? "0deg" : `${distance * -12}deg`,
+          );
+          row.style.setProperty(
+            "--wheel-scale",
+            reduceMotion ? "1" : String(1 - depth * 0.035),
+          );
+          row.style.setProperty(
+            "--wheel-opacity",
+            String(Math.max(0.32, 1 - depth * 0.27)),
+          );
+        },
+      );
+    }
+
     function read() {
       const el = trackRef.current;
       if (!el) return;
       const height = rowHeight();
       if (!height) return;
+      updatePresentation(el, height);
       const { options: opts, value: current, onChange: commit } = latest.current;
       const index = Math.min(
         opts.length - 1,
@@ -130,6 +154,7 @@ export function WheelPicker({
     // timer above. Running settle twice is harmless — it is idempotent.
     const hasScrollEnd = "onscrollend" in window;
     if (hasScrollEnd) track.addEventListener("scrollend", settle);
+    frame.current = requestAnimationFrame(read);
 
     return () => {
       cancelAnimationFrame(frame.current);
@@ -139,7 +164,7 @@ export function WheelPicker({
       track.removeEventListener("scroll", onScroll);
       if (hasScrollEnd) track.removeEventListener("scrollend", settle);
     };
-  }, [rowHeight]);
+  }, [reduceMotion, rowHeight]);
 
   /** Home/End only — native radio groups do not provide them. Arrows are
       the browser's job, and the centring effect follows whatever it picks. */
@@ -174,18 +199,20 @@ export function WheelPicker({
               className="sr-only"
             />
             <span className="wheel-face">
-              {option.mark && (
-                <span aria-hidden="true" className="text-[1.125rem] leading-none">
-                  {option.mark}
-                </span>
-              )}
+              <span
+                aria-hidden="true"
+                className="wheel-mark text-[1.125rem] leading-none"
+              >
+                {option.mark ?? ""}
+              </span>
               <span
                 lang={option.lang}
                 dir={option.dir}
-                className="min-w-0 flex-1 truncate text-small"
+                className="wheel-label truncate text-center text-[1.0625rem]"
               >
                 {option.label}
               </span>
+              <span aria-hidden="true" className="wheel-mark" />
               {option.gloss && <span className="sr-only">{option.gloss}</span>}
             </span>
           </label>

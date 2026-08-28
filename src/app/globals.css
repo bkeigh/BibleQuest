@@ -1024,7 +1024,7 @@ html.force-reduce-motion .art-at-rest {
 /* Wheel picker — an iOS-style drum built from a real radio group.
  *
  * Nineteen languages as a scrolling bordered list took most of the onboarding
- * step. A drum shows the same options in three rows. It is deliberately NOT a
+ * step. A drum shows the same options in five rows. It is deliberately NOT a
  * custom widget: the markup stays <fieldset> + radios, so keyboard, VoiceOver
  * and all four themes come free, and CSS scroll-snap does the motion.
  *
@@ -1033,19 +1033,21 @@ html.force-reduce-motion .art-at-rest {
  * stays exact.
  */
 .wheel {
-  --wheel-row: 2.75rem;
-  --wheel-rows: 3;
+  --wheel-row: 3rem;
+  --wheel-rows: 5;
   position: relative;
   height: calc(var(--wheel-row) * var(--wheel-rows));
   overflow: hidden;
   border: 1px solid var(--color-mist);
   border-radius: var(--radius-button);
   background: var(--color-paper);
+  background: color-mix(in srgb, var(--color-paper) 92%, var(--color-parchment));
+  perspective: 18rem;
 }
-/* Tall viewports can afford the full five-row drum. */
-@media (min-height: 880px) {
+/* Short phones keep the whole onboarding step reachable without crowding. */
+@media (max-height: 739px) {
   .wheel {
-    --wheel-rows: 5;
+    --wheel-rows: 3;
   }
 }
 .wheel-track {
@@ -1060,6 +1062,10 @@ html.force-reduce-motion .art-at-rest {
      its flick. */
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  cursor: grab;
+}
+.wheel-track:active {
+  cursor: grabbing;
 }
 .wheel-track::-webkit-scrollbar {
   display: none;
@@ -1072,22 +1078,39 @@ html.force-reduce-motion .art-at-rest {
   height: calc(var(--wheel-row) * (var(--wheel-rows) - 1) / 2);
 }
 .wheel-row {
+  --wheel-tilt: 0deg;
+  --wheel-scale: 1;
+  --wheel-opacity: 0.62;
   display: block;
   min-height: var(--wheel-row);
   scroll-snap-align: center;
+  transform-style: preserve-3d;
   /* scroll-snap-stop stays `normal` so one flick can travel several rows. */
 }
 .wheel-face {
-  display: flex;
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr) 2.25rem;
   align-items: center;
-  gap: 0.75rem;
   min-height: var(--wheel-row);
-  padding-inline: 0.875rem;
+  padding-inline: 1rem;
   color: var(--color-charcoal);
-  opacity: 0.6;
+  opacity: var(--wheel-opacity);
+  transform: rotateX(var(--wheel-tilt)) scale(var(--wheel-scale));
+  transform-origin: center;
   transition:
-    opacity 180ms var(--ease-gentle),
-    color 180ms var(--ease-gentle);
+    opacity 100ms linear,
+    color 180ms var(--ease-gentle),
+    transform 100ms linear;
+  will-change: opacity, transform;
+}
+.wheel-mark {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+}
+.wheel-label {
+  min-width: 0;
 }
 .wheel-row input:checked + .wheel-face {
   opacity: 1;
