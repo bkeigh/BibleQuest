@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { WheelPicker } from "@/components/design-system/WheelPicker";
 
@@ -95,5 +95,32 @@ describe("WheelPicker keyboard order", () => {
 
     fireEvent.click(view.getByRole("radio", { name: "Español" }));
     expect(selected).toBe("es");
+  });
+
+  it("selects the centered language after a swipe-driven scroll", async () => {
+    let selected = "en";
+    const view = render(
+      <WheelPicker
+        name="language"
+        options={options}
+        value={selected}
+        onChange={(value) => {
+          selected = value;
+        }}
+      />,
+    );
+    const track = view.container.querySelector<HTMLElement>(".wheel-track");
+    const row = view.container.querySelector<HTMLElement>("[data-wheel-row]");
+    expect(track).not.toBeNull();
+    expect(row).not.toBeNull();
+    if (!track || !row) return;
+
+    row.getBoundingClientRect = () =>
+      ({ height: 48 }) as DOMRect;
+    track.scrollTop = 48;
+    fireEvent.pointerDown(track);
+    fireEvent.scroll(track);
+
+    await waitFor(() => expect(selected).toBe("es"));
   });
 });
