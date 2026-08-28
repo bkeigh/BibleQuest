@@ -119,6 +119,7 @@ function OnboardingInner({
   }));
   const [legalDocument, setLegalDocument] =
     useState<LegalDocumentKind | null>(null);
+  const mainRef = useRef<HTMLElement>(null);
   // Separate session hooks can settle one render apart; derive the safe entry
   // screen so a restored account never sees the account form a second time.
   const visibleStep =
@@ -127,6 +128,12 @@ function OnboardingInner({
       ? NAME_STEP
       : step;
   const background = STEP_BACKGROUNDS[visibleStep];
+
+  // Opens each guide page at its top after a longer previous step was scrolled.
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [visibleStep]);
 
   useEffect(() => {
     if (alreadyDone) return;
@@ -190,7 +197,10 @@ function OnboardingInner({
 
   return (
     <MotionConfig reducedMotion="user">
-      <main className="relative flex min-h-dvh flex-col overflow-x-hidden overflow-y-auto bg-parchment px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-safe">
+      <main
+        ref={mainRef}
+        className="relative flex min-h-dvh flex-col overflow-x-hidden overflow-y-auto bg-parchment px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-safe"
+      >
         {background && (
           <>
             <div

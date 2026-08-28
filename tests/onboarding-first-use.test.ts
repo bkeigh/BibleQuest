@@ -77,4 +77,19 @@ describe("first-use onboarding", () => {
     expect(source).toContain("{authUnavailable && accountEnabled && (");
     expect(source).toContain("You can continue privately on");
   });
+
+  it("opens every guide page at the top after a longer step scrolls", () => {
+    const source = readFileSync(
+      "src/components/onboarding/OnboardingFlow.tsx",
+      "utf8",
+    );
+
+    expect(source).toContain(
+      'mainRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" })',
+    );
+    expect(source).toContain(
+      'window.scrollTo({ top: 0, left: 0, behavior: "auto" })',
+    );
+    expect(source).toContain("ref={mainRef}");
+  });
 });
