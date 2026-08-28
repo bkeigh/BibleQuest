@@ -22,8 +22,8 @@ describe("production sign-in methods", () => {
     );
 
     expect(markup).toContain("Email me a sign-in code");
-    expect(markup).toContain("Sign in with Apple");
-    expect(markup).toContain("Sign in with Google");
+    expect(markup).toContain(">Sign in with Apple</span>");
+    expect(markup).toContain(">Sign in with Google</span>");
     expect(markup).toContain('data-provider-button="apple"');
     expect(markup).toContain('data-provider-mark="apple"');
     expect(markup).toContain("/brand/apple-logo-white.png");
