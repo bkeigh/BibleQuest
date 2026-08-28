@@ -462,24 +462,26 @@ function StepAccount({
       ) : (
         <PaperCard variant="linen" padding="md" className="mt-5 text-center">
           <p className="text-small leading-relaxed text-charcoal">
-            Account sign-in is unavailable here. BibleQuest still works on this
-            device.
+            Account sign-in is unavailable here. You can continue privately on
+            this device.
           </p>
         </PaperCard>
       )}
 
-      {(authUnavailable || !accountEnabled) && (
+      {authUnavailable && accountEnabled && (
         <p className="mt-1 text-center text-caption leading-relaxed text-ash">
-          Your setup can stay safely on this device until account access is
-          available.
+          Account access couldn’t load. Continue on this device and try again
+          later.
         </p>
       )}
 
+      {/* Local-only mode has one viable path, so it receives primary emphasis;
+          the same action stays secondary when account choices are available. */}
       <GentleButton
-        variant="ghost"
-        size="sm"
+        variant={accountEnabled ? "ghost" : "primary"}
+        size={accountEnabled ? "sm" : "lg"}
         fullWidth
-        className="mt-2 text-ash"
+        className={accountEnabled ? "mt-2 text-ash" : "mt-4"}
         onClick={onContinue}
       >
         {accountEnabled ? "Continue without an account" : "Continue on this device"}

@@ -63,4 +63,18 @@ describe("first-use onboarding", () => {
     );
     expect(settings).toContain("myShepherdFloatingButton: false");
   });
+
+  it("makes the only available local path visually primary", () => {
+    const source = readFileSync(
+      "src/components/onboarding/OnboardingFlow.tsx",
+      "utf8",
+    );
+
+    expect(source).toContain(
+      'variant={accountEnabled ? "ghost" : "primary"}',
+    );
+    expect(source).toContain('size={accountEnabled ? "sm" : "lg"}');
+    expect(source).toContain("{authUnavailable && accountEnabled && (");
+    expect(source).toContain("You can continue privately on");
+  });
 });
