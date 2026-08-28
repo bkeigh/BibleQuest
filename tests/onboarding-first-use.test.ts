@@ -56,13 +56,28 @@ describe("first-use onboarding", () => {
 
   it("defers persistent prompts until after value and never stacks them", () => {
     const shell = readFileSync("src/components/app-shell/AppShell.tsx", "utf8");
+    const installPrompt = readFileSync(
+      "src/components/app-shell/InstallPrompt.tsx",
+      "utf8",
+    );
+    const installCapture = readFileSync(
+      "src/components/app-shell/InstallPromptEventCapture.tsx",
+      "utf8",
+    );
+    const rootLayout = readFileSync("src/app/layout.tsx", "utf8");
     const settings = readFileSync("src/lib/questos/types.ts", "utf8");
 
-    expect(shell).toContain("hasCompletedQuest && (");
+    expect(shell).toContain("eligible={hasCompletedQuest}");
+    expect(shell).not.toContain("{hasCompletedQuest && (");
     expect(shell).toContain("!installPromptVisible &&");
     expect(shell).toContain(
       "onVisibilityChange={handleInstallPromptVisibility}",
     );
+    expect(installPrompt).toContain("eligibleRef.current");
+    expect(installCapture).toContain(
+      'window.addEventListener("beforeinstallprompt", capture)',
+    );
+    expect(rootLayout).toContain("<InstallPromptEventCapture />");
     expect(settings).toContain("myShepherdFloatingButton: false");
   });
 

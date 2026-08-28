@@ -148,13 +148,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           !hidesFloatingTools &&
           (!isNativeTarget() || isPlus) && <FloatingMyShepherd />}
         <BottomNav />
-        {/* Installation is offered only after the reader has completed the
-            first daily loop, so onboarding earns value before acquisition. */}
-        {hasCompletedQuest && (
-          <InstallPrompt
-            onVisibilityChange={handleInstallPromptVisibility}
-          />
-        )}
+        {/* Capture the browser's one-shot install event from launch, but keep
+            the offer hidden until the first daily loop has earned it. */}
+        <InstallPrompt
+          eligible={hasCompletedQuest}
+          onVisibilityChange={handleInstallPromptVisibility}
+        />
       </div>
     </ToastProvider>
   );

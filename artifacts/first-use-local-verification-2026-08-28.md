@@ -9,7 +9,7 @@ PASS FOR LOCAL SOURCE REVIEW; NOT A SIGNED OR DEVICE-VERIFIED RELEASE CANDIDATE
 - Branch: `codex/first-use-release-candidate`
 - Starting source: `c3af44df5834a53736da671cfe5a51b9a7ae1475`
 - Recorded: `2026-08-28T05:15:26Z`
-- Scope: six-step onboarding, reviewed starter-quest allowlist, direct free-app entry, exact selected-quest handoff, first-screen daily actions, post-value installation timing, opt-in MyShepherd launcher, safe-area-aware skip links, and append-only Production native-availability reconciliation
+- Scope: six-step onboarding, reviewed starter-quest allowlist, direct free-app entry, exact selected-quest handoff, first-screen daily actions, route-independent capture plus post-value installation timing, opt-in MyShepherd launcher, safe-area-aware skip links, and append-only Production native-availability reconciliation
 
 ## Automated evidence
 
@@ -18,12 +18,15 @@ PASS FOR LOCAL SOURCE REVIEW; NOT A SIGNED OR DEVICE-VERIFIED RELEASE CANDIDATE
 | `pnpm install --frozen-lockfile` | PASS | Local dependency installation only |
 | `pnpm lint` | PASS | Static lint only |
 | `pnpm exec tsc --noEmit` | PASS | Type analysis only |
-| `pnpm test` | PASS — 215 files, 1,655 tests | Repeated after the native keyboard-order adjustments |
+| `pnpm test` | PASS — 216 files, 1,656 tests | Includes the route-independent install-event handoff and native keyboard-order adjustments |
 | Focused first-use, launch-content, and Home-formation tests | PASS — 32 tests | Source-contract and layout-order coverage, not a signed binary |
+| Focused install eligibility test | PASS | Captures the browser event before value, remains hidden, waits the complete post-value delay, then invokes the retained prompt |
 | `pnpm test:e2e` | PASS — 11 browser journeys | Includes one-stop language-wheel traversal and native radio arrow behavior |
 | `pnpm test:headers` | PASS — production build and 2 header checks | Local fixture environment |
 | `pnpm test:service-worker` | PASS — 31 tests | Local worker harness |
 | `pnpm test:observability` | PASS — 30 tests | Local/fixture contracts |
+| `pnpm test:launch-evidence` | PASS — expected guest-only `REVIEW` only | Sanitized fixture; not live monitoring or named posture acceptance |
+| `pnpm check:supabase-browser-bundle` | PASS — one reviewed public target | Built with the guarded public account-release input; no key value recorded |
 | `pnpm audit --prod --audit-level high` | PASS — no known vulnerabilities | Registry state at command time |
 | `git diff --check` | PASS | Whitespace only |
 | `pnpm ios:account-release:prepare` | PASS — 261 pages, reviewed public target, content-rights inventory, exact containing-commit identity | Local export, not an uploaded archive |
