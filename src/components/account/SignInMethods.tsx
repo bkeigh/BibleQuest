@@ -595,6 +595,7 @@ function OAuthButtons({
     <div className="space-y-2">
       {providers.map((provider) => {
         const providerName = provider === "apple" ? "Apple" : "Google";
+        // Keep the visible provider name aligned with the accessible label.
         const label =
           pending === provider
             ? `Opening ${providerName}…`
@@ -615,7 +616,7 @@ function OAuthButtons({
             data-provider-button={provider}
           >
             {provider === "apple" ? <AppleMark /> : <GoogleMark />}
-            <span>{pending === provider ? "Opening" : "Sign in with"}</span>
+            <span>{label}</span>
           </GentleButton>
         );
       })}
