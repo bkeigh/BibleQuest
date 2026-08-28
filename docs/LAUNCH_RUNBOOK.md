@@ -13,6 +13,17 @@ Provider-console and physical-device work can be coordinated with the
 guardrailed [`Claude Cowork launch-operator prompt`](archive/CLAUDE_COWORK_LAUNCH_PROMPT.md);
 that prompt does not replace any gate in this runbook.
 
+> **Current-state boundary — August 28, 2026.** This file preserves the July
+> web-launch sequence, including its then-correct requirement that native
+> `0037` remain absent while standalone web hardening `0038` was applied. It is
+> not the migration target for the current iOS account replacement: Production
+> now records `0037`, `0038`, and retention migration `0039`, with native
+> availability still off. Use [`CURRENT_RELEASE_STATUS.md`](CURRENT_RELEASE_STATUS.md)
+> and [`IOS_ACCOUNT_REPLACEMENT_RELEASE.md`](IOS_ACCOUNT_REPLACEMENT_RELEASE.md)
+> for that candidate, and do not replay or reinterpret the historical July
+> migration steps below. The general QA, privacy, rollback, and evidence rules
+> remain applicable where the current release record incorporates them.
+
 No unchecked item is a pass. `OPEN`, `TBD`, and blank evidence fields are
 release blockers unless a gate explicitly documents an approved out-of-scope
 posture. Never paste secrets, tokens, database URLs/passwords, private user
@@ -103,7 +114,7 @@ Expected filenames, in order:
 0038_web_account_deletion_hardening.sql
 ```
 
-The 37-entry repository manifest also contains
+The July 31 37-entry repository manifest also contains
 `0037_native_account_beta_availability.sql`. It is staging/account-beta-only
 and is not part of the Production web set above. The standalone `0038` packet
 is deliberately self-contained so Production can advance from `0036` to
@@ -293,7 +304,7 @@ billing, legal, monitoring, and rollback gates remain mandatory in both tracks.
 | Gate | Pass evidence required | Owner | No-go / recovery action | Status |
 | --- | --- | --- | --- | --- |
 | Account launch posture | Exactly one track is selected. Enabled requires every active auth/sync gate below. Guest-only requires the frozen source's `ACCOUNT_SYNC_CONTAINED` constant to be `true`; `/api/health` reports `guest-only`; customer enrollment, sign-in, and account-action controls are absent (a status-only containment notice/page is allowed); customer callback code/token exchange, middleware session refresh, and browser sync/client creation are no-ops; clean and upgraded customer browsers show no Supabase Auth, session-refresh, user-table, or sync-RPC network traffic; the separately allowlisted operator console is tested as a private surface; the complete local-first core loop, persistence, export/clear, offline/reconnect, and PWA update pass; the named account posture owner and rollback authority accept the evidence and residual cached-client risk | Account posture + QA + rollback authority | Hold or roll back on a customer posture mismatch, visible customer account action, customer exchange/refresh/client creation, customer-browser Supabase auth/sync request, local-data loss, or unaccepted residual client; use backend containment when a stale open client makes the browser latch insufficient | OPEN |
-| Migration history | Clean local reset; the 37-entry repository manifest contains the reviewed 35-file Production prefix ending at `0036`, separately excluded beta-only `0037`, and standalone web hardening `0038`; `0013` is absent, and immutable `0014` matches its pinned SHA. Staging and Production lists are captured, and the guarded Production check proves a fresh backup, pinned hashes, and exactly the `0038` packet after the legacy history. | Database owner | Stop on any filename/hash/history mismatch or replay of renamed `0002`-`0006`; follow the forward-only reconciliation procedure; never use `--include-all`, normal Production `db push`, or repair as a shortcut | OPEN |
+| Migration history | Clean local reset; the July 31 37-entry repository manifest contains the reviewed 35-file Production prefix ending at `0036`, separately excluded beta-only `0037`, and standalone web hardening `0038`; `0013` is absent, and immutable `0014` matches its pinned SHA. Staging and Production lists are captured, and the guarded Production check proves a fresh backup, pinned hashes, and exactly the `0038` packet after the legacy history. | Database owner | Stop on any filename/hash/history mismatch or replay of renamed `0002`-`0006`; follow the forward-only reconciliation procedure; never use `--include-all`, normal Production `db push`, or repair as a shortcut | OPEN |
 | RLS | Catalog report shows all 45 expected public tables with RLS enabled, only documented policies, correct roles, sealed avatar/push/billing/support/console/entitlement/Arcade functions, and the account identity/generation/revision/row-size/Storage-deletion boundary through `0038`; no provider-v2 adoption state or policies exist, and native `0037` remains gated | Database owner | Stop application rollout; correct with a new higher-numbered migration and repeat all DB gates | OPEN |
 | Daily-quest CAS | In both tracks, all 59 local CAS/contract DB tests and deterministic client tests pass and the public posture RPC returns only the fixed contract identity plus `ok: true`. Enabled auth/sync additionally requires staging simultaneous-device, stale-revision, duplicate-retry, rollback, unpick, completion-durability, bounded-conflict, and old-cached-client evidence. Guest-only records those active client scenarios out of scope until enablement | Database + QA owners | Keep account rollout on hold for any overwrite, resurrection, completion loss, retry loop, RLS, contract, or cached-client failure; a guest-only launch may continue only if containment remains proven | OPEN |
 | Content mirror | After schema/RLS passes: regenerated seed/manifest have clean diffs and approved digests; seed dry run reports no pending migrations; production readiness proves exact natural-key/content hashes for 150 quests, 180 passages, 38 milestones, and 32/32 prompts | Database + content owners | Keep sync beta-gated; inspect mismatch totals and frozen artifacts; never reset production or paste ad hoc SQL from chat | OPEN |
@@ -388,7 +399,7 @@ docker exec -i supabase_db_BibleQuest \
   < supabase/evidence/rls_policy_report.sql
 ```
 
-Pass means all 37 checked-in migrations apply in the documented local order,
+Pass means all 38 checked-in migrations apply in the documented local order,
 with `0013` absent and immutable `0014` matching its pinned SHA. Analytics
 consent defaults to and is reset to explicit opt-in (`false`) by `0009`, the
 rolling/recent-verse schema from `0010` exists, the Bible preference and
@@ -400,8 +411,9 @@ boundaries from `0016` through `0022` pass, and the private avatar, push,
 billing, lifetime entitlement, one-time support, console, row-size, and operator
 Plus, Stripe correction, guided progress, distributed provider-limit, and
 Arcade store boundaries from `0023` through `0036` pass, native `0037` remains
-default-off, and standalone `0038` proves serialized avatar uploads plus an
-empty owner folder before Auth deletion. Every
+default-off, standalone `0038` proves serialized avatar uploads plus an empty
+owner folder before Auth deletion, and `0039` bounds opaque provider-rate
+buckets with the reviewed retention contract. Every
 content-free public posture RPC reports the fixed contract identity and
 `ok: true`, and the report meets the 45-table RLS gate. Supabase CLI and
 a Docker-compatible daemon are required.
