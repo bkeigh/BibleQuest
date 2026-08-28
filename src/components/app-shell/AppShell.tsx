@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BottomNav } from "./BottomNav";
 import { InstallPrompt } from "./InstallPrompt";
 import { LanguageApplier } from "./LanguageApplier";
@@ -41,6 +41,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const floatingMyShepherd = useQuestOS(
     (state) => state.settings.appearance.myShepherdFloatingButton !== false,
   );
+  const hasCompletedQuest = useQuestOS((state) =>
+    Object.values(state.myQuests).some((quest) => quest.status === "completed"),
+  );
+  const [installPromptVisible, setInstallPromptVisible] = useState(false);
+
+  // Keeps the two persistent shell prompts mutually exclusive on small screens.
+  const handleInstallPromptVisibility = useCallback((visible: boolean) => {
+    setInstallPromptVisible(visible);
+  }, []);
   // Home already carries MyShepherd in the formation flow, where the large
   // launcher would duplicate the action and cover the restored card sequence.
   const hidesFloatingTools =
@@ -110,9 +119,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <LanguageApplier />
         <WallpaperBackdrop />
+        {/* Keep the keyboard-only escape hatch below a notched device's
+            status area when it becomes visible. */}
         <a
           href="#app-main"
-          className="sr-only z-50 rounded-[var(--radius-button)] bg-paper px-4 py-3 text-accent paper-shadow-lg focus:not-sr-only focus:fixed focus:start-4 focus:top-4"
+          className="sr-only z-50 rounded-[var(--radius-button)] bg-paper px-4 py-3 text-accent paper-shadow-lg focus:not-sr-only focus:fixed focus:start-4 focus:top-[max(1rem,calc(env(safe-area-inset-top)+0.5rem))]"
         >
           Skip to content
         </a>
@@ -133,10 +144,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Web readers may see the acquisition preview; native readers see the
             tool only after an existing entitlement resolves. */}
         {floatingMyShepherd &&
+          !installPromptVisible &&
           !hidesFloatingTools &&
           (!isNativeTarget() || isPlus) && <FloatingMyShepherd />}
         <BottomNav />
-        <InstallPrompt />
+        {/* Capture the browser's one-shot install event from launch, but keep
+            the offer hidden until the first daily loop has earned it. */}
+        <InstallPrompt
+          eligible={hasCompletedQuest}
+          onVisibilityChange={handleInstallPromptVisibility}
+        />
       </div>
     </ToastProvider>
   );

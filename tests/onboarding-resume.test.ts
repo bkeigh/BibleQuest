@@ -65,6 +65,7 @@ describe("onboarding account hand-off", () => {
   });
 
   it("preserves the exact intentional launch destination", () => {
+    expect(onboardingLaunchDestination("plus")).toBe("/app");
     expect(onboardingLaunchDestination("launch")).toBe("/app");
     expect(onboardingLaunchDestination("launch_quests")).toBe(
       "/app/quests",
@@ -78,8 +79,8 @@ describe("onboarding account hand-off", () => {
     expect(shouldRedirectAppToOnboarding(false, "launch")).toBe(true);
   });
 
-  it("keeps only the intentional Plus preview on the onboarding route", () => {
-    expect(shouldKeepCompletedProfileOnOnboarding(true, "plus")).toBe(true);
+  it("moves completed profiles past the retired Plus preview", () => {
+    expect(shouldKeepCompletedProfileOnOnboarding(true, "plus")).toBe(false);
     expect(shouldKeepCompletedProfileOnOnboarding(true, "account")).toBe(false);
     expect(shouldKeepCompletedProfileOnOnboarding(false, "plus")).toBe(false);
   });

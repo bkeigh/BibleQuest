@@ -643,7 +643,8 @@ export const DEFAULT_SETTINGS: Settings = {
     wallpaperMode: "still",
     glassSurfaces: true,
     glassOpacity: DEFAULT_GLASS_OPACITY,
-    myShepherdFloatingButton: true,
+    // New journeys opt in from Settings after meeting MyShepherd in context.
+    myShepherdFloatingButton: false,
   },
   language: "en",
   preferredBibleTranslation: DEFAULT_BIBLE_TRANSLATION_KEY,

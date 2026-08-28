@@ -4,7 +4,13 @@
  * Install guidance. Uses the native install prompt when available and gives
  * platform-specific manual steps everywhere else after a short delay.
  */
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { GentleButton } from "@/components/design-system/GentleButton";
@@ -19,11 +25,11 @@ import {
   type InstallPlatform,
 } from "@/lib/pwa/install-guidance";
 import { isNativeTarget } from "@/lib/platform/target";
-
-interface BIPEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: string }>;
-}
+import {
+  clearDeferredInstallPrompt,
+  getDeferredInstallPrompt,
+  subscribeDeferredInstallPrompt,
+} from "@/lib/pwa/install-event";
 
 const DISMISS_KEY = "biblequest:install-dismissed";
 
@@ -40,9 +46,19 @@ function isDismissed(): boolean {
   }
 }
 
-export function InstallPrompt() {
+export function InstallPrompt({
+  eligible,
+  onVisibilityChange,
+}: {
+  eligible: boolean;
+  onVisibilityChange?: (visible: boolean) => void;
+}) {
   const [show, setShow] = useState(false);
-  const [deferred, setDeferred] = useState<BIPEvent | null>(null);
+  const deferred = useSyncExternalStore(
+    subscribeDeferredInstallPrompt,
+    getDeferredInstallPrompt,
+    getDeferredInstallPrompt,
+  );
   const [platform] = useState<InstallPlatform>(() =>
     typeof navigator === "undefined"
       ? "other"
@@ -56,50 +72,72 @@ export function InstallPrompt() {
   const dismissedRef = useRef(false);
   const shownRef = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const eligibleRef = useRef(eligible);
+  const offerReadyRef = useRef(false);
+  const visible = eligible && show;
+
+  // Keeps the browser-event listener current without tearing it down on state changes.
+  useEffect(() => {
+    eligibleRef.current = eligible;
+  }, [eligible]);
+
+  // Reveals once, and only after the reader has completed a daily loop.
+  const reveal = useCallback(() => {
+    if (
+      !eligibleRef.current ||
+      !offerReadyRef.current ||
+      shownRef.current ||
+      dismissedRef.current ||
+      isDismissed()
+    ) {
+      return;
+    }
+    shownRef.current = true;
+    setShow(true);
+    track("pwa_install_prompt_viewed");
+  }, []);
+
+  // Lets the persistent shell suppress other launchers while this panel is open.
+  useEffect(() => {
+    onVisibilityChange?.(visible);
+  }, [onVisibilityChange, visible]);
+
+  // Releases the shared overlay slot if the prompt leaves with the shell.
+  useEffect(() => {
+    return () => {
+      onVisibilityChange?.(false);
+    };
+  }, [onVisibilityChange]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (isDismissed()) return;
+    if (!deferred) return;
+    reveal();
+  }, [deferred, reveal]);
 
+  useEffect(() => {
+    if (!eligible) {
+      offerReadyRef.current = false;
+      return;
+    }
+    if (typeof window === "undefined") return;
     // The native app IS the installed app. `isStandaloneWebApp()` only reads
     // display-mode and navigator.standalone, neither of which a Capacitor
     // WebView sets, so without this the fallback timer below would show
-    // "Tap Share, then Add to Home Screen" inside the iOS app — the classic
-    // web-wrapper tell that App Store review rejects under guideline 4.2.
-    if (isNativeTarget()) return;
+    // "Tap Share, then Add to Home Screen" inside the iOS app.
+    if (isDismissed() || isNativeTarget() || isStandaloneWebApp()) return;
 
-    if (isStandaloneWebApp()) return;
-
-    // Reveals at most once per mount so fallback and native events cannot
-    // double-count the same prompt impression.
-    const reveal = () => {
-      if (shownRef.current || dismissedRef.current || isDismissed()) return;
-      shownRef.current = true;
-      setShow(true);
-      track("pwa_install_prompt_viewed");
-    };
-
-    const onBIP = (e: Event) => {
-      e.preventDefault();
-      setDeferred(e as BIPEvent);
-      reveal();
-    };
-    window.addEventListener("beforeinstallprompt", onBIP);
-
-    // Every browser gets useful manual steps if no native event arrives.
-    const fallbackTimer = setTimeout(() => {
+    // Every browser gets useful manual steps after a post-value pause. A
+    // Chromium event captured earlier remains available to the revealed panel.
+    const fallbackTimer = window.setTimeout(() => {
+      offerReadyRef.current = true;
       reveal();
     }, 12000);
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", onBIP);
-      clearTimeout(fallbackTimer);
-    };
-  }, []);
+    return () => window.clearTimeout(fallbackTimer);
+  }, [eligible, reveal]);
 
   useEffect(() => {
     const panel = panelRef.current;
-    if (!show || !panel) {
+    if (!visible || !panel) {
       document.documentElement.style.removeProperty(
         "--app-install-prompt-height",
       );
@@ -124,11 +162,12 @@ export function InstallPrompt() {
       );
       window.dispatchEvent(new Event("biblequest:app-overlay-layout"));
     };
-  }, [show, deferred]);
+  }, [visible, deferred]);
 
   function dismiss() {
     dismissedRef.current = true;
     setShow(false);
+    clearDeferredInstallPrompt(deferred);
     try {
       localStorage.setItem(DISMISS_KEY, String(Date.now()));
     } catch {
@@ -147,17 +186,17 @@ export function InstallPrompt() {
           ? "pwa_install_accepted"
           : "pwa_install_dismissed",
       );
-      setDeferred(null);
+      clearDeferredInstallPrompt(deferred);
       dismiss();
     } catch {
       // A consumed or browser-cancelled event should fall back to directions.
-      setDeferred(null);
+      clearDeferredInstallPrompt(deferred);
     }
   }
 
   return (
     <AnimatePresence>
-      {show && (
+      {visible && (
         <motion.div
           ref={panelRef}
           initial={{ opacity: 0, y: 20 }}

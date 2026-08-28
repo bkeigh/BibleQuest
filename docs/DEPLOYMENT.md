@@ -123,11 +123,12 @@ needed — just don't remove that config.
       push (if enabling sync).
 - [ ] Complete [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md): apply its
       account boundary through `0022`, then the launch capability migrations
-      through `0036` and standalone web account-deletion hardening `0038`, with
-      native beta migration `0037` explicitly excluded and the reviewed seed
-      applied separately,
-      configure custom SMTP, and pass production readiness, daily-quest CAS,
-      cached-client, and two-user isolation checks.
+      through `0036`; for the current account replacement, verify already-shipped
+      native availability `0037`, web account-deletion hardening `0038`, and
+      provider-retention `0039` without replaying them, keep native availability
+      off until its signed release gate passes, and apply the reviewed seed
+      separately; configure custom SMTP, and pass production readiness,
+      daily-quest CAS, cached-client, and two-user isolation checks.
 - [ ] Require `account_deletion_storage_contract` to contain exactly the fixed
       contract identity and `ok: true` before any owner Storage sweep; missing,
       malformed, or false posture is a deletion and release blocker.

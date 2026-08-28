@@ -29,9 +29,10 @@ describe("Home formation layout", () => {
 
   it("gives the quest section one heading, above its card", () => {
     const forToday = home.indexOf('id="for-today-home-title"');
-    const questLink = home.indexOf('href="/app/quests"', forToday);
+    const questLink = home.indexOf("`/app/quests/${featuredQuest.slug}`", forToday);
     const rhythm = home.indexOf("<RhythmTodayCard", questLink);
-    const guided = home.indexOf('show="guide"', rhythm);
+    const prayer = home.indexOf('title="One minute of prayer"', rhythm);
+    const guided = home.indexOf('show="guide"', prayer);
     const shepherd = home.indexOf("<ShepherdCallout", guided);
     const growth = home.indexOf('href="/app/journey"', shepherd);
     const games = home.indexOf('show="game"', growth);
@@ -39,7 +40,8 @@ describe("Home formation layout", () => {
     expect(forToday).toBeGreaterThan(-1);
     expect(questLink).toBeGreaterThan(forToday);
     expect(rhythm).toBeGreaterThan(questLink);
-    expect(guided).toBeGreaterThan(rhythm);
+    expect(prayer).toBeGreaterThan(rhythm);
+    expect(guided).toBeGreaterThan(prayer);
     expect(shepherd).toBeGreaterThan(guided);
     expect(growth).toBeGreaterThan(shepherd);
     expect(games).toBeGreaterThan(growth);
@@ -136,18 +138,22 @@ describe("Home formation layout", () => {
   });
 
   it("places devotional shortcuts before account and commerce invitations", () => {
-    const games = home.indexOf('show="game"');
-    const prayer = home.indexOf('title="One minute of prayer"', games);
+    const rhythm = home.indexOf("<RhythmTodayCard");
+    const prayer = home.indexOf('title="One minute of prayer"', rhythm);
     const bible = home.indexOf('title="Open the Bible"', prayer);
     const reflections = home.indexOf('title="Reflect on Today"', bible);
+    const guided = home.indexOf('show="guide"', reflections);
+    const games = home.indexOf('show="game"', guided);
     const account = home.indexOf("<AccountPrompt", reflections);
     const support = home.indexOf("<SupportLink", account);
     const newsletter = home.indexOf("<NewsletterLink");
 
-    expect(prayer).toBeGreaterThan(games);
+    expect(prayer).toBeGreaterThan(rhythm);
     expect(bible).toBeGreaterThan(prayer);
     expect(reflections).toBeGreaterThan(bible);
-    expect(account).toBeGreaterThan(reflections);
+    expect(guided).toBeGreaterThan(reflections);
+    expect(games).toBeGreaterThan(guided);
+    expect(account).toBeGreaterThan(games);
     expect(support).toBeGreaterThan(account);
     expect(newsletter).toBeGreaterThan(support);
   });

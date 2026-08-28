@@ -155,6 +155,9 @@ describe("production web account deletion hardening", () => {
     expect(NATIVE_SCRIPT).toContain(
       '["20260812005000", "web_account_deletion_hardening"]',
     );
+    expect(NATIVE_SCRIPT).toContain(
+      '["20260826010000", "bound_provider_rate_limit_retention"]',
+    );
     expect(NATIVE_BEFORE).toContain(
       "public.account_deletion_storage_contract()",
     );

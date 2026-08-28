@@ -94,8 +94,8 @@ describe("native commerce gating", () => {
 
     expect(gate).toContain('destination === "/app/plus"');
     expect(gate).toContain('? "/app"');
-    expect(flow).toContain(
-      '!isNativeTarget() && visibleStep === PLUS_STEP',
-    );
+    expect(flow).toContain('router.replace("/app")');
+    expect(flow).not.toContain("PLUS_STEP");
+    expect(flow).not.toContain("function StepPlus");
   });
 });

@@ -88,12 +88,16 @@ describe("launch content catalog", () => {
       "utf8",
     );
 
-    // Home previews one relevant card; lifecycle management stays on Quests.
+    // Home previews one relevant card and opens that exact quest; lifecycle
+    // management and broad discovery stay on Quests.
     expect(home).toContain('<section id="quests"');
-    expect(home).toContain('href="/app/quests"');
+    expect(home).toContain('`/app/quests/${featuredQuest.slug}`');
     expect(home).toContain("{questSummary || \"Choose a quest\"}");
     expect(home).toContain("activePicks[0] ?? readyPicks[0]");
-    expect(home).toContain("View all quests");
+    expect(home).toContain('featuredPick?.status === "started"');
+    expect(home).toContain('featuredPick?.status === "assigned"');
+    expect(home).toContain('"Open quest"');
+    expect(home).toContain('"Browse quests"');
     expect(home).not.toContain("<HomeQuestDisclosure");
     expect(home).not.toContain("buildHomeQuestGroups");
     expect(home).not.toContain("completedToday");
@@ -291,8 +295,10 @@ describe("launch content catalog", () => {
       "utf8",
     );
 
-    expect(onboarding).toContain("your quests");
-    expect(onboarding).toContain("unlimited quest windows");
+    expect(onboarding).toContain("one meaningful quest");
+    expect(onboarding).toContain("places it in your");
+    expect(onboarding).toContain("Quests, ready whenever you are");
+    expect(onboarding).not.toContain("unlimited quest windows");
     expect(onboarding).not.toContain("active quests");
   });
 

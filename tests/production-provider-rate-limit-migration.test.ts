@@ -40,6 +40,10 @@ const MIGRATION = readFileSync(
 const PACKAGE = JSON.parse(
   readFileSync(join(ROOT, "package.json"), "utf8"),
 ) as { scripts: Record<string, string> };
+const REPLACEMENT_RUNBOOK = readFileSync(
+  join(ROOT, "docs", "IOS_ACCOUNT_REPLACEMENT_RELEASE.md"),
+  "utf8",
+);
 
 // Hashes the guarded release inputs without interpreting their contents.
 function sha256(value: string | Buffer) {
@@ -94,6 +98,15 @@ describe("production provider rate-limit migration", () => {
   it("wires the guarded read-only production check into package scripts", () => {
     expect(PACKAGE.scripts["check:production-provider-rate-limits"]).toBe(
       "node scripts/reconcile-production-provider-rate-limits.mjs --dry-run",
+    );
+  });
+
+  it("records the applied packet as history instead of a future write", () => {
+    expect(REPLACEMENT_RUNBOOK).toContain("PASS — APPLIED; DO NOT REPLAY");
+    expect(REPLACEMENT_RUNBOOK).toContain("`applied=true`, `proposed=[]`");
+    expect(REPLACEMENT_RUNBOOK).not.toContain("OPEN — 0039 PENDING");
+    expect(REPLACEMENT_RUNBOOK).not.toContain(
+      "BIBLEQUEST_PRODUCTION_MIGRATION_CONFIRM='apply 20260826010000",
     );
   });
 });

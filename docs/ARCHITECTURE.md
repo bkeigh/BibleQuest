@@ -6,7 +6,7 @@ auth, storage, sync, or the platform boundary. Behavioural contracts live in
 the per-topic docs this file links; process and release state live in the
 runbooks.
 
-Last verified against the source on 2026-08-14.
+Last verified against the source on 2026-08-28.
 
 ## The one constraint that explains everything else
 
@@ -66,7 +66,8 @@ UI screens (src/components/**)
   `x-biblequest-expected-user` header match, and the database re-checks
   ownership via RLS and contract-shaped RPCs regardless of what the client
   claims. Migrations 0037/0038 add the native availability boundary and the
-  deletion latch; `supabase/tests/` holds the pgTAP proofs.
+  deletion latch; `0039` bounds retention for opaque provider-rate buckets;
+  `supabase/tests/` holds the pgTAP proofs.
 
 ## The authority concepts (read before adding any private-data feature)
 

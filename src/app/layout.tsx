@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegistrar } from "@/components/app-shell/ServiceWorkerRegistrar";
+import { InstallPromptEventCapture } from "@/components/app-shell/InstallPromptEventCapture";
 import { NativeJourneyGuard } from "@/components/app-shell/NativeJourneyGuard";
 import { APPEARANCE_BOOTSTRAP_SCRIPT } from "@/lib/appearance/bootstrap";
 import { deploymentLabel } from "@/lib/deployment-label";
@@ -131,6 +132,9 @@ export default function RootLayout({
             {stagingLabel}
           </div>
         ) : null}
+        {/* Chromium may publish its one-shot event during onboarding, before
+            the private app shell that eventually presents the offer mounts. */}
+        <InstallPromptEventCapture />
         <NativeJourneyGuard>
           {children}
         </NativeJourneyGuard>

@@ -234,7 +234,14 @@ function HomeInner() {
               title={t.nav.quests}
               subtitle={questSummary || "Choose a quest"}
             />
-            <Link href="/app/quests" className="block">
+            <Link
+              href={
+                featuredQuest
+                  ? `/app/quests/${featuredQuest.slug}`
+                  : "/app/quests"
+              }
+              className="block"
+            >
               <PaperCard
                 interactive
                 variant="paper"
@@ -274,7 +281,12 @@ function HomeInner() {
                     </p>
                   )}
                   <span className="mt-2 inline-flex items-center gap-1 text-small font-medium text-accent">
-                    View all quests <IconArrowRight size={14} />
+                    {featuredPick?.status === "started"
+                      ? "Resume quest"
+                      : featuredPick?.status === "assigned"
+                        ? "Open quest"
+                        : "Browse quests"}{" "}
+                    <IconArrowRight size={14} />
                   </span>
                 </div>
                 <IconChevronRight className="shrink-0 text-fog" />
@@ -284,6 +296,39 @@ function HomeInner() {
 
           {/* The weekly rhythm stays attached to the daily quest. */}
           <RhythmTodayCard dayKey={dayKey} now={now} />
+
+          {/* Core devotional shortcuts stay within the first-screen daily path. */}
+          <div
+            role="group"
+            className="grid grid-cols-3 gap-2.5 sm:gap-4"
+            aria-label="Prayer, Bible, and reflection shortcuts"
+          >
+            <QuickActionTile
+              href="/app/prayer/new"
+              sprite="candle"
+              title="One minute of prayer"
+              animate
+            />
+            <QuickActionTile
+              href={
+                readingPosition
+                  ? chapterHref(readingPosition.bookSlug, readingPosition.chapter)
+                  : "/app/bible"
+              }
+              sprite="book"
+              title="Open the Bible"
+              ariaLabel={
+                readingPosition
+                  ? `Continue ${readingPosition.bookName} ${readingPosition.chapter}`
+                  : "Open the Bible"
+              }
+            />
+            <QuickActionTile
+              href="/app/prayer/reflections"
+              sprite="sun"
+              title="Reflect on Today"
+            />
+          </div>
 
           {/* Guided Scripture remains a distinct daily formation choice. */}
           <TodayFormation
@@ -349,39 +394,6 @@ function HomeInner() {
 
           {/* The arcade follows growth as the lighter play surface. */}
           <TodayFormation dayKey={dayKey} show="game" />
-
-          {/* Core devotional shortcuts close the formation path before promotions. */}
-          <div
-            role="group"
-            className="grid grid-cols-3 gap-2.5 sm:gap-4"
-            aria-label="Prayer, Bible, and reflection shortcuts"
-          >
-            <QuickActionTile
-              href="/app/prayer/new"
-              sprite="candle"
-              title="One minute of prayer"
-              animate
-            />
-            <QuickActionTile
-              href={
-                readingPosition
-                  ? chapterHref(readingPosition.bookSlug, readingPosition.chapter)
-                  : "/app/bible"
-              }
-              sprite="book"
-              title="Open the Bible"
-              ariaLabel={
-                readingPosition
-                  ? `Continue ${readingPosition.bookName} ${readingPosition.chapter}`
-                  : "Open the Bible"
-              }
-            />
-            <QuickActionTile
-              href="/app/prayer/reflections"
-              sprite="sun"
-              title="Reflect on Today"
-            />
-          </div>
 
           {/* A gentle, once-per-context invitation keeps a journey safe across devices. */}
           <AccountPrompt />

@@ -68,6 +68,9 @@ export function isOnboardingResumePending(
 export function onboardingLaunchDestination(
   stage: OnboardingResumeStage | null,
 ): "/app" | "/app/quests" | "/app/plus" | null {
+  // Older web builds paused on a post-quest Plus preview. Resume those readers
+  // in the free app now that onboarding no longer monetizes first use.
+  if (stage === "plus") return "/app";
   if (stage === "launch") return "/app";
   if (stage === "launch_quests") return "/app/quests";
   if (stage === "launch_plus") return "/app/plus";
@@ -86,12 +89,14 @@ export function shouldRedirectAppToOnboarding(
   return !onboardingCompleted;
 }
 
-/** Keeps only the intentional post-quest Plus preview on the public route. */
+/** Completed profiles no longer remain on onboarding for a Plus preview. */
 export function shouldKeepCompletedProfileOnOnboarding(
   onboardingCompleted: boolean,
   stage: OnboardingResumeStage | null,
 ): boolean {
-  return onboardingCompleted && stage === "plus";
+  void onboardingCompleted;
+  void stage;
+  return false;
 }
 
 /** A newly restored session skips the account form even when another hook loaded first. */

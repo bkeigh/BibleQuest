@@ -116,8 +116,8 @@ function normalizeAppearanceSettings(
   return {
     ...appearance,
     glassOpacity: normalizeGlassOpacity(appearance.glassOpacity),
-    // Absent means on: the launcher ships present, and only an explicit
-    // `false` from the settings toggle takes it away.
+    // Preserve the prior-build default for legacy records that predate the
+    // explicit setting; new journeys persist the current opt-in default.
     myShepherdFloatingButton:
       appearance.myShepherdFloatingButton !== false,
   };
