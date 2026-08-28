@@ -9,6 +9,7 @@ PASS FOR LOCAL SOURCE REVIEW; NOT A SIGNED OR DEVICE-VERIFIED RELEASE CANDIDATE
 - Branch: `codex/first-use-release-candidate`
 - Starting source: `c3af44df5834a53736da671cfe5a51b9a7ae1475`
 - Recorded: `2026-08-28T05:15:26Z`
+- Local database rerun: `2026-08-28T06:54:40Z`
 - Scope: six-step onboarding, reviewed starter-quest allowlist, direct free-app entry, exact selected-quest handoff, first-screen daily actions, route-independent capture plus post-value installation timing, opt-in MyShepherd launcher, safe-area-aware skip links, and append-only Production native-availability reconciliation
 
 ## Automated evidence
@@ -29,7 +30,13 @@ PASS FOR LOCAL SOURCE REVIEW; NOT A SIGNED OR DEVICE-VERIFIED RELEASE CANDIDATE
 | `pnpm check:supabase-browser-bundle` | PASS — one reviewed public target | Built with the guarded public account-release input; no key value recorded |
 | `pnpm audit --prod --audit-level high` | PASS — no known vulnerabilities | Registry state at command time |
 | `git diff --check` | PASS | Whitespace only |
-| Local Supabase / Docker status | OPEN — harness unavailable at `2026-08-28T06:45:08Z` | Both read-only status probes remained silent for 90 seconds and were interrupted; pgTAP, RLS, and concurrency checks were not claimed |
+| Local Supabase clean reset | PASS — all 38 numbered migrations through `0039`; `0013` absent | Local Docker Desktop required a bounded restart after its Linux engine had stopped; only the BibleQuest stack was reset and later removed |
+| `supabase migration list --local` | PASS — local history matches every checked-in numbered migration through `0039` | Local history only; remote reconciliation remains separate |
+| `supabase test db --local` | PASS — 23 files, 572 assertions | Local pgTAP acceptance suite |
+| `supabase db lint --local --schema public --level warning --fail-on warning` | PASS — no schema errors | Local public schema only |
+| `supabase/evidence/rls_policy_report.sql` | PASS — all 45 expected public tables have RLS and every bounded public posture contract reports ready/ok | Local catalog and grants; signed two-account isolation remains separate |
+| `pnpm test:account-deletion-concurrency` | PASS — two PostgreSQL connections prove both upload/deletion orderings, waits, denials, and zero post-delete object creation | Local race harness; signed app deletion remains separate |
+| Deterministic seed and content counts | PASS — no generated diff; 150 quests / 180 daily verses / 38 milestones / 32 prayer prompts / 32 reflection prompts | Local reviewed mirror only |
 | `pnpm ios:account-release:prepare` | PASS — 261 pages, reviewed public target, content-rights inventory, exact containing-commit identity | Local export, not an uploaded archive |
 | Unsigned Release iPhone `xcodebuild` | PASS — `BUILD SUCCEEDED` | Proves device-target compilation, not signing, TestFlight processing, or physical-device behavior |
 | Complete unsigned simulator artifact verifier | PASS — profile `account-release`, version `1.2`, build `4`, 2,853 files, exact containing-commit source identity | Uses the reviewed unsigned mode; signed archive verification remains open |
