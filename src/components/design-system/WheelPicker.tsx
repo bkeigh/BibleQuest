@@ -160,13 +160,16 @@ export function WheelPicker({
       <div aria-hidden="true" className="wheel-band" />
       <div ref={trackRef} className="wheel-track" onKeyDown={onKeyDown}>
         <div aria-hidden="true" className="wheel-pad" />
-        {options.map((option) => (
+        {options.map((option, index) => (
           <label key={option.value} data-wheel-row className="wheel-row">
+            {/* Keep the selected radio as the group's one sequential stop;
+                native arrow behavior still moves within the group. */}
             <input
               type="radio"
               name={name}
               value={option.value}
               checked={value === option.value}
+              tabIndex={index === selectedIndex ? 0 : -1}
               onChange={() => onChange(option.value)}
               className="sr-only"
             />

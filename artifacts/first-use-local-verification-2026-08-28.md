@@ -18,9 +18,9 @@ PASS FOR LOCAL SOURCE REVIEW; NOT A SIGNED OR DEVICE-VERIFIED RELEASE CANDIDATE
 | `pnpm install --frozen-lockfile` | PASS | Local dependency installation only |
 | `pnpm lint` | PASS | Static lint only |
 | `pnpm exec tsc --noEmit` | PASS | Type analysis only |
-| `pnpm test` | PASS — 214 files, 1,652 tests | Repeated after the native skip-link safe-area adjustment |
+| `pnpm test` | PASS — 215 files, 1,655 tests | Repeated after the native keyboard-order adjustments |
 | Focused first-use, launch-content, and Home-formation tests | PASS — 32 tests | Source-contract and layout-order coverage, not a signed binary |
-| `pnpm test:e2e` | PASS — 10 browser journeys | Local fixture environment |
+| `pnpm test:e2e` | PASS — 11 browser journeys | Includes one-stop language-wheel traversal and native radio arrow behavior |
 | `pnpm test:headers` | PASS — production build and 2 header checks | Local fixture environment |
 | `pnpm test:service-worker` | PASS — 31 tests | Local worker harness |
 | `pnpm test:observability` | PASS — 30 tests | Local/fixture contracts |
@@ -50,7 +50,7 @@ The revised artifact uses one full-width evergreen “Continue on this device”
 
 After the host became available, Full Keyboard Access exercised the exact unsigned Release artifact through Account, Name, Language/Bible, Daily rhythm, Practices, First quest, Home, and the exact “Read One Psalm Slowly” quest detail. The First quest action assigned the selected quest, Home placed Prayer/Bible/Reflection in the first viewport, “Open quest” reached that exact detail, the bottom Begin action sat clear of the fixed tab bar, and a terminate/relaunch returned to Home with onboarding complete, the local profile intact, and the starter quest still Ready.
 
-The walkthrough exposed one native-only accessibility defect: the focused Home “Skip to content” link appeared beneath the status/Dynamic Island area. Both application shells now position focused skip links with the top safe-area inset. The rebuilt account-release artifact embeds that exact CSS rule, passes the complete artifact verifier, and launched cleanly on a fresh iPhone 16 Pro / iOS 18.6 simulator through Language/Bible before the host locked again. Full Keyboard Access also revealed that its navigation visits all nineteen language-wheel radios; the flow remains operable, but condensing that traversal is a worthwhile accessibility-hardening follow-up.
+The walkthrough exposed one native-only accessibility defect: the focused Home “Skip to content” link appeared beneath the status/Dynamic Island area. Both application shells now position focused skip links with the top safe-area inset. The rebuilt account-release artifact embeds that exact CSS rule, passes the complete artifact verifier, and launched cleanly on a fresh iPhone 16 Pro / iOS 18.6 simulator through Language/Bible before the host locked again. Full Keyboard Access also revealed that its navigation visited all nineteen language-wheel radios. The wheel now exposes only its selected radio to sequential keyboard navigation while retaining native arrow-key movement; component and optimized-browser tests cover both contracts.
 
 No account, credential, prayer, reflection, note, identifier, or private URL was used or captured. Every disposable simulator created for these checks was removed afterward.
 
