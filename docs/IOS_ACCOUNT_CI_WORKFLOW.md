@@ -1,12 +1,11 @@
 # Building the account replacement in Xcode Cloud
 
-Every Xcode Cloud build BibleQuest has ever produced is the **guest** profile,
-including the TestFlight builds numbered 13 and 19. `ci_post_clone.sh` ended at
-`pnpm ios:release:prepare`, which blanks the Supabase configuration and turns
-both account latches off. A guest build behaving well says nothing about
-accounts, and a build number says nothing about the source: Xcode Cloud stamps
-`CFBundleVersion` from `CI_BUILD_NUMBER`, which is why TestFlight numbers never
-match `CURRENT_PROJECT_VERSION` in the committed project.
+Historical TestFlight builds 13 and 19 used the **guest** profile. Build 43 is
+an account candidate but is held because its post-code flow can remain behind
+an infinite loading screen. A build number alone proves neither profile nor
+source: Xcode Cloud stamps `CFBundleVersion` from `CI_BUILD_NUMBER`, which is
+why TestFlight numbers do not match `CURRENT_PROJECT_VERSION` in the committed
+project. Use the signed-artifact verifier and embedded source identity.
 
 This document covers the one workflow that can produce an account-enabled
 binary, and the App Store Connect steps only the account holder can perform.
@@ -73,8 +72,9 @@ fall through and build accounts anyway.
 
 Both belong to the release owner and neither is checked by CI:
 
-- Confirm custom SMTP, the exact provider and callback settings, the code-only
-  email template, and resend limits (§5 item 10).
+- Confirm custom SMTP, exact six-digit OTP configuration, the code-only email
+  templates, resend limits, the Apple capability/profile, the exact web-first
+  Apple client-ID list, and Apple private-relay sender posture (§5 item 10).
 - Confirm the App Store privacy answers describe the **account** build. The
   current answers describe the guest app and are wrong for this binary.
 
@@ -88,7 +88,7 @@ actual build number:
 node scripts/verify-ios-release-app.mjs \
   --app "<App.app>" \
   --profile account-release \
-  --expected-build 41 \
+  --expected-build "<ACTUAL_CLOUD_BUILD_NUMBER>" \
   --expected-source "<FULL_FROZEN_MAIN_SHA>"
 ```
 
@@ -100,8 +100,8 @@ artifact; a tree digest is not a substitute for that file hash.
 ## What still cannot be produced this way
 
 A local development build (`xcodebuild -destination generic/platform=iOS`) is
-enough to test behaviour on an attached device, and that is how the 2026-08-15
-defects were found. It does **not** prove signing, TestFlight delivery,
+enough to test behavior on an attached device, and that is how the post-code
+loader defect can be reproduced. It does **not** prove signing, TestFlight delivery,
 reinstall, or the App Store distribution path. Those need this workflow.
 
 ## This workflow is the only path, not the preferred one

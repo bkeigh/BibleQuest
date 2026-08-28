@@ -2,8 +2,9 @@
 
 Status: **HOLD — inventory complete, visual-asset ownership evidence open**
 Scope: the exact public media allowlist, native asset catalogs, generated fonts,
-and online Scripture that can be reached by the planned US-only Build 41.
-Last source review: **2026-08-26**
+and online Scripture that can be reached by the next signed US-only replacement
+build.
+Last source review: **2026-08-27**
 
 Do not accept App Store Connect's content-rights promise from this document
 until every `OPEN` row is replaced by dated evidence and a named owner signs
@@ -15,14 +16,15 @@ integrated a file; neither proves who created it or who owns its rights.
 `scripts/lib/native-media.mjs` is the executable public-picture allowlist.
 `scripts/build-native.mjs` now removes every other public picture before the
 native export and fails if the retained set drifts. The allowlist currently has
-**78 files**: 64 manifest-controlled 2.5D files and 14 other native-route files.
-The account build no longer carries the dormant Apple/Google web sign-in marks,
-unused game art, wallpaper thumbnails, or unused wallpaper posters.
+**79 files**: 64 manifest-controlled 2.5D files and 15 other native-route files.
+The account build carries the supplied Apple mark solely for the functional
+Sign in with Apple control. It excludes the unreachable Google mark, unused
+game art, wallpaper thumbnails, and unused wallpaper posters.
 `scripts/verify-ios-content-rights.mjs` verifies the generated native payload;
 `scripts/verify-ios-release-app.mjs` repeats the byte comparisons inside the
 extracted archived `.app` and includes the result in its exact tree digest.
 
-The final Build 41 comparison must also include these Xcode/build-produced
+The final signed-build comparison must also include these Xcode/build-produced
 surfaces, which are not under `public/`:
 
 - the three App Icon Composer layers in `ios/App/App/AppIcon.icon/Assets/`;
@@ -41,13 +43,14 @@ No group may be approved by sampling only one file.
 | Row | Files | Creator | Source and creation date | Rights owner | License or assignment | Image/tool terms | Status |
 | --- | ---: | --- | --- | --- | --- | --- | --- |
 | A1 — 2.5D stills and candle loops | 64 | The external master README records BibleQuest art direction through the built-in image-generation path; the operator/account owner still requires a signed declaration. | External `Assets-BibleQuest/2.5D` generation reports date all 58 stills to **2026-08-01** and document six derived loops. All 64 source masters exactly match the runtime manifest paths and aggregate to the evidence fingerprint below. | `LICENSE` covers original BibleQuest assets jointly owned by Brendan Kenney and Winterhill Media LLC, but a signed record must still connect the operator, account, authorized pixel-sprite references, and masters to those owners. | Founder declaration must confirm the operator/account, authorized inputs, ownership at creation, and Winterhill Media LLC's App Store distribution rights. | Built-in image generation is documented, but the applicable account and terms cannot be inferred from files alone. | **OPEN — declaration required** |
-| A2 — Scripture game art | 3 | Not required for Build 41. | The candidate now reuses reviewed A3 posters for all three game cards and the Seven Days scene. The exact native allowlist excludes `scripture-games-today.webp`, `scripture-games-coming-2.webp`, and `seven-days-match-poster.webp`. | Not applicable to the Build 41 binary. | Not applicable to the Build 41 binary. | Not applicable to the Build 41 binary. | **OUT OF SCOPE — verifier must prove absent** |
+| A2 — Scripture game art | 3 | Not required for the replacement build. | The candidate now reuses reviewed A3 posters for all three game cards and the Seven Days scene. The exact native allowlist excludes `scripture-games-today.webp`, `scripture-games-coming-2.webp`, and `seven-days-match-poster.webp`. | Not applicable to the replacement binary. | Not applicable to the replacement binary. | Not applicable to the replacement binary. | **OUT OF SCOPE — verifier must prove absent** |
 | A3 — onboarding wallpaper posters | 6 | BibleQuest art direction using OpenAI image generation; the human/operator and generating account owner must be confirmed. | Exact source concepts remain under `output/live-wallpapers/**/openai-imagegen-20260720-r01/`; creation date **2026-07-20**. The shipped WebPs are derived stills and the source manifests are fingerprinted below. | Current OpenAI terms assign output to the customer/user to the extent permitted by law, but the repository does not prove which person/entity held the generating account or owned every input/reference. | Founder declaration must confirm the account, authorized inputs/references, and Winterhill Media LLC's distribution rights. | [OpenAI Terms of Use](https://openai.com/policies/row-terms-of-use/) and, if the generating account was business/API, the [Services Agreement](https://openai.com/policies/services-agreement/); both leave input rights and output review with the user/customer. | **OPEN — declaration required** |
 | A4 — BibleQuest logo and Open Graph image | 2 | The `.ai` metadata identifies Adobe Illustrator 30.6 and `AIRobin`, but files cannot establish the human designer or account owner. | `BQ-Logo-Board-1.ai` was created **2026-07-09 01:58:35 -04:00**. `assets/BQ-Logo-Vector-Cross.svg`, `public/brand/bq-logo.svg`, and the Icon Composer logo source are byte-identical. `og.png` is a deterministic derivative. | Not evidenced beyond `LICENSE`. | Founder declaration must identify the designer/account, authorized inputs, ownership at creation, and Winterhill Media LLC's distribution rights. | Illustrator metadata is evidence of the tool, not ownership or input rights. | **OPEN — declaration required** |
 | A5 — web/PWA icon derivatives | 6 | Deterministically produced from A4 and the active A6 layer. | Five PNGs are generated by `scripts/build-app-icons.mjs` from `2.5d-BQ-book.png`; `icon.svg` is generated by `scripts/build-icons.mjs` from the byte-identical A4 logo. | Inherits A4 and A6. | Inherits A4 and A6. | Sharp is only a deterministic processing tool. | **VERIFIED DERIVATION — inherits A4/A6** |
 | A6 — App Icon Composer layers | 3 | The active book layer has an external PSD and 2.5D-generation evidence; the operator/account owner still requires a signed declaration. | `2.5d-BQ-book.png` exactly matches the external master; its PSD metadata records Photoshop 27.8, creation on **2026-08-01**, and modification on **2026-08-07**. Icon Composer marks `01-let-there-be-light.png` and `book-open.png` hidden; only the book layer renders. | Not evidenced beyond `LICENSE`. | Founder declaration must confirm the operator/account, authorized inputs, ownership at creation, and Winterhill Media LLC's distribution rights. | Icon Composer and Photoshop compose/edit the source; applicable generation-account terms still require confirmation. | **OPEN — declaration required** |
 | A7 — launch images | 3 | Deterministic derivatives of `public/art/2.5d/book-open.webp`. | Generated by `scripts/build-ios-splash.mjs`; current files entered Git on 2026-08-13. | Inherits A1. | Inherits A1. | Sharp only resizes the unresolved A1 source. | **OPEN — hard stop** |
 | A8 — app/favicon export | 1 source plus generated copies | Deterministically produced from A4. | `scripts/build-icons.mjs` generates `src/app/favicon.ico` from the byte-identical A4 logo source. | Inherits A4. | Inherits A4. | Sharp is only a deterministic processing tool. | **VERIFIED DERIVATION — inherits A4** |
+| A9 — Sign in with Apple mark | 1 | Apple provider mark supplied for the existing sign-in control. | `public/brand/apple-logo-white.png`; introduced in repository history on **2026-07-28** and now reachable only from the functional Sign in with Apple button. | Apple Inc. owns the Apple mark. | Use is limited to identifying and initiating Sign in with Apple and must remain consistent with Apple's Sign in with Apple design requirements. | The mark is not BibleQuest artwork and must not be reused decoratively or outside the provider control. | **VERIFIED FUNCTIONAL USE — recheck exact signed button** |
 
 ### Required founder visual-rights declaration
 
@@ -56,7 +59,7 @@ declarant must name the actual creator/operator and account holder, confirm that
 every input/reference was owned or authorized, record ownership at creation and
 any assignment or license, and grant or confirm Winterhill Media LLC's right to
 distribute the material in the United States through the App Store. Legal/owner
-review must then approve the exact Build 41 binary.
+review must then approve the exact signed replacement binary.
 
 ### Evidence fingerprints
 
@@ -75,12 +78,13 @@ the required human ownership declaration.
 | Byte-identical logo SVG source | `03e7a0164496686cd2a00e3c07462e737419bd49d26579c0f0e700db2598abd8` |
 | Illustrator logo board | `45de8b9d5530a9cd4b773a144a051fe07ffca675da93c27416899c967f14d941` |
 | Active App Icon book layer / external PSD | `2ed07b19bb61419dfcab95b6c8cd44e66d8c94e9289f7f2913819948ff7a4194` / `54b322cb8d7c368a51656b1cd3887b95510e9f2a9260156145df2b6aff130a26` |
+| Sign in with Apple mark | `a0ddf4d6b890cfbb4892ae55f20615321c835c51c49f798925a2bc6e95021eb0` |
 
 ## Fonts and notices
 
 | Content | Creator/source | License | Binary compliance | Status |
 | --- | --- | --- | --- | --- |
-| Fraunces | Fraunces Project Authors; loaded with `next/font/google` from Google Fonts | SIL Open Font License 1.1; [upstream license](https://github.com/google/fonts/blob/main/ofl/fraunces/OFL.txt) | Commercial embedding is permitted if the copyright notice and license accompany the font. Both are in `public/THIRD_PARTY_NOTICES.txt`, linked from Settings, and must be present in Build 41. | **VERIFIED — recheck exact bundle** |
+| Fraunces | Fraunces Project Authors; loaded with `next/font/google` from Google Fonts | SIL Open Font License 1.1; [upstream license](https://github.com/google/fonts/blob/main/ofl/fraunces/OFL.txt) | Commercial embedding is permitted if the copyright notice and license accompany the font. Both are in `public/THIRD_PARTY_NOTICES.txt`, linked from Settings, and must be present in the final signed build. | **VERIFIED — recheck exact bundle** |
 | Inter | Inter Project Authors; loaded with `next/font/google` from Google Fonts | SIL Open Font License 1.1; [upstream license](https://github.com/google/fonts/blob/main/ofl/inter/OFL.txt) | Same as Fraunces. | **VERIFIED — recheck exact bundle** |
 
 At final freeze, record every hashed WOFF2 filename and SHA-256 from the signed
@@ -225,7 +229,7 @@ src/app/favicon.ico
 | --- | --- | --- | --- |
 | Every remaining `OPEN` field resolved | `[NAME]` | `[UTC]` | `[RESTRICTED EVIDENCE LINK]` |
 | Legal accepts every asset and Scripture row for United States distribution | `[NAME]` | `[UTC]` | `[EVIDENCE]` |
-| Signed Build 41 media/hashes exactly match this inventory | `[NAME]` | `[UTC]` | `[EVIDENCE]` |
+| Signed replacement-build media/hashes exactly match this inventory | `[NAME]` | `[UTC]` | `[EVIDENCE]` |
 | Production translation catalog is unchanged and API.Bible remains off | `[NAME]` | `[UTC]` | `[EVIDENCE]` |
 | App Store content-rights promise approved | `[NAME]` | `[UTC]` | `[APP STORE EVIDENCE]` |
 

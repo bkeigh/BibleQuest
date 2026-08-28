@@ -165,6 +165,11 @@ matrix instead and leave the provider round trips explicitly out of scope.
    Production was reconciled and read back byte-for-byte against both checked-in
    templates on August 10, 2026. Re-run this comparison after any dashboard edit.
 
+   Set and read back the Production email OTP length as exactly **6**, matching
+   `supabase/config.toml`. The native field accepts only six digits, advertises
+   `one-time-code` to iOS, normalizes formatted paste, and submits on the sixth
+   digit. A server/client length mismatch is a release hold.
+
 Do not put `{{ .Token }}` in the subject, where a locked-screen notification
 could expose it. Keep the code in the email body. A fresh iOS 17.2+ Home Screen
 install copies existing browser cookies once, but Safari and the installed app
@@ -174,7 +179,7 @@ email in Mail never transfers a session into Safari or the installed PWA.
 
 Do not hard-code `SiteURL`, `/app`, or an email verification link in these
 templates. Test each saved template with a newly created beta account and an
-existing account, including the numeric code inside an installed PWA. The code
+existing account, including the six-digit code inside an installed PWA. The code
 must complete only in the browser or app where it is entered. See
 [Supabase email templates](https://supabase.com/docs/guides/auth/auth-email-templates)
 and [redirect URL guidance](https://supabase.com/docs/guides/auth/redirect-urls).

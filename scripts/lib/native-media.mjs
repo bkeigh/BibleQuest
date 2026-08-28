@@ -5,6 +5,7 @@ const MEDIA_EXTENSION = /\.(?:gif|ico|jpe?g|png|svg|webp)$/i;
 
 // These public files are referenced by native routes outside the 2.5D registry.
 const NATIVE_PUBLIC_MEDIA = [
+  "public/brand/apple-logo-white.png",
   "public/brand/bq-logo.svg",
   "public/icons/apple-touch-icon.png",
   "public/icons/favicon-48.png",

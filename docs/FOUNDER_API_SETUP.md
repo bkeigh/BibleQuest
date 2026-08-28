@@ -75,6 +75,13 @@ intentionally absent because they are not bound to the requesting browser. See
 [Supabase redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls)
 and [email templates](https://supabase.com/docs/guides/auth/auth-email-templates).
 
+Set the Production email OTP length to exactly **6**, matching
+`[auth.email].otp_length` in `supabase/config.toml`. Read it back after saving,
+then send fresh confirmation and returning-user emails to a staffed test
+iPhone. Verify both messages contain one six-digit `Token`, iOS offers the code
+above the keyboard, a formatted clipboard paste is normalized, and the sixth
+digit completes without another tap. Do not record the address or code.
+
 Before calling auth fixed, complete the schema/content recovery steps in
 [`ACCOUNT_SYNC_RUNBOOK.md`](ACCOUNT_SYNC_RUNBOOK.md). A verified code can
 successfully create a session and still fail to restore the journey if the
@@ -105,13 +112,23 @@ See [Supabase Login with Google](https://supabase.com/docs/guides/auth/social-lo
 
 ### Apple sign-in credentials
 
-Apple is the primary social sign-in option. Configure an Apple Services ID in
-**Supabase → Authentication → Sign In / Providers → Apple**, using the exact
-Supabase callback URL displayed there. The production provider currently uses
-`co.biblequest.web` as its Services ID. Register the Supabase project domain
-`iacnjqnssovaaojswjoh.supabase.co` and callback
-`https://iacnjqnssovaaojswjoh.supabase.co/auth/v1/callback` with that Services
-ID in Apple Developer.
+Apple is the native app's only social sign-in option. In Apple Developer,
+enable Sign in with Apple for the primary App ID `co.biblequest.app`, then
+regenerate the App Store/Xcode Cloud provisioning profile and inspect the
+signed entitlement. Keep the existing Services ID `co.biblequest.web` for the
+website. Its registered domain is `iacnjqnssovaaojswjoh.supabase.co` and its
+return URL is
+`https://iacnjqnssovaaojswjoh.supabase.co/auth/v1/callback`.
+
+In **Supabase → Authentication → Sign In / Providers → Apple**, preserve
+`co.biblequest.web` as the first client ID and add `co.biblequest.app` as the
+native client ID. The resulting reviewed list must be exactly
+`co.biblequest.web,co.biblequest.app`; the first ID remains the web OAuth
+client while native `signInWithIdToken` accepts the app's audience. Enable the
+provider only in the separately approved Production activation window. If
+people using Hide My Email must receive BibleQuest account mail, also register
+the exact custom SMTP sender domain with Apple's private email relay and test a
+synthetic relay address without retaining it in evidence.
 
 Apple client secrets expire after at most 180 days. Generate a replacement
 locally before the current secret expires:
@@ -130,7 +147,8 @@ Never put the `.p8` key in the repository, Vercel, command history, or a shared
 document. Record the new expiry date and schedule the next rotation before it.
 The Apple credentials stay in Supabase; they are not Vercel variables. Keep
 the app's `/auth/callback` URLs in the Supabase redirect allow-list described
-above. See
+above. The native app exchanges Apple's nonce-bound identity token directly
+with Supabase and does not use a browser callback. See
 [Supabase Login with Apple](https://supabase.com/docs/guides/auth/social-login/auth-apple).
 
 ## 2. Prepare one-time Support BibleQuest Checkout

@@ -199,6 +199,7 @@ interface SessionState {
   recovery:
     | "none"
     | "installing"
+    | "session-unavailable"
     | "locked-local-journey"
     | "clearing-local-journey";
 }
@@ -509,6 +510,14 @@ export function useSession(): SessionState {
       Parameters<typeof supabase.auth.onAuthStateChange>[0]
     >[1] = null;
 
+    /** Keeps private descendants closed without leaving a permanent spinner. */
+    const showRetryableSessionFailure = () => {
+      verifiedUserId.current = null;
+      setUser(null);
+      setRecovery(isNativeTarget() ? "session-unavailable" : "none");
+      setSessionLoading(!isNativeTarget());
+    };
+
     /** Keeps account surfaces closed while a terminal cleanup owns the device. */
     const resumeDeletedAccount = async (
       userId: string,
@@ -621,9 +630,7 @@ export function useSession(): SessionState {
           before.error ||
           !observedCredentialMatches(expected, before.data.session)
         ) {
-          verifiedUserId.current = null;
-          setUser(null);
-          setSessionLoading(true);
+          showRetryableSessionFailure();
           return;
         }
 
@@ -672,10 +679,10 @@ export function useSession(): SessionState {
           // Retryable identity failures preserve only a previously accepted
           // same-subject view; a replacement always remains isolated.
           if (!preserveVerifiedUserOnRetryableFailure) {
-            verifiedUserId.current = null;
-            setUser(null);
+            showRetryableSessionFailure();
+          } else {
+            setSessionLoading(false);
           }
-          setSessionLoading(!preserveVerifiedUserOnRetryableFailure);
           return;
         }
 
@@ -689,9 +696,7 @@ export function useSession(): SessionState {
             outcome: "failure",
             category: classifyOperationalError(statusError),
           });
-          verifiedUserId.current = null;
-          setUser(null);
-          setSessionLoading(true);
+          showRetryableSessionFailure();
           return;
         }
         if (!active || run !== verificationRun) return;
@@ -706,9 +711,7 @@ export function useSession(): SessionState {
           after.error ||
           !observedCredentialMatches(expected, after.data.session)
         ) {
-          verifiedUserId.current = null;
-          setUser(null);
-          setSessionLoading(true);
+          showRetryableSessionFailure();
           return;
         }
         if (pending) {
@@ -747,9 +750,7 @@ export function useSession(): SessionState {
           outcome: "failure",
           category: classifyOperationalError(error),
         });
-        verifiedUserId.current = null;
-        setUser(null);
-        setSessionLoading(true);
+        showRetryableSessionFailure();
       });
     };
 
@@ -816,6 +817,52 @@ export function useSession(): SessionState {
         authEventCompletesSignIn(event, callbackCompleted),
       );
     });
+
+    /** Restores Keychain state even when auth-js's initial event was missed. */
+    const bootstrapNativeSession = async (showLoading = false) => {
+      if (!isNativeTarget()) return;
+      const eventRevision = authStorageRead;
+      if (showLoading) {
+        setRecovery("none");
+        setSessionLoading(true);
+      }
+      try {
+        const restored = await withDeadline(
+          supabase.auth.getSession(),
+          SESSION_LOOKUP_DEADLINE_MS,
+          "Native account restoration",
+        );
+        // A newer auth event already owns the snapshot and must win this race.
+        if (!active || eventRevision !== authStorageRead) return;
+        if (restored.error) {
+          reportClientSignal({
+            surface: "auth",
+            stage: "session",
+            outcome: "failure",
+            category: classifyOperationalError(restored.error),
+          });
+          showRetryableSessionFailure();
+          return;
+        }
+        latestSession = restored.data.session;
+        if (restored.data.session) {
+          await observeSession(restored.data.session, false);
+        } else {
+          observeSignedOut(false);
+        }
+      } catch (error) {
+        if (!active || eventRevision !== authStorageRead) return;
+        reportClientSignal({
+          surface: "auth",
+          stage: "session",
+          outcome: "failure",
+          category: classifyOperationalError(error),
+        });
+        showRetryableSessionFailure();
+      }
+    };
+
+    if (isNativeTarget()) void bootstrapNativeSession();
 
     /** Reconciles the durable v2 envelope before trusting any SDK observation. */
     reconcileWebAuthStorage = () => {
@@ -1120,6 +1167,8 @@ export function useSession(): SessionState {
         reconcileWebAuthStorage();
       } else if (latestSession) {
         void observeSession(latestSession, false);
+      } else {
+        void bootstrapNativeSession(true);
       }
     };
     window.addEventListener("online", verifyAfterReconnect);

@@ -111,7 +111,11 @@ export function createConsoleClient(): SupabaseClient {
 
 /** Create an auth-only client that can never read or mutate durable auth. */
 function createIsolatedAuthClient(
-  purpose: "email-otp" | "email-otp-request" | "account-sign-out",
+  purpose:
+    | "email-otp"
+    | "email-otp-request"
+    | "apple-id-token"
+    | "account-sign-out",
 ) {
   if (!isSupabaseConfigured()) {
     throw new Error(
@@ -150,6 +154,11 @@ export function createEmailOtpVerificationClient() {
 /** Request an email code without initializing or mutating the primary owner. */
 export function createEmailAuthRequestClient() {
   return createIsolatedAuthClient("email-otp-request");
+}
+
+/** Exchange an Apple identity token without touching durable auth storage. */
+export function createAppleIdTokenAuthClient() {
+  return createIsolatedAuthClient("apple-id-token");
 }
 
 /** Revoke one captured session without letting auth-js clear native storage. */

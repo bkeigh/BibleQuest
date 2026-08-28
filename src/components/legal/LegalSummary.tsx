@@ -44,7 +44,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
   privacy: {
     eyebrow: "Privacy",
     title: "Privacy Policy",
-    effectiveDate: "August 26, 2026",
+    effectiveDate: "August 27, 2026",
     intro: `BibleQuest is a product of ${LEGAL_ENTITY_NAME}. This policy explains what we collect, why we use it, and the choices you have.`,
     sections: [
       {
@@ -74,7 +74,12 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
       {
         title: "Service providers",
         body:
-          "We use service providers only for defined tasks: Supabase for authentication and protected account storage; Vercel for hosting and operational delivery; Plausible for optional analytics; Stripe for optional subscriptions and one-time support payments; Tally for the BibleQuest newsletter; and reviewed Bible providers for requested online editions. Stripe receives the payment and contact details needed to run Checkout, subscriptions, receipts, refunds, and disputes; BibleQuest does not receive full card numbers. Providers process information under their own terms and privacy notices. Bible requests do not include your prayers, reflections, name, or BibleQuest account ID.",
+          "We use service providers only for defined tasks: Supabase for authentication and protected account storage; Apple for optional Sign in with Apple; Vercel for hosting and operational delivery; Plausible for optional analytics; Stripe for optional subscriptions and one-time support payments; Tally for the BibleQuest newsletter; and reviewed Bible providers for requested online editions. Stripe receives the payment and contact details needed to run Checkout, subscriptions, receipts, refunds, and disputes; BibleQuest does not receive full card numbers. Providers process information under their own terms and privacy notices. Bible requests do not include your prayers, reflections, name, or BibleQuest account ID.",
+      },
+      {
+        title: "Signing in with Apple",
+        body:
+          "If you choose Sign in with Apple, Apple and Supabase process the authentication credential needed to sign you in. Apple may provide your email address or an Apple private relay address. BibleQuest does not use the Apple identity credential for analytics, and the app does not retain the Apple identity token or nonce after the sign-in exchange. The resulting BibleQuest session is stored in the iPhone Keychain so you can remain signed in.",
       },
       {
         title: "Online Bible editions",

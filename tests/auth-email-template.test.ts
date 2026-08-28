@@ -30,7 +30,12 @@ describe("PWA-safe auth email templates", () => {
 
   it("wires both templates into local Supabase configuration", () => {
     const config = readFileSync(join(ROOT, "supabase", "config.toml"), "utf8");
+    // Isolate email Auth so the disabled SMS OTP setting cannot satisfy this gate.
+    const emailConfig = config.match(
+      /\[auth\.email\]([\s\S]*?)(?=\n\[auth\.(?:email\.|sms\]))/,
+    )?.[1];
 
+    expect(emailConfig).toMatch(/^otp_length\s*=\s*6$/m);
     expect(config).toContain("[auth.email.template.confirmation]");
     expect(config).toContain("[auth.email.template.magic_link]");
     expect(config).toContain("./supabase/templates/confirmation.html");

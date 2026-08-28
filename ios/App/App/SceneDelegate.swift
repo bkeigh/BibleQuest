@@ -19,7 +19,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         clearRetainedAuthAfterReinstall()
-        let bridge = CAPBridgeViewController()
+        // The BibleQuest bridge registers the native Apple authorization plugin.
+        let bridge = BibleQuestBridgeViewController()
         bridgeViewController = bridge
         window = UIWindow(windowScene: windowScene)
         window?.rootViewController = bridge

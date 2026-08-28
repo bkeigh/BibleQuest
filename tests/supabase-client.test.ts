@@ -212,6 +212,31 @@ describe("Supabase browser clients", () => {
     expect(mocks.createBrowserClient).not.toHaveBeenCalled();
   });
 
+  it("exchanges Apple tokens without durable auth storage", async () => {
+    const tokenClient = { auth: { signInWithIdToken: vi.fn() } };
+    mocks.createSupabaseClient.mockReturnValue(tokenClient);
+    const { createAppleIdTokenAuthClient } = await import(
+      "@/lib/supabase/client"
+    );
+
+    expect(createAppleIdTokenAuthClient()).toBe(tokenClient);
+    expect(mocks.createSupabaseClient).toHaveBeenCalledWith(
+      "https://fixture.supabase.co",
+      legacyAnonFixture,
+      expect.objectContaining({
+        auth: expect.objectContaining({
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+          storageKey: expect.stringMatching(
+            /^biblequest-apple-id-token-\d+$/,
+          ),
+        }),
+        global: { headers: { "x-biblequest-web-auth": "v2" } },
+      }),
+    );
+  });
+
   it("creates sign-out revocation clients without durable auth storage", async () => {
     const revocationClient = { auth: { admin: { signOut: vi.fn() } } };
     mocks.createSupabaseClient.mockReturnValue(revocationClient);

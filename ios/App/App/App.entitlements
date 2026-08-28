@@ -5,5 +5,10 @@
 	<!-- Personal journal files remain unavailable until the device is unlocked. -->
 	<key>com.apple.developer.default-data-protection</key>
 	<string>NSFileProtectionComplete</string>
+	<!-- Enables the system-owned Sign in with Apple authorization sheet. -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
 </dict>
 </plist>

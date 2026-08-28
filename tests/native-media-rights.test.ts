@@ -12,7 +12,7 @@ describe("native media rights boundary", () => {
   it("keeps one finite, existing public-media allowlist", () => {
     const files = nativePublicMediaAllowlist(repositoryRoot);
 
-    expect(files).toHaveLength(78);
+    expect(files).toHaveLength(79);
     expect(new Set(files).size).toBe(files.length);
     expect(files.every(isPublicMediaPath)).toBe(true);
     expect(files.every((file) => existsSync(path.join(repositoryRoot, file)))).toBe(
@@ -40,10 +40,10 @@ describe("native media rights boundary", () => {
     );
   });
 
-  it("omits unreachable social marks and retired game art", () => {
+  it("retains the native Apple mark while omitting unreachable media", () => {
     const files = nativePublicMediaAllowlist(repositoryRoot);
 
-    expect(files).not.toContain("public/brand/apple-logo-white.png");
+    expect(files).toContain("public/brand/apple-logo-white.png");
     expect(files).not.toContain("public/brand/google-g-2025.png");
     expect(files).not.toContain("public/art/scripture-games-coming-1.webp");
     expect(files).not.toContain("public/art/scripture-games-coming-2.webp");

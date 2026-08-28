@@ -115,6 +115,29 @@ async function startVerification() {
 }
 
 describe("unmounting the sign-in form mid-verification", () => {
+  it("accepts a formatted six-digit paste and submits it immediately", async () => {
+    const { SignInMethods } = await import(
+      "@/components/account/SignInMethods"
+    );
+    const view = render(<SignInMethods source="account" intent="signin" />);
+
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: ADDRESS },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /sign-in code/i }));
+    const codeField = await screen.findByLabelText("Sign-in code");
+
+    expect(codeField.getAttribute("autocomplete")).toBe("one-time-code");
+    expect(codeField.getAttribute("maxlength")).toBe("6");
+    fireEvent.paste(codeField, {
+      clipboardData: { getData: () => "123 456" },
+    });
+
+    await waitFor(() => expect(verification.attempt).not.toBeNull());
+    expect((codeField as HTMLInputElement).value).toBe(CODE);
+    view.unmount();
+  });
+
   it("leaves the in-flight attempt current so the session survives", async () => {
     const { view, emailOtpAttemptIsCurrent } = await startVerification();
     const attempt = verification.attempt!;
