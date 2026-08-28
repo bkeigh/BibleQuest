@@ -291,8 +291,10 @@ describe("launch content catalog", () => {
       "utf8",
     );
 
-    expect(onboarding).toContain("your quests");
-    expect(onboarding).toContain("unlimited quest windows");
+    expect(onboarding).toContain("one meaningful quest");
+    expect(onboarding).toContain("places it in your");
+    expect(onboarding).toContain("Quests, ready whenever you are");
+    expect(onboarding).not.toContain("unlimited quest windows");
     expect(onboarding).not.toContain("active quests");
   });
 

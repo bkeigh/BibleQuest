@@ -40,7 +40,11 @@ function isDismissed(): boolean {
   }
 }
 
-export function InstallPrompt() {
+export function InstallPrompt({
+  onVisibilityChange,
+}: {
+  onVisibilityChange?: (visible: boolean) => void;
+}) {
   const [show, setShow] = useState(false);
   const [deferred, setDeferred] = useState<BIPEvent | null>(null);
   const [platform] = useState<InstallPlatform>(() =>
@@ -56,6 +60,18 @@ export function InstallPrompt() {
   const dismissedRef = useRef(false);
   const shownRef = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // Lets the persistent shell suppress other launchers while this panel is open.
+  useEffect(() => {
+    onVisibilityChange?.(show);
+  }, [onVisibilityChange, show]);
+
+  // Releases the shared overlay slot if the prompt leaves with the shell.
+  useEffect(() => {
+    return () => {
+      onVisibilityChange?.(false);
+    };
+  }, [onVisibilityChange]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

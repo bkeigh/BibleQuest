@@ -60,6 +60,11 @@ const REVIEWED_HISTORY = [
   ["20260812005000", "web_account_deletion_hardening"],
 ];
 
+/** Allows only reviewed migrations that were appended after native availability. */
+const POST_PACKET_HISTORY = [
+  ["20260826010000", "bound_provider_rate_limit_retention"],
+];
+
 /** Stops without reflecting SQL, provider output, or credentials. */
 function fail(message) {
   throw new Error(message);
@@ -182,7 +187,11 @@ function history(workdir) {
 /** Accepts only exact pre-release or fully applied Production history. */
 function historyState(actual) {
   const reviewed = REVIEWED_HISTORY.map(([version]) => version);
-  const applied = [...reviewed, PACKET.version];
+  const applied = [
+    ...reviewed,
+    PACKET.version,
+    ...POST_PACKET_HISTORY.map(([version]) => version),
+  ];
   if (JSON.stringify(actual) === JSON.stringify(reviewed)) return "reviewed";
   if (JSON.stringify(actual) === JSON.stringify(applied)) return "applied";
   fail("Production migration history differs from the reviewed release lane");

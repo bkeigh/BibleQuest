@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BottomNav } from "./BottomNav";
 import { InstallPrompt } from "./InstallPrompt";
 import { LanguageApplier } from "./LanguageApplier";
@@ -41,6 +41,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const floatingMyShepherd = useQuestOS(
     (state) => state.settings.appearance.myShepherdFloatingButton !== false,
   );
+  const hasCompletedQuest = useQuestOS((state) =>
+    Object.values(state.myQuests).some((quest) => quest.status === "completed"),
+  );
+  const [installPromptVisible, setInstallPromptVisible] = useState(false);
+
+  // Keeps the two persistent shell prompts mutually exclusive on small screens.
+  const handleInstallPromptVisibility = useCallback((visible: boolean) => {
+    setInstallPromptVisible(visible);
+  }, []);
   // Home already carries MyShepherd in the formation flow, where the large
   // launcher would duplicate the action and cover the restored card sequence.
   const hidesFloatingTools =
@@ -133,10 +142,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Web readers may see the acquisition preview; native readers see the
             tool only after an existing entitlement resolves. */}
         {floatingMyShepherd &&
+          !installPromptVisible &&
           !hidesFloatingTools &&
           (!isNativeTarget() || isPlus) && <FloatingMyShepherd />}
         <BottomNav />
-        <InstallPrompt />
+        {/* Installation is offered only after the reader has completed the
+            first daily loop, so onboarding earns value before acquisition. */}
+        {hasCompletedQuest && (
+          <InstallPrompt
+            onVisibilityChange={handleInstallPromptVisibility}
+          />
+        )}
       </div>
     </ToastProvider>
   );

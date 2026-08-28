@@ -1,14 +1,13 @@
 "use client";
 
 /**
- * First-run guide. Account access comes first, then concise product explainers,
- * one active quest, and an optional Plus invitation.
+ * First-run guide. Account access comes first, followed by a compact orientation
+ * and one deliberately gentle starter quest.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MotionConfig, motion } from "framer-motion";
 import { useQuestOS } from "@/lib/questos/store";
-import { isNativeTarget } from "@/lib/platform/target";
 import { useSession } from "@/lib/supabase/useSession";
 import { ClientOnly } from "@/components/app-shell/ClientOnly";
 import { GentleButton } from "@/components/design-system/GentleButton";
@@ -24,7 +23,6 @@ import {
   ArtMascot,
   type ArtMascotName,
 } from "@/components/design-system/ArtMascot";
-import { ArtIcon } from "@/components/design-system/ArtIcon";
 import { WheelPicker } from "@/components/design-system/WheelPicker";
 import { SignInMethods } from "@/components/account/SignInMethods";
 import { AccountIntentPicker } from "@/components/account/AccountIntentPicker";
@@ -36,6 +34,7 @@ import {
 } from "@/components/legal/LegalSummary";
 import { selectSuggestedQuests } from "@/lib/questos/quest-engine";
 import { seedQuests } from "@/data/seed/quests";
+import { onboardingStarterQuests } from "@/lib/questos/onboarding-starter-quests";
 import { getCurrentSeason } from "@/lib/questos/seasonal-engine";
 import { toDateKey } from "@/lib/utils/dates";
 import { track } from "@/lib/analytics/events";
@@ -65,29 +64,31 @@ const NAME_STEP = 1;
 // so the very first screen of the app is already in their language rather than
 // in English until they find Settings.
 const LANGUAGE_STEP = 2;
-const WELCOME_STEP = 3;
-const DENOMINATIONS_STEP = 4;
-const HOME_STEP = 5;
-const QUESTS_STEP = 6;
-const BIBLE_STEP = 7;
-const PRAYER_STEP = 8;
-const FIRST_QUEST_STEP = 9;
-const PLUS_STEP = 10;
-// The native build ends at the first quest — see startFirstQuest — so the
-// progress dots must not promise a step that never arrives.
-const TOTAL_STEPS = isNativeTarget() ? PLUS_STEP : PLUS_STEP + 1;
+const DAILY_RHYTHM_STEP = 3;
+const PRACTICES_STEP = 4;
+const FIRST_QUEST_STEP = 5;
+const TOTAL_STEPS = FIRST_QUEST_STEP + 1;
 
 const STEP_HEADING_ID = "onboarding-step-heading";
 
-// Uses retained stills only, giving the guide a taste of app artwork without video cost.
-const STEP_BACKGROUNDS: Partial<Record<number, string>> = {
-  [WELCOME_STEP]: "/wallpapers/01-let-there-be-light/poster.webp",
-  [DENOMINATIONS_STEP]: "/wallpapers/the-olive-grove/poster.webp",
-  [HOME_STEP]: "/wallpapers/galilee-be-still/poster.webp",
-  [QUESTS_STEP]: "/wallpapers/the-sheltering-tree/poster.webp",
-  [BIBLE_STEP]: "/wallpapers/12-baptism-in-the-jordan/poster.webp",
-  [PRAYER_STEP]: "/wallpapers/20-empty-tomb-at-dawn/poster.webp",
+// Gives screen-reader users a concise step change without moving visible focus.
+const STEP_ANNOUNCEMENTS: Record<number, string> = {
+  [ACCOUNT_STEP]: "Account options",
+  [NAME_STEP]: "Your name",
+  [LANGUAGE_STEP]: "Language and Bible edition",
+  [DAILY_RHYTHM_STEP]: "A calm daily rhythm",
+  [PRACTICES_STEP]: "Scripture, prayer, and growth",
+  [FIRST_QUEST_STEP]: "Your first quest",
 };
+
+// Uses retained stills only, giving the compact guide a taste of app artwork.
+const STEP_BACKGROUNDS: Partial<Record<number, string>> = {
+  [DAILY_RHYTHM_STEP]: "/wallpapers/galilee-be-still/poster.webp",
+  [PRACTICES_STEP]: "/wallpapers/20-empty-tomb-at-dawn/poster.webp",
+};
+
+// The starter catalogue is reviewed separately from the wider suggestion shelf.
+const STARTER_QUESTS = onboardingStarterQuests(seedQuests);
 
 function OnboardingInner({
   authFailure,
@@ -105,10 +106,8 @@ function OnboardingInner({
   const updateSettings = useQuestOS((state) => state.updateSettings);
   const alreadyDone = profile?.onboardingCompleted ?? false;
   const resumeStage = getOnboardingResumeStage();
-  const continuingPlus =
-    !isNativeTarget() && alreadyDone && resumeStage === "plus";
   const [step, setStep] = useState(() =>
-    continuingPlus ? PLUS_STEP : user ? NAME_STEP : ACCOUNT_STEP,
+    user ? NAME_STEP : ACCOUNT_STEP,
   );
   const settings = useQuestOS((state) => state.settings);
   const [draft, setDraft] = useState<Draft>(() => ({
@@ -120,7 +119,6 @@ function OnboardingInner({
   }));
   const [legalDocument, setLegalDocument] =
     useState<LegalDocumentKind | null>(null);
-  const hasNavigated = useRef(false);
   // Separate session hooks can settle one render apart; derive the safe entry
   // screen so a restored account never sees the account form a second time.
   const visibleStep =
@@ -144,10 +142,10 @@ function OnboardingInner({
   const suggestedQuest = useMemo<QuestTemplate | null>(
     () =>
       selectSuggestedQuests({
-        quests: seedQuests,
+        quests: STARTER_QUESTS,
         dateKey: toDateKey(),
         profile: {
-          displayName: draft.displayName.trim() || "friend",
+          displayName: "friend",
           onboardingCompleted: false,
           createdAt: new Date(0).toISOString(),
         },
@@ -156,13 +154,12 @@ function OnboardingInner({
         recentSlugs: [],
         count: 1,
       })[0] ?? null,
-    [draft.displayName],
+    [],
   );
 
-  // Moves between guide pages while preserving predictable focus behavior.
+  // Moves between the bounded guide pages without allowing an invalid stage.
   function goTo(nextStep: number) {
-    hasNavigated.current = true;
-    setStep(Math.max(ACCOUNT_STEP, Math.min(nextStep, PLUS_STEP)));
+    setStep(Math.max(ACCOUNT_STEP, Math.min(nextStep, FIRST_QUEST_STEP)));
   }
 
   // Commits only fields the revised guide actually asks for.
@@ -182,30 +179,13 @@ function OnboardingInner({
     goTo(NAME_STEP);
   }
 
-  // Adds the suggested quest before showing the optional membership invitation.
+  // Adds the suggested quest and opens the free daily experience immediately.
   function startFirstQuest() {
     if (!alreadyDone) saveProfile();
     if (suggestedQuest) pickQuest(suggestedQuest.slug);
     markAccountNudgeShown("onboarding");
-    // Plus cannot be purchased on iOS until a StoreKit path exists, so the
-    // invitation would end on a page the reader can never act on. Finish
-    // straight into the app instead.
-    if (isNativeTarget()) {
-      finish("/app");
-      return;
-    }
-    setOnboardingResumeStage("plus");
-    goTo(PLUS_STEP);
-  }
-
-  // Finalizes a safe app destination and clears the onboarding hand-off in the app gate.
-  function finish(destination: "/app" | "/app/plus") {
-    if (!alreadyDone) saveProfile();
-    markAccountNudgeShown("onboarding");
-    setOnboardingResumeStage(
-      destination === "/app/plus" ? "launch_plus" : "launch",
-    );
-    router.replace(destination);
+    setOnboardingResumeStage("launch");
+    router.replace("/app");
   }
 
   return (
@@ -224,6 +204,10 @@ function OnboardingInner({
             />
           </>
         )}
+
+        <p aria-live="polite" aria-atomic="true" className="sr-only">
+          {`Step ${visibleStep + 1} of ${TOTAL_STEPS}: ${STEP_ANNOUNCEMENTS[visibleStep]}`}
+        </p>
 
         <div
           role="progressbar"
@@ -269,11 +253,6 @@ function OnboardingInner({
               variants={stepTransition}
               initial="enter"
               animate="center"
-              onAnimationComplete={(definition) => {
-                if (definition === "center" && hasNavigated.current) {
-                  document.getElementById(STEP_HEADING_ID)?.focus();
-                }
-              }}
             >
               {visibleStep === ACCOUNT_STEP && (
                 <StepAccount
@@ -305,83 +284,31 @@ function OnboardingInner({
                   onBibleTranslation={(bibleTranslation) =>
                     setDraft((current) => ({ ...current, bibleTranslation }))
                   }
-                  onNext={() => goTo(WELCOME_STEP)}
+                  onNext={() => goTo(DAILY_RHYTHM_STEP)}
                 />
               )}
-              {visibleStep === WELCOME_STEP && (
-                <StepGuide
-                  mascot="lamb"
-                  eyebrow="Welcome to BibleQuest"
-                  title="Your daily guide to living your faith"
-                  body="Come as you are. BibleQuest helps you make space for Scripture, prayer, and one meaningful step each day."
-                  points={[
-                    "A clear daily rhythm, not another noisy feed",
-                    "Gentle progress that reflects practice, not perfection",
-                  ]}
-                  onNext={() => goTo(DENOMINATIONS_STEP)}
-                />
-              )}
-              {visibleStep === DENOMINATIONS_STEP && (
-                <StepGuide
-                  mascot="dove"
-                  eyebrow="A wide-open welcome"
-                  title="Made for Christians across denominations"
-                  body="BibleQuest does not ask you to fit into a label. It keeps the focus on Scripture and everyday faith while respecting traditions where Christians differ."
-                  points={[
-                    "Multiple Bible editions with clear attribution",
-                    "Language designed to welcome new and lifelong believers",
-                  ]}
-                  onNext={() => goTo(HOME_STEP)}
-                />
-              )}
-              {visibleStep === HOME_STEP && (
+              {visibleStep === DAILY_RHYTHM_STEP && (
                 <StepGuide
                   mascot="lantern"
-                  eyebrow="Today"
-                  title="A calm place to begin each day"
-                  body="Today brings your daily verse, quests, and a simple invitation to pray or reflect into one clear view."
+                  eyebrow="Welcome to BibleQuest"
+                  title="A calm daily rhythm"
+                  body="Come as you are. Today keeps Scripture and one meaningful quest close without turning faith into another noisy feed."
                   points={[
-                    "A daily verse chosen for your journey",
-                    "Your next faithful steps, easy to find",
+                    "Your daily verse and next faithful step stay easy to find",
+                    "Christians across denominations — and people exploring faith — are welcome",
                   ]}
-                  onNext={() => goTo(QUESTS_STEP)}
+                  onNext={() => goTo(PRACTICES_STEP)}
                 />
               )}
-              {visibleStep === QUESTS_STEP && (
-                <StepGuide
-                  mascot="map"
-                  eyebrow="Quests"
-                  title="Turn faith into something you can live"
-                  body="Quests are reviewed, practical invitations to serve, pray, read, forgive, give, or slow down."
-                  points={[
-                    "Choose what fits your real day",
-                    "Keep your quests close until you are ready",
-                  ]}
-                  onNext={() => goTo(BIBLE_STEP)}
-                />
-              )}
-              {visibleStep === BIBLE_STEP && (
-                <StepGuide
-                  mascot="scroll"
-                  eyebrow="Bible"
-                  title="Read Scripture without losing your place"
-                  body="Move through the full Bible, choose from available editions, save verses, and return to recent passages whenever you need them."
-                  points={[
-                    "World English Bible works offline",
-                    "Bookmarks and reading progress stay with your journey",
-                  ]}
-                  onNext={() => goTo(PRAYER_STEP)}
-                />
-              )}
-              {visibleStep === PRAYER_STEP && (
+              {visibleStep === PRACTICES_STEP && (
                 <StepGuide
                   mascot="campfire"
-                  eyebrow="Prayer and Journey"
+                  eyebrow="Bible, Prayer, and Journey"
                   title="Keep what matters close"
-                  body="Write private prayers and reflections, revisit answered prayers, and watch your Journey grow from the practices you choose."
+                  body="Read Scripture, choose practical quests, write private prayers or reflections, and watch your Journey grow from the practices you choose."
                   points={[
-                    "Your writing stays out of analytics",
-                    "You can export or clear your data in Settings",
+                    "Your private writing stays out of analytics",
+                    "You can export or clear your data from Settings",
                   ]}
                   onNext={() => {
                     setOnboardingResumeStage("quest");
@@ -397,12 +324,6 @@ function OnboardingInner({
                   name={draft.displayName.trim() || "friend"}
                   quest={suggestedQuest}
                   onStart={startFirstQuest}
-                />
-              )}
-              {!isNativeTarget() && visibleStep === PLUS_STEP && (
-                <StepPlus
-                  onExplore={() => finish("/app/plus")}
-                  onSkip={() => finish("/app")}
                 />
               )}
             </motion.div>
@@ -492,7 +413,6 @@ function StepAccount({
         </p>
         <h1
           id={STEP_HEADING_ID}
-          tabIndex={-1}
           className="mt-1.5 font-display text-[1.75rem] leading-tight text-graphite outline-none"
         >
           {!accountEnabled
@@ -637,10 +557,9 @@ function StepLanguage({
       />
       <h1
         id={STEP_HEADING_ID}
-        tabIndex={-1}
         className="font-display text-editorial text-graphite outline-none"
       >
-        What should we speak?
+        Choose your language and Bible
       </h1>
       <p className="mx-auto mt-2 max-w-xs text-small leading-relaxed text-ash">
         Both can be changed later in Settings, and they need not match.
@@ -752,7 +671,6 @@ function StepName({
       <StepMascot name="lamb" size={192} />
       <h1
         id={STEP_HEADING_ID}
-        tabIndex={-1}
         className="font-display text-editorial text-graphite outline-none"
       >
         What should we call you?
@@ -812,7 +730,6 @@ function StepGuide({
         </p>
         <h1
           id={STEP_HEADING_ID}
-          tabIndex={-1}
           className="mt-1.5 font-display text-[1.625rem] leading-tight text-graphite outline-none"
         >
           {title}
@@ -865,7 +782,6 @@ function StepFirstQuest({
         </p>
         <h1
           id={STEP_HEADING_ID}
-          tabIndex={-1}
           className="mt-1.5 font-display text-[1.5rem] leading-snug text-graphite outline-none"
         >
           Start your journey, {name}
@@ -890,59 +806,6 @@ function StepFirstQuest({
         {quest ? "Start with this quest" : "Continue to BibleQuest"}
       </GentleButton>
     </div>
-  );
-}
-
-function StepPlus({
-  onExplore,
-  onSkip,
-}: {
-  onExplore: () => void;
-  onSkip: () => void;
-}) {
-  return (
-    <PaperCard variant="atmospheric" padding="lg" className="text-center">
-      <motion.div
-        variants={riseIn}
-        initial="hidden"
-        animate="visible"
-        className="mb-4 flex justify-center"
-      >
-        <ArtIcon name="crown" size={120} />
-      </motion.div>
-      <p className="text-caption uppercase tracking-[0.16em] text-gilt">
-        BibleQuest Plus
-      </p>
-      <h1
-        id={STEP_HEADING_ID}
-        tabIndex={-1}
-        className="mt-1.5 font-display text-[1.625rem] leading-tight text-graphite outline-none"
-      >
-        More room to go deeper
-      </h1>
-      <p className="mt-3 text-small leading-relaxed text-charcoal">
-        The heart of BibleQuest stays free. Plus adds unlimited quest windows,
-        every wallpaper, and more ways to find the right next step.
-      </p>
-      <GentleButton
-        variant="primary"
-        size="lg"
-        fullWidth
-        className="mt-6"
-        onClick={onExplore}
-      >
-        Explore BibleQuest Plus
-      </GentleButton>
-      <GentleButton
-        variant="ghost"
-        size="sm"
-        fullWidth
-        className="mt-2 text-ash"
-        onClick={onSkip}
-      >
-        Not now
-      </GentleButton>
-    </PaperCard>
   );
 }
 
