@@ -8,7 +8,7 @@ PASS FOR LOCAL SOURCE REVIEW; NOT A SIGNED OR DEVICE-VERIFIED RELEASE CANDIDATE
 
 - Branch: `codex/first-use-release-candidate`
 - Starting source: `c3af44df5834a53736da671cfe5a51b9a7ae1475`
-- Recorded: `2026-08-28T05:03:05Z`
+- Recorded: `2026-08-28T05:15:26Z`
 - Scope: six-step onboarding, reviewed starter-quest allowlist, direct free-app entry, exact selected-quest handoff, post-value installation timing, opt-in MyShepherd launcher, and append-only Production native-availability reconciliation
 
 ## Automated evidence
@@ -37,6 +37,8 @@ At 390×844, a clean account moved through Account, Name, Language/Bible, Daily 
 After completing “Notice Where Kindness Found You,” the completion and First Step milestone dialogs appeared in order. Thirteen seconds after they closed, the installation panel appeared; MyShepherd did not occupy the floating overlay slot. At 320×568, the language screen had no horizontal overflow (`innerWidth=320`, `scrollWidth=320`) and retained ordinary vertical scrolling.
 
 A disposable in-memory preview then mounted the production Home, Quests, quest detail, Journey, Prayer, Bible, and Settings components inside the production visual shell without weakening or mocking the private-storage gate. At 390×844, the review exercised the quest Start and completion states as well as the completion dialog. It exposed a first-use handoff mismatch: onboarding said “Start with this quest,” but only added the quest to Ready, and Home’s selected card linked to the entire catalogue with “View all quests.” The candidate now says “Add this quest to today,” and Home’s Ready/Active card opens the exact quest with “Open quest” or “Resume quest.” The revised Home remained free of horizontal overflow at both 390×844 and 320×568. The temporary preview files were deleted before verification and do not ship.
+
+The same production-component preview measured Home’s action hierarchy before and after a bounded DOM reorder. At 390×844, the Prayer/Bible/Reflection group moved from `top=1800`–`bottom=1922` to `top=626`–`bottom=748`, entirely inside the first viewport after the selected quest and weekly rhythm; Guided Scripture now begins immediately afterward at `top=776`. At 320×568, the three links remained distinct 87×136 px tiles with `scrollWidth=320`, `innerWidth=320`, and no horizontal overflow. No feature, state transition, route, or promotion was removed; the change makes existing high-intent actions reachable before secondary formation and game discovery.
 
 A second local-only responsive pass inspected all six pages at 320×568 and the account page at 375×667. At 375×667, the primary action and both legal links were visible without scrolling. At 320×568, the primary action remained fully visible (`top=496.15`, `bottom=547.65`) with no horizontal overflow; the legal sentence continued below the fold through ordinary vertical scrolling. This pass exposed one transition defect: after scrolling the long Language/Bible page to Continue, the next illustrated page inherited the scroll offset and clipped its mascot. The candidate now resets both the onboarding container and document scroll on every step change. Replaying the narrow path produced `scrollY=0`, a visible mascot (`top=75`), and `scrollWidth=320` on the Daily rhythm and Practices pages, and `scrollY=0` on the First quest page.
 

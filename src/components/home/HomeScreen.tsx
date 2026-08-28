@@ -297,6 +297,39 @@ function HomeInner() {
           {/* The weekly rhythm stays attached to the daily quest. */}
           <RhythmTodayCard dayKey={dayKey} now={now} />
 
+          {/* Core devotional shortcuts stay within the first-screen daily path. */}
+          <div
+            role="group"
+            className="grid grid-cols-3 gap-2.5 sm:gap-4"
+            aria-label="Prayer, Bible, and reflection shortcuts"
+          >
+            <QuickActionTile
+              href="/app/prayer/new"
+              sprite="candle"
+              title="One minute of prayer"
+              animate
+            />
+            <QuickActionTile
+              href={
+                readingPosition
+                  ? chapterHref(readingPosition.bookSlug, readingPosition.chapter)
+                  : "/app/bible"
+              }
+              sprite="book"
+              title="Open the Bible"
+              ariaLabel={
+                readingPosition
+                  ? `Continue ${readingPosition.bookName} ${readingPosition.chapter}`
+                  : "Open the Bible"
+              }
+            />
+            <QuickActionTile
+              href="/app/prayer/reflections"
+              sprite="sun"
+              title="Reflect on Today"
+            />
+          </div>
+
           {/* Guided Scripture remains a distinct daily formation choice. */}
           <TodayFormation
             dayKey={dayKey}
@@ -361,39 +394,6 @@ function HomeInner() {
 
           {/* The arcade follows growth as the lighter play surface. */}
           <TodayFormation dayKey={dayKey} show="game" />
-
-          {/* Core devotional shortcuts close the formation path before promotions. */}
-          <div
-            role="group"
-            className="grid grid-cols-3 gap-2.5 sm:gap-4"
-            aria-label="Prayer, Bible, and reflection shortcuts"
-          >
-            <QuickActionTile
-              href="/app/prayer/new"
-              sprite="candle"
-              title="One minute of prayer"
-              animate
-            />
-            <QuickActionTile
-              href={
-                readingPosition
-                  ? chapterHref(readingPosition.bookSlug, readingPosition.chapter)
-                  : "/app/bible"
-              }
-              sprite="book"
-              title="Open the Bible"
-              ariaLabel={
-                readingPosition
-                  ? `Continue ${readingPosition.bookName} ${readingPosition.chapter}`
-                  : "Open the Bible"
-              }
-            />
-            <QuickActionTile
-              href="/app/prayer/reflections"
-              sprite="sun"
-              title="Reflect on Today"
-            />
-          </div>
 
           {/* A gentle, once-per-context invitation keeps a journey safe across devices. */}
           <AccountPrompt />
