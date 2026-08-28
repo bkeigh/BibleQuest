@@ -46,6 +46,8 @@ describe("first-use onboarding", () => {
     expect(source).toContain("const TOTAL_STEPS = FIRST_QUEST_STEP + 1");
     expect(source).toContain('aria-live="polite"');
     expect(source).toContain('router.replace("/app")');
+    expect(source).toContain('"Add this quest to today"');
+    expect(source).not.toContain('"Start with this quest"');
     expect(source).toContain("Choose your language and Bible");
     expect(source).not.toContain("function StepPlus");
     expect(source).not.toContain("Explore BibleQuest Plus");

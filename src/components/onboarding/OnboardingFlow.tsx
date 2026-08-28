@@ -815,7 +815,7 @@ function StepFirstQuest({
         className="mt-5"
         onClick={onStart}
       >
-        {quest ? "Start with this quest" : "Continue to BibleQuest"}
+        {quest ? "Add this quest to today" : "Continue to BibleQuest"}
       </GentleButton>
     </div>
   );

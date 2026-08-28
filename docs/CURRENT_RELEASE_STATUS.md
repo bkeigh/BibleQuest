@@ -8,7 +8,7 @@ GO FOR LOCAL SOURCE VERIFICATION; NO-GO FOR A SIGNED BUILD, TESTFLIGHT ACCOUNT W
 - Working branch: `codex/first-use-release-candidate`
 - Clean base before this change: `c3af44df5834a53736da671cfe5a51b9a7ae1475` from `origin/main`
 - Intended environment: local source verification, followed by a separately approved internal TestFlight candidate
-- Change scope: the merged native-auth recovery repair plus a bounded first-use UX slice covering onboarding length, starter-quest safety, the pre-value Plus screen, and persistent overlay timing
+- Change scope: the merged native-auth recovery repair plus a bounded first-use UX slice covering onboarding length, starter-quest safety, the pre-value Plus screen, persistent overlay timing, and the selected-quest handoff from onboarding through Home
 - External owner: Brendan Kenney for Xcode Cloud, TestFlight, Production, App Store Connect, legal publication, and release decisions
 - Candidate identity: **not frozen** until the current changes pass review, protected CI, and merge to a clean `main`
 
@@ -20,8 +20,8 @@ This file is the current navigation record. Older App Store packets and Build 43
 | --- | --- | --- | --- |
 | Build 43 | SUPERSEDED | Build 43 exposed an infinite post-code loading failure after its flag-off smoke | Do not select or submit Build 43 |
 | Native-auth source repair | PASS FOR BASE SOURCE | `origin/main` at `c3af44d` includes bounded native session recovery, six-digit code handling, and native Sign in with Apple | Rerun every gate after the UX slice freezes |
-| First-use UX | PASS FOR LOCAL REVIEW | Six-step guide, curated low-risk starter pool, direct free-app launch, deferred installation prompt, opt-in floating MyShepherd, and a visually primary local-only native fallback passed local review | Product/content owner reviews copy and placement |
-| Automated verification | PASS FOR LOCAL SOURCE | Lint, TypeScript, 1,649 Vitest tests, 24 focused containment/first-use/native-commerce tests, ten Playwright journeys, production/header build, service worker, observability, production audit, and whitespace checks passed | Protected CI reruns against merged `main` |
+| First-use UX | PASS FOR LOCAL REVIEW | Six-step guide, curated low-risk starter pool, direct free-app launch, honest “Add this quest to today” copy, an exact selected-quest link on Home, deferred installation prompt, opt-in floating MyShepherd, and a visually primary local-only native fallback passed local review | Product/content owner reviews copy and placement |
+| Automated verification | PASS FOR LOCAL SOURCE | Lint, TypeScript, 1,650 Vitest tests, 32 focused first-use/Home tests, ten Playwright journeys, production/header build, service worker, observability, production audit, and whitespace checks passed | Protected CI reruns against merged `main` |
 | Native account export | PASS FOR EXACT LOCAL ARTIFACT | Guarded account-release export generated 261 static pages, retained 79 reviewed public media files, verified the one reviewed public Supabase target, passed content-rights inventory, compiled for Release iPhone, and passed the complete unsigned simulator artifact verifier against its containing commit | Signed archive and device gates remain open |
 | Native simulator first screen | PASS; DEEPER FLOW OPEN | A clean iPhone 16 Pro / iOS 18.6 simulator launched and relaunched the exact account-release artifact with correct safe areas, the native availability latch off, one clear evergreen local-only action, and Terms/Privacy visible | macOS remained locked, so Computer Use could not click through the remaining native screens; physical and interactive native matrices stay open |
 | Content placement | OPEN — HUMAN REVIEW | `artifacts/first-use-starter-quest-content-review-2026-08-27.md` verifies structure, safety, and Scripture support but does not publish or approve content | Theology/content owner checks the two open boxes |

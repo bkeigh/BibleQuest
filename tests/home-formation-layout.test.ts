@@ -29,7 +29,7 @@ describe("Home formation layout", () => {
 
   it("gives the quest section one heading, above its card", () => {
     const forToday = home.indexOf('id="for-today-home-title"');
-    const questLink = home.indexOf('href="/app/quests"', forToday);
+    const questLink = home.indexOf("`/app/quests/${featuredQuest.slug}`", forToday);
     const rhythm = home.indexOf("<RhythmTodayCard", questLink);
     const guided = home.indexOf('show="guide"', rhythm);
     const shepherd = home.indexOf("<ShepherdCallout", guided);

@@ -234,7 +234,14 @@ function HomeInner() {
               title={t.nav.quests}
               subtitle={questSummary || "Choose a quest"}
             />
-            <Link href="/app/quests" className="block">
+            <Link
+              href={
+                featuredQuest
+                  ? `/app/quests/${featuredQuest.slug}`
+                  : "/app/quests"
+              }
+              className="block"
+            >
               <PaperCard
                 interactive
                 variant="paper"
@@ -274,7 +281,12 @@ function HomeInner() {
                     </p>
                   )}
                   <span className="mt-2 inline-flex items-center gap-1 text-small font-medium text-accent">
-                    View all quests <IconArrowRight size={14} />
+                    {featuredPick?.status === "started"
+                      ? "Resume quest"
+                      : featuredPick?.status === "assigned"
+                        ? "Open quest"
+                        : "Browse quests"}{" "}
+                    <IconArrowRight size={14} />
                   </span>
                 </div>
                 <IconChevronRight className="shrink-0 text-fog" />
