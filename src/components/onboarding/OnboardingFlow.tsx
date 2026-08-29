@@ -5,7 +5,6 @@
  * and one deliberately gentle starter quest.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { MotionConfig, motion } from "framer-motion";
 import { useQuestOS } from "@/lib/questos/store";
 import { useSession } from "@/lib/supabase/useSession";
@@ -95,7 +94,6 @@ function OnboardingInner({
 }: {
   authFailure: AuthFailureReason | null;
 }) {
-  const router = useRouter();
   const { user, configured, loading: accountLoading } = useSession();
   const completeOnboarding = useQuestOS((state) => state.completeOnboarding);
   const pickQuest = useQuestOS((state) => state.pickQuest);
@@ -188,11 +186,12 @@ function OnboardingInner({
 
   // Adds the suggested quest and opens the free daily experience immediately.
   function startFirstQuest() {
+    // The route gate owns the one navigation. Writing its destination first
+    // lets the completed-profile update hand off without racing a second push.
+    setOnboardingResumeStage("launch");
     if (!alreadyDone) saveProfile();
     if (suggestedQuest) pickQuest(suggestedQuest.slug);
     markAccountNudgeShown("onboarding");
-    setOnboardingResumeStage("launch");
-    router.replace("/app");
   }
 
   return (

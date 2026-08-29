@@ -38,21 +38,29 @@ async function prepareLocalJourneyHandoffAsync(
   lifecycle?: AccountLifecycleHandle,
   webOperation?: WebAccountOperationHandle,
 ): Promise<void> {
-  if (lifecycle) {
+  /** Refuses every late continuation after the owning lifecycle is released. */
+  const requireCurrentLifecycle = () => {
     if (
-      lifecycle.userId !== userId ||
-      !accountLifecycleHandleIsCurrent(lifecycle)
+      lifecycle &&
+      (lifecycle.userId !== userId ||
+        !accountLifecycleHandleIsCurrent(lifecycle))
     ) {
       throw new Error("The account handoff lifecycle changed.");
     }
+  };
+
+  if (lifecycle) {
+    requireCurrentLifecycle();
   } else {
     requireAccountLifecycleIdle();
   }
   if (startFresh) {
-    if (
-      !purgePersistedJourney() ||
-      !(await purgeAllDeviceLocalJournalDrafts())
-    ) {
+    const journeyPurged = purgePersistedJourney();
+    const draftsPurged = journeyPurged
+      ? await purgeAllDeviceLocalJournalDrafts()
+      : false;
+    requireCurrentLifecycle();
+    if (!journeyPurged || !draftsPurged) {
       throw new Error("The previous journey could not be cleared.");
     }
   }
@@ -69,7 +77,12 @@ async function prepareLocalJourneyHandoffAsync(
     }
     return;
   }
-  if (!startFresh) await markLocalJourneyClaimPending(userId);
+  if (!startFresh) {
+    await markLocalJourneyClaimPending(userId);
+    requireCurrentLifecycle();
+  }
   await markInitialSyncPending(userId);
+  requireCurrentLifecycle();
   await setLastSyncedUserId(userId);
+  requireCurrentLifecycle();
 }

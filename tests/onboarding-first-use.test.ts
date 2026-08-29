@@ -42,10 +42,17 @@ describe("first-use onboarding", () => {
       "src/components/onboarding/OnboardingFlow.tsx",
       "utf8",
     );
+    const gate = readFileSync(
+      "src/components/onboarding/OnboardingGate.tsx",
+      "utf8",
+    );
 
     expect(source).toContain("const TOTAL_STEPS = FIRST_QUEST_STEP + 1");
     expect(source).toContain('aria-live="polite"');
-    expect(source).toContain('router.replace("/app")');
+    expect(source).not.toContain('router.replace("/app")');
+    expect(gate).toContain('router.replace(launchDestination ?? "/app")');
+    expect(gate).toContain("Your journey is ready");
+    expect(gate).toContain("Open my journey");
     expect(source).toContain('"Add this quest to today"');
     expect(source).not.toContain('"Start with this quest"');
     expect(source).toContain("Choose your language and Bible");

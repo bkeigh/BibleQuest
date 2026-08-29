@@ -94,7 +94,9 @@ describe("native commerce gating", () => {
 
     expect(gate).toContain('destination === "/app/plus"');
     expect(gate).toContain('? "/app"');
-    expect(flow).toContain('router.replace("/app")');
+    expect(flow).toContain('setOnboardingResumeStage("launch")');
+    expect(flow).not.toContain('router.replace("/app")');
+    expect(gate).toContain('router.replace(launchDestination ?? "/app")');
     expect(flow).not.toContain("PLUS_STEP");
     expect(flow).not.toContain("function StepPlus");
   });

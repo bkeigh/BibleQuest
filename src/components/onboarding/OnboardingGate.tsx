@@ -48,6 +48,8 @@ import {
   purgeAmbiguousWebPrivateDataAndEstablishGuest,
 } from "@/lib/storage/web-private-cutover";
 
+const ROUTE_TRANSITION_RECOVERY_MS = 6_000;
+
 /** Redirects stale web-only Plus hand-offs to the native app home. */
 function safeLaunchDestination(stage: ReturnType<typeof getOnboardingResumeStage>) {
   const destination = onboardingLaunchDestination(stage);
@@ -100,7 +102,12 @@ function Gate({ children }: { children: React.ReactNode }) {
     router,
   ]);
 
-  if (redirectToOnboarding || redirectToLaunch) return <LoadingVeil />;
+  if (redirectToOnboarding) {
+    return <RouteTransitionVeil destination="/onboarding" />;
+  }
+  if (redirectToLaunch && launchDestination) {
+    return <RouteTransitionVeil destination={launchDestination} />;
+  }
   return <>{children}</>;
 }
 
@@ -122,7 +129,7 @@ function OnboardingRouteGate({ children }: { children: React.ReactNode }) {
   }, [completed, continuingOnboarding, launchDestination, router]);
 
   return completed && !continuingOnboarding ? (
-    <LoadingVeil />
+    <RouteTransitionVeil destination={launchDestination ?? "/app"} />
   ) : (
     <>{children}</>
   );
@@ -130,6 +137,53 @@ function OnboardingRouteGate({ children }: { children: React.ReactNode }) {
 
 function LoadingVeil() {
   return <AppLoadingScreen />;
+}
+
+/** Replaces an unexpectedly stalled local route with an explicit safe retry. */
+function RouteTransitionVeil({ destination }: { destination: string }) {
+  const router = useRouter();
+  const [stalled, setStalled] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setStalled(true),
+      ROUTE_TRANSITION_RECOVERY_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [attempt, destination]);
+
+  if (!stalled) return <LoadingVeil />;
+
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-parchment px-5">
+      <div className="w-full max-w-sm">
+        <PaperCard variant="paper" padding="lg">
+          <ArtMascot name="lantern" size={176} className="mb-4" />
+          <h1 className="font-display text-[1.375rem] leading-snug text-graphite">
+            Your journey is ready
+          </h1>
+          <p role="alert" className="mt-2 text-small leading-relaxed text-charcoal">
+            BibleQuest saved your choice, but the next screen did not open.
+            Nothing was lost.
+          </p>
+          <GentleButton
+            variant="primary"
+            size="md"
+            fullWidth
+            className="mt-5"
+            onClick={() => {
+              setStalled(false);
+              setAttempt((current) => current + 1);
+              router.replace(destination);
+            }}
+          >
+            Open my journey
+          </GentleButton>
+        </PaperCard>
+      </div>
+    </div>
+  );
 }
 
 /** Offers a bounded retry without mounting or revealing account-owned data. */

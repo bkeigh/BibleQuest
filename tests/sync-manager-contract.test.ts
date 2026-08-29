@@ -22,10 +22,20 @@ describe("native account sync manager boundaries", () => {
     expect(MANAGER).toContain("const rhythmCleared = await clearRhythmState()");
     expect(MANAGER).toContain("!(await clearStandaloneGameData())");
     expect(MANAGER).toContain("withActiveWebPrivateWriteReset(");
-    expect(HANDOFF).toContain("!purgePersistedJourney()");
-    expect(HANDOFF).toContain("!(await purgeAllDeviceLocalJournalDrafts())");
+    expect(HANDOFF).toContain("const journeyPurged = purgePersistedJourney()");
+    expect(HANDOFF).toContain("await purgeAllDeviceLocalJournalDrafts()");
+    expect(HANDOFF.match(/requireCurrentLifecycle\(\)/g)?.length).toBeGreaterThan(
+      4,
+    );
     expect(HANDOFF.indexOf("purgePersistedJourney()")).toBeLessThan(
       HANDOFF.lastIndexOf("setLastSyncedUserId(userId)"),
     );
+  });
+
+  it("bounds a silent native handoff and restores an actionable error", () => {
+    expect(MANAGER).toContain("NATIVE_HANDOFF_DEADLINE_MS");
+    expect(MANAGER).toContain("await withDeadline(");
+    expect(MANAGER).toContain('"Native journey handoff"');
+    expect(MANAGER).toContain("handoffFailurePending = true");
   });
 });
