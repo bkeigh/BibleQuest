@@ -34,6 +34,13 @@ import {
 } from "@/lib/auth/account-sign-out";
 import { PaperCard } from "@/components/design-system/PaperCard";
 import { GentleButton } from "@/components/design-system/GentleButton";
+import { withDeadline } from "@/lib/async/deadline";
+
+export const NATIVE_HANDOFF_DEADLINE_MS = 12_000;
+
+// The lifecycle privacy veil unmounts this manager; retain only a content-free
+// failure marker so the remounted dialog can explain why it returned.
+let handoffFailurePending = false;
 
 /**
  * Runs the account sync engine while a user is signed in. Renders nothing and
@@ -54,7 +61,9 @@ export function SyncManager() {
   // forces a re-render after resolve() updates it.
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const [resolving, setResolving] = useState(false);
-  const [handoffError, setHandoffError] = useState(false);
+  const [handoffError, setHandoffError] = useState(
+    () => handoffFailurePending,
+  );
 
   // Safe to read during render: on the server (and at hydration, when the
   // session hasn't loaded yet) userId is null, so both sides render nothing.
@@ -94,6 +103,7 @@ export function SyncManager() {
     }
     setResolving(true);
     setHandoffError(false);
+    handoffFailurePending = false;
     let mirrorPurged = false;
     let lifecycleFinished = false;
     try {
@@ -141,7 +151,8 @@ export function SyncManager() {
             const rhythmCleared = await clearRhythmState();
             if (
               !rhythmCleared ||
-              !(await clearStandaloneGameData())
+              !(await clearStandaloneGameData()) ||
+              !accountLifecycleHandleIsCurrent(lifecycle)
             ) {
               return false;
             }
@@ -167,17 +178,24 @@ export function SyncManager() {
         return completeHandoff();
       };
       const resolved = isNativeTarget()
-        ? await resolveExpectedAccount()
+        ? await withDeadline(
+            resolveExpectedAccount(),
+            NATIVE_HANDOFF_DEADLINE_MS,
+            "Native journey handoff",
+          )
         : await withWebAccountOperationLock(resolveExpectedAccount);
       if (!resolved) {
+        handoffFailurePending = true;
         setHandoffError(true);
         return;
       }
+      handoffFailurePending = false;
       finishAccountLifecycle(lifecycle);
       lifecycleFinished = true;
       void startSync(userId);
       rerender();
     } catch {
+      handoffFailurePending = true;
       setHandoffError(true);
     } finally {
       // A failed post-tombstone local step may safely resume: either the old
