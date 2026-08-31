@@ -220,6 +220,24 @@ describe("daily synthetic health", () => {
     );
   });
 
+  it("accepts Vercel deployment queries on static asset URLs", async () => {
+    const routes = healthyRoutes();
+    // Mirrors Vercel's immutable deployment cache-buster without changing the asset path.
+    routes.set(
+      `${CANONICAL}/app`,
+      response(html().replace(STATIC_ASSET, `${STATIC_ASSET}?dpl=dpl_fixture`)),
+    );
+    const report = await runSyntheticHealth({
+      env: environment(),
+      fetchImpl: fixtureFetch(routes),
+      retries: 0,
+    });
+
+    expect(report.checks).toContainEqual(
+      expect.objectContaining({ id: "static_assets", ok: true }),
+    );
+  });
+
   it("names deploy drift when production serves a different commit", async () => {
     // The exact failure that went undiagnosed for three days: every contract
     // matched except the commit, because the production alias stayed on an
