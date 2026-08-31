@@ -74,11 +74,15 @@ describe("launch legal documents", () => {
   it("uses final document names and an effective date", () => {
     expect(LEGAL_DOCUMENTS.privacy.title).toBe("Privacy Policy");
     expect(LEGAL_DOCUMENTS.terms.title).toBe("Terms of Use");
-    expect(LEGAL_DOCUMENTS.privacy.effectiveDate).toBe("August 27, 2026");
+    expect(LEGAL_DOCUMENTS.privacy.effectiveDate).toBe("August 30, 2026");
     expect(LEGAL_DOCUMENTS.terms.effectiveDate).toBe("August 26, 2026");
   });
 
   it("covers launch-critical privacy and terms topics", () => {
+    // Joins the policy copy so sensitive-content disclosure cannot silently regress.
+    const privacyCopy = LEGAL_DOCUMENTS.privacy.sections
+      .map((section) => section.body)
+      .join(" ");
     const privacySections = LEGAL_DOCUMENTS.privacy.sections.map(
       (section) => section.title,
     );
@@ -96,6 +100,8 @@ describe("launch legal documents", () => {
         "Contact",
       ]),
     );
+    expect(privacyCopy).toContain("religious or philosophical beliefs");
+    expect(privacyCopy).toContain("explicitly choose to adopt");
     expect(termsSections).toEqual(
       expect.arrayContaining([
         "Who may use BibleQuest",
