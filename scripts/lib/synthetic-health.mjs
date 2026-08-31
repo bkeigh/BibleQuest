@@ -203,7 +203,7 @@ function exactCanonical(html, canonicalOrigin) {
 function staticAssetPaths(html, canonicalOrigin) {
   const paths = new Set();
   for (const match of html.matchAll(
-    /(?:src|href)=["']([^"']*\/_next\/static\/[^"'?#]+)["']/g,
+    /(?:src|href)=["']([^"']*\/_next\/static\/[^"'?#]+)(?:[?#][^"']*)?["']/g,
   )) {
     try {
       const url = new URL(match[1], canonicalOrigin);
