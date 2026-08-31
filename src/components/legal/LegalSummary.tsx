@@ -21,12 +21,13 @@ interface LegalDocument {
   sections: LegalSection[];
 }
 
-// Keeps every legal surface truthful while production account sync is contained.
-const ACCOUNT_STORAGE_COPY = ACCOUNT_SYNC_CONTAINED
+// Keeps the web account description truthful while web sync is contained.
+const WEB_ACCOUNT_STORAGE_COPY = ACCOUNT_SYNC_CONTAINED
   ? "Account sync is temporarily unavailable, so new app data currently stays in this browser on this device."
   : "When you sign in, app data can sync to your protected BibleQuest account so it is available across devices.";
 
-const ACCOUNT_SECURITY_COPY = ACCOUNT_SYNC_CONTAINED
+// Keeps the web access-control description aligned with its launch flag.
+const WEB_ACCOUNT_SECURITY_COPY = ACCOUNT_SYNC_CONTAINED
   ? "If you previously created an account, its account and app records remain subject to this policy while account sync is unavailable."
   : "Synced app records use per-user database access controls so one account cannot read another account’s rows.";
 
@@ -44,22 +45,22 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
   privacy: {
     eyebrow: "Privacy",
     title: "Privacy Policy",
-    effectiveDate: "August 27, 2026",
+    effectiveDate: "August 30, 2026",
     intro: `BibleQuest is a product of ${LEGAL_ENTITY_NAME}. This policy explains what we collect, why we use it, and the choices you have.`,
     sections: [
       {
         title: "What this policy covers",
         body:
-          "This policy covers BibleQuest’s website, progressive web app, account features, support, and related services. It does not control a third party’s own website or service, even when BibleQuest links to it.",
+          "This policy covers BibleQuest’s native iPhone app, website, progressive web app, account features, support, and related services. Platform-specific behavior is identified below. It does not control a third party’s own website or service, even when BibleQuest links to it.",
       },
       {
         title: "Information you choose to provide",
         body:
-          "You may provide an email address, display name, and profile photo for an account; prayers, reflections, notes, bookmarks, quests, reading progress, settings, and Journey activity; and messages you send to support. Prayer and reflection text is sensitive personal content. BibleQuest does not require a denomination, legal name, precise location, or contact list.",
+          "Depending on the platform and features you use, you may provide an email address, display name, and profile photo for an account; prayers, reflections, notes, bookmarks, quests, reading progress, settings, and Journey activity; and messages you send to support. Prayer and reflection text is sensitive personal content and may reveal religious or philosophical beliefs. BibleQuest does not require a denomination, legal name, precise location, or contact list.",
       },
       {
         title: "Information created when you use BibleQuest",
-        body: `Without an account, app data is stored in your browser on your device. ${ACCOUNT_STORAGE_COPY} We may also receive limited technical information needed to authenticate you, prevent abuse, deliver requested passages, complete a purchase or one-time support payment, and keep the service reliable. ${ACCOUNT_SECURITY_COPY}`,
+        body: `In the website and progressive web app, signed-out app data is stored in that browser on that device. ${WEB_ACCOUNT_STORAGE_COPY} In the native iPhone app, guest data is stored in the app’s protected local Application Support area and is excluded from device backups. Signing in does not upload guest data. Only Prayer journal entries you explicitly choose to adopt are copied to your protected account; other guest data remains device-only. Account records use per-user access controls. We may also receive limited technical information needed to authenticate you, prevent abuse, deliver requested passages on the web, complete a web purchase or one-time support payment, and keep the service reliable. ${WEB_ACCOUNT_SECURITY_COPY}`,
       },
       {
         title: "How we use information",
@@ -69,12 +70,12 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
       {
         title: "Analytics are optional",
         body:
-          "Analytics are off until you opt in. If enabled, BibleQuest sends allowlisted event names and small bounded values to Plausible. It excludes prayer, reflection, note, and verse text; names and contact details; account and record IDs; authentication tokens; and URL queries or hashes. Turning analytics off clears pending events. We also respect browser Do Not Track and Global Privacy Control signals.",
+          "The native iPhone app does not include analytics. On the website and progressive web app, analytics are off until you opt in. If enabled, the web app sends allowlisted event names and small bounded values to Plausible. It excludes prayer, reflection, note, and verse text; names and contact details; account and record IDs; authentication tokens; and URL queries or hashes. Turning web analytics off clears pending events. The web app also respects browser Do Not Track and Global Privacy Control signals.",
       },
       {
         title: "Service providers",
         body:
-          "We use service providers only for defined tasks: Supabase for authentication and protected account storage; Apple for optional Sign in with Apple; Vercel for hosting and operational delivery; Plausible for optional analytics; Stripe for optional subscriptions and one-time support payments; Tally for the BibleQuest newsletter; and reviewed Bible providers for requested online editions. Stripe receives the payment and contact details needed to run Checkout, subscriptions, receipts, refunds, and disputes; BibleQuest does not receive full card numbers. Providers process information under their own terms and privacy notices. Bible requests do not include your prayers, reflections, name, or BibleQuest account ID.",
+          "We use service providers only for defined tasks: Supabase for authentication and protected account storage; Apple for optional Sign in with Apple in the native iPhone app; Vercel for website hosting and operational delivery; Plausible for optional web analytics; Stripe for optional web subscriptions and one-time support payments; Tally for the BibleQuest newsletter; and reviewed Bible providers for requested online web editions. BibleQuest 1.2 for iPhone does not offer purchases. Stripe receives the payment and contact details needed to run web Checkout, subscriptions, receipts, refunds, and disputes; BibleQuest does not receive full card numbers. Providers process information under their own terms and privacy notices. Bible requests do not include your prayers, reflections, name, or BibleQuest account ID.",
       },
       {
         title: "Signing in with Apple",
@@ -84,31 +85,33 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentKind, LegalDocument> = {
       {
         title: "Online Bible editions",
         body:
-          "BibleQuest can request a passage from the HelloAO Free Use Bible API for reviewed open editions. For a separately licensed edition, API.Bible may receive the requested passage and random device or session identifiers required for usage reporting. Choosing the bundled World English Bible avoids a third-party Scripture request.",
+          "The native iPhone app reads its bundled public-domain World English Bible and does not make a third-party Scripture request. On the website and progressive web app, BibleQuest can request a passage from the HelloAO Free Use Bible API for reviewed open editions. For a separately licensed web edition, API.Bible may receive the requested passage and random device or session identifiers required for usage reporting. Choosing the bundled World English Bible avoids a third-party Scripture request.",
       },
       {
         title: "How long information is kept",
         body:
-          "Device-only data remains until you clear it, remove the app’s browser storage, or lose access to that device. Account and support records remain while needed to provide the service, resolve a request, protect against abuse, or meet legal duties. Payment, invoice, refund, and dispute records may remain after account deletion when needed for accounting, fraud prevention, legal retention, or resolving a transaction; BibleQuest detaches unnecessary application ownership where practical. When other deletion is completed, limited copies may remain temporarily in access-restricted backups until they roll off through the provider’s normal backup cycle.",
+          "Device-only data remains until you clear it, remove the relevant browser storage or native app, or lose access to that device. Private native app files are excluded from iPhone backups. Account and support records remain while needed to provide the service, resolve a request, protect against abuse, or meet legal duties. Payment, invoice, refund, and dispute records may remain after account deletion when needed for accounting, fraud prevention, legal retention, or resolving a transaction; BibleQuest detaches unnecessary application ownership where practical. When other deletion is completed, limited copies may remain temporarily in access-restricted provider backups until they roll off through the provider’s normal backup cycle.",
       },
       {
         title: "Your choices and rights",
         body:
-          "Settings lets you export readable app data, clear app data, choose whether to use analytics, and change app preferences. Depending on where you live, you may also ask to access, correct, delete, restrict, or receive a copy of personal information, or object to or withdraw consent for certain processing. We will not discriminate against you for making a privacy request.",
+          "Available controls differ by platform. Web Settings lets you export readable web app data, clear web app data, choose whether to use web analytics, and change preferences. Native iPhone Settings lets you clear device-only guest data, change app preferences, sign out, and delete a signed-in account. The native app does not currently provide a data export or analytics setting because it does not include analytics. Depending on where you live, you may also ask to access, correct, delete, restrict, or receive a copy of personal information, or object to or withdraw consent for certain processing. We will not discriminate against you for making a privacy request.",
       },
       {
         title: "Deleting app data or an account",
         body: (
           <>
-            “Clear my data” removes app content from this device and, when
-            signed in and sync is available, requests deletion of synced app
-            records. It does not by itself close the login identity. When
-            account access is available, a signed-in person can use “Delete
-            account” in Settings to close the login identity and delete its
-            synced app records. If that control is unavailable or you need help,
-            email <ContactLink /> from the account email. We may verify an email
-            request and will aim to complete it within 30 days unless law
-            requires otherwise.
+            In the native iPhone app, “Clear Guest Data” removes device-only
+            guest content but does not change signed-in account data. “Delete
+            Account” closes the signed-in identity and deletes its synced
+            account records; device-only guest data stays on that iPhone unless
+            you separately clear it. In the web app, “Clear my data” removes web
+            app content from that browser and, when signed in and sync is
+            available, requests deletion of synced web app records. Clearing app
+            data does not by itself close the login identity. If an account
+            deletion control is unavailable or you need help, email <ContactLink />
+            from the account email. We may verify an email request and will aim
+            to complete it within 30 days unless law requires otherwise.
           </>
         ),
       },

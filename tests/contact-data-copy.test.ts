@@ -1,26 +1,24 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-/** Reads the public support copy so guest-only wording cannot hide account sync. */
+/** Reads public support copy so native and web storage boundaries cannot drift. */
 const CONTACT_PAGE = readFileSync(
   "src/app/(marketing)/contact/page.tsx",
   "utf8",
 );
 
 describe("public contact data copy", () => {
-  it("explains both guest storage and optional account sync", () => {
-    expect(CONTACT_PAGE).toContain(
-      "Guest use may keep journey data on your device",
-    );
-    expect(CONTACT_PAGE).toContain("sign in to a supported BibleQuest");
-    expect(CONTACT_PAGE).toContain("sync to that protected");
-    expect(CONTACT_PAGE).not.toContain(
-      "stores your journey locally and does not send it to",
-    );
+  it("explains native guest storage and explicit Prayer adoption", () => {
+    expect(CONTACT_PAGE).toContain("protected local app storage");
+    expect(CONTACT_PAGE).toContain("excluded from device backups");
+    expect(CONTACT_PAGE).toContain("Signing in does");
+    expect(CONTACT_PAGE).toContain("Prayer journal entries you explicitly adopt");
   });
 
-  it("names the Settings data paths without promising deletion results", () => {
-    expect(CONTACT_PAGE).toContain("export or clear journey data");
-    expect(CONTACT_PAGE).toContain("request account deletion");
+  it("distinguishes native controls from web controls", () => {
+    expect(CONTACT_PAGE).toContain("clear guest data");
+    expect(CONTACT_PAGE).toContain("delete the account");
+    expect(CONTACT_PAGE).toContain("Web Settings provides");
+    expect(CONTACT_PAGE).toContain("export, clearing, and");
   });
 });

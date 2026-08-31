@@ -38,14 +38,20 @@ export default function ContactPage() {
 
       <ProseHeading>Privacy and data</ProseHeading>
       <Prose>
-        Guest use may keep journey data on your device, and iOS may include app
-        data in device backups. If you sign in to a supported BibleQuest
-        account, supported parts of your journey can sync to that protected
-        account.
-        Settings has ways to export or clear journey data and, when you are
-        signed in, request account deletion. For a privacy or account-and-data
-        question, email the address above from the relevant account address when
-        possible so the request can be verified.
+        In the native iPhone app, guest data stays in protected local app storage
+        and its private files are excluded from device backups. Signing in does
+        not upload guest data. Only Prayer journal entries you explicitly adopt
+        sync to your protected account; other guest data remains device-only.
+        Native Settings lets you clear guest data and, when signed in, sign out
+        or delete the account. The native app does not currently provide data
+        export or analytics because it does not include analytics.
+      </Prose>
+      <Prose>
+        In the website and progressive web app, signed-out journey data stays in
+        that browser. Web Settings provides the available export, clearing, and
+        optional analytics controls. For a privacy or account-and-data question,
+        email the address above from the relevant account address when possible
+        so the request can be verified.
       </Prose>
       <Prose>
         Read the <Link href="/privacy">Privacy Policy</Link> and{" "}
